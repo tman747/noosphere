@@ -1,0 +1,21 @@
+[package]
+name = "noos-braid"
+version = "0.1.0"
+description = "NOOSPHERE Braid header layer: canonical BlockHeaderV1/BlockBodyV1 wire objects with the mandatory receipt split, the D-BLOCK-HEADER block hash and D-PROPOSAL-COMMITMENT proposal commitment laws, a deterministic in-memory header DAG with bounded orphan pool and post-finality duplicate-ticket scan, exact U256 work accumulation, lexicographic fork choice, and reorg plan emission. No Witness Ring votes/membership/slashing/beacon, storage, networking, or block production."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+noos-codec = { path = "../noos-codec" }
+noos-crypto = { path = "../noos-crypto" }
+noos-ground = { path = "../noos-ground" }
+noos-lumen = { path = "../noos-lumen" }
+
+[dev-dependencies]
+hex = "=0.4.3"
+serde_json = "=1.0.150"
+
+[lints]
+workspace = true

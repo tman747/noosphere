@@ -1,0 +1,19 @@
+[package]
+name = "noos-weft-check"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Weft v0: canonical content-addressed certificate schemas (MeaningContract, NumericProfile, CostCertificate, JetCertificate, SpanStatement) plus the total bounded relation checker"
+
+[dependencies]
+noos-codec = { path = "../noos-codec" }
+noos-grain = { path = "../noos-grain" }
+blake3 = "1.8"
+
+[dev-dependencies]
+serde_json = "1.0"
+
+[lints]
+workspace = true

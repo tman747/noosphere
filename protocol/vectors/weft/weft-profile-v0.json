@@ -1,0 +1,150 @@
+{
+  "schema": "noos/weft/profile-v0",
+  "description": "NumericProfileV0 decode+check cases (weft-v0.md sections 4.1, 5.1, 7). Runner: admit store entries in order, then admit bytes as object; compare outcome and content id or stable error code/class.",
+  "cases": [
+    {
+      "name": "profile-accept",
+      "kind": "positive",
+      "object": "numeric_profile",
+      "bytes": "000001000600000057384138763102000803000804002005000106000000070001feff710800080900800a007f0b000f000000",
+      "store": [],
+      "expect": {"result": "accept", "content_id": "6ff4d7d56a5697dcf47d0cddd1054f0dda68372490c1831a1d8d2fe5bafea4ab"}
+    },
+    {
+      "name": "profile-name-empty",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000001000000000002000803000804002005000106000000070001feff710800080900800a007f0b000f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 20, "error_class": "profile_name_invalid"}
+    },
+    {
+      "name": "profile-name-bad-first",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000001000300000038784102000803000804002005000106000000070001feff710800080900800a007f0b000f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 20, "error_class": "profile_name_invalid"}
+    },
+    {
+      "name": "profile-name-bad-char",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "0000010005000000573820413802000803000804002005000106000000070001feff710800080900800a007f0b000f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 20, "error_class": "profile_name_invalid"}
+    },
+    {
+      "name": "profile-width-w16",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000001000600000057384138763102001003000804002005000106000000070001feff710800080900800a007f0b000f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 21, "error_class": "profile_width_inadmissible"}
+    },
+    {
+      "name": "profile-accum-inexact",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000001000600000057384138763102000803000804002005000006000000070001feff710800080900800a007f0b000f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 22, "error_class": "profile_accum_not_exact"}
+    },
+    {
+      "name": "profile-requant-mult-zero",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "0000010006000000573841387631020008030008040020050001060000000700000000000800080900800a007f0b000f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 23, "error_class": "profile_requant_invalid"}
+    },
+    {
+      "name": "profile-requant-shift-zero",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000001000600000057384138763102000803000804002005000106000000070001feff710800000900800a007f0b000f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 23, "error_class": "profile_requant_invalid"}
+    },
+    {
+      "name": "profile-requant-shift-32",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000001000600000057384138763102000803000804002005000106000000070001feff710800200900800a007f0b000f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 23, "error_class": "profile_requant_invalid"}
+    },
+    {
+      "name": "profile-saturate-narrow",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000001000600000057384138763102000803000804002005000106000000070001feff710800080900800a007e0b000f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 24, "error_class": "profile_saturate_invalid"}
+    },
+    {
+      "name": "profile-forbid-missing-bit",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000001000600000057384138763102000803000804002005000106000000070001feff710800080900800a007f0b0007000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 25, "error_class": "profile_forbid_invalid"}
+    },
+    {
+      "name": "profile-forbid-unknown-bit",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000001000600000057384138763102000803000804002005000106000000070001feff710800080900800a007f0b001f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 25, "error_class": "profile_forbid_invalid"}
+    },
+    {
+      "name": "profile-version-unknown",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "010001000600000057384138763102000803000804002005000106000000070001feff710800080900800a007f0b000f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 6, "error_class": "decode_unknown_version"}
+    },
+    {
+      "name": "profile-tag-confusion",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000002000600000057384138763102000803000804002005000106000000070001feff710800080900800a007f0b000f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 4, "error_class": "decode_unknown_field"}
+    },
+    {
+      "name": "profile-requant-kind-unknown",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000001000600000057384138763102000803000804002005000106000100070001feff710800080900800a007f0b000f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 7, "error_class": "decode_unknown_discriminant"}
+    },
+    {
+      "name": "profile-truncated",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000001000600000057384138763102000803000804002005000106000000070001feff710800080900800a007f0b000f0000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 1, "error_class": "decode_truncated"}
+    },
+    {
+      "name": "profile-trailing-byte",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000001000600000057384138763102000803000804002005000106000000070001feff710800080900800a007f0b000f00000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 2, "error_class": "decode_trailing_bytes"}
+    },
+    {
+      "name": "profile-name-length-overflow",
+      "kind": "negative",
+      "object": "numeric_profile",
+      "bytes": "000001002100000057384138763102000803000804002005000106000000070001feff710800080900800a007f0b000f000000",
+      "store": [],
+      "expect": {"result": "reject", "error_code": 5, "error_class": "decode_length_bound"}
+    }
+  ]
+}

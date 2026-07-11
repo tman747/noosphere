@@ -32,6 +32,7 @@ D-NEL-DISPUTE,BLAKE3_CONTEXT,NOOS/NEL/DISPUTE/V1,BLAKE3-256,noos-nel,ASSIGNED pe
 D-NEL-BISECT,BLAKE3_CONTEXT,NOOS/NEL/BISECT/V1,BLAKE3-256,noos-nel,ASSIGNED per template; bisection move (round:u16 position:u32)
 D-NEL-LEAF-RECEIPT,BLAKE3_CONTEXT,NOOS/NEL/LEAF_RECEIPT/V1,BLAKE3-256,noos-nel,ASSIGNED per template; canonical leaf-receipt envelope; proof bytes bounded by verifier registry
 D-BLOCK-HEADER,BLAKE3_CONTEXT,NOOS/BLOCK/HEADER/V1,BLAKE3-256,noos-consensus,ASSIGNED; block hash over canonical header incl. proposer signature (arch §9.1 names no literal); G0 review
+D-PROPOSAL-COMMITMENT,BLAKE3_CONTEXT,NOOS/BLOCK/PROPOSAL/V1,BLAKE3-256,noos-braid,ASSIGNED; proposal_commitment over every canonical header field EXCEPT ground_ticket_root and proposer_signature (arch §4.2: also excludes the ticket itself and the final block hash, neither of which is a header field); preimage = version_u16_le then per included field tag_u16_le || canonical bytes in header-body.md order; G0 review
 D-TX-ID,BLAKE3_CONTEXT,NOOS/TX/ID/V1,BLAKE3-256,noos-lumen,ASSIGNED; txid over non-witness body (arch §6.5); exact layout frozen in constants-v1.toml (G0)
 D-TX-WID,BLAKE3_CONTEXT,NOOS/TX/WID/V1,BLAKE3-256,noos-lumen,ASSIGNED; wtxid over body+witnesses; distinct from txid by construction
 D-TX-WROOT,BLAKE3_CONTEXT,NOOS/TX/WROOT/V1,BLAKE3-256,noos-lumen,ASSIGNED; witness_root = H(ctx || canonical lock_reveals list) — programs only; signatures excluded so txid->signature binding stays acyclic (lumen-v1.md; arch §6.5 names no literal); G0 review
@@ -56,3 +57,9 @@ D-HKDF-UMBRA,HKDF_INFO,NOOS/HKDF/UMBRA/V1,HKDF-SHA-256,noos-umbra,hash=SHA-256; 
 D-HKDF-BESI,HKDF_INFO,NOOS/HKDF/BESI/V1,HKDF-SHA-256,noos-private-besi,hash=SHA-256; salt="NOOS/HKDF/BESI/SALT/V1"; info=ctx || X25519 shared secret context || share_index || direction; L=32 per ChaCha20Poly1305 channel key (plan §11.8)
 D-HKDF-CHANNEL,HKDF_INFO,NOOS/HKDF/CHANNEL/V1,HKDF-SHA-256,noos-p2p,hash=SHA-256; salt="NOOS/HKDF/CHANNEL/SALT/V1"; info=ctx || chain_id || peer pair || session nonce; L=32
 D-HKDF-EPOCH,HKDF_INFO,NOOS/HKDF/EPOCH/V1,HKDF-SHA-256,noos-umbra,hash=SHA-256; salt="NOOS/HKDF/EPOCH/SALT/V1"; info=ctx || key_epoch_le_u64 || parent epoch key commitment; L=32; epoch rotation keys
+D-WEFT-MEANING,BLAKE3_CONTEXT,NOOS/WEFT/MEANING/V0,BLAKE3-256,noos-weft-check,ASSIGNED plan §5.5; meaning_id = H(ctx || canonical MeaningContractV0); schema frozen in protocol/schemas/weft-v0.md
+D-WEFT-PROFILE,BLAKE3_CONTEXT,NOOS/WEFT/PROFILE/V0,BLAKE3-256,noos-weft-check,ASSIGNED plan §5.5; profile_id = H(ctx || canonical NumericProfileV0)
+D-WEFT-COST,BLAKE3_CONTEXT,NOOS/WEFT/COST/V0,BLAKE3-256,noos-weft-check,ASSIGNED plan §5.5/§5.8; cost_certificate_id = H(ctx || canonical CostCertificateV0)
+D-WEFT-JETCERT,BLAKE3_CONTEXT,NOOS/WEFT/JETCERT/V0,BLAKE3-256,noos-weft-check,ASSIGNED plan §5.5/§5.9; jet_certificate_id = H(ctx || canonical JetCertificateV0); registry key stays (grain_version formula_id)
+D-WEFT-SPAN,BLAKE3_CONTEXT,NOOS/WEFT/SPAN/V0,BLAKE3-256,noos-weft-check,ASSIGNED plan §5.5; span_id = H(ctx || canonical SpanStatementV0); ch06 §3.3 wire example
+D-WEFT-FORMULA,BLAKE3_CONTEXT,NOOS/WEFT/FORMULA/V0,BLAKE3-256,noos-weft-check,ASSIGNED weft-v0.md §3; formula_id = H(ctx || canonical Grain noun bytes); required so certificate-reference integrity never hashes without a registered domain (CSV CI law c)
