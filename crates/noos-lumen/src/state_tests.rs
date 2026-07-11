@@ -1,0 +1,1231 @@
+//! State-transition tests: root-transition invariants, conservation,
+//! failure-fee determinism, replay/nullifier law, governance/emergency
+//! limits, capability gate, StateDelta ordering, and a seeded property
+//! battery. Whole-ledger clones appear ONLY here (bounded test oracles,
+//! plan §4.1).
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::arithmetic_side_effects
+)]
+
+use noos_codec::NoosEncode;
+
+use crate::engine::{AuthVerifier, ContractEngine, EngineOutcome, EngineTrap};
+use crate::fees::{self, FeeParamsV1, FeeStateV1};
+use crate::issuance::{EmissionSharesV1, IssuanceParamsV1};
+use crate::objects::{
+    note_id, txid, witness_root, AccessEntry, AccountV1, ActionV1, BoundedBytes, BoundedList,
+    CapabilityGrantV1, FeatureControlV1, IntentV1, NoteV1, ObjectV1, OptionalHash32,
+    OptionalObject, ResourceVector, SignedIntentV1, TransactionV1, TransactionWitnessesV1,
+};
+use crate::state::{
+    param_key, ApplyOutcome, BlockContext, FailCode, GenesisConfig, LumenLedger, LumenRoots,
+    RejectReason, StateDelta, TreeId, CONTROL_PREFIX, NOOS_ASSET,
+};
+use crate::test_util::SplitMix64;
+use crate::Hash32;
+
+const CHAIN: Hash32 = [0x11; 32];
+const PAYER: Hash32 = [0x0F; 32];
+const GOV: Hash32 = [0xB0; 32];
+const EMERGENCY: Hash32 = [0xE0; 32];
+const PROPOSER: Hash32 = [0xA1; 32];
+const WITNESS_POOL: Hash32 = [0xA2; 32];
+const TREASURY: Hash32 = [0xA3; 32];
+/// Objects with this code hash trap deterministically in the stub engine.
+const TRAP_CODE: Hash32 = [0xEE; 32];
+const OK_CODE: Hash32 = [0xCC; 32];
+
+// ---------------------------------------------------------------------------
+// Stubs
+// ---------------------------------------------------------------------------
+
+/// Accept-all verifier (crypto arrives with noos-crypto).
+struct AcceptAll;
+impl AuthVerifier for AcceptAll {
+    fn verify_signature(&self, _: u16, _: &[u8], _: &Hash32, _: &[u8]) -> bool {
+        true
+    }
+    fn verify_lock_reveal(&self, _: &Hash32, _: &[u8]) -> bool {
+        true
+    }
+    fn verify_evidence_ref(&self, _: &Hash32) -> bool {
+        true
+    }
+}
+
+/// Rejects every signature: exercises the rejection path.
+struct RejectSigs;
+impl AuthVerifier for RejectSigs {
+    fn verify_signature(&self, _: u16, _: &[u8], _: &Hash32, _: &[u8]) -> bool {
+        false
+    }
+    fn verify_lock_reveal(&self, _: &Hash32, _: &[u8]) -> bool {
+        true
+    }
+    fn verify_evidence_ref(&self, _: &Hash32) -> bool {
+        true
+    }
+}
+
+/// Deterministic engine stub: traps on TRAP_CODE, otherwise returns a state
+/// root derived from the input and a fixed charge.
+struct StubEngine;
+impl ContractEngine for StubEngine {
+    fn execute(
+        &self,
+        code_hash: &Hash32,
+        _object_id: &Hash32,
+        prior_state_root: &Hash32,
+        input: &[u8],
+        step_limit: u64,
+    ) -> Result<EngineOutcome, EngineTrap> {
+        if *code_hash == TRAP_CODE {
+            return Err(EngineTrap { code: 7 });
+        }
+        if step_limit < 100 {
+            return Err(EngineTrap { code: 3 }); // exhausted meter
+        }
+        Ok(EngineOutcome {
+            new_state_root: crate::domain_hash(
+                crate::domains::SMT_LEAF,
+                &[prior_state_root, input],
+            ),
+            grain_steps: 100,
+            storage_words: 4,
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fixture
+// ---------------------------------------------------------------------------
+
+fn account(id: Hash32) -> AccountV1 {
+    AccountV1 {
+        account_id: id,
+        auth_descriptor: BoundedBytes::new(vec![1]).unwrap(),
+        nonce: 0,
+        liquid_balances_root: crate::smt::empty_root(crate::smt::DEPTH),
+        bond_refs_root: [0; 32],
+        metadata_commitment: [0; 32],
+        recovery_policy_root: [0; 32],
+    }
+}
+
+/// Genesis ledger: NOOS_TEST fixtures, funded payer, authority accounts,
+/// emission recipients, one callable object and one trapping object.
+fn genesis() -> LumenLedger {
+    let mut ledger = LumenLedger::new();
+    let accounts = [
+        (account(PAYER), vec![(NOOS_ASSET, 1_000_000_000u128)]),
+        (account(GOV), vec![]),
+        (account(EMERGENCY), vec![]),
+        (account(PROPOSER), vec![]),
+        (account(WITNESS_POOL), vec![]),
+        (account(TREASURY), vec![]),
+    ];
+    ledger.install_genesis(&GenesisConfig {
+        fee_params: FeeParamsV1::testnet_fixture(),
+        fee_state: FeeStateV1::testnet_fixture(),
+        issuance: IssuanceParamsV1::testnet_fixture(),
+        shares: EmissionSharesV1::testnet_fixture(),
+        controls: &[("neural_lane", false), ("dream_lane", false)],
+        accounts: &accounts,
+        gov_authority: GOV,
+        emergency_authority: EMERGENCY,
+    });
+    ledger
+}
+
+fn ctx(height: u64) -> BlockContext {
+    BlockContext {
+        chain_id: CHAIN,
+        height,
+    }
+}
+
+fn limits() -> ResourceVector {
+    ResourceVector {
+        bytes: 65_536,
+        grain_steps: 10_000,
+        proof_units: 8,
+        state_reads: 64,
+        state_writes: 64,
+        blob_bytes: 0,
+    }
+}
+
+/// Build a transaction + aligned witnesses. `signers` must contain the fee
+/// payer; one intent per account input, one lock reveal per note input.
+fn build_tx(
+    height: u64,
+    note_inputs: Vec<Hash32>,
+    signers: Vec<Hash32>,
+    actions: Vec<ActionV1>,
+    outputs: Vec<NoteV1>,
+) -> (Vec<u8>, Vec<u8>, TransactionV1) {
+    let reveals: Vec<BoundedBytes<4096>> = note_inputs
+        .iter()
+        .map(|_| BoundedBytes::new(vec![0x01]).unwrap())
+        .collect();
+    let lock_reveals = BoundedList::new(reveals).unwrap();
+    let action_bytes: Vec<BoundedBytes<65536>> = actions
+        .iter()
+        .map(|a| BoundedBytes::new(a.encode_canonical()).unwrap())
+        .collect();
+    let tx = TransactionV1 {
+        chain_id: CHAIN,
+        format_version: 1,
+        expiry_height: height + 10,
+        fee_payer: PAYER,
+        fee_authorization: OptionalObject(None),
+        resource_limits: limits(),
+        note_inputs: BoundedList::new(note_inputs).unwrap(),
+        account_inputs: BoundedList::new(signers.clone()).unwrap(),
+        object_access_list: BoundedList::new(
+            actions
+                .iter()
+                .filter_map(|a| match a {
+                    ActionV1::CallObject { object_id, .. } => Some(AccessEntry {
+                        object_id: *object_id,
+                        mode: AccessEntry::MODE_READ_WRITE,
+                    }),
+                    _ => None,
+                })
+                .collect(),
+        )
+        .unwrap(),
+        actions: BoundedList::new(action_bytes).unwrap(),
+        outputs: BoundedList::new(outputs).unwrap(),
+        evidence_refs: BoundedList::new(vec![]).unwrap(),
+        witness_root: witness_root(&lock_reveals),
+    };
+    let id = txid(&tx);
+    let intents: Vec<SignedIntentV1> = signers
+        .iter()
+        .map(|_| SignedIntentV1 {
+            tx_commitment: id,
+            signer_scope: 0,
+            capability_ref: OptionalHash32(None),
+            signature_suite: 1,
+            signature: BoundedBytes::new(vec![0xAB; 64]).unwrap(),
+        })
+        .collect();
+    let witnesses = TransactionWitnessesV1 {
+        intents: BoundedList::new(intents).unwrap(),
+        lock_reveals,
+    };
+    (tx.encode_canonical(), witnesses.encode_canonical(), tx)
+}
+
+fn out_note(amount: u128, height: u64, fill: u8) -> NoteV1 {
+    NoteV1 {
+        asset_id: NOOS_ASSET,
+        amount,
+        lock_root: [fill; 32],
+        datum_root: [0; 32],
+        birth_height: height,
+        relative_timelock: 0,
+        memo_commitment: [0; 32],
+    }
+}
+
+/// Create a note on the ledger through the real transition: withdraw from
+/// the payer balance into a fresh output note. Returns the note id.
+fn mint_note_via_withdraw(ledger: &mut LumenLedger, height: u64, amount: u128, fill: u8) -> Hash32 {
+    let note = out_note(amount, height, fill);
+    let (tx_bytes, wit_bytes, tx) = build_tx(
+        height,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::WithdrawFromAccount {
+            account_id: PAYER,
+            asset_id: NOOS_ASSET,
+            amount,
+        }],
+        vec![note.clone()],
+    );
+    let outcome = ledger
+        .apply_transaction(&ctx(height), &tx_bytes, &wit_bytes, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(
+        matches!(outcome, ApplyOutcome::Applied { .. }),
+        "seed tx failed: {outcome:?}"
+    );
+    note_id(&txid(&tx), 0, &note)
+}
+
+fn assert_roots_eq(a: &LumenRoots, b: &LumenRoots) {
+    assert_eq!(a.notes_root, b.notes_root, "notes_root diverged");
+    assert_eq!(
+        a.nullifiers_root, b.nullifiers_root,
+        "nullifiers_root diverged"
+    );
+    assert_eq!(a.accounts_root, b.accounts_root, "accounts_root diverged");
+    assert_eq!(a.objects_root, b.objects_root, "objects_root diverged");
+    assert_eq!(a.receipts_root, b.receipts_root, "receipts_root diverged");
+    assert_eq!(a.params_root, b.params_root, "params_root diverged");
+}
+
+/// Create an object and return its derived id.
+fn create_object(ledger: &mut LumenLedger, height: u64, code_hash: Hash32) -> Hash32 {
+    let (tx_bytes, wit_bytes, tx) = build_tx(
+        height,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::CreateObject {
+            class_id: 1,
+            owner_or_policy_root: [0; 32],
+            code_hash,
+            state_root: [0; 32],
+            storage_words: 4,
+            rent_deposit: 0,
+            flags: 0,
+        }],
+        vec![],
+    );
+    let outcome = ledger
+        .apply_transaction(&ctx(height), &tx_bytes, &wit_bytes, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(
+        matches!(outcome, ApplyOutcome::Applied { .. }),
+        "create failed: {outcome:?}"
+    );
+    crate::objects::object_id(&txid(&tx), 0, 1)
+}
+
+// ---------------------------------------------------------------------------
+// Root-transition invariants
+// ---------------------------------------------------------------------------
+
+#[test]
+fn rejected_transaction_leaves_all_six_roots_byte_identical() {
+    let mut ledger = genesis();
+    let _seed = mint_note_via_withdraw(&mut ledger, 1, 10_000, 0x21);
+    let before = ledger.roots();
+
+    // Wrong chain.
+    let (tx_bytes, wit_bytes, _) = build_tx(2, vec![], vec![PAYER], vec![], vec![]);
+    let mut wrong_chain = tx_bytes.clone();
+    wrong_chain[4] ^= 0xFF; // chain_id first byte (after version+tag)
+    let r = ledger.apply_transaction(&ctx(2), &wrong_chain, &wit_bytes, &StubEngine, &AcceptAll);
+    assert!(r.is_err());
+    assert_roots_eq(&before, &ledger.roots());
+
+    // Expired.
+    let r = ledger.apply_transaction(&ctx(9_999), &tx_bytes, &wit_bytes, &StubEngine, &AcceptAll);
+    assert_eq!(r.unwrap_err(), RejectReason::Expired);
+    assert_roots_eq(&before, &ledger.roots());
+
+    // Unknown note input.
+    let (tx2, wit2, _) = build_tx(2, vec![[0xDD; 32]], vec![PAYER], vec![], vec![]);
+    let r = ledger.apply_transaction(&ctx(2), &tx2, &wit2, &StubEngine, &AcceptAll);
+    assert_eq!(r.unwrap_err(), RejectReason::UnknownNoteInput);
+    assert_roots_eq(&before, &ledger.roots());
+
+    // Bad signature.
+    let r = ledger.apply_transaction(&ctx(2), &tx_bytes, &wit_bytes, &StubEngine, &RejectSigs);
+    assert_eq!(r.unwrap_err(), RejectReason::SignatureInvalid);
+    assert_roots_eq(&before, &ledger.roots());
+
+    // Noncanonical bytes.
+    let mut trailing = tx_bytes.clone();
+    trailing.push(0);
+    let r = ledger.apply_transaction(&ctx(2), &trailing, &wit_bytes, &StubEngine, &AcceptAll);
+    assert_eq!(r.unwrap_err(), RejectReason::Noncanonical);
+    assert_roots_eq(&before, &ledger.roots());
+
+    // Insufficient fee balance: drain-scale declared limits ok, but a payer
+    // with zero balance cannot reserve. Use GOV (no balance) as payer.
+    let mut tx = TransactionV1::decode_canonical_helper(&tx_bytes);
+    tx.fee_payer = GOV;
+    tx.account_inputs = BoundedList::new(vec![GOV]).unwrap();
+    let id = txid(&tx);
+    let wit = TransactionWitnessesV1 {
+        intents: BoundedList::new(vec![SignedIntentV1 {
+            tx_commitment: id,
+            signer_scope: 0,
+            capability_ref: OptionalHash32(None),
+            signature_suite: 1,
+            signature: BoundedBytes::new(vec![0xAB; 64]).unwrap(),
+        }])
+        .unwrap(),
+        lock_reveals: BoundedList::new(vec![]).unwrap(),
+    };
+    let r = ledger.apply_transaction(
+        &ctx(2),
+        &tx.encode_canonical(),
+        &wit.encode_canonical(),
+        &StubEngine,
+        &AcceptAll,
+    );
+    assert_eq!(r.unwrap_err(), RejectReason::InsufficientFeeBalance);
+    assert_roots_eq(&before, &ledger.roots());
+}
+
+#[test]
+fn execution_trap_charges_only_failure_fee_and_preserves_four_roots() {
+    let mut ledger = genesis();
+    let trap_object = create_object(&mut ledger, 1, TRAP_CODE);
+    let before = ledger.roots();
+    let payer_before = ledger.balance(&PAYER, &NOOS_ASSET);
+    let nonce_before = ledger.get_account(&PAYER).unwrap().nonce;
+
+    let (tx_bytes, wit_bytes, tx) = build_tx(
+        2,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::CallObject {
+            object_id: trap_object,
+            input: BoundedBytes::new(vec![1]).unwrap(),
+        }],
+        vec![],
+    );
+    let outcome = ledger
+        .apply_transaction(&ctx(2), &tx_bytes, &wit_bytes, &StubEngine, &AcceptAll)
+        .unwrap();
+    let ApplyOutcome::Failed {
+        receipt,
+        delta,
+        code,
+    } = outcome
+    else {
+        panic!("expected Failed, got {outcome:?}");
+    };
+    assert_eq!(code, FailCode::EngineTrap(7));
+    assert_eq!(receipt.status, 2007);
+
+    let after = ledger.roots();
+    // Four roots byte-identical: the overlay was dropped.
+    assert_eq!(before.notes_root, after.notes_root);
+    assert_eq!(before.nullifiers_root, after.nullifiers_root);
+    assert_eq!(before.objects_root, after.objects_root);
+    assert_eq!(before.params_root, after.params_root);
+    // Accounts and receipts changed: failure charge + failure receipt.
+    assert_ne!(before.accounts_root, after.accounts_root);
+    assert_ne!(before.receipts_root, after.receipts_root);
+
+    // The charge is exactly the frozen failure fee (min with reservation).
+    let fee_params = FeeParamsV1::testnet_fixture();
+    let charged = payer_before - ledger.balance(&PAYER, &NOOS_ASSET);
+    assert_eq!(charged, fee_params.failure_fee);
+    assert_eq!(receipt.fee_charged, charged);
+    // Only the fee payer's nonce advanced.
+    assert_eq!(ledger.get_account(&PAYER).unwrap().nonce, nonce_before + 1);
+    // The failure receipt is settled: replaying the same tx now rejects.
+    let r = ledger.apply_transaction(&ctx(2), &tx_bytes, &wit_bytes, &StubEngine, &AcceptAll);
+    assert_eq!(r.unwrap_err(), RejectReason::TxAlreadySettled);
+    assert_eq!(ledger.get_receipt(&txid(&tx)).unwrap().status, 2007);
+    assert!(!delta.is_empty());
+}
+
+#[test]
+fn failure_fee_is_deterministic_across_identical_ledgers() {
+    // Bounded test oracle: two identical ledgers, same trap tx, byte-identical
+    // roots and deltas afterwards.
+    let mut a = genesis();
+    let trap_a = create_object(&mut a, 1, TRAP_CODE);
+    let mut b = genesis();
+    let trap_b = create_object(&mut b, 1, TRAP_CODE);
+    assert_eq!(trap_a, trap_b, "object derivation must be deterministic");
+    assert_roots_eq(&a.roots(), &b.roots());
+
+    let (tx_bytes, wit_bytes, _) = build_tx(
+        2,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::CallObject {
+            object_id: trap_a,
+            input: BoundedBytes::new(vec![1]).unwrap(),
+        }],
+        vec![],
+    );
+    let oa = a
+        .apply_transaction(&ctx(2), &tx_bytes, &wit_bytes, &StubEngine, &AcceptAll)
+        .unwrap();
+    let ob = b
+        .apply_transaction(&ctx(2), &tx_bytes, &wit_bytes, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert_eq!(oa, ob, "failure outcomes must be byte-identical");
+    assert_roots_eq(&a.roots(), &b.roots());
+}
+
+// ---------------------------------------------------------------------------
+// Conservation and value flow
+// ---------------------------------------------------------------------------
+
+#[test]
+fn per_asset_conservation_is_strict() {
+    let mut ledger = genesis();
+    let seed = mint_note_via_withdraw(&mut ledger, 1, 10_000, 0x21);
+
+    // Spend 10_000 into 6_000 + 4_000: conserves, applies.
+    let (tx_bytes, wit_bytes, _) = build_tx(
+        2,
+        vec![seed],
+        vec![PAYER],
+        vec![],
+        vec![out_note(6_000, 2, 0x31), out_note(4_000, 2, 0x32)],
+    );
+    let outcome = ledger
+        .apply_transaction(&ctx(2), &tx_bytes, &wit_bytes, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(matches!(outcome, ApplyOutcome::Applied { .. }));
+    assert!(ledger.nullifier_spent(&seed));
+    assert!(
+        ledger.get_note(&seed).is_none(),
+        "spent note must leave the unspent set"
+    );
+
+    // Imbalanced: 6_000 -> 7_000 must fail conservation (post-reservation).
+    let seed2 = mint_note_via_withdraw(&mut ledger, 3, 6_000, 0x41);
+    let before = ledger.roots();
+    let (tx_bytes, wit_bytes, _) = build_tx(
+        4,
+        vec![seed2],
+        vec![PAYER],
+        vec![],
+        vec![out_note(7_000, 4, 0x51)],
+    );
+    let outcome = ledger
+        .apply_transaction(&ctx(4), &tx_bytes, &wit_bytes, &StubEngine, &AcceptAll)
+        .unwrap();
+    let ApplyOutcome::Failed { code, .. } = outcome else {
+        panic!("imbalance must fail");
+    };
+    assert_eq!(code, FailCode::ConservationViolation);
+    // Note set untouched: the seed note is still unspent.
+    assert_eq!(before.notes_root, ledger.roots().notes_root);
+    assert!(ledger.get_note(&seed2).is_some());
+}
+
+#[test]
+fn duplicate_nullifier_rejects_within_and_across_transactions() {
+    let mut ledger = genesis();
+    let seed = mint_note_via_withdraw(&mut ledger, 1, 5_000, 0x21);
+
+    // Spend once.
+    let (tx_bytes, wit_bytes, _) = build_tx(
+        2,
+        vec![seed],
+        vec![PAYER],
+        vec![],
+        vec![out_note(5_000, 2, 0x31)],
+    );
+    let outcome = ledger
+        .apply_transaction(&ctx(2), &tx_bytes, &wit_bytes, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(matches!(outcome, ApplyOutcome::Applied { .. }));
+
+    // Second spend of the same note rejects: the nullifier is set.
+    let before = ledger.roots();
+    let (tx2, wit2, _) = build_tx(
+        3,
+        vec![seed],
+        vec![PAYER],
+        vec![],
+        vec![out_note(5_000, 3, 0x32)],
+    );
+    let r = ledger.apply_transaction(&ctx(3), &tx2, &wit2, &StubEngine, &AcceptAll);
+    assert_eq!(r.unwrap_err(), RejectReason::NullifierAlreadySpent);
+    assert_roots_eq(&before, &ledger.roots());
+
+    // Duplicate note input inside ONE transaction also rejects (the second
+    // resolution sees the identical id; conservation would also catch it,
+    // but resolution must fail first on the duplicate declared input).
+    let seed2 = mint_note_via_withdraw(&mut ledger, 4, 5_000, 0x41);
+    let (tx3, wit3_bad, _) = build_tx(
+        5,
+        vec![seed2, seed2],
+        vec![PAYER],
+        vec![],
+        vec![out_note(10_000, 5, 0x51)],
+    );
+    let r = ledger.apply_transaction(&ctx(5), &tx3, &wit3_bad, &StubEngine, &AcceptAll);
+    assert!(r.is_err(), "double-declared input must not apply");
+}
+
+#[test]
+fn supply_invariant_holds_under_seeded_random_traffic() {
+    // Property battery: minted + genesis funding == notes + balances + fees
+    // burned, after every step, across 200 seeded random operations.
+    let mut ledger = genesis();
+    let genesis_funding: u128 = 1_000_000_000;
+    let mut fees_burned: u128 = 0;
+    let mut live_notes: Vec<(Hash32, u128)> = Vec::new();
+    let mut rng = SplitMix64(0xC0FFEE);
+    let mut height = 1u64;
+
+    for step in 0..200u32 {
+        height += 1;
+        let choice = rng.next_u64() % 3;
+        let outcome = if choice == 0 || live_notes.is_empty() {
+            // Withdraw a random amount into a fresh note.
+            let amount = u128::from(rng.next_u64() % 50_000 + 1);
+            if ledger.balance(&PAYER, &NOOS_ASSET) < amount + 100_000 {
+                continue; // keep fee headroom
+            }
+            let fill = u8::try_from(step % 251).unwrap();
+            let note = out_note(amount, height, fill);
+            let (txb, witb, tx) = build_tx(
+                height,
+                vec![],
+                vec![PAYER],
+                vec![ActionV1::WithdrawFromAccount {
+                    account_id: PAYER,
+                    asset_id: NOOS_ASSET,
+                    amount,
+                }],
+                vec![note.clone()],
+            );
+            let out = ledger
+                .apply_transaction(&ctx(height), &txb, &witb, &StubEngine, &AcceptAll)
+                .unwrap();
+            if matches!(out, ApplyOutcome::Applied { .. }) {
+                live_notes.push((note_id(&txid(&tx), 0, &note), amount));
+            }
+            out
+        } else if choice == 1 {
+            // Spend a random note into two conserving outputs.
+            let idx = (rng.next_u64() as usize) % live_notes.len();
+            let (id, amount) = live_notes.swap_remove(idx);
+            let a = amount / 2;
+            let b = amount - a;
+            let fill_a = u8::try_from((step * 2) % 251).unwrap();
+            let fill_b = u8::try_from((step * 2 + 1) % 251).unwrap();
+            let mut outs = vec![out_note(a, height, fill_a), out_note(b, height, fill_b)];
+            outs.retain(|n| n.amount > 0);
+            let (txb, witb, tx) = build_tx(height, vec![id], vec![PAYER], vec![], outs.clone());
+            let out = ledger
+                .apply_transaction(&ctx(height), &txb, &witb, &StubEngine, &AcceptAll)
+                .unwrap();
+            if matches!(out, ApplyOutcome::Applied { .. }) {
+                for (i, n) in outs.iter().enumerate() {
+                    live_notes.push((note_id(&txid(&tx), u32::try_from(i).unwrap(), n), n.amount));
+                }
+            } else {
+                live_notes.push((id, amount)); // note survived the failure
+            }
+            out
+        } else {
+            // Deposit a random note back into the payer balance.
+            let idx = (rng.next_u64() as usize) % live_notes.len();
+            let (id, amount) = live_notes.swap_remove(idx);
+            let (txb, witb, _) = build_tx(
+                height,
+                vec![id],
+                vec![PAYER],
+                vec![ActionV1::DepositToAccount {
+                    account_id: PAYER,
+                    asset_id: NOOS_ASSET,
+                    amount,
+                }],
+                vec![],
+            );
+            let out = ledger
+                .apply_transaction(&ctx(height), &txb, &witb, &StubEngine, &AcceptAll)
+                .unwrap();
+            if !matches!(out, ApplyOutcome::Applied { .. }) {
+                live_notes.push((id, amount));
+            }
+            out
+        };
+        fees_burned += outcome.receipt().fee_charged;
+
+        // Invariant after EVERY step.
+        let note_total: u128 = live_notes.iter().map(|(_, a)| *a).sum();
+        let balance_total = ledger.balance(&PAYER, &NOOS_ASSET);
+        assert_eq!(
+            genesis_funding + ledger.total_minted(),
+            note_total + balance_total + fees_burned,
+            "supply conservation violated at step {step}"
+        );
+    }
+    assert!(fees_burned > 0, "battery must actually charge fees");
+    assert!(!live_notes.is_empty(), "battery must leave live notes");
+}
+
+// ---------------------------------------------------------------------------
+// StateDelta ordering
+// ---------------------------------------------------------------------------
+
+#[test]
+fn state_delta_is_canonically_ordered_and_deterministic() {
+    let mut a = genesis();
+    let mut b = genesis();
+    let seed_a = mint_note_via_withdraw(&mut a, 1, 9_000, 0x21);
+    let seed_b = mint_note_via_withdraw(&mut b, 1, 9_000, 0x21);
+    assert_eq!(seed_a, seed_b);
+
+    let (txb, witb, _) = build_tx(
+        2,
+        vec![seed_a],
+        vec![PAYER],
+        vec![ActionV1::DepositToAccount {
+            account_id: PAYER,
+            asset_id: NOOS_ASSET,
+            amount: 9_000,
+        }],
+        vec![],
+    );
+    let extract = |o: ApplyOutcome| -> StateDelta {
+        match o {
+            ApplyOutcome::Applied { delta, .. } | ApplyOutcome::Failed { delta, .. } => delta,
+        }
+    };
+    let da = extract(
+        a.apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll)
+            .unwrap(),
+    );
+    let db = extract(
+        b.apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll)
+            .unwrap(),
+    );
+    assert_eq!(da, db, "identical ledgers must emit identical deltas");
+
+    // Canonical order: strictly ascending (tree, key, sub_key).
+    let keys: Vec<_> = da
+        .entries
+        .iter()
+        .map(|e| (e.tree, e.key, e.sub_key))
+        .collect();
+    let mut sorted = keys.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(keys, sorted, "delta must be sorted and duplicate-free");
+    // Touches at least notes (delete), nullifiers, accounts, balances, receipts.
+    let trees: std::collections::BTreeSet<TreeId> = da.entries.iter().map(|e| e.tree).collect();
+    assert!(trees.contains(&TreeId::Notes));
+    assert!(trees.contains(&TreeId::Nullifiers));
+    assert!(trees.contains(&TreeId::Accounts));
+    assert!(trees.contains(&TreeId::Receipts));
+    assert!(trees.contains(&TreeId::AccountBalances));
+}
+
+// ---------------------------------------------------------------------------
+// Emission
+// ---------------------------------------------------------------------------
+
+#[test]
+fn emission_follows_schedule_and_never_recreates_missed_heights() {
+    let mut ledger = genesis();
+    let issuance = IssuanceParamsV1::testnet_fixture();
+    let e1 = issuance.emission_at(1).unwrap();
+    let e5 = issuance.emission_at(5).unwrap();
+
+    let d = ledger
+        .apply_emission(1, &PROPOSER, &WITNESS_POOL, &TREASURY)
+        .unwrap();
+    assert!(!d.is_empty());
+    assert_eq!(ledger.total_minted(), e1);
+
+    // Same height twice: rejected, nothing minted.
+    let before = ledger.roots();
+    assert!(ledger
+        .apply_emission(1, &PROPOSER, &WITNESS_POOL, &TREASURY)
+        .is_err());
+    assert_roots_eq(&before, &ledger.roots());
+    assert_eq!(ledger.total_minted(), e1);
+
+    // Skip to height 5: heights 2-4 are FORFEIT, only E_5 mints.
+    ledger
+        .apply_emission(5, &PROPOSER, &WITNESS_POOL, &TREASURY)
+        .unwrap();
+    assert_eq!(ledger.total_minted(), e1 + e5);
+    assert_eq!(ledger.last_emission_height(), 5);
+
+    // Going back rejects.
+    assert!(ledger
+        .apply_emission(3, &PROPOSER, &WITNESS_POOL, &TREASURY)
+        .is_err());
+
+    // The split is conserved to the micro.
+    let shares = EmissionSharesV1::testnet_fixture();
+    let split = shares.split(e1).unwrap();
+    assert_eq!(split.total().unwrap(), e1);
+    // Balances credited (both heights).
+    let total_credited = ledger.balance(&PROPOSER, &NOOS_ASSET)
+        + ledger.balance(&WITNESS_POOL, &NOOS_ASSET)
+        + ledger.balance(&TREASURY, &NOOS_ASSET);
+    assert_eq!(total_credited, e1 + e5);
+}
+
+#[test]
+fn emission_past_terminal_height_is_zero_and_unknown_recipient_rejects() {
+    let mut ledger = genesis();
+    let issuance = IssuanceParamsV1::testnet_fixture();
+    // Unknown recipient fails closed.
+    assert!(ledger
+        .apply_emission(1, &[0xFF; 32], &WITNESS_POOL, &TREASURY)
+        .is_err());
+    // Past terminal: mints zero but advances the height watermark.
+    ledger
+        .apply_emission(
+            issuance.terminal_height + 10,
+            &PROPOSER,
+            &WITNESS_POOL,
+            &TREASURY,
+        )
+        .unwrap();
+    assert_eq!(ledger.total_minted(), 0);
+}
+
+// ---------------------------------------------------------------------------
+// Governance and emergency limits
+// ---------------------------------------------------------------------------
+
+#[test]
+fn governance_requires_authority_delay_and_cannot_touch_controls() {
+    let mut ledger = genesis();
+    let target = param_key("noos.registry.jets.v1");
+    let update = |activation: u64, key: Hash32| ActionV1::GovernanceRegistryUpdate {
+        registry_key: key,
+        new_value: BoundedBytes::new(vec![9, 9]).unwrap(),
+        activation_height: activation,
+    };
+
+    // Without the governance authority signed: reject, roots unchanged.
+    let before = ledger.roots();
+    let (txb, witb, _) = build_tx(2, vec![], vec![PAYER], vec![update(100, target)], vec![]);
+    let r = ledger.apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll);
+    assert_eq!(r.unwrap_err(), RejectReason::GovernanceDenied);
+    assert_roots_eq(&before, &ledger.roots());
+
+    // With authority but an activation below the delay floor: reject.
+    let (txb, witb, _) = build_tx(2, vec![], vec![PAYER, GOV], vec![update(3, target)], vec![]);
+    let r = ledger.apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll);
+    assert_eq!(r.unwrap_err(), RejectReason::GovernanceDenied);
+
+    // Param update aimed at a feature-control key: reject even with authority
+    // and delay (suite activation requires a hard fork).
+    let control = param_key(&format!("{CONTROL_PREFIX}neural_lane"));
+    let enable = ActionV1::GovernanceParamUpdate {
+        param_key: control,
+        new_value: BoundedBytes::new(FeatureControlV1 { enabled: 1 }.encode_canonical()).unwrap(),
+        activation_height: 100,
+    };
+    let (txb, witb, _) = build_tx(2, vec![], vec![PAYER, GOV], vec![enable], vec![]);
+    let r = ledger.apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll);
+    assert_eq!(r.unwrap_err(), RejectReason::GovernanceDenied);
+
+    // Valid: pending recorded, current unchanged until activation.
+    let (txb, witb, _) = build_tx(
+        2,
+        vec![],
+        vec![PAYER, GOV],
+        vec![update(100, target)],
+        vec![],
+    );
+    let out = ledger
+        .apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(matches!(out, ApplyOutcome::Applied { .. }));
+    // Before activation: promoting at height 99 does nothing for this key.
+    let d = ledger.activate_pending_params(99);
+    assert!(d.is_empty());
+    // At activation: promoted.
+    let d = ledger.activate_pending_params(100);
+    assert!(!d.is_empty());
+}
+
+#[test]
+fn emergency_can_only_disable_and_quarantine() {
+    let mut ledger = genesis();
+    let obj = create_object(&mut ledger, 1, OK_CODE);
+    let control = param_key(&format!("{CONTROL_PREFIX}neural_lane"));
+
+    // Emergency without authority: reject.
+    let (txb, witb, _) = build_tx(
+        2,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::EmergencyDisable {
+            control_key: control,
+        }],
+        vec![],
+    );
+    let r = ledger.apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll);
+    assert_eq!(r.unwrap_err(), RejectReason::GovernanceDenied);
+
+    // With authority: disable applies (idempotent risk reduction).
+    let (txb, witb, _) = build_tx(
+        2,
+        vec![],
+        vec![PAYER, EMERGENCY],
+        vec![ActionV1::EmergencyDisable {
+            control_key: control,
+        }],
+        vec![],
+    );
+    let out = ledger
+        .apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(matches!(out, ApplyOutcome::Applied { .. }));
+
+    // Quarantine the object, then calls against it REJECT pre-reservation.
+    let (txb, witb, _) = build_tx(
+        3,
+        vec![],
+        vec![PAYER, EMERGENCY],
+        vec![ActionV1::EmergencyQuarantine { object_id: obj }],
+        vec![],
+    );
+    let out = ledger
+        .apply_transaction(&ctx(3), &txb, &witb, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(matches!(out, ApplyOutcome::Applied { .. }));
+    assert!(ledger.get_object(&obj).unwrap().flags & ObjectV1::FLAG_QUARANTINED != 0);
+
+    let before = ledger.roots();
+    let (txb, witb, _) = build_tx(
+        4,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::CallObject {
+            object_id: obj,
+            input: BoundedBytes::new(vec![1]).unwrap(),
+        }],
+        vec![],
+    );
+    let r = ledger.apply_transaction(&ctx(4), &txb, &witb, &StubEngine, &AcceptAll);
+    assert_eq!(r.unwrap_err(), RejectReason::ObjectQuarantined);
+    assert_roots_eq(&before, &ledger.roots());
+}
+
+// ---------------------------------------------------------------------------
+// Contract calls and capabilities
+// ---------------------------------------------------------------------------
+
+#[test]
+fn contract_call_updates_object_and_charges_grain_steps() {
+    let mut ledger = genesis();
+    let obj = create_object(&mut ledger, 1, OK_CODE);
+    let before_version = ledger.get_object(&obj).unwrap().object_version;
+
+    let (txb, witb, _) = build_tx(
+        2,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::CallObject {
+            object_id: obj,
+            input: BoundedBytes::new(vec![7]).unwrap(),
+        }],
+        vec![],
+    );
+    let out = ledger
+        .apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll)
+        .unwrap();
+    let ApplyOutcome::Applied { receipt, .. } = out else {
+        panic!("call must apply");
+    };
+    assert_eq!(receipt.resources_used.grain_steps, 100);
+    assert!(receipt.fee_charged > 0);
+    let obj_after = ledger.get_object(&obj).unwrap();
+    assert_eq!(obj_after.object_version, before_version + 1);
+
+    // Undeclared access: same call WITHOUT the access-list entry traps.
+    // Build manually: build_tx auto-declares, so strip the list.
+    let action = ActionV1::CallObject {
+        object_id: obj,
+        input: BoundedBytes::new(vec![8]).unwrap(),
+    };
+    let lock_reveals: BoundedList<BoundedBytes<4096>, 256> = BoundedList::new(vec![]).unwrap();
+    let tx = TransactionV1 {
+        chain_id: CHAIN,
+        format_version: 1,
+        expiry_height: 20,
+        fee_payer: PAYER,
+        fee_authorization: OptionalObject(None),
+        resource_limits: limits(),
+        note_inputs: BoundedList::new(vec![]).unwrap(),
+        account_inputs: BoundedList::new(vec![PAYER]).unwrap(),
+        object_access_list: BoundedList::new(vec![]).unwrap(),
+        actions: BoundedList::new(vec![BoundedBytes::new(action.encode_canonical()).unwrap()])
+            .unwrap(),
+        outputs: BoundedList::new(vec![]).unwrap(),
+        evidence_refs: BoundedList::new(vec![]).unwrap(),
+        witness_root: witness_root(&lock_reveals),
+    };
+    let id = txid(&tx);
+    let wit = TransactionWitnessesV1 {
+        intents: BoundedList::new(vec![SignedIntentV1 {
+            tx_commitment: id,
+            signer_scope: 0,
+            capability_ref: OptionalHash32(None),
+            signature_suite: 1,
+            signature: BoundedBytes::new(vec![0xAB; 64]).unwrap(),
+        }])
+        .unwrap(),
+        lock_reveals,
+    };
+    let out = ledger
+        .apply_transaction(
+            &ctx(3),
+            &tx.encode_canonical(),
+            &wit.encode_canonical(),
+            &StubEngine,
+            &AcceptAll,
+        )
+        .unwrap();
+    let ApplyOutcome::Failed { code, .. } = out else {
+        panic!("undeclared access must trap");
+    };
+    assert_eq!(code, FailCode::UndeclaredAccess);
+}
+
+#[test]
+fn capability_gate_enforces_issuer_budget_and_expiry() {
+    let mut ledger = genesis();
+    let agent = crate::objects::AgentIdV1 {
+        agent_id: [0x77; 32],
+        genesis_manifest_root: [0; 32],
+        controller_policy_root: [0; 32],
+        active_key_root: [0; 32],
+        model_refs_root: [0; 32],
+        host_refs_root: [0; 32],
+        capability_root: [0; 32],
+        recovery_root: [0; 32],
+        agent_version: 1,
+    };
+    let grant = CapabilityGrantV1 {
+        grant_id: [0x88; 32],
+        issuer: PAYER,
+        subject_agent: agent.agent_id,
+        allowed_action_schema_root: [0; 32],
+        object_scope_root: [0; 32],
+        per_action_limit: 500,
+        cumulative_budget: 800,
+        expiry_height: 50,
+        delegation_depth: 1,
+        revocation_nonce: 0,
+    };
+    // Register agent + grant (issuer PAYER is signed).
+    let (txb, witb, _) = build_tx(
+        2,
+        vec![],
+        vec![PAYER],
+        vec![
+            ActionV1::RegisterAgent {
+                agent: agent.clone(),
+            },
+            ActionV1::GrantCapability {
+                grant: grant.clone(),
+            },
+        ],
+        vec![],
+    );
+    let out = ledger
+        .apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(matches!(out, ApplyOutcome::Applied { .. }));
+
+    let intent = |budget: u128, deadline: u64, nonce: u64| IntentV1 {
+        agent_id: agent.agent_id,
+        action_type: 1,
+        canonical_arguments: BoundedBytes::new(vec![]).unwrap(),
+        finalized_prestate_root: [0; 32],
+        expected_postcondition_root: [0; 32],
+        budget,
+        deadline,
+        capability_ref: grant.grant_id,
+        nonce,
+    };
+
+    // Budget over per-action limit: fails (policy gate).
+    let (txb, witb, _) = build_tx(
+        3,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::SubmitIntent {
+            intent: intent(600, 50, 0),
+        }],
+        vec![],
+    );
+    let out = ledger
+        .apply_transaction(&ctx(3), &txb, &witb, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(matches!(
+        out,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+
+    // Two valid intents of 500 + 400 > 800: the second breaks the cumulative
+    // budget after the first consumed it.
+    let (txb, witb, _) = build_tx(
+        4,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::SubmitIntent {
+            intent: intent(500, 50, 1),
+        }],
+        vec![],
+    );
+    let out = ledger
+        .apply_transaction(&ctx(4), &txb, &witb, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(matches!(out, ApplyOutcome::Applied { .. }));
+    let (txb, witb, _) = build_tx(
+        5,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::SubmitIntent {
+            intent: intent(400, 50, 2),
+        }],
+        vec![],
+    );
+    let out = ledger
+        .apply_transaction(&ctx(5), &txb, &witb, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(matches!(
+        out,
+        ApplyOutcome::Failed {
+            code: FailCode::InsufficientBalance,
+            ..
+        }
+    ));
+
+    // Past expiry: fails.
+    let (txb, witb, _) = build_tx(
+        60,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::SubmitIntent {
+            intent: intent(1, 100, 3),
+        }],
+        vec![],
+    );
+    let out = ledger
+        .apply_transaction(&ctx(60), &txb, &witb, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(matches!(
+        out,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+
+    // Revocation by a non-issuer rejects; by the issuer applies.
+    let (txb, witb, _) = build_tx(
+        6,
+        vec![],
+        vec![GOV],
+        vec![ActionV1::RevokeCapability {
+            grant_id: grant.grant_id,
+        }],
+        vec![],
+    );
+    // GOV is not the issuer AND not the fee payer -> fee payer missing.
+    let r = ledger.apply_transaction(&ctx(6), &txb, &witb, &StubEngine, &AcceptAll);
+    assert!(r.is_err());
+    let (txb, witb, _) = build_tx(
+        6,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::RevokeCapability {
+            grant_id: grant.grant_id,
+        }],
+        vec![],
+    );
+    let out = ledger
+        .apply_transaction(&ctx(6), &txb, &witb, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(matches!(out, ApplyOutcome::Applied { .. }));
+}
+
+// ---------------------------------------------------------------------------
+// Fee edges + controller integration
+// ---------------------------------------------------------------------------
+
+#[test]
+fn fee_reservation_and_refund_never_overcharge() {
+    let mut ledger = genesis();
+    let before = ledger.balance(&PAYER, &NOOS_ASSET);
+    let (txb, witb, _) = build_tx(2, vec![], vec![PAYER], vec![], vec![]);
+    let out = ledger
+        .apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll)
+        .unwrap();
+    let ApplyOutcome::Applied { receipt, .. } = out else {
+        panic!()
+    };
+    // The declared maximum fee is far above the measured fee.
+    let params = FeeStateV1::testnet_fixture();
+    let max_fee = fees::fee(&params.prices(), &fees::usage_from_resources(&limits())).unwrap();
+    assert!(
+        receipt.fee_charged < max_fee,
+        "actual must be below the reservation"
+    );
+    assert_eq!(
+        before - ledger.balance(&PAYER, &NOOS_ASSET),
+        receipt.fee_charged
+    );
+}
+
+#[test]
+fn end_block_controller_updates_prices_in_params_root() {
+    let mut ledger = genesis();
+    let before = ledger.roots().params_root;
+    let prices_before = ledger.fee_state().unwrap().prices();
+    let cap = FeeParamsV1::testnet_fixture().capacity();
+    // Full block on B, empty elsewhere.
+    let usage = [cap[0], 0, 0, 0, 0];
+    let delta = ledger.end_block_fee_update(&usage).unwrap();
+    assert!(!delta.is_empty());
+    assert_ne!(
+        ledger.roots().params_root,
+        before,
+        "prices live under params_root"
+    );
+    let prices_after = ledger.fee_state().unwrap().prices();
+    assert!(prices_after[0] > prices_before[0]);
+    assert!(prices_after[1] <= prices_before[1]);
+}
+
+// ---------------------------------------------------------------------------
+// LumenState projection
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lumen_state_object_carries_the_six_roots() {
+    let ledger = genesis();
+    let roots = ledger.roots();
+    let state = crate::objects::LumenStateV1 {
+        notes_root: roots.notes_root,
+        nullifiers_root: roots.nullifiers_root,
+        accounts_root: roots.accounts_root,
+        objects_root: roots.objects_root,
+        receipts_root: roots.receipts_root,
+        params_root: roots.params_root,
+    };
+    let bytes = state.encode_canonical();
+    use noos_codec::NoosDecode;
+    assert_eq!(
+        crate::objects::LumenStateV1::decode_canonical(&bytes).unwrap(),
+        state
+    );
+    // Fresh ledger: notes/nullifiers/objects/receipts are the empty root.
+    let empty = crate::smt::empty_root(crate::smt::DEPTH);
+    assert_eq!(roots.notes_root, empty);
+    assert_eq!(roots.nullifiers_root, empty);
+    assert_eq!(roots.objects_root, empty);
+    assert_eq!(roots.receipts_root, empty);
+    assert_ne!(roots.accounts_root, empty);
+    assert_ne!(roots.params_root, empty);
+}
+
+// Helper used by the rejection test to mutate a decoded transaction.
+trait DecodeHelper {
+    fn decode_canonical_helper(bytes: &[u8]) -> TransactionV1;
+}
+impl DecodeHelper for TransactionV1 {
+    fn decode_canonical_helper(bytes: &[u8]) -> TransactionV1 {
+        use noos_codec::NoosDecode;
+        TransactionV1::decode_canonical(bytes).unwrap()
+    }
+}

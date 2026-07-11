@@ -30,22 +30,22 @@ define_object! {
     /// Static fee parameters (params tree, key `noos.params.fees.v1`).
     pub struct FeeParamsV1 {
         version: 1;
-        /// Lower clamp for every controller-driven price (>= 1).
+        // Lower clamp for every controller-driven price (>= 1).
         1 => min_price: u128,
-        /// Upper clamp for every controller-driven price (explicit maximum).
+        // Upper clamp for every controller-driven price (explicit maximum).
         2 => max_price: u128,
-        /// Bounded per-block relative price change, parts per million.
+        // Bounded per-block relative price change, parts per million.
         3 => max_change_ppm: u32,
-        /// Per-block capacity per dimension: [B, G, V, R, D].
+        // Per-block capacity per dimension: [B, G, V, R, D].
         4 => capacity_b: u64,
         5 => capacity_g: u64,
         6 => capacity_v: u64,
         7 => capacity_r: u64,
         8 => capacity_d: u64,
-        /// Frozen deterministic failure fee (charged from the reservation on
-        /// trap/failed postcondition; ODR-FEES-003).
+        // Frozen deterministic failure fee (charged from the reservation on
+        // trap/failed postcondition; ODR-FEES-003).
         9 => failure_fee: u128,
-        /// Minimum governance activation delay in heights (plan §4.7).
+        // Minimum governance activation delay in heights (plan §4.7).
         10 => min_activation_delay: u64,
     }
 }
@@ -67,7 +67,13 @@ impl FeeParamsV1 {
     /// Per-block capacity vector `[B, G, V, R, D]`.
     #[must_use]
     pub fn capacity(&self) -> Usage {
-        [self.capacity_b, self.capacity_g, self.capacity_v, self.capacity_r, self.capacity_d]
+        [
+            self.capacity_b,
+            self.capacity_g,
+            self.capacity_v,
+            self.capacity_r,
+            self.capacity_d,
+        ]
     }
 
     /// Valueless NOOS_TEST fixture (plan §2.5; is_test_fixture semantics —
@@ -97,7 +103,13 @@ impl FeeStateV1 {
 
     #[must_use]
     pub fn from_prices(p: Prices) -> Self {
-        Self { p_b: p[0], p_g: p[1], p_v: p[2], p_r: p[3], p_d: p[4] }
+        Self {
+            p_b: p[0],
+            p_g: p[1],
+            p_v: p[2],
+            p_r: p[3],
+            p_d: p[4],
+        }
     }
 
     /// Valueless NOOS_TEST initial prices.
@@ -114,7 +126,13 @@ impl FeeStateV1 {
 /// priced inside `G` in v1.
 #[must_use]
 pub fn usage_from_resources(r: &ResourceVector) -> Usage {
-    [r.bytes, r.grain_steps, r.proof_units, r.state_writes, r.blob_bytes]
+    [
+        r.bytes,
+        r.grain_steps,
+        r.proof_units,
+        r.state_writes,
+        r.blob_bytes,
+    ]
 }
 
 /// `Fee = Σ p_i * u_i`, checked. `None` on u128 overflow.
@@ -141,12 +159,7 @@ pub fn fee(prices: &Prices, usage: &Usage) -> Option<u128> {
 /// `max_change_ppm` per block. All arithmetic checked; `None` = overflow
 /// (rejected by the caller, never wrapped).
 #[must_use]
-pub fn next_price(
-    price: u128,
-    used: u64,
-    capacity: u64,
-    params: &FeeParamsV1,
-) -> Option<u128> {
+pub fn next_price(price: u128, used: u64, capacity: u64, params: &FeeParamsV1) -> Option<u128> {
     if capacity < 2 {
         return None;
     }
@@ -202,7 +215,11 @@ mod tests {
         let prices: Prices = [u128::MAX, 0, 0, 0, 0];
         assert_eq!(fee(&prices, &[2, 0, 0, 0, 0]), None);
         let prices: Prices = [u128::MAX / 2, u128::MAX / 2, 0, 0, 0];
-        assert_eq!(fee(&prices, &[2, 2, 0, 0, 0]), None, "sum overflow must be caught");
+        assert_eq!(
+            fee(&prices, &[2, 2, 0, 0, 0]),
+            None,
+            "sum overflow must be caught"
+        );
     }
 
     #[test]
@@ -213,13 +230,19 @@ mod tests {
         let up = next_price(price, p.capacity_b, p.capacity_b, &p).unwrap();
         assert!(up > price);
         let max_step = price * u128::from(p.max_change_ppm) / 1_000_000;
-        assert!(up - price <= max_step.max(1), "upward change exceeded ppm bound");
+        assert!(
+            up - price <= max_step.max(1),
+            "upward change exceeded ppm bound"
+        );
         // Empty block: max downward step, floored at min_price.
         let down = next_price(price, 0, p.capacity_b, &p).unwrap();
         assert!(down < price);
         assert!(price - down <= max_step.max(1));
         // At target: unchanged.
-        assert_eq!(next_price(price, p.capacity_b / 2, p.capacity_b, &p), Some(price));
+        assert_eq!(
+            next_price(price, p.capacity_b / 2, p.capacity_b, &p),
+            Some(price)
+        );
     }
 
     #[test]
@@ -267,8 +290,14 @@ mod tests {
     fn params_roundtrip() {
         use noos_codec::{NoosDecode, NoosEncode};
         let p = params();
-        assert_eq!(FeeParamsV1::decode_canonical(&p.encode_canonical()).unwrap(), p);
+        assert_eq!(
+            FeeParamsV1::decode_canonical(&p.encode_canonical()).unwrap(),
+            p
+        );
         let s = FeeStateV1::testnet_fixture();
-        assert_eq!(FeeStateV1::decode_canonical(&s.encode_canonical()).unwrap(), s);
+        assert_eq!(
+            FeeStateV1::decode_canonical(&s.encode_canonical()).unwrap(),
+            s
+        );
     }
 }

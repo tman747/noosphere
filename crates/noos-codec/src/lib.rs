@@ -192,15 +192,18 @@ impl<'a> Reader<'a> {
     }
 
     pub fn remaining(&self) -> usize {
-        self.input.len() - self.pos
+        // pos <= input.len() is a structural invariant maintained by `take`.
+        self.input.len().saturating_sub(self.pos)
     }
 
     fn take(&mut self, n: usize) -> Result<&'a [u8], CodecError> {
         if self.remaining() < n {
             return Err(CodecError::Truncated);
         }
-        let s = &self.input[self.pos..self.pos + n];
-        self.pos += n;
+        // Guarded above: pos + n <= input.len() <= usize::MAX.
+        let end = self.pos.checked_add(n).ok_or(CodecError::Truncated)?;
+        let s = &self.input[self.pos..end];
+        self.pos = end;
         Ok(s)
     }
 

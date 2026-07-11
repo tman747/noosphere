@@ -1,0 +1,18 @@
+[package]
+name = "noos-ground"
+version = "0.1.0"
+description = "Ground v1 proposal tickets and Pulse v1 ASERT retarget for the NOOSPHERE Braid: challenge/ticket recomputation under the D-GROUND-* domains, exact-integer target retargeting through the frozen exp2_q64 table, slot/median-time-past law, and G(b) work accounting. No DAG, fork choice, Witness Ring, or block assembly."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+noos-crypto = { path = "../noos-crypto" }
+
+[dev-dependencies]
+hex = "=0.4.3"
+serde_json = "=1.0.150"
+
+[lints]
+workspace = true

@@ -35,7 +35,7 @@ t_min = 1                               # source: ch01 section 4.3 ("T_min=1")
 t_max = "2^256-1"                       # source: ch01 section 4.3 ("T_max=2^256-1"); string because it exceeds TOML integer range
 exp2_format = "signed Q64.64 fixed point, exp2_q64 constant table committed by params_root, rounded toward negative infinity"  # source: ch01 section 4.3
 anchor = "most recent finalized checkpoint on the branch, (h_a, t_a, T_a)"  # source: ch01 section 4.3
-exp2_q64_table = "UNRESOLVED_SOURCE"    # searched ch01 for: exp2, Q64, constant table, vectors — table values are a protocol-package artifact ("canonical edge vectors are part of the protocol package", ch01 section 4.3) not enumerated in the corpus; must be generated and frozen under protocol/vectors before G1
+exp2_q64_table = "protocol/spec/pulse-exp2-v1.md; blake3(u128-LE concat) = 15d783a23bcf9d9e20d1133bbc247a5c94a876705aed5281e73246f67c883999"  # source: generated protocol-package artifact (ch01 section 4.3 names the table without values); derivation frozen in protocol/spec/pulse-exp2-v1.md, generator tools/vector-generators/gen_exp2_table.py (--check), checked-in constant crates/noos-ground/src/exp2_table.rs, vectors protocol/vectors/ground/pulse-retarget-v1.json
 
 [witness]
 n_max = 256                             # source: ch01 section 4.6 ("top N_max=256 candidates by r_i")
@@ -77,6 +77,9 @@ state_roots = ["notes_root", "nullifiers_root", "accounts_root", "objects_root",
 tree = "versioned sparse Merkle tree, canonical key derivation, domain-separated leaf/node hashes, constant empty roots, order-independent"  # source: ch01 section 6.1
 tree_depth = 256                         # source: plan section 4.2 ("versioned depth-256 sparse Merkle tree"); ch01 section 6.1 does not number the depth — plan resolution is binding
 note_id_domain = "NOOS/NOTE/V1"          # source: ch01 section 6.2 (note_id = H("NOOS/NOTE/V1" || creating_txid || output_index || canonical_note))
+note_id_output_index_width = "u32 LE (4 bytes)"  # source: protocol/schemas/lumen-v1.md section 4 (noos-lumen freeze); ch01 section 6.2 names the field without a width
+witness_root_domain = "NOOS/TX/WROOT/V1"  # source: protocol/schemas/lumen-v1.md (witness_root = H(ctx || canonical lock_reveals list), programs only, signatures excluded — txid->signature binding acyclic); crypto-domains-v1.csv D-TX-WROOT, ASSIGNED, G0 review
+object_id_domain = "NOOS/OBJECT/ID/V1"    # source: protocol/schemas/lumen-v1.md (object_id = H(ctx || creating_txid || action_index_u32_le || class_id_u32_le)); crypto-domains-v1.csv D-OBJECT-ID, ASSIGNED, G0 review
 txid_scope = "commits the non-witness transaction body"           # source: ch01 section 6.5
 wtxid_scope = "commits body and segregated witnesses"             # source: ch01 section 6.5
 txid_domain = "NOOS/TX/ID/V1"            # source: protocol/spec/crypto-domains-v1.csv (IdentityFreeze registry, ASSIGNED, flagged for G0 review; not spelled in ch01)
@@ -84,7 +87,7 @@ wtxid_domain = "NOOS/TX/WID/V1"          # source: protocol/spec/crypto-domains-
 account_nonce_rule = "an account transaction consumes exactly nonce+1"  # source: ch01 section 6.3
 receipts_root_semantics = "post-state compact settled-receipt index, distinct from the block's ordered execution receipts"  # source: ch01 section 6.1; plan section 4.2
 resource_limit_fields = ["bytes", "grain_steps", "proof_units", "state_reads", "state_writes", "blob_bytes"]  # source: ch01 section 6.5 TransactionV1.resource_limits
-collection_maxima = "UNRESOLVED_SOURCE"  # searched ch01 for: maximum, max inputs, max outputs, bounded collections — ch01 section 9.1 requires "explicit maxima" for every variable structure but numbers none; per-collection u32 maxima assigned PROPOSED-G0 in schema-tables/lumen-objects.md
+collection_maxima = "frozen per schema-tables/lumen-objects.md PROPOSED-G0 values, implemented in protocol/schemas/lumen-v1.md"  # source: protocol/schemas/lumen-v1.md (noos-lumen adopted the PROPOSED-G0 maxima exactly); originally UNRESOLVED in ch01 section 9.1 which requires explicit maxima but numbers none; still subject to G0 review
 wallet_derivation_template = "m/NOOS/1/{sign|view|umbra|agent|recovery}/account/index"  # source: ch01 section 6.8
 wallet_derivation_hardened_indices = "UNRESOLVED_SOURCE"  # searched ch01 for: hardened, purpose number, derivation path, BIP — ch01 section 6.8 gives the symbolic path only; numeric hardened purpose/branch constants required by plan section 1.7 are unassigned. ODR-WALLET-001
 

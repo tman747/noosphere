@@ -32,6 +32,9 @@ pub mod state;
 #[doc(hidden)]
 pub mod vector_gen;
 
+#[cfg(test)]
+mod state_tests;
+
 /// 32-byte BLAKE3-256 digest / tree key. Plain array so it orders
 /// lexicographically (= MSB-first bit order) in `BTreeMap`s.
 pub type Hash32 = [u8; 32];
@@ -76,7 +79,11 @@ pub fn domain_hash(context: &str, parts: &[&[u8]]) -> Hash32 {
 /// Shared test utilities (test builds only): deterministic seeded PRNG and
 /// the runtime-decoded legacy domain string used by identity-rejection tests.
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::arithmetic_side_effects
+)]
 pub(crate) mod test_util {
     use crate::Hash32;
 
@@ -122,7 +129,10 @@ mod lib_tests {
     fn domain_separation_changes_digest() {
         let a = domain_hash(domains::SMT_LEAF, &[b"payload"]);
         let b = domain_hash(domains::SMT_NODE, &[b"payload"]);
-        assert_ne!(a, b, "distinct contexts must never collide on equal payloads");
+        assert_ne!(
+            a, b,
+            "distinct contexts must never collide on equal payloads"
+        );
     }
 
     #[test]

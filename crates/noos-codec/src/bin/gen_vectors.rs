@@ -3,6 +3,9 @@
 //! Writes `protocol/vectors/codec/codec-v1.json` relative to the workspace
 //! root (two levels up from this crate). Zero dependencies: JSON is emitted by
 //! hand from fully controlled ASCII content.
+//
+// Dev-only tool: hard assertions are the failure mode we want here.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::arithmetic_side_effects)]
 
 use noos_codec::{define_object, CodecError, NoosDecode, NoosEncode, Writer};
 

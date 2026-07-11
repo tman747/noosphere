@@ -331,7 +331,11 @@ impl ObjectV1 {
 pub fn object_id(creating_txid: &Hash32, action_index: u32, class_id: u32) -> Hash32 {
     domain_hash(
         domains::OBJECT_ID,
-        &[creating_txid, &action_index.to_le_bytes(), &class_id.to_le_bytes()],
+        &[
+            creating_txid,
+            &action_index.to_le_bytes(),
+            &class_id.to_le_bytes(),
+        ],
     )
 }
 
@@ -385,11 +389,11 @@ define_object! {
     }
 }
 
-/// Segregated witness container (lumen-v1.md §4.2). `intents` align with
-/// `account_inputs` by index; `lock_reveals` align with `note_inputs` by
-/// index. Signatures live here and are excluded from the txid.
 define_object! {
-    /// Transaction witnesses: account-intent signatures + note lock reveals.
+    /// Segregated witness container (lumen-v1.md §4.2): account-intent
+    /// signatures + note lock reveals. `intents` align with `account_inputs`
+    /// by index; `lock_reveals` align with `note_inputs` by index.
+    /// Signatures live here and are excluded from the txid.
     pub struct TransactionWitnessesV1 {
         version: 1;
         1 => intents: BoundedList<SignedIntentV1, 64>,
@@ -521,7 +525,10 @@ pub fn witness_root(lock_reveals: &BoundedList<BoundedBytes<4096>, 256>) -> Hash
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActionV1 {
     /// 0 — call a Grain contract object through the ContractEngine.
-    CallObject { object_id: Hash32, input: BoundedBytes<65536> },
+    CallObject {
+        object_id: Hash32,
+        input: BoundedBytes<65536>,
+    },
     /// 1 — create an object; `object_id` derives from (txid, action index,
     /// class_id) under D-OBJECT-ID.
     CreateObject {
@@ -534,9 +541,17 @@ pub enum ActionV1 {
         flags: u32,
     },
     /// 2 — move value from note-input surplus into an account liquid balance.
-    DepositToAccount { account_id: Hash32, asset_id: Hash32, amount: u128 },
+    DepositToAccount {
+        account_id: Hash32,
+        asset_id: Hash32,
+        amount: u128,
+    },
     /// 3 — move value from a signed account input's balance into output surplus.
-    WithdrawFromAccount { account_id: Hash32, asset_id: Hash32, amount: u128 },
+    WithdrawFromAccount {
+        account_id: Hash32,
+        asset_id: Hash32,
+        amount: u128,
+    },
     /// 4 — versioned parameter update with activation delay. Feature-control
     /// keys (`noos.control.*`) are NOT writable here (activation of a
     /// disabled suite requires a hard fork, ch01 §8.6/§12).
@@ -597,25 +612,41 @@ impl NoosEncode for ActionV1 {
                 w.put_u128(*rent_deposit);
                 w.put_u32(*flags);
             }
-            ActionV1::DepositToAccount { account_id, asset_id, amount } => {
+            ActionV1::DepositToAccount {
+                account_id,
+                asset_id,
+                amount,
+            } => {
                 w.put_u16(2);
                 w.put_array32(account_id);
                 w.put_array32(asset_id);
                 w.put_u128(*amount);
             }
-            ActionV1::WithdrawFromAccount { account_id, asset_id, amount } => {
+            ActionV1::WithdrawFromAccount {
+                account_id,
+                asset_id,
+                amount,
+            } => {
                 w.put_u16(3);
                 w.put_array32(account_id);
                 w.put_array32(asset_id);
                 w.put_u128(*amount);
             }
-            ActionV1::GovernanceParamUpdate { param_key, new_value, activation_height } => {
+            ActionV1::GovernanceParamUpdate {
+                param_key,
+                new_value,
+                activation_height,
+            } => {
                 w.put_u16(4);
                 w.put_array32(param_key);
                 new_value.encode(w);
                 w.put_u64(*activation_height);
             }
-            ActionV1::GovernanceRegistryUpdate { registry_key, new_value, activation_height } => {
+            ActionV1::GovernanceRegistryUpdate {
+                registry_key,
+                new_value,
+                activation_height,
+            } => {
                 w.put_u16(5);
                 w.put_array32(registry_key);
                 new_value.encode(w);
@@ -685,12 +716,24 @@ impl NoosDecode for ActionV1 {
                 new_value: BoundedBytes::decode(r)?,
                 activation_height: r.get_u64()?,
             }),
-            6 => Ok(ActionV1::EmergencyDisable { control_key: r.get_array32()? }),
-            7 => Ok(ActionV1::EmergencyQuarantine { object_id: r.get_array32()? }),
-            8 => Ok(ActionV1::RegisterAgent { agent: AgentIdV1::decode(r)? }),
-            9 => Ok(ActionV1::GrantCapability { grant: CapabilityGrantV1::decode(r)? }),
-            10 => Ok(ActionV1::RevokeCapability { grant_id: r.get_array32()? }),
-            11 => Ok(ActionV1::SubmitIntent { intent: IntentV1::decode(r)? }),
+            6 => Ok(ActionV1::EmergencyDisable {
+                control_key: r.get_array32()?,
+            }),
+            7 => Ok(ActionV1::EmergencyQuarantine {
+                object_id: r.get_array32()?,
+            }),
+            8 => Ok(ActionV1::RegisterAgent {
+                agent: AgentIdV1::decode(r)?,
+            }),
+            9 => Ok(ActionV1::GrantCapability {
+                grant: CapabilityGrantV1::decode(r)?,
+            }),
+            10 => Ok(ActionV1::RevokeCapability {
+                grant_id: r.get_array32()?,
+            }),
+            11 => Ok(ActionV1::SubmitIntent {
+                intent: IntentV1::decode(r)?,
+            }),
             _ => Err(CodecError::UnknownDiscriminant),
         }
     }
@@ -861,20 +904,32 @@ mod tests {
         let base = note_id(&[1; 32], 0, &n);
         assert_ne!(base, note_id(&[2; 32], 0, &n), "txid must bind");
         assert_ne!(base, note_id(&[1; 32], 1, &n), "output index must bind");
-        assert_ne!(base, note_id(&[1; 32], 0, &sample_note(11)), "content must bind");
+        assert_ne!(
+            base,
+            note_id(&[1; 32], 0, &sample_note(11)),
+            "content must bind"
+        );
         // The historical chain's note domain (hex-decoded at runtime; old
         // identity literals are forbidden in source) never reproduces a
         // NOOS note id.
         let legacy = crate::test_util::legacy_note_domain();
-        let old = domain_hash(&legacy, &[&[1u8; 32], &0u32.to_le_bytes(), &n.encode_canonical()]);
+        let old = domain_hash(
+            &legacy,
+            &[&[1u8; 32], &0u32.to_le_bytes(), &n.encode_canonical()],
+        );
         assert_ne!(base, old);
     }
 
     #[test]
     fn action_discriminants_are_declaration_ordered_and_closed() {
         let actions = vec![
-            ActionV1::CallObject { object_id: [1; 32], input: BoundedBytes::new(vec![]).unwrap() },
-            ActionV1::EmergencyDisable { control_key: [2; 32] },
+            ActionV1::CallObject {
+                object_id: [1; 32],
+                input: BoundedBytes::new(vec![]).unwrap(),
+            },
+            ActionV1::EmergencyDisable {
+                control_key: [2; 32],
+            },
             ActionV1::RevokeCapability { grant_id: [3; 32] },
         ];
         for a in &actions {

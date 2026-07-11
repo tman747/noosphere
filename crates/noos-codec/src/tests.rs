@@ -1,3 +1,6 @@
+// Test-only module: hard assertions are the desired failure mode.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::arithmetic_side_effects)]
+
 use crate::{CodecError, NoosDecode, NoosEncode, Reader, Writer};
 
 define_object! {

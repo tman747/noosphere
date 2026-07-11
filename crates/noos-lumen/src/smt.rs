@@ -61,6 +61,10 @@ pub fn node_hash(left: &Hash32, right: &Hash32) -> Hash32 {
 }
 
 /// Bit `d` of `key`, depth-from-root order (MSB-first within each byte).
+// Structural index math only: every operand is bounded by `d < DEPTH`
+// (0 <= d/8 < 32, 0 <= d%8 < 8), so overflow is impossible by construction.
+// Value/state arithmetic elsewhere in this crate is checked.
+#[allow(clippy::arithmetic_side_effects)]
 #[inline]
 #[must_use]
 pub fn key_bit(key: &Hash32, d: usize) -> bool {
@@ -78,7 +82,9 @@ pub struct Smt {
 impl Smt {
     #[must_use]
     pub fn new() -> Self {
-        Self { leaves: BTreeMap::new() }
+        Self {
+            leaves: BTreeMap::new(),
+        }
     }
 
     #[must_use]
@@ -127,6 +133,9 @@ impl Smt {
     /// Merkle proof for `key` (inclusion when present, non-inclusion when
     /// absent). Siblings are recorded root→leaf; empty siblings are elided
     /// via the bitmap.
+    // Index math bounded by DEPTH and by `lo <= split <= hi <= entries.len()`
+    // (partition_point invariants); no value arithmetic.
+    #[allow(clippy::arithmetic_side_effects)]
     #[must_use]
     pub fn prove(&self, key: &Hash32) -> SmtProof {
         let entries: Vec<(&Hash32, &Vec<u8>)> = self.leaves.iter().collect();
@@ -137,9 +146,7 @@ impl Smt {
         let mut lo = 0usize;
         let mut hi = entries.len();
         for d in 0..DEPTH {
-            let split = lo
-                + entries[lo..hi]
-                    .partition_point(|(k, _)| !key_bit(k, d));
+            let split = lo + entries[lo..hi].partition_point(|(k, _)| !key_bit(k, d));
             let (on_lo, on_hi, off_lo, off_hi) = if key_bit(key, d) {
                 (split, hi, lo, split)
             } else {
@@ -163,6 +170,8 @@ impl Smt {
     }
 }
 
+// Recursion depth bounded by DEPTH; `split <= entries.len()`.
+#[allow(clippy::arithmetic_side_effects)]
 /// Root of the subtree at `depth` containing exactly the given sorted
 /// entries (whose keys all share the first `depth` path bits).
 fn subtree_root(entries: &[(&Hash32, &Vec<u8>)], depth: usize) -> Hash32 {
@@ -199,6 +208,8 @@ impl SmtProof {
     }
 
     /// Fold the proof from a leaf digest up to a candidate root.
+    // Index math bounded by `d < DEPTH`; sibling cursor uses checked_sub.
+    #[allow(clippy::arithmetic_side_effects)]
     #[must_use]
     fn fold(&self, key: &Hash32, leaf: Hash32) -> Option<Hash32> {
         if self.bitmap_count() != self.siblings.len() {
@@ -315,7 +326,7 @@ mod tests {
 
     #[test]
     fn shuffled_insertion_sets_give_identical_roots() {
-        let mut rng = SplitMix64(0x4C55_4D45_4E_u64); // "LUMEN"
+        let mut rng = SplitMix64(0x004C_554D_454E_u64); // "LUMEN"
         let mut pairs: Vec<(Hash32, Vec<u8>)> = (0..200u32)
             .map(|i| (rng.next_hash(), i.to_le_bytes().to_vec()))
             .collect();
@@ -342,7 +353,11 @@ mod tests {
         let (k0, _) = pairs[0].clone();
         let before = a.root();
         a.insert(k0, b"replacement".to_vec());
-        assert_ne!(a.root(), before, "duplicate-key update must change the root");
+        assert_ne!(
+            a.root(),
+            before,
+            "duplicate-key update must change the root"
+        );
         pairs[0].1 = b"replacement".to_vec();
         let mut fresh = Smt::new();
         for (k, v) in &pairs {
@@ -367,7 +382,10 @@ mod tests {
             let value = (i as u32).to_le_bytes();
             assert!(proof.verify_inclusion(&root, k, &value));
             assert!(!proof.verify_inclusion(&root, k, b"wrong-value"));
-            assert!(!proof.verify_non_inclusion(&root, k), "present key cannot prove absence");
+            assert!(
+                !proof.verify_non_inclusion(&root, k),
+                "present key cannot prove absence"
+            );
         }
         // Absent keys.
         for _ in 0..16 {

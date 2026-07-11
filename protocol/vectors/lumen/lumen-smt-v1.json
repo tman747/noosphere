@@ -1,0 +1,11 @@
+{
+  "schema": "noos-lumen/smt-v1",
+  "cases": [
+    {"name": "smt_empty_root", "kind": "positive", "bytes": "c3c2ee6903fb8c1cfe5c34010778e5227fbb2228caa363ebdb7af2c97cdfd3f700000000", "note": "E[256]: recursively derived empty root of the depth-256 tree"},
+    {"name": "smt_single_leaf", "kind": "positive", "bytes": "3d90a3559fb821c872d0124b5e3cfbfb4df8049a9541ea7c379da30ad518885801000000010101010101010101010101010101010101010101010101010101010101010101000000aa", "note": "single leaf: 255 empty siblings folded against H(leaf || key || value)"},
+    {"name": "smt_two_adjacent_keys", "kind": "positive", "bytes": "d236bd34f68b278307b0f239d40e917e5fe54c4fbc862ca2a7379c239e7572aa02000000f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0040000006c656674f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f1050000007269676874", "note": "two keys sharing a 255-bit prefix force a full-depth split"},
+    {"name": "smt_four_leaves", "kind": "positive", "bytes": "fd1cd6d6563da86dbc58ed697dcf0617a3fc47dc6315ab2646605ad202b9f1e904000000000000000000000000000000000000000000000000000000000000000000000001000000014040404040404040404040404040404040404040404040404040404040404040010000000280808080808080808080808080808080808080808080808080808080808080800100000003c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c00100000004", "note": "four leaves spread across the top two path bits"},
+    {"name": "smt_wrong_value_root_rejected", "kind": "negative", "bytes": "2f13a49cb7eb42f5ad52a36e1c0102c9c4791178c763a7a41c005a9d1beaf79001000000010101010101010101010101010101010101010101010101010101010101010101000000aa", "note": "claimed root belongs to value 0xAB, pairs carry 0xAA; rebuild must not match"},
+    {"name": "smt_crossed_domain_root_rejected", "kind": "negative", "bytes": "d745f2b581f2cf62493706f59cd52f4a02a0f2a9325998d4eade2425286f930d01000000010101010101010101010101010101010101010101010101010101010101010101000000aa", "note": "root built with D-SMT-NODE as the leaf context must not match D-SMT-LEAF law"}
+  ]
+}

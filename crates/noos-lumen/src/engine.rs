@@ -77,7 +77,8 @@ pub trait AuthVerifier {
 /// this trait; it exists so the Loom crate can attach without Lumen changes.
 pub trait WorkJobEscrow {
     /// Reserve escrow for a job. MUST NOT mint; funds come from the payer.
-    fn reserve(&mut self, job_id: &Hash32, payer: &Hash32, amount: u128) -> Result<(), EscrowError>;
+    fn reserve(&mut self, job_id: &Hash32, payer: &Hash32, amount: u128)
+        -> Result<(), EscrowError>;
     /// Settle escrow to providers per the Loom's conserved split.
     fn settle(&mut self, job_id: &Hash32) -> Result<(), EscrowError>;
     /// Refund unspent escrow to the payer.

@@ -60,7 +60,9 @@ pub struct EmissionSplit {
 impl EmissionSplit {
     #[must_use]
     pub fn total(&self) -> Option<u128> {
-        self.proposer.checked_add(self.witness)?.checked_add(self.treasury)
+        self.proposer
+            .checked_add(self.witness)?
+            .checked_add(self.treasury)
     }
 }
 
@@ -134,7 +136,11 @@ impl IssuanceParamsV1 {
                 break;
             }
             let end = start
-                .checked_add(self.era_length.checked_sub(1).ok_or(IssuanceError::Overflow)?)
+                .checked_add(
+                    self.era_length
+                        .checked_sub(1)
+                        .ok_or(IssuanceError::Overflow)?,
+                )
                 .ok_or(IssuanceError::Overflow)?
                 .min(self.terminal_height);
             let heights = u128::from(end.checked_sub(start).ok_or(IssuanceError::Overflow)?)
@@ -206,13 +212,21 @@ impl EmissionSharesV1 {
             .checked_sub(witness)
             .and_then(|p| p.checked_sub(treasury))
             .ok_or(IssuanceError::Overflow)?;
-        Ok(EmissionSplit { proposer, witness, treasury })
+        Ok(EmissionSplit {
+            proposer,
+            witness,
+            treasury,
+        })
     }
 
     /// Valueless NOOS_TEST fixture.
     #[must_use]
     pub fn testnet_fixture() -> Self {
-        Self { proposer_ppm: 500_000, witness_ppm: 350_000, treasury_ppm: 150_000 }
+        Self {
+            proposer_ppm: 500_000,
+            witness_ppm: 350_000,
+            treasury_ppm: 150_000,
+        }
     }
 }
 
@@ -259,7 +273,7 @@ mod tests {
         let p = IssuanceParamsV1::testnet_fixture();
         let total = p.total_scheduled().unwrap();
         assert!(total <= p.max_supply);
-        let mut rng = SplitMix64(0x1355_7A11_CE_u64);
+        let mut rng = SplitMix64(0x0013_557A_11CE_u64);
         for _ in 0..100_000 {
             let h = rng.next_u64() % (p.terminal_height * 2);
             let e = p.emission_at(h).unwrap();
@@ -298,9 +312,16 @@ mod tests {
                 era_cache_val = p.era_emission(era).unwrap();
             }
             sum = sum.checked_add(era_cache_val).unwrap();
-            assert!(sum <= p.max_supply, "cumulative emission pierced the cap at height {h}");
+            assert!(
+                sum <= p.max_supply,
+                "cumulative emission pierced the cap at height {h}"
+            );
         }
-        assert_eq!(sum, p.total_scheduled().unwrap(), "path sum must equal closed form");
+        assert_eq!(
+            sum,
+            p.total_scheduled().unwrap(),
+            "path sum must equal closed form"
+        );
     }
 
     #[test]
@@ -325,10 +346,18 @@ mod tests {
         for _ in 0..10_000 {
             let e = u128::from(rng.next_u64());
             let split = s.split(e).unwrap();
-            assert_eq!(split.total().unwrap(), e, "split must conserve to the micro");
+            assert_eq!(
+                split.total().unwrap(),
+                e,
+                "split must conserve to the micro"
+            );
         }
         // Shares not summing to 1e6 reject.
-        let bad = EmissionSharesV1 { proposer_ppm: 1, witness_ppm: 1, treasury_ppm: 1 };
+        let bad = EmissionSharesV1 {
+            proposer_ppm: 1,
+            witness_ppm: 1,
+            treasury_ppm: 1,
+        };
         assert_eq!(bad.validate(), Err(IssuanceError::InvalidParams));
     }
 }

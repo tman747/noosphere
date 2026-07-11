@@ -359,6 +359,15 @@ name = "noos-grain"
 version = "0.1.0"
 
 [[package]]
+name = "noos-ground"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "noos-crypto",
+ "serde_json",
+]
+
+[[package]]
 name = "noos-lumen"
 version = "0.1.0"
 dependencies = [

@@ -10,7 +10,9 @@ Legend: **Tag** = object-family numeric tag. ch01 names the objects but assigns 
 numeric tags or field widths; every value marked `PROPOSED-G0` is a sequential
 assignment for review, not a corpus quotation. `Hash32` = 32-byte domain-separated
 BLAKE3-256. Collection maxima marked PROPOSED-G0 are engineering bounds pending the
-G0 review (ch01 §9.1 requires explicit maxima but numbers none).
+G0 review (ch01 §9.1 requires explicit maxima but numbers none); noos-lumen has
+adopted these exact values in `protocol/schemas/lumen-v1.md` (the implementation
+freeze), so changing any of them at G0 review now requires a lumen-v1.md revision.
 
 ## Object-family tag registry (all PROPOSED-G0)
 
@@ -45,7 +47,8 @@ key derivation, domain-separated leaf/node hashes, constant empty roots.
 
 ## 2. Note (ch01 §6.2)
 
-`note_id = H("NOOS/NOTE/V1" || creating_txid || output_index || canonical_note)`.
+`note_id = H("NOOS/NOTE/V1" || creating_txid || output_index || canonical_note)`;
+`output_index` frozen as u32 LE (protocol/schemas/lumen-v1.md §4).
 Immutable, consumed exactly once. Amounts public.
 
 | # | Field | Width | Notes |
@@ -82,7 +85,7 @@ Grain-controlled persistent state; undeclared reads trap.
 
 | # | Field | Width | Notes |
 |---:|---|---|---|
-| 0 | `object_id` | Hash32 (PROPOSED-G0) | |
+| 0 | `object_id` | Hash32 | `H("NOOS/OBJECT/ID/V1" \|\| creating_txid \|\| action_index_u32_le \|\| class_id_u32_le)` — lumen-v1.md; registry D-OBJECT-ID |
 | 1 | `class_id` | u32 (PROPOSED-G0) | registry-scoped |
 | 2 | `owner_or_policy_root` | Hash32 | |
 | 3 | `code_hash` | Hash32 | |
@@ -111,7 +114,7 @@ Grain-controlled persistent state; undeclared reads trap.
 | 9 | `actions[]` | bounded bytes each, max 65536 (PROPOSED-G0) | 64 (PROPOSED-G0) | typed actions, declaration-order discriminants |
 | 10 | `outputs[]` | `Note` each | 256 (PROPOSED-G0) | |
 | 11 | `evidence_refs[]` | Hash32 each | 64 (PROPOSED-G0) | |
-| 12 | `witness_root` | Hash32 | — | segregated witness program roots |
+| 12 | `witness_root` | Hash32 | — | `H("NOOS/TX/WROOT/V1" \|\| canonical lock_reveals)`, programs only, signatures excluded (lumen-v1.md; registry D-TX-WROOT) |
 
 ## 6. SignedIntentV1 (ch01 §6.5)
 
