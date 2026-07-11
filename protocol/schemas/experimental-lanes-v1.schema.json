@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindchain.network/noosphere/experimental-lanes-v1.schema.json",
+  "title": "NOOSPHERE experimental lane evidence envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mechanism_id", "lifecycle", "result", "enabled", "slashable", "evidence_root"],
+  "properties": {
+    "mechanism_id": {"enum": ["A-CLASS-GATE.v2", "A-REFLEX", "E-ORACLE-01", "E-GRAD-01", "I-PENTAGON", "NOOS-CHORUS", "NOOS-SWARM", "FORESIGHT"]},
+    "lifecycle": {"enum": ["EXPERIMENTAL", "KILLED", "WITHDRAWN", "RETIRED"]},
+    "result": {"enum": ["IRREVERSIBLE_BUDGET_ZERO", "DISABLED_PENDING_LIVE_DRILL", "EXPERIMENTAL_PROFILE", "SHADOW_ONLY", "ADVISORY_ONLY", "PAYOUT_FREE_NONAUTHORITATIVE"]},
+    "enabled": {"type": "boolean"},
+    "slashable": {"type": "boolean"},
+    "evidence_root": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

@@ -1,0 +1,1295 @@
+{
+  "bundle_sha256": "8e5e7863d165261e24daa66ec0e94fd6761becfd4213e4fd460dc0f4edc10c83",
+  "command": [
+    "C:\\Users\\ntrap\\AppData\\Local\\Programs\\Python\\Python310\\python.exe",
+    "C:\\noosphere\\tools\\e2e\\run_network.py",
+    "--scenario",
+    "wan-fault-matrix",
+    "--clients",
+    "rust,go",
+    "--validators",
+    "10",
+    "--seed-file",
+    "protocol/vectors/wan-seeds.txt"
+  ],
+  "cwd": "C:\\noosphere",
+  "environment": {
+    "LIBCLANG_PATH": "C:/Users/ntrap/AppData/Local/Programs/Swift/Toolchains/6.3.2+Asserts/usr/bin",
+    "RUST_BACKTRACE": "1"
+  },
+  "exclusions": {
+    "G3_EXTERNAL_NOT_SATISFIED": [
+      "public adversarial testnet duration (90 days)",
+      "seven uninterrupted public AI-off days required by A-BRAID",
+      "open participation and funded red team",
+      "independent consensus/network/state/crypto audit and cryptanalysis"
+    ]
+  },
+  "exit": {
+    "simulator": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "wrapper": 0
+  },
+  "gate": "G2_INDEPENDENT_DEVNET_DETERMINISTIC_SIMULATION",
+  "observations": {
+    "client_pairs": [
+      "go->go",
+      "go->rust",
+      "rust->go",
+      "rust->rust"
+    ],
+    "runs": [
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 54,
+          "messages_dropped": 179,
+          "messages_sent": 573,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 58,
+          "messages_dropped": 180,
+          "messages_sent": 575,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 64,
+          "messages_dropped": 176,
+          "messages_sent": 574,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 52,
+          "messages_dropped": 173,
+          "messages_sent": 575,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 53,
+          "messages_dropped": 180,
+          "messages_sent": 573,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 54,
+          "messages_dropped": 182,
+          "messages_sent": 574,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 67,
+          "messages_dropped": 174,
+          "messages_sent": 575,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 60,
+          "messages_dropped": 167,
+          "messages_sent": 574,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 52,
+          "messages_dropped": 171,
+          "messages_sent": 575,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 64,
+          "messages_dropped": 174,
+          "messages_sent": 574,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 58,
+          "messages_dropped": 173,
+          "messages_sent": 574,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 62,
+          "messages_dropped": 178,
+          "messages_sent": 575,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 59,
+          "messages_dropped": 177,
+          "messages_sent": 575,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 59,
+          "messages_dropped": 175,
+          "messages_sent": 574,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 53,
+          "messages_dropped": 169,
+          "messages_sent": 575,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      },
+      {
+        "blackout": {
+          "disabled_lanes": [],
+          "finalizations": 0,
+          "ground_blocks": 0,
+          "lumen_transfers": 0,
+          "optional_lanes_disabled": false,
+          "trapped_escrow": 0
+        },
+        "client_pairs": [
+          "go->go",
+          "go->rust",
+          "rust->go",
+          "rust->rust"
+        ],
+        "faults": {
+          "fsync_faults_injected": 0,
+          "messages_delayed": 60,
+          "messages_dropped": 174,
+          "messages_sent": 574,
+          "partitions_injected": 1,
+          "recovery_checks": 1
+        },
+        "liveness": {
+          "eligible_blocks": 60,
+          "finalization_ratio": 1.0,
+          "finalized_blocks": 60,
+          "max_recovery_slots": 1
+        },
+        "roots": {
+          "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe",
+          "fork_divergences": 0,
+          "state_divergences": 0
+        },
+        "safety": {
+          "conflicting_finalizations": 0,
+          "false_certificates": 0,
+          "honest_slashes": 0
+        },
+        "scenario": "wan-fault-matrix",
+        "schema_version": "noos.base-battery.v1",
+        "seeds_run": 1,
+        "validators": 10,
+        "verdict": "PASS",
+        "workload": {
+          "contracts_executed": 0,
+          "historical_receipts_verified": true,
+          "transfers_applied": 64
+        }
+      }
+    ]
+  },
+  "parameters": {
+    "clients": [
+      "rust",
+      "go"
+    ],
+    "crypto": "real",
+    "duration_argument": null,
+    "duration_slots": 60,
+    "kill_every_fsync_boundary": false,
+    "max_ai_load": false,
+    "max_faults": null,
+    "seed_file": {
+      "path": "protocol/vectors/wan-seeds.txt",
+      "sha256": "997b48581e34466ada5e4c53a3d0c57bc363dcd15641fed519a8f9cb9449cf1b"
+    },
+    "simulated_days": null,
+    "tx_load": 64,
+    "validators": 10
+  },
+  "raw_log": {
+    "bytes": 18490,
+    "path": "evidence/logs/wan-fault-matrix-d036a447de45988b16461bca7d7d8be3e14dc9c5f558dceadd10a9f375c6e388.raw.log",
+    "sha256": "d036a447de45988b16461bca7d7d8be3e14dc9c5f558dceadd10a9f375c6e388"
+  },
+  "revision": {
+    "git_head": "666b735a5b457f95b207b6d90fb24995d9bc2c90",
+    "source_sha256": {
+      "Cargo.lock": "bb816485d8d2f10f871ccaab5afc8f809f117cbfb93e1b94834441575ed368ca",
+      "crates/noos-sim-net/Cargo.toml": "361d18fd6ca243362c1370c8b3e611cf612fa1d51d2555a74bdb49dd26b0e7d4",
+      "crates/noos-sim-net/src/lib.rs": "ce6d7f776eeeedef265d8a6d980fb1710dc68c8a6dec41832ddd7ce39a254629",
+      "crates/noos-sim-net/src/main.rs": "e703c60d5734bee2350f403234ac9476529f0b7ac9c4633cae97fe5680502547",
+      "tools/e2e/run_network.py": "cbb7a9d97fabfbf652fff123295d5a2ef0688ba6e371a9bdd5e9726fd95e76e7"
+    },
+    "working_tree": "exact source files are hash-bound; this remains G2-only evidence"
+  },
+  "rollback": {
+    "ordinary_base_live": true,
+    "result": "fault removal restored/retained deterministic base finality and state agreement",
+    "verdict": "PASS"
+  },
+  "scenario": "wan-fault-matrix",
+  "schema_version": "noos.base-g2-evidence.v1",
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    7,
+    11,
+    17,
+    23,
+    42,
+    255,
+    256,
+    257,
+    65535,
+    4294967295,
+    9223372036854775807,
+    18446744073709551615
+  ],
+  "simulator_commands": [
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "0",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "1",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "2",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "3",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "7",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "11",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "17",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "23",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "42",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "255",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "256",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "257",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "65535",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "4294967295",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "9223372036854775807",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ],
+    [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "noos-sim-net",
+      "--locked",
+      "--",
+      "wan-fault-matrix",
+      "--seed",
+      "18446744073709551615",
+      "--validators",
+      "10",
+      "--slots",
+      "60",
+      "--tx-load",
+      "64",
+      "--clients",
+      "rust,go",
+      "--crypto",
+      "real"
+    ]
+  ],
+  "thresholds": {
+    "conflicting_finalizations_max": 0,
+    "eligible_finalization_ratio_min": 0.99,
+    "false_certificates_max": 0,
+    "fork_divergences_max": 0,
+    "historical_receipts_verified": true,
+    "honest_slashes_max": 0,
+    "recovery_slots_max": 512,
+    "root_divergences_max": 0,
+    "trapped_escrow_max": 0
+  },
+  "timestamps": {
+    "ended_utc": "2026-07-11T10:33:11.046Z",
+    "started_utc": "2026-07-11T10:32:58.148Z"
+  },
+  "toolchain": {
+    "cargo": "cargo 1.96.1 (356927216 2026-06-26)",
+    "python": "3.10.11",
+    "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)\nbinary: rustc\ncommit-hash: 31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd\ncommit-date: 2026-06-26\nhost: x86_64-pc-windows-msvc\nrelease: 1.96.1\nLLVM version: 22.1.2"
+  },
+  "verdict": "PASS"
+}

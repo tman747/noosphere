@@ -1,0 +1,30 @@
+#cloud-config
+users:
+  - name: noosphere
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/lib/noosphere
+write_files:
+  - path: /etc/systemd/system/noosd.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=MindChain node
+      After=network-online.target
+      Wants=network-online.target
+      [Service]
+      User=noosphere
+      Group=noosphere
+      EnvironmentFile=/etc/noosphere/noosd.env
+      ExecStart=/opt/mindchain/noosphere/current/noosd --descriptor /etc/noosphere/descriptor.json --genesis /etc/noosphere/genesis.bin --state-root /var/lib/noosphere/node
+      ProtectSystem=strict
+      ReadWritePaths=/var/lib/noosphere/node
+      NoNewPrivileges=true
+      Restart=on-failure
+      [Install]
+      WantedBy=multi-user.target
+runcmd:
+  - [mkdir, -p, /var/lib/noosphere/node, /var/lib/noosphere/indexer, /opt/mindchain/noosphere]
+  - [chown, -R, noosphere:noosphere, /var/lib/noosphere]
+  # Artifact installation is deliberately not run here. A signed identity-bound manifest
+  # must be supplied to deploy/installer.py; failed init leaves any prior generation intact.

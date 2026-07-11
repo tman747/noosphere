@@ -1,0 +1,12 @@
+{
+  "contract": "NOOS/TELEMETRY/V1",
+  "hash_algorithm": "sha256",
+  "root_law": "SHA-256 over each lexicographically sorted UTF-8 relative path, NUL, then its 32-byte SHA-256 digest",
+  "files": {
+    "protocol/telemetry/fixtures/all-metrics-v1.json": "d526a309fe4cb0708ee7f35b603fac85f66b65949d63b01eb24ab4f92479cc8c",
+    "protocol/telemetry/fixtures/pipeline-v1.json": "b4b0ef1b2e37249cb98d16026dc360c568c6ed2af5169881aeb29b31048386f2",
+    "protocol/telemetry/telemetry-v1.yaml": "49a0c8e6fea7a4440f70e5f0a3cd60fc3f157e0620819460e7cc259c94b12da0"
+  },
+  "fixture_root": "3ee33bb9245b368233d16b52212f5f7ff6f64512aaab3510b7b837c2727d11ac",
+  "contract_root": "72f0120b1112e1f8736155ec1a57f30841b867ba77a8c5fd13b1ec7494a5aaa5"
+}

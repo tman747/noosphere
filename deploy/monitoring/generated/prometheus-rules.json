@@ -1,0 +1,664 @@
+{
+  "groups": [
+    {
+      "interval": "15s",
+      "name": "noos_telemetry_contract_violations_total",
+      "rules": [
+        {
+          "expr": "sum by (reason) (rate(noos_telemetry_contract_violations_total[5m]))",
+          "record": "noos:telemetry_contract_violations:rate5m"
+        },
+        {
+          "alert": "NoosTelemetryContractViolation",
+          "annotations": {
+            "summary": "Telemetry contract violations by bounded reason.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "noos:telemetry_contract_violations:rate5m > 0 or unknown(noos:telemetry_contract_violations:rate5m)",
+          "for": "1m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "15s",
+      "name": "noos_p2p_peers",
+      "rules": [
+        {
+          "expr": "sum(noos_p2p_peers)",
+          "record": "noos:p2p_peers:sum"
+        },
+        {
+          "alert": "NoosPeerIsolation",
+          "annotations": {
+            "summary": "Connected peers by direction.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "noos:p2p_peers:sum < 3 or unknown(noos:p2p_peers:sum)",
+          "for": "2m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "15s",
+      "name": "noos_consensus_stall_seconds",
+      "rules": [
+        {
+          "expr": "max(noos_consensus_stall_seconds)",
+          "record": "noos:consensus_stall_seconds:max"
+        },
+        {
+          "alert": "NoosConsensusStall",
+          "annotations": {
+            "summary": "Seconds since unsafe head advanced.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "noos:consensus_stall_seconds:max > 30 or unknown(noos:consensus_stall_seconds:max)",
+          "for": "1m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "15s",
+      "name": "noos_finality_lag_blocks",
+      "rules": [
+        {
+          "expr": "max(noos_finality_lag_blocks)",
+          "record": "noos:finality_lag_blocks:max"
+        },
+        {
+          "alert": "NoosFinalityLag",
+          "annotations": {
+            "summary": "Unsafe-head minus finalized height without fallback inference.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "noos:finality_lag_blocks:max > 20 or unknown(noos:finality_lag_blocks:max)",
+          "for": "2m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "15s",
+      "name": "noos_queue_depth",
+      "rules": [
+        {
+          "expr": "max by (queue) (noos_queue_depth)",
+          "record": "noos:queue_depth:max"
+        },
+        {
+          "alert": "NoosQueueSaturation",
+          "annotations": {
+            "summary": "Bounded supervisor queue depth.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "max(noos:queue_depth:max) > 1000 or unknown(noos:queue_depth:max)",
+          "for": "5m",
+          "labels": {
+            "severity": "warning"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "15s",
+      "name": "noos_mempool_transactions",
+      "rules": [
+        {
+          "expr": "max(noos_mempool_transactions)",
+          "record": "noos:mempool_transactions:max"
+        },
+        {
+          "alert": "NoosMempoolBacklog",
+          "annotations": {
+            "summary": "Admitted mempool transaction count.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "noos:mempool_transactions:max > 50000 or unknown(noos:mempool_transactions:max)",
+          "for": "10m",
+          "labels": {
+            "severity": "warning"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "15s",
+      "name": "noos_indexer_freshness_seconds",
+      "rules": [
+        {
+          "expr": "max by (replica) (noos_indexer_freshness_seconds)",
+          "record": "noos:indexer_freshness_seconds:max"
+        },
+        {
+          "alert": "NoosIndexerStale",
+          "annotations": {
+            "summary": "Age of newest identity-matched indexed finalized block.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "max(noos:indexer_freshness_seconds:max) > 60 or unknown(noos:indexer_freshness_seconds:max)",
+          "for": "2m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "15s",
+      "name": "noos_identity_match",
+      "rules": [
+        {
+          "expr": "min by (component) (noos_identity_match)",
+          "record": "noos:identity_match:min"
+        },
+        {
+          "alert": "NoosIdentityMismatch",
+          "annotations": {
+            "summary": "One only when chain ID, genesis and API version match the release manifest.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "min(noos:identity_match:min) != 1 or unknown(noos:identity_match:min)",
+          "for": "0m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "15s",
+      "name": "noos_replica_divergence_blocks",
+      "rules": [
+        {
+          "expr": "max(noos_replica_divergence_blocks)",
+          "record": "noos:replica_divergence_blocks:max"
+        },
+        {
+          "alert": "NoosReplicaDivergence",
+          "annotations": {
+            "summary": "Finalized height divergence among identity-matched replicas.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "noos:replica_divergence_blocks:max > 0 or unknown(noos:replica_divergence_blocks:max)",
+          "for": "1m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "15s",
+      "name": "noos_rpc_requests_total",
+      "rules": [
+        {
+          "expr": "sum by (route,outcome) (rate(noos_rpc_requests_total[5m]))",
+          "record": "noos:rpc_requests:rate5m"
+        },
+        {
+          "alert": "NoosRpcErrors",
+          "annotations": {
+            "summary": "RPC requests by bounded route class and outcome.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "ratio_5xx(noos:rpc_requests:rate5m) > 0.05 or unknown(noos:rpc_requests:rate5m)",
+          "for": "5m",
+          "labels": {
+            "severity": "warning"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "30s",
+      "name": "noos_faucet_requests_total",
+      "rules": [
+        {
+          "expr": "sum by (outcome) (rate(noos_faucet_requests_total[5m]))",
+          "record": "noos:faucet_requests:rate5m"
+        },
+        {
+          "alert": "NoosFaucetFailure",
+          "annotations": {
+            "summary": "Test-network faucet outcomes.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "ratio_rejected(noos:faucet_requests:rate5m) > 0.5 or unknown(noos:faucet_requests:rate5m)",
+          "for": "10m",
+          "labels": {
+            "severity": "warning"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "60s",
+      "name": "noos_tls_certificate_expiry_seconds",
+      "rules": [
+        {
+          "expr": "min by (service) (noos_tls_certificate_expiry_seconds)",
+          "record": "noos:tls_certificate_expiry_seconds:min"
+        },
+        {
+          "alert": "NoosTlsExpiry",
+          "annotations": {
+            "summary": "Seconds until TLS certificate expiry.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "min(noos:tls_certificate_expiry_seconds:min) < 1209600 or unknown(noos:tls_certificate_expiry_seconds:min)",
+          "for": "5m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "30s",
+      "name": "noos_descriptor_drift",
+      "rules": [
+        {
+          "expr": "max(noos_descriptor_drift)",
+          "record": "noos:descriptor_drift:max"
+        },
+        {
+          "alert": "NoosDescriptorDrift",
+          "annotations": {
+            "summary": "One on immutable descriptor drift.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "noos:descriptor_drift:max != 0 or unknown(noos:descriptor_drift:max)",
+          "for": "0m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "30s",
+      "name": "noos_genesis_drift",
+      "rules": [
+        {
+          "expr": "max(noos_genesis_drift)",
+          "record": "noos:genesis_drift:max"
+        },
+        {
+          "alert": "NoosGenesisDrift",
+          "annotations": {
+            "summary": "One on immutable genesis drift.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "noos:genesis_drift:max != 0 or unknown(noos:genesis_drift:max)",
+          "for": "0m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "30s",
+      "name": "noos_download_bytes_total",
+      "rules": [
+        {
+          "expr": "sum by (artifact,outcome) (rate(noos_download_bytes_total[5m]))",
+          "record": "noos:download_bytes:rate5m"
+        },
+        {
+          "alert": "NoosDownloadFailure",
+          "annotations": {
+            "summary": "Artifact downloads by bounded artifact class and result.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "ratio_error(noos:download_bytes:rate5m) > 0.1 or unknown(noos:download_bytes:rate5m)",
+          "for": "10m",
+          "labels": {
+            "severity": "warning"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "60s",
+      "name": "noos_version_skew",
+      "rules": [
+        {
+          "expr": "max(noos_version_skew)",
+          "record": "noos:version_skew:max"
+        },
+        {
+          "alert": "NoosVersionSkew",
+          "annotations": {
+            "summary": "Supported release versions behind current.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "noos:version_skew:max > 1 or unknown(noos:version_skew:max)",
+          "for": "30m",
+          "labels": {
+            "severity": "warning"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "15s",
+      "name": "noos_witness_stake",
+      "rules": [
+        {
+          "expr": "sum by (weight) (noos_witness_stake)",
+          "record": "noos:witness_stake:sum"
+        },
+        {
+          "alert": "NoosStakeTelemetryUnknown",
+          "annotations": {
+            "summary": "Aggregate witness stake without validator identity labels.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "unknown(noos:witness_stake:sum)",
+          "for": "1m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "60s",
+      "name": "noos_control_cluster_concentration",
+      "rules": [
+        {
+          "expr": "max by (statistic) (noos_control_cluster_concentration)",
+          "record": "noos:control_cluster_concentration:max"
+        },
+        {
+          "alert": "NoosControlConcentration",
+          "annotations": {
+            "summary": "Declared-control-cluster concentration statistic.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "threshold_concentration(noos:control_cluster_concentration:max) or unknown(noos:control_cluster_concentration:max)",
+          "for": "1h",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "300s",
+      "name": "noos_ecosystem_concentration",
+      "rules": [
+        {
+          "expr": "max by (dimension,statistic) (noos_ecosystem_concentration)",
+          "record": "noos:ecosystem_concentration:max"
+        },
+        {
+          "alert": "NoosEcosystemConcentration",
+          "annotations": {
+            "summary": "Bounded concentration dimensions and statistics.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "threshold_concentration(noos:ecosystem_concentration:max) or unknown(noos:ecosystem_concentration:max)",
+          "for": "6h",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "15s",
+      "name": "noos_nel_correctness_divergences_total",
+      "rules": [
+        {
+          "expr": "sum(rate(noos_nel_correctness_divergences_total[5m]))",
+          "record": "noos:nel_correctness_divergences:rate5m"
+        },
+        {
+          "alert": "NoosNelCorrectnessDivergence",
+          "annotations": {
+            "summary": "Independent NEL implementation correctness divergences.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "noos:nel_correctness_divergences:rate5m > 0 or unknown(noos:nel_correctness_divergences:rate5m)",
+          "for": "0m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "15s",
+      "name": "noos_nel_token_latency_seconds",
+      "rules": [
+        {
+          "expr": "histogram_quantiles(0.50,0.95,0.99,noos_nel_token_latency_seconds,5m)",
+          "record": "noos:nel_token_latency_seconds:quantiles5m"
+        },
+        {
+          "alert": "NoosNelTokenLatency",
+          "annotations": {
+            "summary": "Committed-token latency distribution.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "p95(noos:nel_token_latency_seconds:quantiles5m) >= 2 or p99(noos:nel_token_latency_seconds:quantiles5m) >= 5 or unknown(noos:nel_token_latency_seconds:quantiles5m)",
+          "for": "10m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "60s",
+      "name": "noos_nel_da_retrieval_ratio",
+      "rules": [
+        {
+          "expr": "min by (window) (noos_nel_da_retrieval_ratio)",
+          "record": "noos:nel_da_retrieval_ratio:min"
+        },
+        {
+          "alert": "NoosNelDaRetrieval",
+          "annotations": {
+            "summary": "Successful NEL witness retrieval ratio.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "label_30d(noos:nel_da_retrieval_ratio:min) < 0.999 or unknown(noos:nel_da_retrieval_ratio:min)",
+          "for": "1h",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "30s",
+      "name": "noos_nel_dispute_rounds",
+      "rules": [
+        {
+          "expr": "histogram_quantile(0.95,noos_nel_dispute_rounds,24h)",
+          "record": "noos:nel_dispute_rounds:p95_24h"
+        },
+        {
+          "alert": "NoosNelDisputeRounds",
+          "annotations": {
+            "summary": "Completed NEL dispute rounds.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "noos:nel_dispute_rounds:p95_24h > 19 or unknown(noos:nel_dispute_rounds:p95_24h)",
+          "for": "1h",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "30s",
+      "name": "noos_nel_dispute_bytes",
+      "rules": [
+        {
+          "expr": "histogram_quantile(0.95,noos_nel_dispute_bytes,24h)",
+          "record": "noos:nel_dispute_bytes:p95_24h"
+        },
+        {
+          "alert": "NoosNelDisputeBytes",
+          "annotations": {
+            "summary": "On-chain bytes per completed NEL dispute.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "noos:nel_dispute_bytes:p95_24h > 8295 or unknown(noos:nel_dispute_bytes:p95_24h)",
+          "for": "1h",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "30s",
+      "name": "noos_nel_dispute_duration_seconds",
+      "rules": [
+        {
+          "expr": "histogram_quantile(0.95,noos_nel_dispute_duration_seconds,24h)",
+          "record": "noos:nel_dispute_duration_seconds:p95_24h"
+        },
+        {
+          "alert": "NoosNelDisputeDuration",
+          "annotations": {
+            "summary": "Completed NEL dispute duration.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "noos:nel_dispute_duration_seconds:p95_24h >= 21600 or unknown(noos:nel_dispute_duration_seconds:p95_24h)",
+          "for": "1h",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "60s",
+      "name": "noos_nel_diversity",
+      "rules": [
+        {
+          "expr": "min by (role) (noos_nel_diversity)",
+          "record": "noos:nel_diversity:min"
+        },
+        {
+          "alert": "NoosNelDiversity",
+          "annotations": {
+            "summary": "Independent NEL committee or funded challenger count.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "role_committee(noos:nel_diversity:min) < 3 or role_challenger(noos:nel_diversity:min) < 2 or unknown(noos:nel_diversity:min)",
+          "for": "1h",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "30s",
+      "name": "noos_nel_finality_state_jobs",
+      "rules": [
+        {
+          "expr": "sum by (state) (noos_nel_finality_state_jobs)",
+          "record": "noos:nel_finality_state_jobs:sum"
+        },
+        {
+          "alert": "NoosNelFinalityStateUnknown",
+          "annotations": {
+            "summary": "NEL job count by explicit finality state.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "unknown(noos:nel_finality_state_jobs:sum)",
+          "for": "2m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "30s",
+      "name": "noos_nel_finality_state_age_seconds",
+      "rules": [
+        {
+          "expr": "max by (state) (noos_nel_finality_state_age_seconds)",
+          "record": "noos:nel_finality_state_age_seconds:max"
+        },
+        {
+          "alert": "NoosNelFinalityAge",
+          "annotations": {
+            "summary": "Oldest job age in each NEL finality state.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "state_soft(noos:nel_finality_state_age_seconds:max) > 21600 or unknown(noos:nel_finality_state_age_seconds:max)",
+          "for": "10m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "15s",
+      "name": "noos_nel_verifier_backlog",
+      "rules": [
+        {
+          "expr": "sum by (profile) (noos_nel_verifier_backlog)",
+          "record": "noos:nel_verifier_backlog:sum"
+        },
+        {
+          "alert": "NoosNelVerifierBacklog",
+          "annotations": {
+            "summary": "Queued proofs by closed verifier profile.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "max(noos:nel_verifier_backlog:sum) > 1000 or unknown(noos:nel_verifier_backlog:sum)",
+          "for": "5m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "interval": "30s",
+      "name": "noos_nel_bond_value_exposure_ratio",
+      "rules": [
+        {
+          "expr": "max by (scope) (noos_nel_bond_value_exposure_ratio)",
+          "record": "noos:nel_bond_value_exposure_ratio:max"
+        },
+        {
+          "alert": "NoosNelBondExposure",
+          "annotations": {
+            "summary": "Aggregate assured value exposure divided by available bond capacity.",
+            "unknown": "UNKNOWN blocks every release gate dependency"
+          },
+          "expr": "max(noos:nel_bond_value_exposure_ratio:max) > 1 or unknown(noos:nel_bond_value_exposure_ratio:max)",
+          "for": "0m",
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      ]
+    }
+  ]
+}

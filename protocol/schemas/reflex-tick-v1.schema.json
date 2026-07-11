@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindchain.network/noosphere/reflex-tick-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slot", "sequence", "timestamp_ms", "leader_key", "bond_id", "tx_root", "receipt_root", "cumulative_gas_root", "prior_accumulator", "signature"],
+  "properties": {
+    "slot": {"type": "string", "pattern": "^(0|[1-9][0-9]*)$"},
+    "sequence": {"type": "string", "pattern": "^(0|[1-9][0-9]*)$"},
+    "timestamp_ms": {"type": "string", "pattern": "^(0|[1-9][0-9]*)$"},
+    "leader_key": {"$ref": "#/$defs/hash32"},
+    "bond_id": {"$ref": "#/$defs/hash32"},
+    "tx_root": {"$ref": "#/$defs/hash32"},
+    "receipt_root": {"$ref": "#/$defs/hash32"},
+    "cumulative_gas_root": {"$ref": "#/$defs/hash32"},
+    "prior_accumulator": {"$ref": "#/$defs/hash32"},
+    "signature": {"type": "string", "pattern": "^[0-9a-f]{128}$"}
+  },
+  "$defs": {"hash32": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

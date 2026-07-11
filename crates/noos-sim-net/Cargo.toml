@@ -1,0 +1,24 @@
+[package]
+name = "noos-sim-net"
+version = "0.1.0"
+description = "Deterministic executable base-network, WAN, blackout, crash, and client-pair simulations"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+blake3 = "1"
+sha2 = "0.10"
+noos-braid = { path = "../noos-braid" }
+noos-contracts = { path = "../noos-contracts" }
+noos-crypto = { path = "../noos-crypto" }
+noos-da = { path = "../noos-da" }
+noos-ground = { path = "../noos-ground" }
+noos-grain = { path = "../noos-grain" }
+noos-lumen = { path = "../noos-lumen" }
+noos-p2p = { path = "../noos-p2p" }
+
+noos-witness = { path = "../noos-witness" }
+[lints]
+workspace = true

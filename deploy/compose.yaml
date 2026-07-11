@@ -1,0 +1,31 @@
+services:
+  node:
+    image: ${NOOS_NODE_IMAGE:?immutable digest required}
+    user: noosphere
+    read_only: true
+    restart: unless-stopped
+    environment:
+      NOOS_DESCRIPTOR: /etc/noosphere/descriptor.json
+      NOOS_GENESIS: /etc/noosphere/genesis.bin
+      NOOS_STATE_ROOT: /var/lib/noosphere/node
+    volumes:
+      - ${NOOS_DESCRIPTOR:?descriptor required}:/etc/noosphere/descriptor.json:ro
+      - ${NOOS_GENESIS:?genesis required}:/etc/noosphere/genesis.bin:ro
+      - noos-node-state:/var/lib/noosphere/node
+    ports: ["127.0.0.1:9650:9650"]
+  indexer:
+    image: ${NOOS_INDEXER_IMAGE:?immutable digest required}
+    user: noosphere
+    read_only: true
+    restart: unless-stopped
+    environment:
+      NOOS_CHAIN_ID: ${NOOS_CHAIN_ID:?chain id required}
+      NOOS_GENESIS_HASH: ${NOOS_GENESIS_HASH:?genesis hash required}
+      NOOS_INDEXER_ROOT: /var/lib/noosphere/indexer
+      NOOS_INDEXER_LISTEN: 0.0.0.0:8080
+    volumes:
+      - noos-indexer-state:/var/lib/noosphere/indexer
+    ports: ["127.0.0.1:8080:8080"]
+volumes:
+  noos-node-state: {}
+  noos-indexer-state: {}

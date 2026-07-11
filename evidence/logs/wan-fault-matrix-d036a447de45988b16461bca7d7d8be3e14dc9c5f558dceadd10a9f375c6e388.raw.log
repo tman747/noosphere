@@ -1,0 +1,302 @@
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 0 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 573, "messages_dropped": 179, "messages_delayed": 54, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 1 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 575, "messages_dropped": 180, "messages_delayed": 58, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 2 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 574, "messages_dropped": 176, "messages_delayed": 64, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 3 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 575, "messages_dropped": 173, "messages_delayed": 52, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 7 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 573, "messages_dropped": 180, "messages_delayed": 53, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 11 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 574, "messages_dropped": 182, "messages_delayed": 54, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 17 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 575, "messages_dropped": 174, "messages_delayed": 67, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 23 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 574, "messages_dropped": 167, "messages_delayed": 60, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 42 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 575, "messages_dropped": 171, "messages_delayed": 52, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 255 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 574, "messages_dropped": 174, "messages_delayed": 64, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 256 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 574, "messages_dropped": 173, "messages_delayed": 58, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 257 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 575, "messages_dropped": 178, "messages_delayed": 62, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 65535 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 575, "messages_dropped": 177, "messages_delayed": 59, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 4294967295 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 574, "messages_dropped": 175, "messages_delayed": 59, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 9223372036854775807 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 575, "messages_dropped": 169, "messages_delayed": 53, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---
+
+
+$ cargo run -q -p noos-sim-net --locked -- wan-fault-matrix --seed 18446744073709551615 --validators 10 --slots 60 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "wan-fault-matrix",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 10,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 60, "finalized_blocks": 60, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "80bbab94e8c87122a9b331bf1d67db31fca167cf5ab611babf66cdb597fcbafe"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 0, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 574, "messages_dropped": 174, "messages_delayed": 60, "partitions_injected": 1, "fsync_faults_injected": 0, "recovery_checks": 1},
+  "blackout": {"optional_lanes_disabled": false, "disabled_lanes": [], "ground_blocks": 0, "lumen_transfers": 0, "finalizations": 0, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---

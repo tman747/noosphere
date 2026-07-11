@@ -1,0 +1,242 @@
+[
+  {
+    "panels": [
+      {
+        "expr": "noos:telemetry_contract_violations:rate5m",
+        "title": "Telemetry contract violations by bounded reason.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "Telemetry Contract",
+    "uid": "noos-telemetry-contract"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:p2p_peers:sum",
+        "title": "Connected peers by direction.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "Network Health",
+    "uid": "noos-network-health"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:consensus_stall_seconds:max",
+        "title": "Seconds since unsafe head advanced.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:finality_lag_blocks:max",
+        "title": "Unsafe-head minus finalized height without fallback inference.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "Consensus",
+    "uid": "noos-consensus"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:queue_depth:max",
+        "title": "Bounded supervisor queue depth.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "Runtime Queues",
+    "uid": "noos-runtime-queues"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:mempool_transactions:max",
+        "title": "Admitted mempool transaction count.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "Transactions",
+    "uid": "noos-transactions"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:indexer_freshness_seconds:max",
+        "title": "Age of newest identity-matched indexed finalized block.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "Indexer",
+    "uid": "noos-indexer"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:identity_match:min",
+        "title": "One only when chain ID, genesis and API version match the release manifest.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:replica_divergence_blocks:max",
+        "title": "Finalized height divergence among identity-matched replicas.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "Identity and Freshness",
+    "uid": "noos-identity-and-freshness"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:rpc_requests:rate5m",
+        "title": "RPC requests by bounded route class and outcome.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:faucet_requests:rate5m",
+        "title": "Test-network faucet outcomes.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "Public API",
+    "uid": "noos-public-api"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:tls_certificate_expiry_seconds:min",
+        "title": "Seconds until TLS certificate expiry.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:descriptor_drift:max",
+        "title": "One on immutable descriptor drift.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:genesis_drift:max",
+        "title": "One on immutable genesis drift.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:download_bytes:rate5m",
+        "title": "Artifact downloads by bounded artifact class and result.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:version_skew:max",
+        "title": "Supported release versions behind current.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "Release and TLS",
+    "uid": "noos-release-and-tls"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:witness_stake:sum",
+        "title": "Aggregate witness stake without validator identity labels.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:control_cluster_concentration:max",
+        "title": "Declared-control-cluster concentration statistic.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:ecosystem_concentration:max",
+        "title": "Bounded concentration dimensions and statistics.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "Stake and Concentration",
+    "uid": "noos-stake-and-concentration"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:nel_correctness_divergences:rate5m",
+        "title": "Independent NEL implementation correctness divergences.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "NEL Correctness",
+    "uid": "noos-nel-correctness"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:nel_token_latency_seconds:quantiles5m",
+        "title": "Committed-token latency distribution.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "NEL Performance",
+    "uid": "noos-nel-performance"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:nel_da_retrieval_ratio:min",
+        "title": "Successful NEL witness retrieval ratio.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "NEL Availability",
+    "uid": "noos-nel-availability"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:nel_dispute_rounds:p95_24h",
+        "title": "Completed NEL dispute rounds.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:nel_dispute_bytes:p95_24h",
+        "title": "On-chain bytes per completed NEL dispute.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:nel_dispute_duration_seconds:p95_24h",
+        "title": "Completed NEL dispute duration.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "NEL Disputes",
+    "uid": "noos-nel-disputes"
+  },
+  {
+    "panels": [
+      {
+        "expr": "noos:nel_diversity:min",
+        "title": "Independent NEL committee or funded challenger count.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:nel_finality_state_jobs:sum",
+        "title": "NEL job count by explicit finality state.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:nel_finality_state_age_seconds:max",
+        "title": "Oldest job age in each NEL finality state.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:nel_verifier_backlog:sum",
+        "title": "Queued proofs by closed verifier profile.",
+        "unknown": "UNKNOWN"
+      },
+      {
+        "expr": "noos:nel_bond_value_exposure_ratio:max",
+        "title": "Aggregate assured value exposure divided by available bond capacity.",
+        "unknown": "UNKNOWN"
+      }
+    ],
+    "title": "NEL Diversity and Exposure",
+    "uid": "noos-nel-diversity-and-exposure"
+  }
+]

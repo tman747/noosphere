@@ -1,0 +1,18 @@
+# NOOSPHERE E-WAN deterministic seed corpus v1.
+# Frozen unsigned 64-bit values; one simulation run per line.
+0
+1
+2
+3
+7
+11
+17
+23
+42
+255
+256
+257
+65535
+4294967295
+9223372036854775807
+18446744073709551615

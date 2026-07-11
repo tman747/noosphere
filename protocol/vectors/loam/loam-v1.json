@@ -1,0 +1,11 @@
+{
+  "schema": "loam-v1",
+  "cases": [
+    {"name":"local-capsule-projection","kind":"positive","bytes":"0200","expected":"roots-only"},
+    {"name":"authorized-raw-disclosure","kind":"positive","bytes":"0201","expected":"consent-plan"},
+    {"name":"expiry-purges-index","kind":"positive","bytes":"0202","expected":"exhausted"},
+    {"name":"plaintext-encrypted-da","kind":"negative","bytes":"fe00","error":"plaintext_publication_forbidden"},
+    {"name":"impossible-without-literal","kind":"negative","bytes":"fe01","error":"non_repairable_label_required"},
+    {"name":"claim-plaintext-forgotten","kind":"negative","bytes":"fe02","error":"plaintext_forgetting_cannot_be_claimed"}
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "commerce-v1",
+  "cases": [
+    {"name":"q0-settlement-after-availability","kind":"positive","bytes":"0300","expected":"settled-no-quality-assurance"},
+    {"name":"evaluation-after-availability","kind":"positive","bytes":"0301","expected":"evaluating"},
+    {"name":"objective-rejection","kind":"positive","bytes":"0302","expected":"work-rejected"},
+    {"name":"evaluation-before-availability","kind":"negative","bytes":"fd00","error":"availability_before_evaluation"},
+    {"name":"q0-quality-badge","kind":"negative","bytes":"fd01","error":"quality_assurance_misrepresentation"},
+    {"name":"subjective-objective-slash","kind":"negative","bytes":"fd02","error":"subjective_slashing_forbidden"}
+  ]
+}

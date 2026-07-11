@@ -1,0 +1,17 @@
+$ cargo run -q -p noos-sim-net --locked -- ai-blackout --seed 0 --validators 4 --slots 432000 --tx-load 64 --clients rust,go --crypto real
+--- stdout ---
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "ai-blackout",
+  "verdict": "PASS",
+  "seeds_run": 1,
+  "validators": 4,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 432000, "finalized_blocks": 432000, "finalization_ratio": 1.000000, "max_recovery_slots": 0},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "0de719ad121f1dc55f5a8d2a8827da74deab37c82d90f3dfa2a54041cb3f4216"},
+  "workload": {"transfers_applied": 64, "contracts_executed": 1, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 1296000, "messages_dropped": 0, "messages_delayed": 0, "partitions_injected": 0, "fsync_faults_injected": 0, "recovery_checks": 0},
+  "blackout": {"optional_lanes_disabled": true, "disabled_lanes": ["ai","worker","prover","model","chorus","umbra","dream","reflex"], "ground_blocks": 432000, "lumen_transfers": 64, "finalizations": 432000, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}
+--- stderr ---

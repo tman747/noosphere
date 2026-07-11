@@ -1,0 +1,12 @@
+{
+  "schema": "hearth-v1",
+  "cases": [
+    {"name":"lan-interactive","kind":"positive","bytes":"0400","expected":"lan_interactive"},
+    {"name":"wan-replica-relay","kind":"positive","bytes":"0401","expected":"relay_fallback"},
+    {"name":"many-source-seeding","kind":"positive","bytes":"0402","expected":"many_source_seeding"},
+    {"name":"two-hop-fifty-ms-pipeline","kind":"negative","bytes":"fc00","error":"feature_disabled_e_hearth_05"},
+    {"name":"casual-stateful-before-gate","kind":"negative","bytes":"fc01","error":"availability_class_ineligible"},
+    {"name":"dream-market-payout","kind":"negative","bytes":"fc02","error":"dream_market_killed"},
+    {"name":"duplicate-realization","kind":"negative","bytes":"fc03","error":"realization_already_used"}
+  ]
+}

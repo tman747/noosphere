@@ -59,16 +59,17 @@
     "go_sum_hash": "PENDING_HASH",
     "python": "PENDING_VERSION",
     "repro_policy": "protocol/release/repro-policy-v1.toml",
+    "repro_policy_hash": "2a4af9299cd8bc3827ddef53704a2ece0ed47a78530f3900645d1cdc0d46ceb4",
     "builders": [
       {
         "id": "PENDING_BUILDER_ID",
-        "platform": "windows-x86_64",
-        "independent_operator": "PENDING"
+        "platforms": ["windows-x86_64"],
+        "independent_operator": "PENDING_OPERATOR_A"
       },
       {
         "id": "PENDING_BUILDER_ID",
-        "platform": "ubuntu-x86_64",
-        "independent_operator": "PENDING"
+        "platforms": ["linux-x86_64", "linux-aarch64"],
+        "independent_operator": "PENDING_OPERATOR_B"
       }
     ]
   },
@@ -76,13 +77,14 @@
     "claim_registry_root": "PENDING_HASH",
     "crypto_domains_root": "PENDING_HASH",
     "constants_root": "PENDING_HASH",
-    "openapi_v1_root": "PENDING_HASH",
-    "telemetry_v1_root": "PENDING_HASH",
+    "openapi_v1_root": "618c46d0dc0d2b6ba9af86c518bf0ec80ea27d9258d3a1fc9efcfebdbc0e0dbf",
+    "api_vectors_root": "72e21e7a3285788dec0881c73b8d0818a8b4fc7a3499c6705ca4b831b0adbae3",
+    "telemetry_v1_root": "49a0c8e6fea7a4440f70e5f0a3cd60fc3f157e0620819460e7cc259c94b12da0",
+    "telemetry_fixtures_root": "3ee33bb9245b368233d16b52212f5f7ff6f64512aaab3510b7b837c2727d11ac",
     "conformance_vector_root": "PENDING_HASH",
     "genesis_vector_root": "PENDING_HASH"
   },
   "artifact_hashes": {
-    "_comment": "Map of released artifact path -> hash per the signed repro policy (raw bytes for unsigned artifacts; unsigned-payload manifest for signed installers).",
     "example/replace-me": "PENDING_HASH"
   },
   "gate_verdicts": [

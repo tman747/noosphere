@@ -8,6 +8,10 @@
 #   python tools/gates/validate_registry.py protocol/claims/registry.json
 #   python tools/gates/check_identity.py --reject-root C:/ascent
 #   python tools/gates/check_vectors.py protocol/vectors
+#   python tools/gates/check_api.py
+#   python tools/gates/check_telemetry.py
+#   python tools/gates/check_repro_policy.py
+#   python tools/gates/check_base_evidence.py
 #
 # Each step logs [PASS]/[FAIL]/[SKIP]. Emits `RESULT noosphere_core_gate=PASS`
 # and exits 0 only when every executed step exits 0; otherwise emits
@@ -69,7 +73,13 @@ Write-Host ("noosphere_core_gate: root={0}" -f $Root)
 # librocksdb-sys (noos-store's pinned RocksDB backend) runs bindgen at
 # build time and needs libclang. Auto-detect when LIBCLANG_PATH is unset.
 if (-not $env:LIBCLANG_PATH) {
-    $libclang = Get-Command 'libclang.dll' -ErrorAction SilentlyContinue
+    $swiftClangDir = 'C:/Users/ntrap/AppData/Local/Programs/Swift/Toolchains/6.3.2+Asserts/usr/bin'
+    $libclang = $null
+    if (Test-Path (Join-Path $swiftClangDir 'libclang.dll')) {
+        $libclang = @{ Source = (Join-Path $swiftClangDir 'libclang.dll') }
+    } else {
+        $libclang = Get-Command 'libclang.dll' -ErrorAction SilentlyContinue
+    }
     if (-not $libclang) {
         $clang = Get-Command 'clang' -ErrorAction SilentlyContinue
         if ($clang) {
@@ -116,6 +126,10 @@ if ($goFiles.Count -eq 0) {
 Invoke-Step 'validate_registry' @('python', 'tools/gates/validate_registry.py', 'protocol/claims/registry.json') $Root
 Invoke-Step 'check_identity' @('python', 'tools/gates/check_identity.py', '--reject-root', 'C:/ascent') $Root
 Invoke-Step 'check_vectors' @('python', 'tools/gates/check_vectors.py', 'protocol/vectors') $Root
+Invoke-Step 'check_api' @('python', 'tools/gates/check_api.py') $Root
+Invoke-Step 'check_telemetry' @('python', 'tools/gates/check_telemetry.py') $Root
+Invoke-Step 'check_repro_policy' @('python', 'tools/gates/check_repro_policy.py') $Root
+Invoke-Step 'check_base_evidence' @('python', 'tools/gates/check_base_evidence.py') $Root
 
 # --- Verdict ----------------------------------------------------------------
 Write-Host ''

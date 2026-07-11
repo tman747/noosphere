@@ -1,0 +1,370 @@
+{
+  "lifecycle": "EXPERIMENTAL",
+  "cases": [
+    {
+      "name": "class-valid-reversible",
+      "lane": "A-CLASS-GATE.v2",
+      "expected": "ACCEPT",
+      "kind": "positive",
+      "bytes": "636c6173732d76616c69642d72657665727369626c65"
+    },
+    {
+      "name": "class-tee-laundering",
+      "lane": "A-CLASS-GATE.v2",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "636c6173732d7465652d6c61756e646572696e67"
+    },
+    {
+      "name": "class-foreign-receipt",
+      "lane": "A-CLASS-GATE.v2",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "636c6173732d666f726569676e2d72656365697074"
+    },
+    {
+      "name": "class-budget-crossing",
+      "lane": "A-CLASS-GATE.v2",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "636c6173732d6275646765742d63726f7373696e67"
+    },
+    {
+      "name": "class-revocation-race",
+      "lane": "A-CLASS-GATE.v2",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "636c6173732d7265766f636174696f6e2d72616365"
+    },
+    {
+      "name": "class-empty-capabilities",
+      "lane": "A-CLASS-GATE.v2",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "636c6173732d656d7074792d6361706162696c6974696573"
+    },
+    {
+      "name": "class-provenance-meet",
+      "lane": "A-CLASS-GATE.v2",
+      "expected": "ACCEPT",
+      "kind": "positive",
+      "bytes": "636c6173732d70726f76656e616e63652d6d656574"
+    },
+    {
+      "name": "class-irreversible-nonzero",
+      "lane": "A-CLASS-GATE.v2",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "636c6173732d697272657665727369626c652d6e6f6e7a65726f"
+    },
+    {
+      "name": "chorus-retrieval-three-quotients",
+      "lane": "NOOS-CHORUS",
+      "expected": "ADVISORY_ONLY",
+      "kind": "positive",
+      "bytes": "63686f7275732d72657472696576616c2d74687265652d71756f7469656e7473"
+    },
+    {
+      "name": "chorus-cloned-lineage",
+      "lane": "NOOS-CHORUS",
+      "expected": "QUOTIENT",
+      "kind": "positive",
+      "bytes": "63686f7275732d636c6f6e65642d6c696e65616765"
+    },
+    {
+      "name": "chorus-conflicting-clone",
+      "lane": "NOOS-CHORUS",
+      "expected": "DISCARD_QUOTIENT",
+      "kind": "positive",
+      "bytes": "63686f7275732d636f6e666c696374696e672d636c6f6e65"
+    },
+    {
+      "name": "chorus-hidden-copy",
+      "lane": "NOOS-CHORUS",
+      "expected": "LIMITATION",
+      "kind": "positive",
+      "bytes": "63686f7275732d68696464656e2d636f7079"
+    },
+    {
+      "name": "chorus-manufactured-third",
+      "lane": "NOOS-CHORUS",
+      "expected": "FALSIFIED",
+      "kind": "negative",
+      "bytes": "63686f7275732d6d616e7566616374757265642d7468697264"
+    },
+    {
+      "name": "chorus-zero-beacon",
+      "lane": "NOOS-CHORUS",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "63686f7275732d7a65726f2d626561636f6e"
+    },
+    {
+      "name": "chorus-oversize-input",
+      "lane": "NOOS-CHORUS",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "63686f7275732d6f76657273697a652d696e707574"
+    },
+    {
+      "name": "chorus-slash-default",
+      "lane": "NOOS-CHORUS",
+      "expected": "ZERO",
+      "kind": "positive",
+      "bytes": "63686f7275732d736c6173682d64656661756c74"
+    },
+    {
+      "name": "swarm-bonded-diverse-route",
+      "lane": "NOOS-SWARM",
+      "expected": "ACCEPT",
+      "kind": "positive",
+      "bytes": "737761726d2d626f6e6465642d646976657273652d726f757465"
+    },
+    {
+      "name": "swarm-unbonded-worker",
+      "lane": "NOOS-SWARM",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "737761726d2d756e626f6e6465642d776f726b6572"
+    },
+    {
+      "name": "swarm-below-opportunity-cost",
+      "lane": "NOOS-SWARM",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "737761726d2d62656c6f772d6f70706f7274756e6974792d636f7374"
+    },
+    {
+      "name": "swarm-budget-exceeded",
+      "lane": "NOOS-SWARM",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "737761726d2d6275646765742d6578636565646564"
+    },
+    {
+      "name": "swarm-cluster-quotient",
+      "lane": "NOOS-SWARM",
+      "expected": "QUOTIENT",
+      "kind": "positive",
+      "bytes": "737761726d2d636c75737465722d71756f7469656e74"
+    },
+    {
+      "name": "swarm-concentration-third",
+      "lane": "NOOS-SWARM",
+      "expected": "BOND_ONLY",
+      "kind": "positive",
+      "bytes": "737761726d2d636f6e63656e74726174696f6e2d7468697264"
+    },
+    {
+      "name": "swarm-manufactured-diversity",
+      "lane": "NOOS-SWARM",
+      "expected": "BOND_ONLY",
+      "kind": "positive",
+      "bytes": "737761726d2d6d616e7566616374757265642d646976657273697479"
+    },
+    {
+      "name": "swarm-payment-double-settle",
+      "lane": "NOOS-SWARM",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "737761726d2d7061796d656e742d646f75626c652d736574746c65"
+    },
+    {
+      "name": "gradient-independent-match",
+      "lane": "E-GRAD-01",
+      "expected": "PASS_FIDELITY",
+      "kind": "positive",
+      "bytes": "6772616469656e742d696e646570656e64656e742d6d61746368"
+    },
+    {
+      "name": "gradient-freivalds-tamper",
+      "lane": "E-GRAD-01",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "6772616469656e742d6672656976616c64732d74616d706572"
+    },
+    {
+      "name": "gradient-zero-case",
+      "lane": "E-GRAD-01",
+      "expected": "NO_FORGED_COVERAGE",
+      "kind": "positive",
+      "bytes": "6772616469656e742d7a65726f2d63617365"
+    },
+    {
+      "name": "gradient-quality-distinct",
+      "lane": "E-GRAD-01",
+      "expected": "ACCEPT_DISTINCT",
+      "kind": "positive",
+      "bytes": "6772616469656e742d7175616c6974792d64697374696e6374"
+    },
+    {
+      "name": "training-promotion-new-revision",
+      "lane": "E-GRAD-01",
+      "expected": "ACCEPT",
+      "kind": "positive",
+      "bytes": "747261696e696e672d70726f6d6f74696f6e2d6e65772d7265766973696f6e"
+    },
+    {
+      "name": "training-mutable-revision",
+      "lane": "E-GRAD-01",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "747261696e696e672d6d757461626c652d7265766973696f6e"
+    },
+    {
+      "name": "reflex-valid-signed-tick",
+      "lane": "A-REFLEX",
+      "expected": "SHAPE_ONLY",
+      "kind": "positive",
+      "bytes": "7265666c65782d76616c69642d7369676e65642d7469636b"
+    },
+    {
+      "name": "reflex-bad-signature",
+      "lane": "A-REFLEX",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "7265666c65782d6261642d7369676e6174757265"
+    },
+    {
+      "name": "reflex-unbonded-leader",
+      "lane": "A-REFLEX",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "7265666c65782d756e626f6e6465642d6c6561646572"
+    },
+    {
+      "name": "reflex-over-250ms",
+      "lane": "A-REFLEX",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "7265666c65782d6f7665722d3235306d73"
+    },
+    {
+      "name": "reflex-state-root-field",
+      "lane": "A-REFLEX",
+      "expected": "SCHEMA_REJECT",
+      "kind": "negative",
+      "bytes": "7265666c65782d73746174652d726f6f742d6669656c64"
+    },
+    {
+      "name": "reflex-same-key-contradiction",
+      "lane": "A-REFLEX",
+      "expected": "PROOF_VALID",
+      "kind": "positive",
+      "bytes": "7265666c65782d73616d652d6b65792d636f6e74726164696374696f6e"
+    },
+    {
+      "name": "reflex-handoff-pause",
+      "lane": "A-REFLEX",
+      "expected": "PAUSED",
+      "kind": "positive",
+      "bytes": "7265666c65782d68616e646f66662d7061757365"
+    },
+    {
+      "name": "reflex-f9-enablement",
+      "lane": "A-REFLEX",
+      "expected": "DISABLED",
+      "kind": "negative",
+      "bytes": "7265666c65782d66392d656e61626c656d656e74"
+    },
+    {
+      "name": "oracle-lineage-median",
+      "lane": "E-ORACLE-01",
+      "expected": "EXPERIMENTAL_PROFILE",
+      "kind": "positive",
+      "bytes": "6f7261636c652d6c696e656167652d6d656469616e"
+    },
+    {
+      "name": "oracle-hidden-copy",
+      "lane": "E-ORACLE-01",
+      "expected": "LIMITATION",
+      "kind": "positive",
+      "bytes": "6f7261636c652d68696464656e2d636f7079"
+    },
+    {
+      "name": "oracle-universal-truth",
+      "lane": "E-ORACLE-01",
+      "expected": "FALSE",
+      "kind": "positive",
+      "bytes": "6f7261636c652d756e6976657273616c2d7472757468"
+    },
+    {
+      "name": "ident01-five-paths",
+      "lane": "I-PENTAGON",
+      "expected": "SHADOW_ONLY",
+      "kind": "positive",
+      "bytes": "6964656e7430312d666976652d7061746873"
+    },
+    {
+      "name": "ident01-double-credit",
+      "lane": "I-PENTAGON",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "6964656e7430312d646f75626c652d637265646974"
+    },
+    {
+      "name": "ident02-fifteen-mutations",
+      "lane": "I-PENTAGON",
+      "expected": "PASS_SHADOW_ONLY",
+      "kind": "positive",
+      "bytes": "6964656e7430322d6669667465656e2d6d75746174696f6e73"
+    },
+    {
+      "name": "ident02-transplant",
+      "lane": "I-PENTAGON",
+      "expected": "REJECT",
+      "kind": "negative",
+      "bytes": "6964656e7430322d7472616e73706c616e74"
+    },
+    {
+      "name": "ident02-cost-overrun",
+      "lane": "I-PENTAGON",
+      "expected": "REPRICE_NEW_CLAIM_VERSION",
+      "kind": "positive",
+      "bytes": "6964656e7430322d636f73742d6f76657272756e"
+    },
+    {
+      "name": "ident03-disable-matrix",
+      "lane": "I-PENTAGON",
+      "expected": "PASS_SHADOW_ONLY",
+      "kind": "positive",
+      "bytes": "6964656e7430332d64697361626c652d6d6174726978"
+    },
+    {
+      "name": "ident03-base-effect",
+      "lane": "I-PENTAGON",
+      "expected": "UNIVERSAL_KILL",
+      "kind": "negative",
+      "bytes": "6964656e7430332d626173652d656666656374"
+    },
+    {
+      "name": "foresight-payout",
+      "lane": "FORESIGHT",
+      "expected": "ZERO",
+      "kind": "positive",
+      "bytes": "666f726573696768742d7061796f7574"
+    },
+    {
+      "name": "foresight-authority",
+      "lane": "FORESIGHT",
+      "expected": "FALSE",
+      "kind": "positive",
+      "bytes": "666f726573696768742d617574686f72697479"
+    },
+    {
+      "name": "foresight-double-realization",
+      "lane": "FORESIGHT",
+      "expected": "INVALIDATED",
+      "kind": "negative",
+      "bytes": "666f726573696768742d646f75626c652d7265616c697a6174696f6e"
+    },
+    {
+      "name": "foresight-action-influence",
+      "lane": "FORESIGHT",
+      "expected": "INVALIDATED",
+      "kind": "negative",
+      "bytes": "666f726573696768742d616374696f6e2d696e666c75656e6365"
+    }
+  ],
+  "schema": "experimental-lanes-v1"
+}

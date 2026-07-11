@@ -1,0 +1,14 @@
+{
+  "vector_version": 1,
+  "cases": [
+    {"id":"frozen-policy-valid","kind":"policy","valid":true},
+    {"id":"manifest-template-valid","kind":"manifest_template","valid":true},
+    {"id":"unlisted-must-default-raw","kind":"policy_mutation","path":"unlisted_artifact_comparison","value":"normalized","valid":false,"error":"unlisted_not_raw"},
+    {"id":"normalization-forbidden","kind":"policy_mutation","path":"post_build_normalization","value":"allowed","valid":false,"error":"normalization_allowed"},
+    {"id":"installer-extra-variance-forbidden","kind":"policy_mutation","path":"comparison.signed_installer.allowed_platform_envelope_fields","value":["platform_signature","timestamp_envelope","file_order"],"valid":false,"error":"variance_not_closed"},
+    {"id":"unsigned-schema-byte-equality","kind":"policy_rule_mutation","pattern":"protocol/schemas/**","comparison":"semantic_yaml","valid":false,"error":"unsigned_not_raw"},
+    {"id":"missing-native-arm-builder","kind":"policy_mutation","path":"required_platforms","value":["windows-x86_64","linux-x86_64"],"valid":false,"error":"platform_set_incomplete"},
+    {"id":"unsigned-policy-blocks-build","kind":"release_readiness","policy_state":"UNSIGNED_BLOCKS_RELEASE","valid":false,"error":"policy_not_signed"},
+    {"id":"placeholder-instance-blocked","kind":"manifest_instance","source":"manifest-template.json","valid":false,"error":"placeholder_in_instance"}
+  ]
+}

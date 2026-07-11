@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#111310">
+  <meta name="description" content="Inspect MindChain node identity, mechanism evidence, and recent blocks.">
+  <title>MindChain Explorer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header>
+    <nav aria-label="Primary navigation">
+      <a class="brand" href="../site/">MindChain</a>
+      <ul>
+        <li><a href="../site/">Home</a></li>
+        <li><a href="./" aria-current="page">Explorer</a></li>
+        <li><a href="../protocol/api/openapi-v1.yaml">API contract</a></li>
+        <li><a href="../protocol/claims/registry.json">Claim registry</a></li>
+        <li><a href="../evidence/base-client-matrix.json">Evidence</a></li>
+      </ul>
+    </nav>
+    <div class="header-layout">
+      <div><span class="eyebrow">MindChain</span><h1>Chain explorer</h1></div>
+      <form id="endpoint-form">
+        <label for="endpoint">API endpoint</label>
+        <div class="input-row"><input id="endpoint" name="endpoint" type="url" value="http://127.0.0.1:8080" required aria-describedby="endpoint-help"><button type="submit">Connect</button></div>
+        <small id="endpoint-help">The endpoint must report the configured chain and genesis.</small>
+      </form>
+    </div>
+  </header>
+  <noscript>
+    <aside class="no-script" aria-label="JavaScript required">
+      <strong>The live explorer requires JavaScript.</strong>
+      <span>You can still read the <a href="../protocol/api/openapi-v1.yaml">API contract</a> or return to the <a href="../site/">MindChain home page</a>.</span>
+    </aside>
+  </noscript>
+  <main id="main" tabindex="-1">
+    <section class="identity" aria-labelledby="identity-title">
+      <div><p class="eyebrow">Independent coordinates</p><h2 id="identity-title">Network status</h2><p id="connection" role="status" aria-live="polite">Not connected</p></div>
+      <dl class="heads"><div><dt>Unsafe head</dt><dd id="unsafe">—</dd></div><div><dt>Justified</dt><dd id="justified">—</dd></div><div><dt>Finalized</dt><dd id="finalized">—</dd></div></dl>
+      <p class="warning">Finalized is read only from the API’s explicit finalized coordinate. It is never derived from unsafe or justified state.</p>
+    </section>
+    <section aria-labelledby="evidence-title">
+      <div class="section-head"><div><p class="eyebrow">Claim registry</p><h2 id="evidence-title">Mechanism evidence</h2></div><div class="field"><label for="mechanism">Mechanism ID</label><div class="input-row"><input id="mechanism" value="M-NEL" pattern="[A-Z][A-Z0-9_-]{1,63}"><button id="load-evidence" type="button">Inspect</button></div></div></div>
+      <div id="evidence" class="evidence" aria-live="polite"><p class="empty">Connect to inspect all six independent claim dimensions.</p></div>
+    </section>
+    <section aria-labelledby="blocks-title">
+      <div class="section-head"><div><p class="eyebrow">Canonical ordering</p><h2 id="blocks-title">Recent blocks</h2></div><button id="refresh" type="button">Refresh</button></div>
+      <div class="table-wrap"><table><caption class="sr-only">Recent blocks sorted by descending height and ascending hash</caption><thead><tr><th>Height</th><th>Hash</th><th>Slot</th><th>Transactions</th></tr></thead><tbody id="blocks"><tr><td colspan="4" class="empty">Connect to load blocks.</td></tr></tbody></table></div>
+    </section>
+  </main>
+  <footer>
+    <span>MindChain · Technical provenance: NOOSPHERE research corpus</span>
+    <a href="../site/">Back to MindChain home</a>
+  </footer>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

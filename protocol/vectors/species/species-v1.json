@@ -1,0 +1,11 @@
+{
+  "schema": "species-v1",
+  "cases": [
+    {"name":"immutable-artifact","kind":"positive","bytes":"0100","expected":"accepted"},
+    {"name":"directional-candidate-reference","kind":"positive","bytes":"0101","expected":"forward-only"},
+    {"name":"accepted-update-new-revision","kind":"positive","bytes":"0102","expected":"accepted"},
+    {"name":"mutable-current-weights","kind":"negative","bytes":"ff00","error":"mutable_current_weights_forbidden"},
+    {"name":"tolerance-transitive-inference","kind":"negative","bytes":"ff01","error":"tolerance_transitivity_forbidden"},
+    {"name":"species-consensus-weight","kind":"negative","bytes":"ff02","error":"consensus_evidence_forbidden"}
+  ]
+}

@@ -1,0 +1,821 @@
+{
+  "schema": "protocol/schemas/analytics-v1.md",
+  "cases": [
+    {
+      "name": "status-universal-hdf",
+      "kind": "negative",
+      "input": "M-HDF",
+      "expect": "RETIRED",
+      "bytes": ""
+    },
+    {
+      "name": "status-energy-profile",
+      "kind": "positive",
+      "input": "M-HDF-ENERGY",
+      "expect": "M-HDF-ENERGY",
+      "bytes": ""
+    },
+    {
+      "name": "status-omega-shadow",
+      "kind": "positive",
+      "input": "M-OMEGA",
+      "expect": "SHADOW_ONLY",
+      "bytes": ""
+    },
+    {
+      "name": "status-stale-credit",
+      "kind": "negative",
+      "input": "material-challenge",
+      "expect": "ZERO_SHADOW_CREDIT",
+      "bytes": ""
+    },
+    {
+      "name": "energy-1x1-zero",
+      "kind": "positive",
+      "rows": 1,
+      "cols": 1,
+      "values": [
+        0
+      ],
+      "row_signs": [
+        1
+      ],
+      "col_signs": [
+        1
+      ],
+      "samples": [
+        [
+          0,
+          0
+        ]
+      ],
+      "estimate": "0/1",
+      "bytes": ""
+    },
+    {
+      "name": "energy-1x1-negative",
+      "kind": "positive",
+      "rows": 1,
+      "cols": 1,
+      "values": [
+        -3
+      ],
+      "row_signs": [
+        -1
+      ],
+      "col_signs": [
+        1
+      ],
+      "samples": [
+        [
+          0,
+          0
+        ]
+      ],
+      "estimate": "9/1",
+      "bytes": ""
+    },
+    {
+      "name": "energy-2x2-full",
+      "kind": "positive",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "estimate": "120/4",
+      "residual_energy": 30,
+      "bytes": ""
+    },
+    {
+      "name": "energy-flat-hit",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [
+        [
+          0,
+          0
+        ]
+      ],
+      "estimate": "16/1",
+      "bytes": ""
+    },
+    {
+      "name": "energy-flat-miss-01",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [
+        [
+          0,
+          1
+        ]
+      ],
+      "estimate": "0/1",
+      "bytes": ""
+    },
+    {
+      "name": "energy-flat-miss-10",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [
+        [
+          1,
+          0
+        ]
+      ],
+      "estimate": "0/1",
+      "bytes": ""
+    },
+    {
+      "name": "energy-flat-miss-11",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [
+        [
+          1,
+          1
+        ]
+      ],
+      "estimate": "0/1",
+      "bytes": ""
+    },
+    {
+      "name": "energy-spike-visible-00",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [
+        [
+          0,
+          0
+        ]
+      ],
+      "estimate": "1/1",
+      "bytes": ""
+    },
+    {
+      "name": "energy-spike-visible-01",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [
+        [
+          0,
+          1
+        ]
+      ],
+      "estimate": "1/1",
+      "bytes": ""
+    },
+    {
+      "name": "energy-spike-visible-10",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [
+        [
+          1,
+          0
+        ]
+      ],
+      "estimate": "1/1",
+      "bytes": ""
+    },
+    {
+      "name": "energy-spike-visible-11",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [
+        [
+          1,
+          1
+        ]
+      ],
+      "estimate": "1/1",
+      "bytes": ""
+    },
+    {
+      "name": "reject-zero-rows",
+      "kind": "negative",
+      "rows": 0,
+      "cols": 1,
+      "values": [],
+      "error": "InvalidDimensions",
+      "bytes": ""
+    },
+    {
+      "name": "reject-zero-cols",
+      "kind": "negative",
+      "rows": 1,
+      "cols": 0,
+      "values": [],
+      "error": "InvalidDimensions",
+      "bytes": ""
+    },
+    {
+      "name": "reject-nonpower-rows",
+      "kind": "negative",
+      "rows": 3,
+      "cols": 2,
+      "values": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "error": "InvalidDimensions",
+      "bytes": ""
+    },
+    {
+      "name": "reject-nonpower-cols",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 3,
+      "values": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "error": "InvalidDimensions",
+      "bytes": ""
+    },
+    {
+      "name": "reject-short-residual",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        0,
+        0,
+        0
+      ],
+      "error": "ResidualSize",
+      "bytes": ""
+    },
+    {
+      "name": "reject-long-residual",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "error": "ResidualSize",
+      "bytes": ""
+    },
+    {
+      "name": "reject-row-sign-zero",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "row_signs": [
+        0,
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [
+        [
+          0,
+          0
+        ]
+      ],
+      "error": "InvalidSigns",
+      "bytes": ""
+    },
+    {
+      "name": "reject-col-sign-two",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1,
+        2
+      ],
+      "samples": [
+        [
+          0,
+          0
+        ]
+      ],
+      "error": "InvalidSigns",
+      "bytes": ""
+    },
+    {
+      "name": "reject-short-row-signs",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "row_signs": [
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [
+        [
+          0,
+          0
+        ]
+      ],
+      "error": "InvalidSigns",
+      "bytes": ""
+    },
+    {
+      "name": "reject-short-col-signs",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1
+      ],
+      "samples": [
+        [
+          0,
+          0
+        ]
+      ],
+      "error": "InvalidSigns",
+      "bytes": ""
+    },
+    {
+      "name": "reject-empty-samples",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [],
+      "error": "InvalidSamples",
+      "bytes": ""
+    },
+    {
+      "name": "reject-row-oob",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [
+        [
+          2,
+          0
+        ]
+      ],
+      "error": "InvalidSamples",
+      "bytes": ""
+    },
+    {
+      "name": "reject-col-oob",
+      "kind": "negative",
+      "rows": 2,
+      "cols": 2,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "row_signs": [
+        1,
+        1
+      ],
+      "col_signs": [
+        1,
+        1
+      ],
+      "samples": [
+        [
+          0,
+          2
+        ]
+      ],
+      "error": "InvalidSamples",
+      "bytes": ""
+    },
+    {
+      "name": "reject-changed-after-commit",
+      "kind": "negative",
+      "input": "different-residual-same-challenge",
+      "error": "Precommitment",
+      "bytes": ""
+    },
+    {
+      "name": "counterexample-characteristic-two-collapse",
+      "kind": "negative",
+      "input": "fwht([1,1,0,0]) mod 2",
+      "expect": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "bytes": ""
+    },
+    {
+      "name": "counterexample-quantization-floor",
+      "kind": "negative",
+      "input": "normalized-4x4-unit-spike-quantum-1",
+      "expect": "all-rounded-zero",
+      "bytes": ""
+    },
+    {
+      "name": "counterexample-post-beacon-nullspace",
+      "kind": "negative",
+      "input": "choose-E-after-signs-and-samples",
+      "expect": "REJECT_PRECOMMITMENT",
+      "bytes": ""
+    },
+    {
+      "name": "auction-naive",
+      "kind": "positive",
+      "family": "Naive",
+      "expect": "registered",
+      "bytes": ""
+    },
+    {
+      "name": "auction-tiled",
+      "kind": "positive",
+      "family": "Tiled",
+      "expect": "registered",
+      "bytes": ""
+    },
+    {
+      "name": "auction-strassen",
+      "kind": "positive",
+      "family": "StrassenFamily",
+      "expect": "registered",
+      "bytes": ""
+    },
+    {
+      "name": "auction-fft-fmm",
+      "kind": "positive",
+      "family": "FftFmm",
+      "expect": "registered",
+      "bytes": ""
+    },
+    {
+      "name": "auction-cached",
+      "kind": "positive",
+      "family": "CachedOperand",
+      "expect": "registered",
+      "bytes": ""
+    },
+    {
+      "name": "auction-sparse",
+      "kind": "positive",
+      "family": "SparseStructured",
+      "expect": "registered",
+      "bytes": ""
+    },
+    {
+      "name": "auction-custom-hardware",
+      "kind": "positive",
+      "family": "CustomHardware",
+      "expect": "registered",
+      "bytes": ""
+    },
+    {
+      "name": "auction-exact-1.05-boundary",
+      "kind": "positive",
+      "baseline_work": 100,
+      "baseline_energy": 105,
+      "candidate_work": 100,
+      "candidate_energy": 100,
+      "expect": "MATERIAL_CHALLENGE",
+      "bytes": ""
+    },
+    {
+      "name": "auction-over-1.05",
+      "kind": "negative",
+      "baseline_work": 100,
+      "baseline_energy": 100,
+      "candidate_work": 100,
+      "candidate_energy": 94,
+      "expect": "ZERO_SHADOW_CREDIT",
+      "bytes": ""
+    },
+    {
+      "name": "auction-missing-proof-cost",
+      "kind": "negative",
+      "commitment_and_proof_included": false,
+      "expect": "ZERO_SHADOW_CREDIT",
+      "bytes": ""
+    },
+    {
+      "name": "auction-digest-only",
+      "kind": "negative",
+      "deliverable_materialized": false,
+      "expect": "ZERO_SHADOW_CREDIT",
+      "bytes": ""
+    },
+    {
+      "name": "auction-demand-starvation",
+      "kind": "negative",
+      "input": "one-retarget-half-life",
+      "expect": "ZERO_SHADOW_CREDIT",
+      "bytes": ""
+    },
+    {
+      "name": "auction-reproduction-10pct",
+      "kind": "positive",
+      "winner_energy": 100,
+      "reproduction_energy": 110,
+      "expect": "within-bound",
+      "bytes": ""
+    },
+    {
+      "name": "auction-reproduction-over-10pct",
+      "kind": "negative",
+      "winner_energy": 100,
+      "reproduction_energy": 111,
+      "error": "ReproductionMismatch",
+      "bytes": ""
+    },
+    {
+      "name": "auction-one-reproducer",
+      "kind": "positive",
+      "implementation_families": [
+        "lab-a"
+      ],
+      "expect": "not-calibrated",
+      "bytes": ""
+    },
+    {
+      "name": "auction-two-reproducers",
+      "kind": "positive",
+      "implementation_families": [
+        "lab-a",
+        "lab-b"
+      ],
+      "expect": "shadow-calibrated",
+      "bytes": ""
+    },
+    {
+      "name": "auction-duplicate-reproducer",
+      "kind": "negative",
+      "implementation_families": [
+        "lab-a",
+        "lab-a"
+      ],
+      "error": "DuplicateReproducer",
+      "bytes": ""
+    },
+    {
+      "name": "base-effect-proposal",
+      "kind": "negative",
+      "input": "ShadowObservation->ProposalWeight",
+      "expect": "NO_API",
+      "bytes": ""
+    },
+    {
+      "name": "base-effect-finality",
+      "kind": "negative",
+      "input": "ShadowObservation->FinalityWeight",
+      "expect": "NO_API",
+      "bytes": ""
+    },
+    {
+      "name": "base-effect-issuance",
+      "kind": "negative",
+      "input": "ShadowObservation->Issuance",
+      "expect": "NO_API",
+      "bytes": ""
+    },
+    {
+      "name": "base-effect-ground",
+      "kind": "negative",
+      "input": "ShadowObservation->Ground",
+      "expect": "NO_API",
+      "bytes": ""
+    },
+    {
+      "name": "exact-freivalds-unchanged",
+      "kind": "negative",
+      "input": "M-HDF-ENERGY",
+      "expect": "exact_freivalds_amplification=false",
+      "bytes": ""
+    },
+    {
+      "name": "universal-dominance-killed",
+      "kind": "negative",
+      "input": "M-HDF-ENERGY",
+      "expect": "universal_dominance=false",
+      "bytes": ""
+    }
+  ]
+}

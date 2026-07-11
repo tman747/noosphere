@@ -1,0 +1,11 @@
+{
+  "app_id": "network.mindchain.noosphere.wallet",
+  "chain_id": "<lowercase-64-hex-chain-id>",
+  "genesis_hash": "<lowercase-64-hex-genesis-hash>",
+  "platform": "<windows|linux|macos>",
+  "arch": "<x86_64|aarch64>",
+  "version": "<semver>",
+  "channel": "<stable|beta>",
+  "artifact_sha256": "<lowercase-64-hex-sha256>",
+  "signature": "<detached-signature-from-new-wallet-updater-key>"
+}

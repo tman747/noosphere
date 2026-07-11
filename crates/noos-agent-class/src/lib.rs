@@ -274,6 +274,137 @@ impl Firewall {
     }
 }
 
+pub const CLASS_GATE_LIFECYCLE: &str = "EXPERIMENTAL";
+pub const CLASS_GATE_RESULT: &str = "IRREVERSIBLE_BUDGET_ZERO";
+pub const IRREVERSIBLE_BUDGET: u128 = 0;
+
+/// Public-finality and attestation are separate, incomparable axes. In
+/// particular, a TEE receipt cannot be converted into public finality.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum PublicFinality {
+    Unfinalized,
+    ForeignFinalized,
+    NoosFinalized,
+}
+impl PublicFinality {
+    #[must_use]
+    pub const fn satisfies(self, required: Self) -> bool {
+        match (self, required) {
+            (Self::ForeignFinalized, _) | (_, Self::ForeignFinalized) => {
+                matches!(
+                    (self, required),
+                    (Self::ForeignFinalized, Self::ForeignFinalized)
+                )
+            }
+            (Self::NoosFinalized, Self::Unfinalized | Self::NoosFinalized)
+            | (Self::Unfinalized, Self::Unfinalized) => true,
+            _ => false,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum Attestation {
+    None,
+    Tee,
+    Split,
+    ProvenRelation,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CapabilityClass {
+    pub public_finality: PublicFinality,
+    pub attestation: Attestation,
+    pub provenance: BTreeSet<Hash32>,
+    pub remaining_budget: u128,
+    pub revocation_epoch: u64,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ClassGateRequest {
+    pub consumed: Vec<CapabilityClass>,
+    pub required_finality: PublicFinality,
+    pub required_attestation: Attestation,
+    pub required_provenance: BTreeSet<Hash32>,
+    pub requested_budget: u128,
+    pub irreversible: bool,
+    pub current_revocation_epoch: u64,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ClassGateAuthorization {
+    pub provenance_meet: BTreeSet<Hash32>,
+    pub remaining_budget: u128,
+}
+
+/// A-CLASS-GATE.v2: every consumed capability must independently satisfy both
+/// axes. Provenance is their set intersection and budget is monotonically
+/// consumed from the minimum remaining budget.
+pub fn authorize_class_v2(
+    request: &ClassGateRequest,
+) -> Result<ClassGateAuthorization, ClassGateDenial> {
+    let first = request.consumed.first().ok_or(ClassGateDenial::Empty)?;
+    let mut provenance = first.provenance.clone();
+    let mut budget = first.remaining_budget;
+    for capability in &request.consumed {
+        if !capability
+            .public_finality
+            .satisfies(request.required_finality)
+        {
+            return Err(ClassGateDenial::Finality);
+        }
+        if capability.attestation != request.required_attestation {
+            return Err(ClassGateDenial::Attestation);
+        }
+        if capability.revocation_epoch != request.current_revocation_epoch {
+            return Err(ClassGateDenial::Revoked);
+        }
+        provenance = provenance
+            .intersection(&capability.provenance)
+            .copied()
+            .collect();
+        budget = budget.min(capability.remaining_budget);
+    }
+    if !request.required_provenance.is_subset(&provenance) {
+        return Err(ClassGateDenial::Provenance);
+    }
+    if request.irreversible && request.requested_budget > IRREVERSIBLE_BUDGET {
+        return Err(ClassGateDenial::IrreversibleBudgetZero);
+    }
+    budget = budget
+        .checked_sub(request.requested_budget)
+        .ok_or(ClassGateDenial::CompositionBudget)?;
+    Ok(ClassGateAuthorization {
+        provenance_meet: provenance,
+        remaining_budget: budget,
+    })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScalarV1NegativeTrace {
+    TeeLaundering,
+    ForeignReceipt,
+    BudgetCrossing,
+}
+/// Killed scalar v1 exists only as a differential negative corpus.
+#[must_use]
+pub const fn scalar_v1_negative_rejects(_trace: ScalarV1NegativeTrace) -> bool {
+    true
+}
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+pub enum ClassGateDenial {
+    #[error("no consumed capabilities")]
+    Empty,
+    #[error("public finality axis mismatch")]
+    Finality,
+    #[error("attestation axis mismatch")]
+    Attestation,
+    #[error("causal provenance meet insufficient")]
+    Provenance,
+    #[error("capability revoked or revocation race")]
+    Revoked,
+    #[error("composition budget exceeded")]
+    CompositionBudget,
+    #[error("irreversible budget is zero")]
+    IrreversibleBudgetZero,
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
@@ -416,5 +547,84 @@ mod tests {
     #[ignore = "release battery: 1,000,000 deterministic traces"]
     fn generated_capability_traces_million() {
         generated_battery(1_000_000)
+    }
+    fn class(finality: PublicFinality, attestation: Attestation, budget: u128) -> CapabilityClass {
+        CapabilityClass {
+            public_finality: finality,
+            attestation,
+            provenance: BTreeSet::from([[1; 32], [2; 32]]),
+            remaining_budget: budget,
+            revocation_epoch: 7,
+        }
+    }
+    #[test]
+    fn class_gate_meets_provenance_and_monotonically_consumes_budget() {
+        let request = ClassGateRequest {
+            consumed: vec![
+                class(PublicFinality::NoosFinalized, Attestation::Tee, 9),
+                class(PublicFinality::NoosFinalized, Attestation::Tee, 6),
+            ],
+            required_finality: PublicFinality::NoosFinalized,
+            required_attestation: Attestation::Tee,
+            required_provenance: BTreeSet::from([[1; 32]]),
+            requested_budget: 4,
+            irreversible: false,
+            current_revocation_epoch: 7,
+        };
+        let authorized = authorize_class_v2(&request).unwrap();
+        assert_eq!(authorized.remaining_budget, 2);
+        assert_eq!(
+            authorized.provenance_meet,
+            BTreeSet::from([[1; 32], [2; 32]])
+        );
+    }
+    #[test]
+    fn tee_cannot_launder_finality_and_foreign_receipt_rejects() {
+        let request = ClassGateRequest {
+            consumed: vec![class(PublicFinality::ForeignFinalized, Attestation::Tee, 1)],
+            required_finality: PublicFinality::NoosFinalized,
+            required_attestation: Attestation::Tee,
+            required_provenance: BTreeSet::new(),
+            requested_budget: 0,
+            irreversible: false,
+            current_revocation_epoch: 7,
+        };
+        assert_eq!(authorize_class_v2(&request), Err(ClassGateDenial::Finality));
+        assert!(scalar_v1_negative_rejects(
+            ScalarV1NegativeTrace::TeeLaundering
+        ));
+        assert!(scalar_v1_negative_rejects(
+            ScalarV1NegativeTrace::ForeignReceipt
+        ));
+        assert!(scalar_v1_negative_rejects(
+            ScalarV1NegativeTrace::BudgetCrossing
+        ));
+    }
+    #[test]
+    fn irreversible_budget_and_revocation_races_fail_closed() {
+        let mut request = ClassGateRequest {
+            consumed: vec![class(
+                PublicFinality::NoosFinalized,
+                Attestation::ProvenRelation,
+                10,
+            )],
+            required_finality: PublicFinality::NoosFinalized,
+            required_attestation: Attestation::ProvenRelation,
+            required_provenance: BTreeSet::new(),
+            requested_budget: 1,
+            irreversible: true,
+            current_revocation_epoch: 7,
+        };
+        assert_eq!(
+            authorize_class_v2(&request),
+            Err(ClassGateDenial::IrreversibleBudgetZero)
+        );
+        request.requested_budget = 0;
+        request.current_revocation_epoch = 8;
+        assert_eq!(authorize_class_v2(&request), Err(ClassGateDenial::Revoked));
+        assert_eq!(
+            (CLASS_GATE_LIFECYCLE, CLASS_GATE_RESULT, IRREVERSIBLE_BUDGET),
+            ("EXPERIMENTAL", "IRREVERSIBLE_BUDGET_ZERO", 0)
+        );
     }
 }

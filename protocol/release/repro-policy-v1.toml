@@ -1,0 +1,133 @@
+policy_version = 1
+policy_id = "NOOS-REPRO-V1"
+state = "UNSIGNED_BLOCKS_RELEASE"
+default_comparison = "raw_bytes"
+hash_algorithm = "sha256"
+post_build_normalization = "forbidden"
+unlisted_artifact_comparison = "raw_bytes"
+require_two_independent_builders = true
+builder_independence_fields = ["operator", "host", "toolchain_installation"]
+required_platforms = ["windows-x86_64", "linux-x86_64", "linux-aarch64"]
+release_manifest_template = "protocol/release/manifest-template.json"
+release_manifest_schema = "protocol/release/manifest-schema-v1.json"
+
+[signature_policy]
+required_before_build = true
+required_roles = ["release-owner", "independent-build-reviewer"]
+detached_signature_algorithm = "ed25519"
+signed_payload = "raw repro-policy-v1.toml bytes with state set to SIGNED and signature records supplied in a detached .signatures.json"
+unsigned_or_pending_state_blocks_release = true
+
+[comparison.raw]
+law = "raw_bytes"
+description = "Files must have identical length and identical bytes; SHA-256 equality is the comparison witness."
+
+[comparison.signed_installer]
+law = "signed_installer_payload"
+description = "Each signed installer must expose the exact unsigned-payload manifest and deterministic container structure from both builders."
+extractor = "tools/release/noos-installer-extract-v1"
+extractor_version = "1.0.0"
+extractor_sha256 = "OWNER_BLOCKED"
+container_structure = "entry path, entry order, compression method, permissions, and unsigned entry bytes must match"
+allowed_platform_envelope_fields = ["platform_signature", "timestamp_envelope"]
+forbidden_variance = ["unsigned_payload", "entry_path", "entry_order", "compression_method", "permissions", "embedded_manifest", "chain_id", "genesis_hash", "api_version", "artifact_version"]
+
+[[artifact_rules]]
+pattern = "**/*.exe"
+class = "unsigned_binary"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "**/noosd"
+class = "unsigned_binary"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "**/noos-cli"
+class = "unsigned_binary"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "**/*.dll"
+class = "library"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "**/*.so"
+class = "library"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "**/*.dylib"
+class = "library"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "protocol/schemas/**"
+class = "schema"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "protocol/api/**"
+class = "api_schema_or_vector"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "protocol/telemetry/**"
+class = "telemetry_schema_or_vector"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "protocol/vectors/**"
+class = "conformance_vector"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "protocol/genesis/**"
+class = "genesis"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "**/*.json"
+class = "data"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "**/*.toml"
+class = "data"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "**/*.yaml"
+class = "data"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "**/*.zip"
+class = "archive"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "**/*.tar.gz"
+class = "archive"
+comparison = "raw_bytes"
+
+[[artifact_rules]]
+pattern = "installers/windows/*.msix"
+class = "signed_installer"
+comparison = "signed_installer_payload"
+
+[[artifact_rules]]
+pattern = "installers/windows/*.msi"
+class = "signed_installer"
+comparison = "signed_installer_payload"
+
+[[artifact_rules]]
+pattern = "installers/linux/*.deb"
+class = "signed_installer"
+comparison = "signed_installer_payload"
+
+[[artifact_rules]]
+pattern = "installers/linux/*.rpm"
+class = "signed_installer"
+comparison = "signed_installer_payload"

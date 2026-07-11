@@ -1,0 +1,21 @@
+{
+  "displayName": "MindChain Wallet",
+  "bundleId": "network.mindchain.noosphere.wallet",
+  "urlScheme": "mindchain-noos://",
+  "pwa": {
+    "manifestId": "/noosphere-wallet-v1/",
+    "scope": "/noosphere-wallet-v1/",
+    "cachePrefix": "mindchain-noosphere-v1"
+  },
+  "updater": {
+    "product": "mindchain-noosphere-wallet",
+    "channels": ["stable", "beta"],
+    "publicKeyEnvironment": "NOOS_WALLET_UPDATER_PUBLIC_KEY"
+  },
+  "dataRoots": {
+    "windows": "%APPDATA%/MindChain/NOOSPHERE/Wallet",
+    "linux": "$XDG_DATA_HOME/mindchain/noosphere/wallet",
+    "macos": "$HOME/Library/Application Support/MindChain/NOOSPHERE/Wallet"
+  },
+  "historicalMigration": "FORBIDDEN"
+}
