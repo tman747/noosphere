@@ -1,0 +1,31 @@
+{
+  "schema": "protocol/schemas/loom-v1.md#lifecycle-and-ordering",
+  "cases": [
+    {"name":"open-funded","kind":"positive","bytes":"010000000a00000000000000140000000000000028000000000000003c00000000000000","expect":"OPEN"},
+    {"name":"commit-before-deadline","kind":"positive","bytes":"02010000000f0000000000000032000000000000000000000000000000","expect":"COMMITTED"},
+    {"name":"challenge-finalized-after-commit","kind":"positive","bytes":"031000000000000000","expect":"RUNNING"},
+    {"name":"receipt-before-submit-deadline","kind":"positive","bytes":"041e00000000000000","expect":"SUBMITTED"},
+    {"name":"availability-finalized","kind":"positive","bytes":"0523000000000000000200","expect":"CHALLENGEABLE"},
+    {"name":"settle-after-window","kind":"positive","bytes":"062e0000000000000046000000000000000a000000000000000a000000000000000a00000000000000","expect":"SETTLED"},
+    {"name":"cancel-open","kind":"positive","bytes":"070b00000000000000","expect":"CANCELLED"},
+    {"name":"expire-uncommitted","kind":"positive","bytes":"081500000000000000","expect":"EXPIRED"},
+    {"name":"dispute-open","kind":"positive","bytes":"0924000000000000000a00000000000000","expect":"DISPUTED"},
+    {"name":"dispute-worker-upheld","kind":"positive","bytes":"0a00","expect":"CHALLENGEABLE"},
+    {"name":"dispute-worker-fault","kind":"positive","bytes":"0a01","expect":"REJECTED"},
+    {"name":"commit-at-open-height","kind":"positive","bytes":"02010000000a0000000000000032000000000000000000000000000000","expect":"COMMITTED"},
+    {"name":"commit-after-deadline","kind":"negative","bytes":"0201000000150000000000000032000000000000000000000000000000","error":"DEADLINE"},
+    {"name":"challenge-same-height-as-commit","kind":"negative","bytes":"030f00000000000000","error":"NOT_FINALIZED"},
+    {"name":"submit-before-challenge","kind":"negative","bytes":"041000000000000000","error":"INVALID_STATE"},
+    {"name":"receipt-after-submit-deadline","kind":"negative","bytes":"042900000000000000","error":"DEADLINE"},
+    {"name":"availability-root-mismatch","kind":"negative","bytes":"0523000000000000000200ff","error":"INVALID_AVAILABILITY"},
+    {"name":"availability-too-few-retrievers","kind":"negative","bytes":"0523000000000000000100","error":"INVALID_AVAILABILITY"},
+    {"name":"settle-before-window-end","kind":"negative","bytes":"062d00000000000000","error":"DISPUTE_WINDOW_CLOSED"},
+    {"name":"settlement-split-underfunded","kind":"negative","bytes":"062e000000000000000100000000000000020000000000000003000000000000000400000000000000","error":"INVALID_SETTLEMENT"},
+    {"name":"duplicate-nullifier","kind":"negative","bytes":"0b0101010101010101010101010101010101010101010101010101010101010101","error":"DUPLICATE_NULLIFIER"},
+    {"name":"unknown-class","kind":"negative","bytes":"01000000ff0300000a00000000000000140000000000000028000000000000003c00000000000000","error":"UNKNOWN_REGISTRY_ID"},
+    {"name":"disabled-proof-profile","kind":"negative","bytes":"0c0100000001","error":"DISABLED_REGISTRY_ID"},
+    {"name":"quarantined-worker-profile-new-job","kind":"negative","bytes":"02010000000f0000000000000032000000000000000000000000000000","error":"PROFILE_QUARANTINED"},
+    {"name":"terminal-reactivation","kind":"negative","bytes":"0d0602","error":"TERMINAL_STATE"},
+    {"name":"resource-over-class-bound","kind":"negative","bytes":"0e6500000000000000","error":"INVALID_REGISTRY_ENTRY"}
+  ]
+}

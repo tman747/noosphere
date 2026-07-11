@@ -1,0 +1,17 @@
+[package]
+name = "noos-umbra"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "NOOSPHERE Umbra typed private fibers and fail-closed suite registry"
+
+[dependencies]
+blake3 = "1.8"
+chacha20poly1305 = "0.10"
+hkdf = "0.12"
+sha2 = "0.10"
+
+[lints]
+workspace = true

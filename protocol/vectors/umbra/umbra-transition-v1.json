@@ -1,0 +1,296 @@
+{
+  "schema": "noos-umbra-v1",
+  "case_count": 40,
+  "validation_order": [
+    "ACTIVATION_BOUNDS",
+    "PRIOR_STATE",
+    "AUTHORIZATION",
+    "FRESHNESS_UNIQUENESS",
+    "RIGHTS_BUDGET",
+    "RESOURCES",
+    "COMPLETE_TUPLE_PROOF",
+    "ATOMIC_UPDATE"
+  ],
+  "cases": [
+    {
+      "id": "U001",
+      "name": "base-valid",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "626173652d76616c6964"
+    },
+    {
+      "id": "U002",
+      "name": "predeclared-exit-after-disable",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "7072656465636c617265642d657869742d61667465722d64697361626c65"
+    },
+    {
+      "id": "U003",
+      "name": "historical-verifier",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "686973746f726963616c2d7665726966696572"
+    },
+    {
+      "id": "U004",
+      "name": "p0-exact",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "70302d6578616374"
+    },
+    {
+      "id": "U005",
+      "name": "p1-exact",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "70312d6578616374"
+    },
+    {
+      "id": "U006",
+      "name": "p2-complete-exact",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "70322d636f6d706c6574652d6578616374"
+    },
+    {
+      "id": "U007",
+      "name": "besi-exact",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "626573692d6578616374"
+    },
+    {
+      "id": "U008",
+      "name": "sequential-key-rotation",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "73657175656e7469616c2d6b65792d726f746174696f6e"
+    },
+    {
+      "id": "U009",
+      "name": "unknown-suite",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "756e6b6e6f776e2d7375697465"
+    },
+    {
+      "id": "U010",
+      "name": "disabled-suite",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "64697361626c65642d7375697465"
+    },
+    {
+      "id": "U011",
+      "name": "malformed-proof",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "6d616c666f726d65642d70726f6f66"
+    },
+    {
+      "id": "U012",
+      "name": "empty-proof",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "656d7074792d70726f6f66"
+    },
+    {
+      "id": "U013",
+      "name": "oversized-proof",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "6f76657273697a65642d70726f6f66"
+    },
+    {
+      "id": "U014",
+      "name": "unknown-profile",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "756e6b6e6f776e2d70726f66696c65"
+    },
+    {
+      "id": "U015",
+      "name": "wrong-verifier-version",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "77726f6e672d76657269666965722d76657273696f6e"
+    },
+    {
+      "id": "U016",
+      "name": "wrong-verifier-hash",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "77726f6e672d76657269666965722d68617368"
+    },
+    {
+      "id": "U017",
+      "name": "key-epoch-before-range",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "6b65792d65706f63682d6265666f72652d72616e6765"
+    },
+    {
+      "id": "U018",
+      "name": "key-epoch-after-range",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "6b65792d65706f63682d61667465722d72616e6765"
+    },
+    {
+      "id": "U019",
+      "name": "prior-version-mismatch",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "7072696f722d76657273696f6e2d6d69736d61746368"
+    },
+    {
+      "id": "U020",
+      "name": "prior-ciphertext-mismatch",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "7072696f722d636970686572746578742d6d69736d61746368"
+    },
+    {
+      "id": "U021",
+      "name": "prior-circuit-mismatch",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "7072696f722d636972637569742d6d69736d61746368"
+    },
+    {
+      "id": "U022",
+      "name": "unauthorized",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "756e617574686f72697a6564"
+    },
+    {
+      "id": "U023",
+      "name": "duplicate-nullifier-in-transition",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "6475706c69636174652d6e756c6c69666965722d696e2d7472616e736974696f6e"
+    },
+    {
+      "id": "U024",
+      "name": "spent-global-nullifier",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "7370656e742d676c6f62616c2d6e756c6c6966696572"
+    },
+    {
+      "id": "U025",
+      "name": "duplicate-commitment-in-transition",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "6475706c69636174652d636f6d6d69746d656e742d696e2d7472616e736974696f6e"
+    },
+    {
+      "id": "U026",
+      "name": "existing-global-commitment",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "6578697374696e672d676c6f62616c2d636f6d6d69746d656e74"
+    },
+    {
+      "id": "U027",
+      "name": "rights-substitution",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "7269676874732d737562737469747574696f6e"
+    },
+    {
+      "id": "U028",
+      "name": "budget-underflow",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "6275646765742d756e646572666c6f77"
+    },
+    {
+      "id": "U029",
+      "name": "resource-over-limit",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "7265736f757263652d6f7665722d6c696d6974"
+    },
+    {
+      "id": "U030",
+      "name": "incomplete-tuple-proof",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "696e636f6d706c6574652d7475706c652d70726f6f66"
+    },
+    {
+      "id": "U031",
+      "name": "verifier-disagreement",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "76657269666965722d64697361677265656d656e74"
+    },
+    {
+      "id": "U032",
+      "name": "invented-exit-after-disable",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "696e76656e7465642d657869742d61667465722d64697361626c65"
+    },
+    {
+      "id": "U033",
+      "name": "p1-as-proven",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "70312d61732d70726f76656e"
+    },
+    {
+      "id": "U034",
+      "name": "p2-raw-gemm-as-proven",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "70322d7261772d67656d6d2d61732d70726f76656e"
+    },
+    {
+      "id": "U035",
+      "name": "besi-as-proven",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "626573692d61732d70726f76656e"
+    },
+    {
+      "id": "U036",
+      "name": "besi-as-assured",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "626573692d61732d61737375726564"
+    },
+    {
+      "id": "U037",
+      "name": "malicious-3pc-fallback",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "6d616c6963696f75732d3370632d66616c6c6261636b"
+    },
+    {
+      "id": "U038",
+      "name": "hfhe-signature-verifier",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "686668652d7369676e61747572652d7665726966696572"
+    },
+    {
+      "id": "U039",
+      "name": "mainnet-secret-fixture",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "6d61696e6e65742d7365637265742d66697874757265"
+    },
+    {
+      "id": "U040",
+      "name": "nonsequential-key-rotation",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "6e6f6e73657175656e7469616c2d6b65792d726f746174696f6e"
+    }
+  ]
+}

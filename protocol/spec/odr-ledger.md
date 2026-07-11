@@ -26,7 +26,7 @@ Resolution classes:
 | ODR-FEES-003 | frozen deterministic failure-fee value | G0-REVIEW | G1 | FeeParamsV1 field 9 |
 | ODR-GRAIN-001 | Grain v1 integer cost table | RESOLVED (PROPOSED-G0) | G0 sign-off | protocol/schemas/grain-v1.md §10 + 78 vectors + Go grainref parity |
 | ODR-GRAIN-002 | Grain limits (arena/noun/formula/depth) | RESOLVED (PROPOSED-G0) | G0 sign-off | grain-v1.md §2 |
-| ODR-WALLET-001 | numeric hardened derivation indices | G0-REVIEW | G1 (wallet phase) | constants-v1.toml [lumen]; to be frozen in wallet phase with vectors |
+| ODR-WALLET-001 | numeric hardened derivation indices | RESOLVED (PROPOSED-G0) | G0 sign-off | constants-v1.toml [lumen]; namespace `0x4e4f4f53`, version `1`, purposes sign/view/umbra/agent/recovery=`1..5`, all components hardened; exact vectors in `protocol/vectors/wallet/derivation-v1.json` |
 | ODR-NEL-001 | `anchor_deadline_blocks` | G0-REVIEW | NEL activation gate | constants-v1.toml [nel]; nel-v1.md phase |
 | ODR-DA-001 | body shard size/count parameters | G0-REVIEW | G1 (DA phase) | schema-tables/da.md proposed values |
 | ODR-DA-002 | body/blob collection maxima | G0-REVIEW | G1 (DA phase) | schema-tables/da.md + header-body.md |

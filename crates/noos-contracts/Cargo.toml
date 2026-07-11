@@ -1,0 +1,17 @@
+[package]
+name = "noos-contracts"
+version = "0.1.0"
+description = "Ordinary Grain contract host with declared access and migration semantics"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+blake3 = "=1.8.5"
+noos-grain = { path = "../noos-grain" }
+serde = { version = "=1.0.228", features = ["derive"] }
+thiserror = "=2.0.18"
+
+[lints]
+workspace = true

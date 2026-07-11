@@ -100,7 +100,7 @@ receipts_root_semantics = "post-state compact settled-receipt index, distinct fr
 resource_limit_fields = ["bytes", "grain_steps", "proof_units", "state_reads", "state_writes", "blob_bytes"]  # source: ch01 section 6.5 TransactionV1.resource_limits
 collection_maxima = "frozen per schema-tables/lumen-objects.md PROPOSED-G0 values, implemented in protocol/schemas/lumen-v1.md"  # source: protocol/schemas/lumen-v1.md (noos-lumen adopted the PROPOSED-G0 maxima exactly); originally UNRESOLVED in ch01 section 9.1 which requires explicit maxima but numbers none; still subject to G0 review
 wallet_derivation_template = "m/NOOS/1/{sign|view|umbra|agent|recovery}/account/index"  # source: ch01 section 6.8
-wallet_derivation_hardened_indices = "UNRESOLVED_SOURCE"  # searched ch01 for: hardened, purpose number, derivation path, BIP — ch01 section 6.8 gives the symbolic path only; numeric hardened purpose/branch constants required by plan section 1.7 are unassigned. ODR-WALLET-001
+wallet_derivation_hardened_indices = "PROPOSED-G0: namespace=0x4e4f4f53, version=1, sign=1, view=2, umbra=3, agent=4, recovery=5; every component including umbra suite/account/index is encoded as u32 big-endian with bit31 set; HKDF info is ASCII NOOS/HKDF/WALLET/V1 followed by path components"  # ODR-WALLET-001 resolved in wallet phase; exact vectors: protocol/vectors/wallet/derivation-v1.json
 
 [nel]
 object_domain_template = "NOOS/NEL/<OBJECT>/V1"    # source: ch05 section 2.1

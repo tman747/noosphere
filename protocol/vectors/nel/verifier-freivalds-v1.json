@@ -1,0 +1,134 @@
+{
+  "schema": "NOOS/NEL/VECTORS/VERIFIER-FREIVALDS/V1",
+  "envelope": {
+    "encoding": "verifier_id:u8 || image_id:32 || public_input_hash:32 || proof_len:u32le || proof",
+    "proof_type": "strict Ed25519 signature over BLAKE3(NOOS/NEL/ENVELOPE/V1 || verifier_id || image_id || public_input_hash)",
+    "closed_ids": [
+      {
+        "id": 1,
+        "name": "EnvelopeV1",
+        "enabled": true
+      },
+      {
+        "id": 2,
+        "name": "Risc0FreivaldsLeafV1",
+        "enabled": true
+      },
+      {
+        "id": 3,
+        "name": "Risc0NonlinearLeafV1",
+        "enabled": true
+      },
+      {
+        "id": 4,
+        "name": "SpecializedChunkV1",
+        "enabled": false
+      }
+    ]
+  },
+  "freivalds": {
+    "ring": "Z/(2^64)",
+    "coefficient_bits": 32,
+    "coefficient_source": "independent uniform vectors from a beacon finalized after the challenged commitment",
+    "matrix": {
+      "m": 2,
+      "k": 2,
+      "n": 2,
+      "A": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "B": [
+        5,
+        6,
+        7,
+        8
+      ],
+      "C": [
+        19,
+        22,
+        43,
+        50
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "StandardReps2",
+      "reps": 2,
+      "label": "2^-64/span",
+      "vectors": [
+        [
+          1,
+          2
+        ],
+        [
+          4294967295,
+          17
+        ]
+      ],
+      "expect": true,
+      "kind": "positive",
+      "bytes": ""
+    },
+    {
+      "name": "ProductionReps4",
+      "reps": 4,
+      "label": "2^-128/span",
+      "vectors": [
+        [
+          1,
+          2
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          7,
+          8
+        ]
+      ],
+      "expect": true,
+      "kind": "positive",
+      "bytes": ""
+    },
+    {
+      "name": "ProductionReps4-tampered",
+      "reps": 4,
+      "C": [
+        19,
+        22,
+        43,
+        51
+      ],
+      "vectors": [
+        [
+          1,
+          2
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          7,
+          8
+        ]
+      ],
+      "expect": false,
+      "kind": "negative",
+      "bytes": ""
+    }
+  ]
+}

@@ -1,0 +1,552 @@
+{
+  "schema": "noos-wallet-derivation-v1",
+  "odr": "ODR-WALLET-001",
+  "cases": [
+    {
+      "name": "sign-a0-i0",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000018000000080000000",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "sign",
+      "suite": null,
+      "account": 0,
+      "index": 0,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000001",
+        "0x80000000",
+        "0x80000000"
+      ],
+      "derived_secret": "9b69b32d19e14d5024fc2662d64a32ed7af4729a202718b2ad8cfe67b323750d"
+    },
+    {
+      "name": "sign-a0-i1",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000018000000080000001",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "sign",
+      "suite": null,
+      "account": 0,
+      "index": 1,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000001",
+        "0x80000000",
+        "0x80000001"
+      ],
+      "derived_secret": "708b7b1baf4ab93564b1ba72b71ef14fa3fe2945140efbcb9c0605c314348945"
+    },
+    {
+      "name": "sign-a1-i0",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000018000000180000000",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "sign",
+      "suite": null,
+      "account": 1,
+      "index": 0,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000001",
+        "0x80000001",
+        "0x80000000"
+      ],
+      "derived_secret": "7a4962cce18ad653da21623001a1261f387cb3a0ca27ef8145bb20300e4c592f"
+    },
+    {
+      "name": "sign-a7-i11",
+      "kind": "positive",
+      "bytes": "ce4f4f538000000180000001800000078000000b",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "sign",
+      "suite": null,
+      "account": 7,
+      "index": 11,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000001",
+        "0x80000007",
+        "0x8000000b"
+      ],
+      "derived_secret": "b8ca1e898490b7dd221662b4f9c85a9260d26ed77365d1f7b7dcbfd972a25901"
+    },
+    {
+      "name": "sign-a2147483647-i2147483647",
+      "kind": "positive",
+      "bytes": "ce4f4f538000000180000001ffffffffffffffff",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "sign",
+      "suite": null,
+      "account": 2147483647,
+      "index": 2147483647,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000001",
+        "0xffffffff",
+        "0xffffffff"
+      ],
+      "derived_secret": "87f0362397f6d83d7b5742d25327f0c0531fd8d18fcbcabc03806f4bacb96105"
+    },
+    {
+      "name": "sign-a42-i99",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000018000002a80000063",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "sign",
+      "suite": null,
+      "account": 42,
+      "index": 99,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000001",
+        "0x8000002a",
+        "0x80000063"
+      ],
+      "derived_secret": "cac2d65e1ea1fa6897fb64c676ca56c30abfc0198eb7edfe639afbbdea579510"
+    },
+    {
+      "name": "view-a0-i0",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000028000000080000000",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "view",
+      "suite": null,
+      "account": 0,
+      "index": 0,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000002",
+        "0x80000000",
+        "0x80000000"
+      ],
+      "derived_secret": "d4537d61f4882be9c4946430414eba7e20f99db1183ac65b064875983878c804"
+    },
+    {
+      "name": "view-a0-i1",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000028000000080000001",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "view",
+      "suite": null,
+      "account": 0,
+      "index": 1,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000002",
+        "0x80000000",
+        "0x80000001"
+      ],
+      "derived_secret": "743bb39ef09afc13af681e83e1647a0de3be699e33df74117d873c4dc39727b3"
+    },
+    {
+      "name": "view-a1-i0",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000028000000180000000",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "view",
+      "suite": null,
+      "account": 1,
+      "index": 0,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000002",
+        "0x80000001",
+        "0x80000000"
+      ],
+      "derived_secret": "3e8ed4d7e0daf12ba84ae1fec1949596d34a75e6032707fdae6b167d21d7f715"
+    },
+    {
+      "name": "view-a7-i11",
+      "kind": "positive",
+      "bytes": "ce4f4f538000000180000002800000078000000b",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "view",
+      "suite": null,
+      "account": 7,
+      "index": 11,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000002",
+        "0x80000007",
+        "0x8000000b"
+      ],
+      "derived_secret": "e9d5a5d0eea454e3040a2ee9b29886e8eb06b73fde470a830f0506d7a39b7016"
+    },
+    {
+      "name": "view-a2147483647-i2147483647",
+      "kind": "positive",
+      "bytes": "ce4f4f538000000180000002ffffffffffffffff",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "view",
+      "suite": null,
+      "account": 2147483647,
+      "index": 2147483647,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000002",
+        "0xffffffff",
+        "0xffffffff"
+      ],
+      "derived_secret": "a7868299d8c329a4cc8e9b5c74e85ebb97627b5e925a79e4fad6110596968519"
+    },
+    {
+      "name": "view-a42-i99",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000028000002a80000063",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "view",
+      "suite": null,
+      "account": 42,
+      "index": 99,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000002",
+        "0x8000002a",
+        "0x80000063"
+      ],
+      "derived_secret": "2c4682f12cec5a47d1e178a3ccfe39bde77d043da46d30cb495c3dbcfbecaea0"
+    },
+    {
+      "name": "umbra-a0-i0",
+      "kind": "positive",
+      "bytes": "ce4f4f538000000180000003800000098000000080000000",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "umbra",
+      "suite": 9,
+      "account": 0,
+      "index": 0,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000003",
+        "0x80000009",
+        "0x80000000",
+        "0x80000000"
+      ],
+      "derived_secret": "6dc4172d50f7d8993060b0f73136355fcd6accd7e6bd0efd6b67a57046ed7446"
+    },
+    {
+      "name": "umbra-a0-i1",
+      "kind": "positive",
+      "bytes": "ce4f4f538000000180000003800000098000000080000001",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "umbra",
+      "suite": 9,
+      "account": 0,
+      "index": 1,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000003",
+        "0x80000009",
+        "0x80000000",
+        "0x80000001"
+      ],
+      "derived_secret": "20e046f106f44cab2241da176b1630f673770feb40006fc17baba889d5f8dd47"
+    },
+    {
+      "name": "umbra-a1-i0",
+      "kind": "positive",
+      "bytes": "ce4f4f538000000180000003800000098000000180000000",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "umbra",
+      "suite": 9,
+      "account": 1,
+      "index": 0,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000003",
+        "0x80000009",
+        "0x80000001",
+        "0x80000000"
+      ],
+      "derived_secret": "98cb28c263ac5e973f7ac04a383e37f493de136cdce9b1eecc11168a8e52b0f8"
+    },
+    {
+      "name": "umbra-a7-i11",
+      "kind": "positive",
+      "bytes": "ce4f4f53800000018000000380000009800000078000000b",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "umbra",
+      "suite": 9,
+      "account": 7,
+      "index": 11,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000003",
+        "0x80000009",
+        "0x80000007",
+        "0x8000000b"
+      ],
+      "derived_secret": "97f4e21316ee3ec50feff8fd54a9c64b468ff35c756eb71e92214cedace2be35"
+    },
+    {
+      "name": "umbra-a2147483647-i2147483647",
+      "kind": "positive",
+      "bytes": "ce4f4f53800000018000000380000009ffffffffffffffff",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "umbra",
+      "suite": 9,
+      "account": 2147483647,
+      "index": 2147483647,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000003",
+        "0x80000009",
+        "0xffffffff",
+        "0xffffffff"
+      ],
+      "derived_secret": "8971afc038ea93136cbdfa133cfafa61824b388bb5d3ea24953230f20aaa2821"
+    },
+    {
+      "name": "umbra-a42-i99",
+      "kind": "positive",
+      "bytes": "ce4f4f538000000180000003800000098000002a80000063",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "umbra",
+      "suite": 9,
+      "account": 42,
+      "index": 99,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000003",
+        "0x80000009",
+        "0x8000002a",
+        "0x80000063"
+      ],
+      "derived_secret": "482feaf84b5ad8c0d26eec07732af17bde24c0fe596873e8d7ea585bf178fdf9"
+    },
+    {
+      "name": "agent-a0-i0",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000048000000080000000",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "agent",
+      "suite": null,
+      "account": 0,
+      "index": 0,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000004",
+        "0x80000000",
+        "0x80000000"
+      ],
+      "derived_secret": "53c25a98f5f2d466739d4a98f260e043ccf8822d42f550256f33581d08784dc4"
+    },
+    {
+      "name": "agent-a0-i1",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000048000000080000001",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "agent",
+      "suite": null,
+      "account": 0,
+      "index": 1,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000004",
+        "0x80000000",
+        "0x80000001"
+      ],
+      "derived_secret": "ffaabf5d473d10936f43dbc7a1a7853423ebef8cbbc155924c7c1df500dbc2bf"
+    },
+    {
+      "name": "agent-a1-i0",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000048000000180000000",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "agent",
+      "suite": null,
+      "account": 1,
+      "index": 0,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000004",
+        "0x80000001",
+        "0x80000000"
+      ],
+      "derived_secret": "85ed4632505388c4bb809d8e5a7c768d72183da001835138a2ed3884280d55c6"
+    },
+    {
+      "name": "agent-a7-i11",
+      "kind": "positive",
+      "bytes": "ce4f4f538000000180000004800000078000000b",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "agent",
+      "suite": null,
+      "account": 7,
+      "index": 11,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000004",
+        "0x80000007",
+        "0x8000000b"
+      ],
+      "derived_secret": "456e8d4c3d82e3e37468ce42bbd1e3b63f5746195daf98137f25926fc69d91d2"
+    },
+    {
+      "name": "agent-a2147483647-i2147483647",
+      "kind": "positive",
+      "bytes": "ce4f4f538000000180000004ffffffffffffffff",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "agent",
+      "suite": null,
+      "account": 2147483647,
+      "index": 2147483647,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000004",
+        "0xffffffff",
+        "0xffffffff"
+      ],
+      "derived_secret": "0bb30094a48c2a2ff6fba7258b68bf6ad07b3cbc8e84a4c6f2c814c4b83fd80d"
+    },
+    {
+      "name": "agent-a42-i99",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000048000002a80000063",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "agent",
+      "suite": null,
+      "account": 42,
+      "index": 99,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000004",
+        "0x8000002a",
+        "0x80000063"
+      ],
+      "derived_secret": "ff3105c0ea7e07bdf059ce5a58a8f84254e065231873946cc2af86474ede81d5"
+    },
+    {
+      "name": "recovery-a0-i0",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000058000000080000000",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "recovery",
+      "suite": null,
+      "account": 0,
+      "index": 0,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000005",
+        "0x80000000",
+        "0x80000000"
+      ],
+      "derived_secret": "99a872e559a070b05fc61a01adbb55a47824f17c56417c8002ae12633bf1346f"
+    },
+    {
+      "name": "recovery-a0-i1",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000058000000080000001",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "recovery",
+      "suite": null,
+      "account": 0,
+      "index": 1,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000005",
+        "0x80000000",
+        "0x80000001"
+      ],
+      "derived_secret": "5b4d129ffd3125d305188088863f35f6e761e625ecc7ded0078cb7a6e98a1f51"
+    },
+    {
+      "name": "recovery-a1-i0",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000058000000180000000",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "recovery",
+      "suite": null,
+      "account": 1,
+      "index": 0,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000005",
+        "0x80000001",
+        "0x80000000"
+      ],
+      "derived_secret": "21bd6f8e6fac08325c2a1cf1ee55eacda594eb82c28776d18d9208b9b51001f3"
+    },
+    {
+      "name": "recovery-a7-i11",
+      "kind": "positive",
+      "bytes": "ce4f4f538000000180000005800000078000000b",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "recovery",
+      "suite": null,
+      "account": 7,
+      "index": 11,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000005",
+        "0x80000007",
+        "0x8000000b"
+      ],
+      "derived_secret": "e38490f9d363d9985c014c3a51345c4257b4f73c2c8ec1021b152944a8a504f0"
+    },
+    {
+      "name": "recovery-a2147483647-i2147483647",
+      "kind": "positive",
+      "bytes": "ce4f4f538000000180000005ffffffffffffffff",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "recovery",
+      "suite": null,
+      "account": 2147483647,
+      "index": 2147483647,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000005",
+        "0xffffffff",
+        "0xffffffff"
+      ],
+      "derived_secret": "a35820504e6ab381396a7ab5fbd6e59e82641645df426aaa2a52363fe4e59b8c"
+    },
+    {
+      "name": "recovery-a42-i99",
+      "kind": "positive",
+      "bytes": "ce4f4f5380000001800000058000002a80000063",
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "purpose": "recovery",
+      "suite": null,
+      "account": 42,
+      "index": 99,
+      "path": [
+        "0xce4f4f53",
+        "0x80000001",
+        "0x80000005",
+        "0x8000002a",
+        "0x80000063"
+      ],
+      "derived_secret": "f045a873550ecba3f496521d81a9e8113e37399c36dc6726e437ed5096d7e1b3"
+    }
+  ]
+}

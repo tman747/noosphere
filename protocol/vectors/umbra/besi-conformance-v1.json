@@ -1,0 +1,207 @@
+{
+  "schema": "noos-besi-conformance-v1",
+  "privacy_profile": "P3_DEEP_SEALED",
+  "execution_mode": "BESI_SPLIT_PROTOTYPE",
+  "assurance": "ASSURED_SPLIT",
+  "bucket": 128,
+  "ring": "Z2^64",
+  "case_count": 28,
+  "cases": [
+    {
+      "id": "B001",
+      "name": "share-reconstruct-wrap",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "73686172652d7265636f6e7374727563742d77726170"
+    },
+    {
+      "id": "B002",
+      "name": "share-gemm-conservation",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "73686172652d67656d6d2d636f6e736572766174696f6e"
+    },
+    {
+      "id": "B003",
+      "name": "bucket-128-padding",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "6275636b65742d3132382d70616464696e67"
+    },
+    {
+      "id": "B004",
+      "name": "two-exact-z-challenges",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "74776f2d65786163742d7a2d6368616c6c656e676573"
+    },
+    {
+      "id": "B005",
+      "name": "channel-roundtrip",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "6368616e6e656c2d726f756e6474726970"
+    },
+    {
+      "id": "B006",
+      "name": "signed-private-adjudication",
+      "expect": "ACCEPT",
+      "kind": "positive",
+      "bytes": "7369676e65642d707269766174652d61646a756469636174696f6e"
+    },
+    {
+      "id": "B007",
+      "name": "tampered-gemm",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "74616d70657265642d67656d6d"
+    },
+    {
+      "id": "B008",
+      "name": "slice-before-verification",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "736c6963652d6265666f72652d766572696669636174696f6e"
+    },
+    {
+      "id": "B009",
+      "name": "request-replay",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "726571756573742d7265706c6179"
+    },
+    {
+      "id": "B010",
+      "name": "context-party-mutation",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "636f6e746578742d70617274792d6d75746174696f6e"
+    },
+    {
+      "id": "B011",
+      "name": "context-request-mutation",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "636f6e746578742d726571756573742d6d75746174696f6e"
+    },
+    {
+      "id": "B012",
+      "name": "context-model-mutation",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "636f6e746578742d6d6f64656c2d6d75746174696f6e"
+    },
+    {
+      "id": "B013",
+      "name": "context-profile-mutation",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "636f6e746578742d70726f66696c652d6d75746174696f6e"
+    },
+    {
+      "id": "B014",
+      "name": "context-tensor-mutation",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "636f6e746578742d74656e736f722d6d75746174696f6e"
+    },
+    {
+      "id": "B015",
+      "name": "context-shape-mutation",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "636f6e746578742d73686170652d6d75746174696f6e"
+    },
+    {
+      "id": "B016",
+      "name": "context-block-order-mutation",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "636f6e746578742d626c6f636b2d6f726465722d6d75746174696f6e"
+    },
+    {
+      "id": "B017",
+      "name": "request-response-substitution",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "726571756573742d726573706f6e73652d737562737469747574696f6e"
+    },
+    {
+      "id": "B018",
+      "name": "cross-epoch-replay",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "63726f73732d65706f63682d7265706c6179"
+    },
+    {
+      "id": "B019",
+      "name": "raw-activation-share-public-da",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "7261772d61637469766174696f6e2d73686172652d7075626c69632d6461"
+    },
+    {
+      "id": "B020",
+      "name": "raw-accumulator-share-public-da",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "7261772d616363756d756c61746f722d73686172652d7075626c69632d6461"
+    },
+    {
+      "id": "B021",
+      "name": "adjudication-signature-tamper",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "61646a756469636174696f6e2d7369676e61747572652d74616d706572"
+    },
+    {
+      "id": "B022",
+      "name": "adjudication-output-rebind",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "61646a756469636174696f6e2d6f75747075742d726562696e64"
+    },
+    {
+      "id": "B023",
+      "name": "adjudication-verdict-rebind",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "61646a756469636174696f6e2d766572646963742d726562696e64"
+    },
+    {
+      "id": "B024",
+      "name": "adjudication-unknown-suite",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "61646a756469636174696f6e2d756e6b6e6f776e2d7375697465"
+    },
+    {
+      "id": "B025",
+      "name": "adjudication-replay",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "61646a756469636174696f6e2d7265706c6179"
+    },
+    {
+      "id": "B026",
+      "name": "assured-split-to-proven",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "617373757265642d73706c69742d746f2d70726f76656e"
+    },
+    {
+      "id": "B027",
+      "name": "malicious-3pc-to-besi-fallback",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "6d616c6963696f75732d3370632d746f2d626573692d66616c6c6261636b"
+    },
+    {
+      "id": "B028",
+      "name": "hfhe-to-besi-fallback",
+      "expect": "REJECT",
+      "kind": "negative",
+      "bytes": "686668652d746f2d626573692d66616c6c6261636b"
+    }
+  ]
+}
