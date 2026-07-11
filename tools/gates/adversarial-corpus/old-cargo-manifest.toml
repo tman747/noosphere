@@ -1,0 +1,10 @@
+# Adversarial sample: Cargo manifest depending on historical ascent-* crates
+# via a path into the reject root. Planted as `Cargo.toml` during self-test
+# so the dedicated dependency check also fires.
+[package]
+name = "bad-port"
+version = "0.1.0"
+
+[dependencies]
+ascent-crypto = { path = "C:/ascent/crates/ascent-crypto" }
+ascent-types = { path = "../../ascent/crates/ascent-types" }

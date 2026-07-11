@@ -1,0 +1,22 @@
+# identity-allowlist.txt — paths permitted to carry historical/provenance
+# references to the Ascent chain (C:/ascent) and the research corpus.
+#
+# Rules:
+#   * one entry per line, relative to the repository root, forward slashes
+#   * a trailing '/' allowlists an entire directory
+#   * '#' starts a comment
+#   * ONLY historical/provenance text belongs here. Runtime code, configs,
+#     schemas, and manifests must never be allowlisted; fix them instead.
+#
+# NOTE: *.md documentation is exempt from content scanning by design, and
+# tools/gates/check_identity.py, this file, and tools/gates/adversarial-corpus/
+# are hard-excluded in the scanner itself (they contain the forbidden
+# patterns by construction).
+
+# Corpus provenance inventory: records source hashes/paths of the historical
+# evidence roots, including C:/ascent (SourceIndexer workstream).
+protocol/spec/source-index.json
+protocol/spec/external-root-index.json
+
+# Gate driver: passes `--reject-root C:/ascent` to this scanner.
+scripts/check.ps1

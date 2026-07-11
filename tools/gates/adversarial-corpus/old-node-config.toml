@@ -1,0 +1,7 @@
+# Adversarial sample: old-style node config pointing at the historical
+# Ascent state root and network. The scanner must flag the state path,
+# the network name, and the schema domain.
+schema = "ascent.node-config.v1"
+network = "ascent-devnet-1"
+state_dir = "C:/ascent/state/devnet1"
+rpc_listen = "127.0.0.1:31000"

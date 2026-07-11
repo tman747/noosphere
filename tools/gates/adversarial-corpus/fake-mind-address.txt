@@ -1,0 +1,3 @@
+# Adversarial sample: old MindChain/Ascent bech32m address under HRP `mind`.
+# The scanner must flag this; NOOSPHERE only accepts HRP `noos`.
+recipient = "mind1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqnz3wfd"

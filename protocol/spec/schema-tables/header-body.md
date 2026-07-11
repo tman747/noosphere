@@ -1,0 +1,120 @@
+# Block header and body schema table (G0 freeze candidate)
+
+Source: `C:/tmp/noosphere/01-architecture.md` §9.1–9.2 (canonical sketch, widths as
+stated there) plus the binding plan §6.3 resolution of the receipt-root naming.
+Fixed-width fields little-endian; variable structures u32-length-delimited with
+explicit maxima; block hash = domain-separated hash of the canonical header
+including proposer signature (ch01 §9.1). Header domain string owned by
+IdentityFreeze.
+
+## Receipt-root resolution (plan §6.3, normative)
+
+ch01 §9.1 shows a single `receipt_root` and omits a receipts state root. The plan
+resolves the ambiguity into **two mandatory versioned header fields**; clients
+reject either omission or interchange:
+
+- `execution_receipt_root` — ordered execution receipts emitted by this block
+  (ch01 §9.2's "receipt_root commits ordered execution receipts").
+- `lumen_receipts_state_root` — post-state projection of `LumenState.receipts_root`
+  (the compact settled-receipt index, ch01 §6.1).
+
+The BlockHeaderV1 layout below applies that resolution; it therefore carries all
+six Lumen roots plus the execution receipt root.
+
+## BlockHeaderV1
+
+Widths marked (src) are stated in ch01 §9.1; others PROPOSED-G0.
+
+| # | Field | Width | Notes |
+|---:|---|---|---|
+| 0 | `chain_id` | Hash32 (src) | rejects `wrong_protocol_identity` on mismatch |
+| 1 | `version` | u16 (src) | |
+| 2 | `height` | u64 (src) | |
+| 3 | `slot` | u64 (src) | `floor((timestamp_ms - genesis_time_ms)/6000)`, ch01 §4.2 |
+| 4 | `timestamp_ms` | u64 (src) | > parent MTP-11; ≤ adjusted time + max_future_drift |
+| 5 | `parent_hash` | Hash32 (src) | |
+| 6 | `proposer_key` | Bytes48 (src) | BLS public key |
+| 7 | `tx_root` | Hash32 (src) | ordered transaction bodies |
+| 8 | `witness_root` | Hash32 (src) | ordered witnesses keyed by txid |
+| 9 | `execution_receipt_root` | Hash32 | plan §6.3 rename of ch01 `receipt_root` |
+| 10 | `evidence_root` | Hash32 (src) | consensus evidence required to verify this block |
+| 11 | `body_da_root` | Hash32 (src) | erasure-coded body shard commitment |
+| 12 | `notes_root` | Hash32 (src) | post-state |
+| 13 | `nullifiers_root` | Hash32 (src) | post-state |
+| 14 | `accounts_root` | Hash32 (src) | post-state |
+| 15 | `objects_root` | Hash32 (src) | post-state |
+| 16 | `lumen_receipts_state_root` | Hash32 | plan §6.3 mandatory addition (absent from ch01 sketch) |
+| 17 | `params_root` | Hash32 (src) | post-state |
+| 18 | `justified_checkpoint` | CheckpointRef | see below |
+| 19 | `finalized_checkpoint` | CheckpointRef | cannot revert by work (fork choice, plan §6.4) |
+| 20 | `finality_certificate_root` | Hash32 (src) | |
+| 21 | `witness_membership_root` | Hash32 (src) | |
+| 22 | `ground_profile_id` | u32 (src) | = 1 under Braid v1 (ch01 §4.2) |
+| 23 | `ground_target` | Uint256 (src) | 32 B LE; deterministic Pulse output for parent |
+| 24 | `ground_ticket_root` | Hash32 (src) | mandatory ticket, every block |
+| 25 | `loom_credit_root` | Hash32 (src) | canonical zero while disabled (plan §6.3) |
+| 26 | `loom_credit` | u128 (src) | canonical zero while disabled |
+| 27 | `gas_used` | ResourceVector = 5 × u64 = 40 (PROPOSED-G0) | axes B,G,V,R,D (ch01 §6.9) |
+| 28 | `base_prices` | ResourcePriceVector = 5 × u64 = 40 (PROPOSED-G0) | per-dimension base prices |
+| 29 | `proposer_signature` | Bytes96 (src) | BLS signature |
+
+### CheckpointRef (PROPOSED-G0 — ch01 names the type, gives no fields)
+
+| # | Field | Width | Notes |
+|---:|---|---|---|
+| 0 | `epoch` | u64 (PROPOSED-G0) | checkpoint = first block at height `e*256` (ch01 §4.1) |
+| 1 | `checkpoint_hash` | Hash32 (PROPOSED-G0) | |
+
+## BlockBodyV1 (ch01 §9.2)
+
+Collection maxima PROPOSED-G0 pending [fees]/[da] capacity freeze (ODR-FEES-002,
+ODR-DA-002); ch01 §9.1 requires explicit maxima, numbers none.
+
+| # | Field | Element | Collection max | Notes |
+|---:|---|---|---|---|
+| 0 | `transactions[]` | TransactionV1 | 16384 (PROPOSED-G0) | |
+| 1 | `segregated_witnesses[]` | witness bundle keyed by txid | 16384 (PROPOSED-G0) | |
+| 2 | `system_transitions[]` | typed system transition | 256 (PROPOSED-G0) | applied before transactions (ch01 §9.3) |
+| 3 | `finality_certificates[]` | FinalityCertificateV1 | 8 (PROPOSED-G0) | |
+| 4 | `ground_ticket` | GroundTicketV1 | exactly 1 | mandatory on every block (ch01 §4.2) |
+| 5 | `loom_credit_claims[]` | loom claim | 0 while disabled | canonical empty at genesis |
+| 6 | `consensus_blob_descriptors[]` | BlobDescriptor (see da.md) | 64 (PROPOSED-G0) | |
+
+## GroundTicketV1 (ch01 §4.2, fields from the challenge/digest construction)
+
+`GroundChallenge = H("NOOS/GROUND/CHALLENGE/V1" || chain_id || parent_hash ||
+parent_ground_target_le || slot_le || proposal_commitment || proposer_pubkey)`;
+`digest = BLAKE3-256-keyed(...)` over canonical LE `nonce` and fixed 32-byte
+`extra_nonce`; validity `uint256_le(digest) < ground_target` (ch01 §4.2).
+
+| # | Field | Width | Notes |
+|---:|---|---|---|
+| 0 | `proposal_commitment` | Hash32 (PROPOSED-G0) | binds the exact proposal |
+| 1 | `nonce` | u64 (PROPOSED-G0) | canonical little-endian |
+| 2 | `extra_nonce` | Bytes32 (src) | fixed 32 bytes (ch01 §4.2 rule 3) |
+
+`(proposer_pubkey, nonce, extra_nonce)` must not appear in any ancestor after the
+last finalized checkpoint (ch01 §4.2 rule 8). Remaining challenge inputs are
+recomputed from the header, not carried.
+
+## FinalityCertificateV1 (ch01 §4.8 prose + plan §6.6)
+
+"aggregate certificates containing source, target, bitmap, aggregate signature,
+raw/effective sums, and membership root" (plan §6.6). Field order PROPOSED-G0.
+Justification threshold: exactly `floor(2*W/3)+1` on raw AND effective weight.
+
+| # | Field | Width | Notes |
+|---:|---|---|---|
+| 0 | `source` | CheckpointRef | |
+| 1 | `target` | CheckpointRef | |
+| 2 | `participation_bitmap` | bounded bytes, max 128 (PROPOSED-G0) | covers N_hard=1024 bits |
+| 3 | `aggregate_signature` | Bytes96 (PROPOSED-G0) | BLS |
+| 4 | `raw_weight_sum` | u128 (PROPOSED-G0) | micro-NOOS |
+| 5 | `effective_weight_sum` | u128 (PROPOSED-G0) | |
+| 6 | `membership_root` | Hash32 | epoch snapshot at lookback e-2 |
+
+## Fork-choice tuple (ch01 M-CLOCK; plan §6.4)
+
+Lexicographic: `(finalized checkpoint, justified checkpoint, cumulative normalized
+G+L, inverse block hash)`. Loom term L = 0 at genesis; `L/(G+L) ≤ 0.10` is the
+never-exceed theoretical bound (ch01 §12; [genesis_controls] in constants-v1.toml).

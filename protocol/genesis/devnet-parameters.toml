@@ -1,0 +1,75 @@
+# NOOSPHERE devnet genesis parameters — noos-devnet-1
+#
+# VALUELESS TEST NETWORK. This file contains NO mainnet economics: token
+# allocation, maximum supply, issuance curve, and minimum witness bond are
+# deliberately absent from the research corpus and remain OWNER_BLOCKED until
+# the signed mainnet-parameters.toml exists (plan §2.5). Nothing here may be
+# copied into a mainnet genesis.
+#
+# chain_id is NEVER hand-written: it is derived as
+#   H("NOOS/CHAIN/V1" || H("NOOS/GENESIS/PARAMS/V1" || canonical(manifest)))
+# over the canonical fixed-width GenesisParameterManifestV1 encoding of this
+# parameter set (identity-v1.md §4). Tools consume chain_name only as a label.
+
+schema_version = 1
+chain_name = "noos-devnet-1"
+is_test_network = true
+
+[token]
+# Valueless engineering asset. Six decimals mirror production micro-NOOS units.
+symbol = "NOOS_TEST"
+decimals = 6
+base_unit = "micro-NOOS_TEST"
+
+[consensus]
+# Plan §6.2 (architecture ch.01 §4): frozen devnet timing.
+slot_seconds = 6
+epoch_length = 256
+max_slot_skip = 20
+median_time_past_blocks = 11
+witness_membership_lookback_epochs = 2
+pulse_target_spacing_seconds = 6
+pulse_half_life_seconds = 3600
+# Devnet clock-drift bound; mainnet value is selected under E-WAN from
+# {12000, 18000, 30000} and is NOT frozen by this file.
+max_future_drift_ms = 12000
+
+[witness_ring]
+# Structural caps only (plan §6.5). Minimum bond is a valueless devnet fixture;
+# the mainnet minimum bond is a signed genesis parameter (OWNER_BLOCKED).
+n_max = 256
+n_tail = 32
+n_hard = 1024
+min_bond_micro_noos_test = 1000000000000
+min_bond_is_test_fixture = true
+
+[controls]
+# The six genesis controls (plan §1.5, §6.8). ALL radical controls are off at
+# genesis on every network; devnet is no exception.
+work_loom_credit_enabled = false
+work_loom_weight_cap = 0
+witness_proofpower_bonus_enabled = false
+neural_lane_enabled = false
+reflex_lane_enabled = false
+umbra_suite_enabled = false     # applies to every Umbra suite; none registered
+dream_lane_enabled = false
+class_gate_irreversible_budget = 0
+
+[faucet]
+# Fixed valueless faucet fixture (plan §2.5). The Ed25519 public key below is a
+# deterministic TEST FIXTURE (BLAKE3 of "noos-devnet-1/faucet/0" keyseed), not
+# ceremony output; nodes MUST refuse to load any is_test_fixture material on a
+# network where is_test_network = false.
+enabled = true
+allocation_micro_noos_test = 1000000000000000
+account_pubkey_ed25519_hex = "0f4a6e1c8b2d9350a7e6c41f5d38b90217c4ae85f0d3962b1e7c05a48d6f31b9"
+is_test_fixture = true
+per_request_micro_noos_test = 1000000000
+cooldown_seconds = 60
+
+[dkg]
+# Devnet uses a deterministic local DKG fixture in place of the multi-party
+# ceremony. Excluded from mainnet by the is_test_fixture scan (plan §3.2).
+participants = 4
+threshold = 3
+is_test_fixture = true

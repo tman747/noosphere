@@ -1,0 +1,9 @@
+// Adversarial sample: go.mod requiring/replacing into the historical chain.
+// Planted as `go.mod` during self-test so the go dependency check fires.
+module github.com/mindchain/bad-port
+
+go 1.25
+
+require github.com/mindchain/ascent-go v0.3.1
+
+replace github.com/mindchain/ascent-go => C:/ascent/go

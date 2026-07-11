@@ -1,0 +1,390 @@
+$ cargo test -p ascent-node -- --test-threads=1
+(cwd=C:/ascent, RUST_BACKTRACE=1, ASCENT_TEST_TIME_MULTIPLIER=3, CARGO_TARGET_DIR=C:/tmp/ascent-baseline-target)
+
+   Compiling ascent-consensus-core v0.1.0 (C:\ascent\crates\ascent-consensus-core)
+   Compiling ascent-node v0.1.0 (C:\ascent\crates\ascent-node)
+   Compiling ascent-wallet-core v0.1.0 (C:\ascent\crates\ascent-wallet-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 31.55s
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_node-70a7682d442e0a0d.exe)
+
+running 92 tests
+test epoch_close_tests::crossed_epoch_target_fires_only_on_boundary ... ok
+test epoch_close_tests::dkg_rekey_proposal_builds_transcript_backed_set ... ok
+test epoch_close_tests::epoch_close_decision_classifies_exit_deactivation_as_changed_set ... ok
+test epoch_close_tests::epoch_close_decision_never_proposes_and_classifies_deferrals ... ok
+test tests::admin_beacon_share_reports_active_commitment_mismatch ... ok
+test tests::admin_beacon_share_requires_auth_and_returns_runtime_result ... ok
+test tests::api_node_reports_identity_paths_and_join_request ... ok
+test tests::api_receipts_returns_committed_receipt_submission ... ok
+test tests::api_workers_returns_committed_worker_registration ... ok
+test tests::automatic_boot_jump_keeps_recovered_cohort_on_next_bucket ... ok
+test tests::automatic_boot_jump_stays_recovered_below_next_bucket_tolerance ... ok
+test tests::block_record_v5_loads_via_fallback_with_empty_slashes ... ok
+test tests::block_record_v6_loads_via_fallback_with_empty_evidence_ids ... ok
+test tests::block_store_append_replay_round_trip ... ok
+test tests::blocks_pagination_descends_and_clamps_limit ... ok
+test tests::boot_evidence_ids_exclude_records_beyond_parent_link_gap ... ok
+test tests::boot_evidence_ids_include_records_below_checkpoint_slot ... ok
+test tests::boot_evidence_ids_seed_only_ttl_window_below_tip ... ok
+test tests::boot_jump_allowance_slots_override_pins_allowance ... ok
+test tests::chain_view_retention_bounds_map_sizes_across_many_slots ... ok
+test tests::chain_view_retention_zero_keeps_full_presentation_history ... ok
+test tests::chain_view_small_retention_prunes_maps_and_keeps_live_state ... FAILED
+test tests::dashboard_includes_worker_registry_surface ... ok
+test tests::dashboard_serves_embedded_html ... ok
+test tests::devnet1_no_restart_migration_rehearsal ... ignored, multi-epoch live-fleet rehearsal; run explicitly (see doc comment)
+test tests::devnet_child_namespace_transfer_and_fee_enforcement ... ok
+test tests::devnet_verification_reward_pool_ns_note_spends_with_quorum_only ... ok
+test tests::durable_recovery_after_snapshot_accepts_parent_linked_slot_gap ... ok
+test tests::durable_recovery_rejects_corrupted_snapshot_state_root ... ok
+test tests::durable_recovery_rejects_tampered_snapshot_note_contents ... ok
+test tests::durable_recovery_uses_snapshot_checkpoint_and_replays_continuity ... ok
+test tests::durable_recovery_without_snapshot_uses_legacy_full_replay ... ok
+test tests::durable_snapshot_round_trip_preserves_validator_registry ... ok
+test tests::framing_round_trip_and_rejects_oversize ... ok
+test tests::full_network_restart_after_clock_gap_resumes_production ... 
+running 1 test
+clock-gap restart resumed production in 30.2494075s (tip 12)
+test tests::full_network_restart_after_clock_gap_resumes_production ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 91 filtered out; finished in 44.73s
+
+ok
+test tests::full_network_restart_resumes_block_production ... 2026-07-11T00:34:25.378610Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:52464/dashboard validator=0 p2p=127.0.0.1:52360 rpc=127.0.0.1:52464
+2026-07-11T00:34:25.424313Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:52465/dashboard validator=1 p2p=127.0.0.1:52361 rpc=127.0.0.1:52465
+2026-07-11T00:34:25.466014Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:52466/dashboard validator=2 p2p=127.0.0.1:52362 rpc=127.0.0.1:52466
+2026-07-11T00:34:25.510375Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:52467/dashboard validator=3 p2p=127.0.0.1:52363 rpc=127.0.0.1:52467
+2026-07-11T00:34:45.897659Z  WARN ascent_node: outbound loop exited from=0 to=2
+2026-07-11T00:34:45.897659Z  WARN ascent_node: outbound loop exited from=0 to=1
+2026-07-11T00:34:45.897741Z  WARN ascent_node: outbound loop exited from=0 to=3
+2026-07-11T00:34:46.102719Z  WARN ascent_node: outbound loop exited from=1 to=0
+2026-07-11T00:34:46.102761Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:34:46.102861Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:34:46.336145Z  WARN ascent_node: outbound loop exited from=2 to=1
+2026-07-11T00:34:46.336142Z  WARN ascent_node: outbound loop exited from=2 to=0
+2026-07-11T00:34:46.336187Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:34:53.242329Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=0 recovered_slot=20 wall_round=22 jump_round=32
+2026-07-11T00:34:53.244747Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53164/dashboard validator=0 p2p=127.0.0.1:53060 rpc=127.0.0.1:53164
+2026-07-11T00:34:59.910814Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=1 recovered_slot=20 wall_round=29 jump_round=32
+2026-07-11T00:34:59.912867Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53165/dashboard validator=1 p2p=127.0.0.1:53061 rpc=127.0.0.1:53165
+2026-07-11T00:35:06.575793Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=2 recovered_slot=20 wall_round=35 jump_round=32
+2026-07-11T00:35:06.577810Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53166/dashboard validator=2 p2p=127.0.0.1:53062 rpc=127.0.0.1:53166
+2026-07-11T00:35:13.307006Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=3 recovered_slot=20 wall_round=42 jump_round=32
+2026-07-11T00:35:13.309187Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53167/dashboard validator=3 p2p=127.0.0.1:53063 rpc=127.0.0.1:53167
+2026-07-11T00:35:22.114153Z  WARN ascent_node: invalid quic frame: transport error: connection lost
+2026-07-11T00:35:24.873065Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:35:24.873145Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:35:25.078254Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:35:25.212401Z  WARN ascent_node: outbound loop exited from=3 to=1
+ok
+test tests::full_network_restart_with_long_history_resumes_production ... 2026-07-11T00:35:25.269086Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53904/dashboard validator=0 p2p=127.0.0.1:53800 rpc=127.0.0.1:53904
+2026-07-11T00:35:25.310496Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53905/dashboard validator=1 p2p=127.0.0.1:53801 rpc=127.0.0.1:53905
+2026-07-11T00:35:25.351552Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53906/dashboard validator=2 p2p=127.0.0.1:53802 rpc=127.0.0.1:53906
+2026-07-11T00:35:25.393190Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53907/dashboard validator=3 p2p=127.0.0.1:53803 rpc=127.0.0.1:53907
+2026-07-11T00:35:45.808711Z  WARN ascent_node: outbound loop exited from=0 to=1
+2026-07-11T00:35:45.808723Z  WARN ascent_node: outbound loop exited from=0 to=2
+2026-07-11T00:35:45.808815Z  WARN ascent_node: outbound loop exited from=0 to=3
+2026-07-11T00:35:46.060249Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:35:46.060330Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:35:46.314116Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:35:53.140181Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=0 recovered_slot=20 wall_round=22 jump_round=32
+2026-07-11T00:35:53.142623Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:48644/dashboard validator=0 p2p=127.0.0.1:48540 rpc=127.0.0.1:48644
+2026-07-11T00:35:59.697666Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=1 recovered_slot=20 wall_round=29 jump_round=32
+2026-07-11T00:35:59.699799Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:48645/dashboard validator=1 p2p=127.0.0.1:48541 rpc=127.0.0.1:48645
+2026-07-11T00:36:06.265887Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=2 recovered_slot=20 wall_round=35 jump_round=32
+2026-07-11T00:36:06.268001Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:48646/dashboard validator=2 p2p=127.0.0.1:48542 rpc=127.0.0.1:48646
+2026-07-11T00:36:13.012131Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=3 recovered_slot=20 wall_round=42 jump_round=32
+2026-07-11T00:36:13.014300Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:48647/dashboard validator=3 p2p=127.0.0.1:48543 rpc=127.0.0.1:48647
+2026-07-11T00:36:17.152418Z  WARN ascent_node: commit pipeline lagging the BFT frontier validator=0 committed=20 applied=20 current=35 high_qc=34 sync_from=None checkpoint=Some(21) requested_anchors=0 buffered_anchors=23 stall_ticks=14 consecutive_timeouts=2 gc=22 next_dag=24 max_cert=23 highest_timeout=Some(34) highest_timeout_votes=1 certificates=92 own_batch_headers=0 proposal_repairs=0 proposal_graces=0 proposals=2 valid_proposals=2 late_proposals=0 votes_cast=2 round_timeouts=4 window_slides=0
+2026-07-11T00:36:30.648965Z  WARN ascent_node: commit pipeline lagging the BFT frontier validator=1 committed=20 applied=20 current=37 high_qc=34 sync_from=None checkpoint=Some(21) requested_anchors=0 buffered_anchors=26 stall_ticks=14 consecutive_timeouts=5 gc=22 next_dag=30 max_cert=29 highest_timeout=Some(36) highest_timeout_votes=3 certificates=118 own_batch_headers=0 proposal_repairs=0 proposal_graces=0 proposals=5 valid_proposals=5 late_proposals=1 votes_cast=4 round_timeouts=6 window_slides=0
+2026-07-11T00:36:33.096133Z  WARN ascent_node: commit pipeline lagging the BFT frontier validator=2 committed=20 applied=20 current=37 high_qc=34 sync_from=None checkpoint=Some(21) requested_anchors=0 buffered_anchors=26 stall_ticks=14 consecutive_timeouts=4 gc=22 next_dag=31 max_cert=30 highest_timeout=Some(36) highest_timeout_votes=4 certificates=121 own_batch_headers=0 proposal_repairs=2 proposal_graces=0 proposals=5 valid_proposals=3 late_proposals=1 votes_cast=2 round_timeouts=4 window_slides=0
+2026-07-11T00:36:49.846677Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:36:49.846745Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:36:50.176346Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:36:50.372506Z  WARN ascent_node: outbound loop exited from=3 to=2
+ok
+test tests::genesis_config_borsh_round_trip ... ok
+test tests::handover_bearing_sync_response_v2_is_never_coalescible ... ok
+test tests::high_qc_recovery_two_slot_crash_keeps_safety_matching_old_value ... ok
+test tests::json_rpc_submit_rejects_undecodable_tx ... ok
+test tests::logtail_returns_recent_lines_with_default_and_cap ... ok
+test tests::metrics_endpoint_reports_prometheus_text_and_advancing_commits ... 2026-07-11T00:36:50.521104Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:51381/dashboard validator=0 p2p=127.0.0.1:51280 rpc=127.0.0.1:51381
+ok
+test tests::noop_reconfigure_keeps_slots_advancing_and_tx_inclusion ... 2026-07-11T00:36:50.853842Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:46124/dashboard validator=0 p2p=127.0.0.1:46020 rpc=127.0.0.1:46124
+2026-07-11T00:36:50.894098Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:46125/dashboard validator=1 p2p=127.0.0.1:46021 rpc=127.0.0.1:46125
+2026-07-11T00:36:50.935286Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:46126/dashboard validator=2 p2p=127.0.0.1:46022 rpc=127.0.0.1:46126
+2026-07-11T00:36:50.976858Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:46127/dashboard validator=3 p2p=127.0.0.1:46023 rpc=127.0.0.1:46127
+2026-07-11T00:36:54.728017Z  INFO ascent_node: validator reconfigure staged validator=0 epoch=1 activation_round=512
+2026-07-11T00:36:54.728683Z  INFO ascent_node: validator reconfigure staged validator=1 epoch=1 activation_round=512
+2026-07-11T00:36:54.729039Z  WARN ascent_node: outbound loop exited from=0 to=1
+2026-07-11T00:36:54.729113Z  WARN ascent_node: outbound loop exited from=0 to=2
+2026-07-11T00:36:54.729138Z  WARN ascent_node: outbound loop exited from=0 to=3
+2026-07-11T00:36:54.729462Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:36:54.729515Z  WARN ascent_node: outbound loop exited from=1 to=0
+2026-07-11T00:36:54.729537Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:36:54.738281Z  WARN ascent_node: outbound loop exited from=2 to=1
+2026-07-11T00:36:54.738300Z  WARN ascent_node: outbound loop exited from=2 to=0
+2026-07-11T00:36:54.738338Z  INFO ascent_node: validator reconfigure staged validator=2 epoch=1 activation_round=512
+2026-07-11T00:36:54.738390Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:36:54.759919Z  INFO ascent_node: validator reconfigure staged validator=3 epoch=1 activation_round=512
+2026-07-11T00:36:54.760045Z  WARN ascent_node: outbound loop exited from=3 to=1
+2026-07-11T00:36:54.760051Z  WARN ascent_node: outbound loop exited from=3 to=0
+2026-07-11T00:36:54.760125Z  WARN ascent_node: outbound loop exited from=3 to=2
+ok
+test tests::note_summary_owner_present_for_sig_absent_otherwise ... ok
+test tests::note_summary_worker_registration_payload_is_exposed ... ok
+test tests::observer_connection_limiter_rejects_saturated_unpinned_lane ... ok
+test tests::observer_restart_resumes_from_checkpoint ... 2026-07-11T00:37:02.598168Z  INFO ascent_node: observer RPC ready; dashboard at http://127.0.0.1:61005/dashboard rpc=127.0.0.1:61005
+2026-07-11T00:37:02.620392Z  INFO ascent_node: observer RPC ready; dashboard at http://127.0.0.1:61007/dashboard rpc=127.0.0.1:61007
+ok
+test tests::observer_syncs_one_validator_devnet_via_quic ... 2026-07-11T00:37:02.653076Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:54861/dashboard validator=0 p2p=127.0.0.1:54760 rpc=127.0.0.1:54861
+2026-07-11T00:37:02.942106Z  INFO ascent_node: observer RPC ready; dashboard at http://127.0.0.1:61016/dashboard rpc=127.0.0.1:61016
+ok
+test tests::observer_syncs_via_rpc_fallback_when_quic_unreachable ... 2026-07-11T00:37:03.158444Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:47601/dashboard validator=0 p2p=127.0.0.1:47500 rpc=127.0.0.1:47601
+2026-07-11T00:37:03.457277Z  INFO ascent_node: observer RPC ready; dashboard at http://127.0.0.1:61028/dashboard rpc=127.0.0.1:61028
+ok
+test tests::onchain_dkg_ceremony_finalizes_rekeys_and_survives_restart ... ok
+test tests::operator_boot_jump_override_reaches_high_common_bucket ... ok
+test tests::outbound_normal_lane_overflow_drops_oldest_and_caps_depth ... ok
+test tests::outbound_priority_coalescing_does_not_displace_responses ... ok
+test tests::outbound_priority_coalescing_replaces_in_flight_stale_sync_response ... ok
+test tests::outbound_priority_lane_coalesces_newest_and_counts_displacements ... ok
+test tests::outbound_priority_lane_replaces_queued_response_with_refresh_request ... ok
+test tests::outbound_priority_lane_replaces_stale_sync_response_with_newer_chunk ... ok
+test tests::oversized_recovery_round_trips_through_sidecar_and_commit_file ... 2026-07-11T00:37:05.430836Z  WARN ascent_node: stored oversized committed recovery metadata separately slot=1 encoded_bytes=16778635 max_inline_bytes=16777216
+ok
+test tests::partial_fleet_full_restart_resumes_and_includes_txs ... 2026-07-11T00:37:05.571808Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:46345/dashboard validator=0 p2p=127.0.0.1:46240 rpc=127.0.0.1:46345
+2026-07-11T00:37:05.623453Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:46346/dashboard validator=1 p2p=127.0.0.1:46241 rpc=127.0.0.1:46346
+2026-07-11T00:37:05.674315Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:46347/dashboard validator=2 p2p=127.0.0.1:46242 rpc=127.0.0.1:46347
+2026-07-11T00:37:05.726118Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:46348/dashboard validator=3 p2p=127.0.0.1:46243 rpc=127.0.0.1:46348
+2026-07-11T00:37:19.540050Z  WARN ascent_node: outbound loop exited from=0 to=3
+2026-07-11T00:37:22.548411Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:37:22.548499Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:37:25.553599Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:37:37.122088Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=0 recovered_slot=13 wall_round=27 jump_round=32
+2026-07-11T00:37:37.124340Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53085/dashboard validator=0 p2p=127.0.0.1:52980 rpc=127.0.0.1:53085
+2026-07-11T00:37:42.565196Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=1 recovered_slot=13 wall_round=32 jump_round=32
+2026-07-11T00:37:42.567195Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53086/dashboard validator=1 p2p=127.0.0.1:52981 rpc=127.0.0.1:53086
+2026-07-11T00:37:48.158999Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=2 recovered_slot=13 wall_round=38 jump_round=32
+2026-07-11T00:37:48.161008Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53087/dashboard validator=2 p2p=127.0.0.1:52982 rpc=127.0.0.1:53087
+2026-07-11T00:37:53.744122Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=3 recovered_slot=13 wall_round=43 jump_round=32
+2026-07-11T00:37:53.746176Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53088/dashboard validator=3 p2p=127.0.0.1:52983 rpc=127.0.0.1:53088
+2026-07-11T00:37:59.706420Z  WARN ascent_node: commit pipeline lagging the BFT frontier validator=0 committed=13 applied=13 current=33 high_qc=14 sync_from=None checkpoint=Some(14) requested_anchors=0 buffered_anchors=11 stall_ticks=14 consecutive_timeouts=2 gc=33 next_dag=33 max_cert=32 highest_timeout=Some(33) highest_timeout_votes=3 certificates=58 own_batch_headers=0 proposal_repairs=0 proposal_graces=0 proposals=1 valid_proposals=1 late_proposals=0 votes_cast=1 round_timeouts=5 window_slides=2
+2026-07-11T00:38:14.539237Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:38:14.539277Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:38:17.544480Z  WARN ascent_node: outbound loop exited from=2 to=3
+ok
+test tests::peers_from_registry_synthesizes_hash_pinned_topology ... 2026-07-11T00:38:23.571272Z  WARN ascent_node: skipping new-set member with unparseable advertise address: invalid socket address syntax member=2 addr=not-an-addr
+ok
+test tests::raw_block_records_page_byte_cap_latches_page_to_keep_slots_contiguous ... ok
+test tests::raw_block_records_page_clamps_count_bound_and_sets_more ... ok
+test tests::raw_block_records_page_enforces_byte_bound_and_sets_more ... ok
+test tests::retained_api_reports_pruned_and_clamps_blocks ... ok
+test tests::rpc_admission_rejects_duplicate_pending_tx ... ok
+test tests::rpc_admission_rejects_oversize_tx ... ok
+test tests::rpc_admission_rejects_sub_fee_floor_tx ... ok
+test tests::rpc_admission_valid_tx_commits_end_to_end ... 2026-07-11T00:38:26.924469Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53824/dashboard validator=0 p2p=127.0.0.1:53720 rpc=127.0.0.1:53824
+2026-07-11T00:38:26.964356Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53825/dashboard validator=1 p2p=127.0.0.1:53721 rpc=127.0.0.1:53825
+2026-07-11T00:38:27.005972Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53826/dashboard validator=2 p2p=127.0.0.1:53722 rpc=127.0.0.1:53826
+2026-07-11T00:38:27.048578Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:53827/dashboard validator=3 p2p=127.0.0.1:53723 rpc=127.0.0.1:53827
+2026-07-11T00:38:33.537558Z  WARN ascent_node: outbound loop exited from=0 to=2
+2026-07-11T00:38:33.537576Z  WARN ascent_node: outbound loop exited from=0 to=1
+2026-07-11T00:38:33.537646Z  WARN ascent_node: outbound loop exited from=0 to=3
+2026-07-11T00:38:34.100981Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:38:34.101040Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:38:34.101643Z  WARN ascent_node: quic open stream failed: closed by peer: validator teardown (code 0) to=1
+2026-07-11T00:38:37.957589Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:38:38.374928Z  WARN ascent_node: outbound loop exited from=3 to=2
+ok
+test tests::rpc_get_block_and_get_tx_return_executed_details ... ok
+test tests::rpc_get_events_includes_note_lifecycle_and_intent_slot ... ok
+test tests::rpc_rate_limit_returns_429_after_burst ... ok
+test tests::rpc_submit_auth_rejects_missing_or_wrong_token_and_open_config_accepts ... ok
+test tests::slash_application_covers_state_root_and_survives_replay ... ok
+test tests::staged_handover_persists_and_replays_across_restart ... 2026-07-11T00:38:39.137592Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:52564/dashboard validator=0 p2p=127.0.0.1:52460 rpc=127.0.0.1:52564
+2026-07-11T00:38:39.178817Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:52565/dashboard validator=1 p2p=127.0.0.1:52461 rpc=127.0.0.1:52565
+2026-07-11T00:38:39.220552Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:52566/dashboard validator=2 p2p=127.0.0.1:52462 rpc=127.0.0.1:52566
+2026-07-11T00:38:39.260588Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:52567/dashboard validator=3 p2p=127.0.0.1:52463 rpc=127.0.0.1:52567
+2026-07-11T00:38:42.780348Z  INFO ascent_node: validator reconfigure staged validator=2 epoch=1 activation_round=512
+2026-07-11T00:38:42.780677Z  INFO ascent_node: validator reconfigure staged validator=0 epoch=1 activation_round=512
+2026-07-11T00:38:42.781202Z  WARN ascent_node: outbound loop exited from=2 to=0
+2026-07-11T00:38:42.781262Z  WARN ascent_node: outbound loop exited from=2 to=1
+2026-07-11T00:38:42.781285Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:38:42.781473Z  WARN ascent_node: outbound loop exited from=0 to=1
+2026-07-11T00:38:42.781555Z  WARN ascent_node: outbound loop exited from=0 to=2
+2026-07-11T00:38:42.781578Z  WARN ascent_node: outbound loop exited from=0 to=3
+2026-07-11T00:38:42.786495Z  WARN ascent_node: outbound loop exited from=3 to=1
+2026-07-11T00:38:42.786509Z  WARN ascent_node: outbound loop exited from=3 to=0
+2026-07-11T00:38:42.786595Z  INFO ascent_node: validator reconfigure staged validator=3 epoch=1 activation_round=512
+2026-07-11T00:38:42.786741Z  WARN ascent_node: outbound loop exited from=3 to=2
+2026-07-11T00:38:42.787253Z  INFO ascent_node: validator reconfigure staged validator=1 epoch=1 activation_round=512
+2026-07-11T00:38:42.787447Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:38:42.787496Z  WARN ascent_node: outbound loop exited from=1 to=0
+2026-07-11T00:38:42.788066Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:38:42.793711Z  WARN ascent_node: outbound loop exited from=0 to=1
+2026-07-11T00:38:42.793726Z  WARN ascent_node: outbound loop exited from=0 to=2
+2026-07-11T00:38:42.793781Z  WARN ascent_node: outbound loop exited from=0 to=3
+2026-07-11T00:38:43.277160Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:38:43.277160Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:38:50.157873Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:38:51.805220Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:49304/dashboard validator=0 p2p=127.0.0.1:49200 rpc=127.0.0.1:49304
+2026-07-11T00:38:53.276593Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:49305/dashboard validator=1 p2p=127.0.0.1:49201 rpc=127.0.0.1:49305
+2026-07-11T00:38:54.767273Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:49306/dashboard validator=2 p2p=127.0.0.1:49202 rpc=127.0.0.1:49306
+2026-07-11T00:38:56.248342Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=3 recovered_slot=3 wall_round=16 jump_round=32
+2026-07-11T00:38:56.250336Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:49307/dashboard validator=3 p2p=127.0.0.1:49203 rpc=127.0.0.1:49307
+2026-07-11T00:39:00.108730Z  WARN ascent_node: validator reconfigure rejected validator=3 epoch=1 reason=pending reconfigure exists
+2026-07-11T00:39:00.145411Z  WARN ascent_node: validator reconfigure rejected validator=1 epoch=1 reason=pending reconfigure exists
+2026-07-11T00:39:00.192344Z  WARN ascent_node: validator reconfigure rejected validator=0 epoch=1 reason=pending reconfigure exists
+2026-07-11T00:39:00.290738Z  WARN ascent_node: validator reconfigure rejected validator=2 epoch=1 reason=pending reconfigure exists
+2026-07-11T00:39:00.334065Z  WARN ascent_node: outbound loop exited from=0 to=2
+2026-07-11T00:39:00.334104Z  WARN ascent_node: outbound loop exited from=0 to=3
+2026-07-11T00:39:00.334799Z  WARN ascent_node: quic open stream failed: closed by peer: validator teardown (code 0) to=0
+2026-07-11T00:39:00.590512Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:39:00.590554Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:39:00.591096Z  WARN ascent_node: quic open stream failed: closed by peer: validator teardown (code 0) to=1
+2026-07-11T00:39:03.934287Z  WARN ascent_node: outbound loop exited from=2 to=3
+ok
+test tests::state_snapshot_v2_without_receipts_loads_via_fallback ... ok
+test tests::state_snapshot_v4_loads_via_fallback_with_empty_dkg_registry ... ok
+test tests::state_snapshot_v5_loads_via_fallback_with_empty_validator_exits ... ok
+test tests::transport_failure_drops_repair_responses_and_retries_the_rest ... ok
+test tests::tx_submitted_to_restarted_validator_is_included ... 2026-07-11T00:39:06.796100Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:46044/dashboard validator=0 p2p=127.0.0.1:45940 rpc=127.0.0.1:46044
+2026-07-11T00:39:06.836016Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:46045/dashboard validator=1 p2p=127.0.0.1:45941 rpc=127.0.0.1:46045
+2026-07-11T00:39:06.876769Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:46046/dashboard validator=2 p2p=127.0.0.1:45942 rpc=127.0.0.1:46046
+2026-07-11T00:39:06.919035Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:46047/dashboard validator=3 p2p=127.0.0.1:45943 rpc=127.0.0.1:46047
+2026-07-11T00:39:15.323831Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:39:15.323831Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:39:15.323934Z  WARN ascent_node: outbound loop exited from=1 to=0
+2026-07-11T00:39:26.175154Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=1 recovered_slot=8 wall_round=17 jump_round=32
+2026-07-11T00:39:26.177217Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:46045/dashboard validator=1 p2p=127.0.0.1:45941 rpc=127.0.0.1:46045
+2026-07-11T00:39:35.460733Z  WARN ascent_node: outbound loop exited from=0 to=2
+2026-07-11T00:39:35.460799Z  WARN ascent_node: outbound loop exited from=0 to=3
+2026-07-11T00:39:35.460831Z  WARN ascent_node: outbound loop exited from=0 to=1
+2026-07-11T00:39:36.084830Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:39:36.085285Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:39:36.256022Z  WARN ascent_node: outbound loop exited from=2 to=1
+2026-07-11T00:39:36.256096Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:39:36.507240Z  WARN ascent_node: outbound loop exited from=3 to=1
+2026-07-11T00:39:36.507331Z  WARN ascent_node: outbound loop exited from=3 to=2
+ok
+test tests::txs_submitted_after_full_restart_are_included ... 2026-07-11T00:39:36.563755Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:52784/dashboard validator=0 p2p=127.0.0.1:52680 rpc=127.0.0.1:52784
+2026-07-11T00:39:36.609074Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:52785/dashboard validator=1 p2p=127.0.0.1:52681 rpc=127.0.0.1:52785
+2026-07-11T00:39:36.651878Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:52786/dashboard validator=2 p2p=127.0.0.1:52682 rpc=127.0.0.1:52786
+2026-07-11T00:39:36.694127Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:52787/dashboard validator=3 p2p=127.0.0.1:52683 rpc=127.0.0.1:52787
+2026-07-11T00:39:49.069658Z  WARN ascent_node: outbound loop exited from=0 to=1
+2026-07-11T00:39:49.069668Z  WARN ascent_node: outbound loop exited from=0 to=2
+2026-07-11T00:39:49.069730Z  WARN ascent_node: outbound loop exited from=0 to=3
+2026-07-11T00:39:49.338838Z  WARN ascent_node: outbound loop exited from=1 to=0
+2026-07-11T00:39:49.338865Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:39:49.338914Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:39:49.646932Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:39:54.049552Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:47524/dashboard validator=0 p2p=127.0.0.1:47420 rpc=127.0.0.1:47524
+2026-07-11T00:39:58.202085Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=1 recovered_slot=12 wall_round=18 jump_round=32
+2026-07-11T00:39:58.204196Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:47525/dashboard validator=1 p2p=127.0.0.1:47421 rpc=127.0.0.1:47525
+2026-07-11T00:40:02.440391Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=2 recovered_slot=12 wall_round=22 jump_round=32
+2026-07-11T00:40:02.442545Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:47526/dashboard validator=2 p2p=127.0.0.1:47422 rpc=127.0.0.1:47526
+2026-07-11T00:40:06.683689Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=3 recovered_slot=12 wall_round=26 jump_round=32
+2026-07-11T00:40:06.686027Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:47527/dashboard validator=3 p2p=127.0.0.1:47423 rpc=127.0.0.1:47527
+2026-07-11T00:40:19.191504Z  WARN ascent_node: outbound loop exited from=0 to=1
+2026-07-11T00:40:19.191575Z  WARN ascent_node: outbound loop exited from=0 to=2
+2026-07-11T00:40:19.191606Z  WARN ascent_node: outbound loop exited from=0 to=3
+2026-07-11T00:40:19.733262Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:40:19.733269Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:40:20.224415Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:40:20.337416Z  WARN ascent_node: outbound loop exited from=3 to=2
+ok
+test tests::txs_submitted_after_slots_are_included_on_every_validator ... 2026-07-11T00:40:20.435016Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:54264/dashboard validator=0 p2p=127.0.0.1:54160 rpc=127.0.0.1:54264
+2026-07-11T00:40:20.480661Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:54265/dashboard validator=1 p2p=127.0.0.1:54161 rpc=127.0.0.1:54265
+2026-07-11T00:40:20.523108Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:54266/dashboard validator=2 p2p=127.0.0.1:54162 rpc=127.0.0.1:54266
+2026-07-11T00:40:20.562961Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:54267/dashboard validator=3 p2p=127.0.0.1:54163 rpc=127.0.0.1:54267
+2026-07-11T00:40:30.075730Z  WARN ascent_node: outbound loop exited from=0 to=2
+2026-07-11T00:40:30.075751Z  WARN ascent_node: outbound loop exited from=0 to=1
+2026-07-11T00:40:30.075787Z  WARN ascent_node: outbound loop exited from=0 to=3
+2026-07-11T00:40:30.712913Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:40:30.712968Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:40:31.458334Z  WARN ascent_node: outbound loop exited from=2 to=1
+2026-07-11T00:40:31.458396Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:40:31.644384Z  WARN ascent_node: outbound loop exited from=3 to=2
+ok
+test tests::unauthenticated_quic_consensus_messages_are_rejected ... 2026-07-11T00:40:31.710615Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:55001/dashboard validator=0 p2p=127.0.0.1:54900 rpc=127.0.0.1:55001
+2026-07-11T00:40:31.720800Z  WARN ascent_node: rejecting unauthenticated quic consensus stream
+ok
+test tests::validator_exit_flow_unlocks_bond_at_unlock_epoch ... ok
+test tests::validator_rejoins_after_crash_restart_and_catches_up ... 2026-07-11T00:40:32.221328Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:51744/dashboard validator=0 p2p=127.0.0.1:51640 rpc=127.0.0.1:51744
+2026-07-11T00:40:32.262189Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:51745/dashboard validator=1 p2p=127.0.0.1:51641 rpc=127.0.0.1:51745
+2026-07-11T00:40:32.301985Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:51746/dashboard validator=2 p2p=127.0.0.1:51642 rpc=127.0.0.1:51746
+2026-07-11T00:40:32.342843Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:51747/dashboard validator=3 p2p=127.0.0.1:51643 rpc=127.0.0.1:51747
+2026-07-11T00:40:52.715381Z  WARN ascent_node: outbound loop exited from=1 to=0
+2026-07-11T00:40:52.715450Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:40:52.715471Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:41:22.106369Z  WARN ascent_node: recovered tip trails the wall clock; jumping the downtime-covered gap instead of walking it validator=1 recovered_slot=20 wall_round=44 jump_round=32
+2026-07-11T00:41:22.108641Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:51745/dashboard validator=1 p2p=127.0.0.1:51641 rpc=127.0.0.1:51745
+2026-07-11T00:41:46.141119Z  WARN ascent_node: runtime task did not stop promptly; aborting validator=1
+2026-07-11T00:41:46.199139Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:41:46.200560Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:41:46.382755Z  WARN ascent_node: outbound loop exited from=2 to=1
+2026-07-11T00:41:46.382797Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:41:46.598084Z  WARN ascent_node: outbound loop exited from=3 to=1
+2026-07-11T00:41:46.598191Z  WARN ascent_node: outbound loop exited from=3 to=2
+ok
+test tests::wal_append_replay_round_trip ... ok
+test tests::wire_governor_fetch_response_keeps_a_fitting_item_prefix ... ok
+test tests::wire_governor_last_resort_sheds_items_and_reports_undeliverable ... 2026-07-11T00:41:46.627185Z  WARN ascent_node: dropping undeliverable oversized sync response
+2026-07-11T00:41:46.627252Z  WARN ascent_node: dropping undeliverable oversized consensus frame
+ok
+test tests::wire_governor_sync_v2_halves_anchors_and_repoints_tip_qc ... ok
+test tests::wire_governor_trim_keeps_exactly_the_closure_of_retained_anchors ... ok
+test tests::wire_governor_under_cap_message_passes_unmodified ... ok
+test tests::zero_commit_restart_restores_high_qc_anchor_and_then_commits ... 2026-07-11T00:41:46.687908Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:50484/dashboard validator=0 p2p=127.0.0.1:50380 rpc=127.0.0.1:50484
+2026-07-11T00:41:46.732152Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:50485/dashboard validator=1 p2p=127.0.0.1:50381 rpc=127.0.0.1:50485
+2026-07-11T00:41:46.775819Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:50486/dashboard validator=2 p2p=127.0.0.1:50382 rpc=127.0.0.1:50486
+2026-07-11T00:41:46.815697Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:50487/dashboard validator=3 p2p=127.0.0.1:50383 rpc=127.0.0.1:50487
+2026-07-11T00:41:48.679439Z  WARN ascent_node: outbound loop exited from=0 to=2
+2026-07-11T00:41:50.695634Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:41:50.695710Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:41:57.700693Z  WARN ascent_node: outbound loop exited from=2 to=3
+2026-07-11T00:41:57.826914Z  WARN ascent_node: outbound loop exited from=3 to=2
+2026-07-11T00:41:58.259195Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:50484/dashboard validator=0 p2p=127.0.0.1:50380 rpc=127.0.0.1:50484
+2026-07-11T00:41:58.669859Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:50485/dashboard validator=1 p2p=127.0.0.1:50381 rpc=127.0.0.1:50485
+2026-07-11T00:41:59.080557Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:50486/dashboard validator=2 p2p=127.0.0.1:50382 rpc=127.0.0.1:50486
+2026-07-11T00:41:59.494908Z  INFO ascent_node: validator RPC ready; dashboard at http://127.0.0.1:50487/dashboard validator=3 p2p=127.0.0.1:50383 rpc=127.0.0.1:50487
+2026-07-11T00:42:01.505492Z  WARN ascent_node: outbound loop exited from=0 to=1
+2026-07-11T00:42:01.505504Z  WARN ascent_node: outbound loop exited from=0 to=2
+2026-07-11T00:42:01.505565Z  WARN ascent_node: outbound loop exited from=0 to=3
+2026-07-11T00:42:03.409432Z  WARN ascent_node: outbound loop exited from=1 to=2
+2026-07-11T00:42:03.409453Z  WARN ascent_node: outbound loop exited from=1 to=3
+2026-07-11T00:42:08.424288Z  WARN ascent_node: outbound loop exited from=2 to=3
+ok
+
+failures:
+
+---- tests::chain_view_small_retention_prunes_maps_and_keeps_live_state stdout ----
+
+thread 'tests::chain_view_small_retention_prunes_maps_and_keeps_live_state' (117916) panicked at crates\ascent-node\src\lib.rs:14092:9:
+assertion failed: !view.objects.contains_key(&fixture.terminal_object_id)
+stack backtrace:
+   0: std::panicking::panic_handler
+             at /rustc/31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd/library\std\src\panicking.rs:689
+   1: core::panicking::panic_fmt
+             at /rustc/31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd/library\core\src\panicking.rs:80
+   2: core::panicking::panic
+             at /rustc/31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd/library\core\src\panicking.rs:150
+   3: ascent_node::tests::chain_view_small_retention_prunes_maps_and_keeps_live_state
+             at .\src\lib.rs:14092
+   4: ascent_node::tests::chain_view_small_retention_prunes_maps_and_keeps_live_state::closure$0
+             at .\src\lib.rs:14055
+   5: core::ops::function::FnOnce::call_once<ascent_node::tests::chain_view_small_retention_prunes_maps_and_keeps_live_state::closure_env$0,tuple$<> >
+             at /rustc/31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd/library\core\src\ops\function.rs:250
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd/library\core\src\ops\function.rs:250
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    tests::chain_view_small_retention_prunes_maps_and_keeps_live_state
+
+test result: FAILED. 90 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 523.30s
+
+error: test failed, to rerun pass `-p ascent-node --lib`
+
+[exit code: 101] [wall time: 556.0s]

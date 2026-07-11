@@ -1,0 +1,403 @@
+$ cargo test --workspace --exclude ascent-node
+(cwd=C:/ascent, RUST_BACKTRACE=1, ASCENT_TEST_TIME_MULTIPLIER=3, CARGO_TARGET_DIR=C:/tmp/ascent-baseline-target)
+
+   Compiling cfg-if v1.0.4
+   Compiling subtle v2.6.1
+   Compiling typenum v1.20.1
+   Compiling once_cell v1.21.4
+   Compiling windows-link v0.2.1
+   Compiling cpufeatures v0.2.17
+   Compiling cpufeatures v0.3.0
+   Compiling tap v1.0.1
+   Compiling funty v2.0.0
+   Compiling num_cpus v1.17.0
+   Compiling constant_time_eq v0.4.2
+   Compiling arrayref v0.3.9
+   Compiling arrayvec v0.7.8
+   Compiling signature v2.2.0
+   Compiling opaque-debug v0.3.1
+   Compiling byte-slice-cast v1.2.3
+   Compiling rand_core v0.10.1
+   Compiling pin-project-lite v0.2.17
+   Compiling zerocopy v0.8.52
+   Compiling serde_core v1.0.228
+   Compiling radium v0.7.0
+   Compiling bytes v1.12.0
+   Compiling itoa v1.0.18
+   Compiling log v0.4.33
+   Compiling smallvec v1.15.2
+   Compiling scopeguard v1.2.0
+   Compiling fastrand v2.4.1
+   Compiling futures-core v0.3.32
+   Compiling zeroize v1.9.0
+   Compiling thiserror v2.0.18
+   Compiling quick-error v1.2.3
+   Compiling wait-timeout v0.2.1
+   Compiling getrandom v0.2.17
+   Compiling windows-sys v0.61.2
+   Compiling wyz v0.5.1
+   Compiling threadpool v1.8.1
+   Compiling ed25519 v2.2.3
+   Compiling getrandom v0.3.4
+   Compiling fnv v1.0.7
+   Compiling getrandom v0.4.3
+   Compiling tracing-core v0.1.36
+   Compiling lock_api v0.4.14
+   Compiling bit-vec v0.8.0
+   Compiling rand_core v0.6.4
+   Compiling blake3 v1.8.5
+   Compiling rand_core v0.9.5
+   Compiling borsh-derive v1.7.0
+   Compiling parking_lot_core v0.9.12
+   Compiling blst v0.3.16
+   Compiling rustls-pki-types v1.15.0
+   Compiling num-traits v0.2.19
+   Compiling untrusted v0.9.0
+   Compiling unarray v0.1.4
+   Compiling regex-syntax v0.8.11
+   Compiling bitflags v2.13.0
+   Compiling slab v0.4.12
+   Compiling tower-service v0.3.3
+   Compiling httparse v1.10.1
+   Compiling futures-channel v0.3.32
+   Compiling chacha20 v0.10.1
+   Compiling bit-set v0.8.0
+   Compiling ring v0.17.14
+   Compiling rand_xorshift v0.3.0
+   Compiling powerfmt v0.2.0
+   Compiling num-conv v0.2.2
+   Compiling rand v0.9.4
+   Compiling parking_lot v0.12.5
+   Compiling rand_xorshift v0.4.0
+   Compiling tinyvec_macros v0.1.1
+   Compiling tower-layer v0.3.3
+   Compiling bitvec v1.1.1
+   Compiling tracing v0.1.44
+   Compiling httpdate v1.0.3
+   Compiling deranged v0.5.8
+   Compiling percent-encoding v2.3.2
+   Compiling time-core v0.1.9
+   Compiling atomic-waker v1.1.2
+   Compiling futures-task v0.3.32
+   Compiling sync_wrapper v1.0.2
+   Compiling rand v0.10.2
+   Compiling tinyvec v1.11.0
+   Compiling libc v0.2.186
+   Compiling zmij v1.0.21
+   Compiling form_urlencoded v1.2.2
+   Compiling rand_pcg v0.10.2
+   Compiling http v1.4.2
+   Compiling futures-util v0.3.32
+   Compiling lru-slab v0.1.2
+   Compiling lazy_static v1.5.0
+   Compiling base64 v0.22.1
+   Compiling generic-array v0.14.7
+   Compiling memchr v2.8.2
+   Compiling mime v0.3.17
+   Compiling rustc-hash v2.1.3
+   Compiling ryu v1.0.23
+   Compiling sharded-slab v0.1.7
+   Compiling tracing-log v0.2.0
+   Compiling thread_local v1.1.9
+   Compiling matchit v0.8.4
+   Compiling hex v0.4.3
+   Compiling base64ct v1.8.3
+   Compiling windows_x86_64_msvc v0.52.6
+   Compiling once_cell_polyfill v1.70.2
+   Compiling anstyle v1.0.14
+   Compiling utf8parse v0.2.2
+   Compiling pem v3.0.6
+   Compiling windows-targets v0.52.6
+   Compiling webpki-roots v1.0.8
+   Compiling colorchoice v1.0.5
+   Compiling anstyle-parse v1.0.0
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling strsim v0.11.1
+   Compiling password-hash v0.5.0
+   Compiling windows-sys v0.59.0
+   Compiling clap_lex v1.1.0
+   Compiling ascent-vm v0.1.0 (C:\ascent\crates\ascent-vm)
+   Compiling ascent-fuzz v0.1.0 (C:\ascent\crates\ascent-fuzz)
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling inout v0.1.4
+   Compiling universal-hash v0.5.1
+   Compiling aead v0.5.2
+   Compiling cipher v0.4.4
+   Compiling digest v0.10.7
+   Compiling poly1305 v0.8.0
+   Compiling chacha20 v0.9.1
+   Compiling salsa20 v0.10.2
+   Compiling sha2 v0.10.9
+   Compiling hmac v0.12.1
+   Compiling curve25519-dalek v4.1.3
+   Compiling http-body v1.0.1
+   Compiling borsh v1.7.0
+   Compiling time v0.3.53
+   Compiling rustls-webpki v0.103.13
+   Compiling http-body-util v0.1.3
+   Compiling pbkdf2 v0.12.2
+   Compiling chacha20poly1305 v0.10.1
+   Compiling scrypt v0.11.0
+   Compiling axum-core v0.5.6
+   Compiling ff v0.13.1
+   Compiling rustls v0.23.41
+   Compiling yasna v0.5.2
+   Compiling ed25519-dalek v2.2.0
+   Compiling rtoolbox v0.0.5
+   Compiling serde v1.0.228
+   Compiling serde_json v1.0.150
+   Compiling serde_path_to_error v0.1.20
+   Compiling rcgen v0.13.2
+   Compiling socket2 v0.6.4
+   Compiling tempfile v3.27.0
+   Compiling mio v1.2.1
+   Compiling nu-ansi-term v0.50.3
+   Compiling anstyle-wincon v3.0.11
+   Compiling anstyle-query v1.1.5
+   Compiling rpassword v7.5.4
+   Compiling anstream v1.0.0
+   Compiling rusty-fork v0.3.1
+   Compiling tracing-subscriber v0.3.23
+   Compiling quinn-udp v0.5.15
+   Compiling serde_urlencoded v0.7.1
+   Compiling clap_builder v4.6.0
+   Compiling tokio v1.52.3
+   Compiling ppv-lite86 v0.2.21
+   Compiling rand_chacha v0.3.1
+   Compiling rand_chacha v0.9.0
+   Compiling proptest v1.11.0
+   Compiling rand v0.8.6
+   Compiling group v0.13.0
+   Compiling pairing v0.23.0
+   Compiling blstrs v0.7.1
+   Compiling clap v4.6.1
+   Compiling quinn-proto v0.11.16
+   Compiling ascent-crypto v0.1.0 (C:\ascent\crates\ascent-crypto)
+   Compiling ascent-types v0.1.0 (C:\ascent\crates\ascent-types)
+   Compiling ascent-receipts v0.1.0 (C:\ascent\crates\ascent-receipts)
+   Compiling ascent-consensus-core v0.1.0 (C:\ascent\crates\ascent-consensus-core)
+   Compiling ascent-state v0.1.0 (C:\ascent\crates\ascent-state)
+   Compiling hyper v1.10.1
+   Compiling tower v0.5.3
+   Compiling ascent-cogitate v0.1.0 (C:\ascent\crates\ascent-cogitate)
+   Compiling ascent-verify v0.1.0 (C:\ascent\crates\ascent-verify)
+   Compiling ascent-sim-net v0.1.0 (C:\ascent\crates\ascent-sim-net)
+   Compiling hyper-util v0.1.20
+   Compiling quinn v0.11.11
+   Compiling axum v0.8.9
+   Compiling ascent-node v0.1.0 (C:\ascent\crates\ascent-node)
+   Compiling ascent-wallet-core v0.1.0 (C:\ascent\crates\ascent-wallet-core)
+   Compiling ascent-cli v0.1.0 (C:\ascent\crates\ascent-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 50.39s
+     Running unittests src\main.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_cli-e47c14c9b6a3eff0.exe)
+
+running 27 tests
+test operator::tests::regen_dkg_complaint_fixture ... ignored, writes the checked-in complaint-drill fixture
+test validator::tests::round_gas_matches_the_stf_schedule ... ok
+test validator::tests::existing_registration_requires_exit_unlock_before_reregistration ... ok
+test validator::tests::bls_commitment_parses_96_hex_chars_only ... ok
+test validator::tests::dkg_next_step_walks_rounds_in_order ... ok
+test validator::tests::unopened_dkg_fallback_uses_bond_and_exit_boundaries ... ok
+test validator::tests::unopened_dkg_fallback_rejects_malformed_bond_and_identity_data ... ok
+test operator::tests::worker_profile_rejects_empty_label ... ok
+test operator::tests::keygen_uses_fresh_entropy_and_identity_file_parses ... ok
+test operator::tests::worker_join_bootstrap_synthesizes_identity_and_minimal_profile ... ok
+test validator::tests::dkg_state_file_round_trips_and_pins_identity_and_epoch ... ok
+test operator::tests::worker_register_intent_signature_verifies ... ok
+test operator::tests::identity_export_public_verifies_and_detects_tamper ... ok
+test operator::tests::node_config_rejects_zero_outbound_normal_queue_max ... ok
+test operator::tests::observer_config_round_trip_from_public_descriptor ... ok
+test operator::tests::dkg_validate_flags_complaint_fixture ... ok
+test operator::tests::network_descriptor_and_node_config_round_trip ... ok
+test operator::tests::v0_descriptor_falls_back_to_legacy_localhost_listen_addrs ... ok
+test operator::tests::dkg_public_intake_matches_private_intake_config ... ok
+test operator::tests::dkg_cross_ceremony_replay_is_rejected ... ok
+test operator::tests::dkg_validate_catches_corrupted_artifact_and_descriptor ... ok
+test operator::tests::dkg_tampered_share_writes_complaint_and_aborts ... ok
+test operator::tests::dkg_transcript_digest_divergence_aborts_finalize ... ok
+test operator::tests::dkg_fixed_entropy_golden_ceremony_is_byte_stable ... ok
+test operator::tests::dkg_public_intake_ceremony_keeps_coordinator_public_only ... ok
+test operator::tests::join_network_binds_unspecified_and_advertises_localhost_finalizes_without_conflicts ... ok
+test operator::tests::dkg_ceremony_assembles_descriptor_and_join_network_finalizes ... ok
+
+test result: ok. 26 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 13.23s
+
+     Running tests\keystore.rs (C:/tmp/ascent-baseline-target\debug\deps\keystore-43f58cae97652585.exe)
+
+running 3 tests
+test keygen_encrypt_writes_only_encrypted_identity ... ok
+test keystore_migration_round_trips_all_artifacts_and_rejects_ambiguous_state ... ok
+test encrypted_config_join_runs_with_env_passphrase has been running for over 60 seconds
+test encrypted_config_join_runs_with_env_passphrase ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 63.97s
+
+     Running tests\webwallet_vectors.rs (C:/tmp/ascent-baseline-target\debug\deps\webwallet_vectors-2832c274bde3ee81.exe)
+
+running 1 test
+test webwallet_vectors_match_committed_json ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests\wp50_dkg_cli.rs (C:/tmp/ascent-baseline-target\debug\deps\wp50_dkg_cli-5cea4fa4f9748778.exe)
+
+running 2 tests
+test dkg_validate_cli_names_corrupted_round_artifact_and_public_descriptor ... ok
+test public_identity_intake_dkg_assembles_network_without_secret_coordinator_artifacts has been running for over 60 seconds
+test public_identity_intake_dkg_assembles_network_without_secret_coordinator_artifacts ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 91.97s
+
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_cogitate-74d378cf80b45ecd.exe)
+
+running 13 tests
+test tests::post_deadline_accepts_exact_n_plus_64_only ... ok
+test tests::double_claim_is_rejected ... ok
+test tests::claim_window_accepts_exact_n_plus_8_and_rejects_n_plus_8_plus_1 ... ok
+test tests::slash_accounting_handles_zero_and_maximal_bonds_without_wrapping ... ok
+test tests::post_miss_slashes_half_odd_bond_and_burn_rounds_up ... ok
+test tests::challenge_suspend_resume_preserves_remaining_slot_arithmetic ... ok
+test tests::challenge_flag_at_deadline_slot_cannot_suspend_finalization ... ok
+test tests::transition_from_wrong_state_is_rejected_with_typed_error ... ok
+test tests::claim_window_reopens_at_n_plus_16 ... ok
+test tests::double_resume_after_t1_is_rejected_without_deadline_drift ... ok
+test tests::happy_path_intent_claimed_posted_final_event_sequence_golden ... ok
+test tests::reverted_refund_and_ring_slash_conserve_value ... ok
+test tests::interleaved_multi_object_lifecycles_do_not_cross_contaminate_accounting ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_consensus_core-46c6d0c7fb14166e.exe)
+
+running 98 tests
+test dag::tests::genesis_qc_shape_is_empty ... ok
+test leader::tests::permutation_golden_for_fixed_seed ... ok
+test dag::tests::first_seen_rule_records_only_first_header ... ok
+test evidence::tests::evidence_rejects_same_digest_wrong_order_and_expired ... ok
+test node::tests::cut_batch_size_limited_cut_flushes_all_txs_within_limits ... ok
+test node::tests::cut_batch_drops_only_unpackable_oversized_tx ... ok
+test node::tests::cut_batch_carves_count_limited_batches_without_loss ... ok
+test node::tests::install_beacon_share_rejects_garbage_and_stale_epochs ... ok
+test dag::tests::parent_coverage_rejects_bad_sets ... ok
+test node::tests::header_production_jumps_past_unreachable_parent_rounds ... ok
+test node::tests::invalid_reconfigures_are_rejected_with_signal ... ok
+test leader::tests::epoch_schedule_is_balanced_and_stake_independent ... ok
+test node::tests::boot_sync_request_rearms_until_response ... ok
+test node::tests::node_new_validates_keys_and_sets_timers ... ok
+test evidence::tests::double_vote_validates_and_slashes_floor ... ok
+test node::tests::out_of_set_identity_boots_as_observer_and_wrong_beacon_key_still_errors ... ok
+test node::tests::header_vote_is_resent_when_header_is_redelivered ... ok
+test node::tests::history_resolves_forward_to_active_set_until_a_recorded_activation ... ok
+test node::tests::proposal_closure_grace_invalid_envelope_times_out_without_grace ... ok
+test node::tests::duplicate_certificate_is_skipped_without_revalidation ... ok
+test handover::tests::handover_params_inherit_from_predecessor_context ... ok
+test node::tests::dag_activation_round_resets_parent_chain ... ok
+test node::tests::batch_cut_timer_rebroadcasts_uncertified_headers_with_backoff ... ok
+test node::tests::proposal_closure_grace_duplicate_does_not_defer_timeout_twice ... ok
+test node::tests::failed_round_counts_once_toward_backoff ... ok
+test node::tests::same_round_timeout_refires_escalate ... ok
+test node::tests::historical_validator_identity_resolves_per_offense_round ... ok
+test node::tests::batch_cut_regossips_and_clears_stale_candidate ... ok
+test node::tests::handover_share_rejections_do_not_poison_aggregation ... ok
+test handover::tests::handover_certificate_rejections ... ok
+test node::tests::promotion_without_installed_rekey_leaves_node_as_observer ... ok
+test node::tests::install_promotion_sparks_signer_lane ... ok
+test node::tests::reconfigure_stages_and_promotes_at_activation_round ... ok
+test node::tests::isolated_qc_without_commit_retains_timeout_backoff ... ok
+test node::tests::skewed_clock_entry_caps_round_gate ... ok
+test node::tests::propose_reconfigure_gossips_share_and_stages_on_quorum ... ok
+test node::tests::self_index_is_rederived_when_validator_order_shifts ... ok
+test node::tests::pre_activation_straggler_votes_aggregate_under_old_set ... ok
+test handover::tests::handover_chain_and_serving_tail ... ok
+test node::tests::new_with_handovers_restores_post_activation_context ... ok
+test beacon::tests::combine_is_subset_independent_and_blst_verifies ... ok
+test node::tests::proposal_closure_grace_votes_when_fetch_completes_before_rearmed_timer ... ok
+test node::tests::staged_beacon_rekey_swaps_share_key_at_promotion ... ok
+test handover::tests::certified_handover_extends_history_and_gates_qc_verification ... ok
+test node::tests::timeout_invalid_higher_qc_does_not_advance ... ok
+test node::tests::tampered_sync_handover_discards_response ... ok
+test node::tests::stale_beacon_rekeys_are_pruned_at_promotion ... ok
+test node::tests::v1_sync_twin_suppressed_once_after_v2_answer ... ok
+test node::tests::stale_timeout_echo_is_thresholded_valid_and_single_shot ... ok
+test node::tests::handover_pull_counter_resets_on_new_candidate ... ok
+test node::tests::sync_learned_handover_stages_and_promotes ... ok
+test node::tests::vote_persist_precedes_vote_broadcast ... ok
+test reconfig::tests::activation_epoch_is_registration_epoch_plus_two ... ok
+test ordering::tests::ordering_is_arrival_independent_and_dedups_batches ... ok
+test reconfig::tests::empty_active_set_is_rejected ... ok
+test node::tests::timeout_verified_higher_qc_advances_and_arms_next_round ... ok
+test reconfig::tests::derivation_drops_exited_and_zero_bond_validators ... ok
+test reconfig::tests::derivation_is_sorted_and_uses_bond_as_stake ... ok
+test reconfig::tests::transcript_derivation_overrides_share_pks_and_group_key ... ok
+test reconfig::tests::quorum_and_params_recompute_across_set_sizes ... ok
+test reconfig::tests::recompute_inherits_every_non_count_field_from_base ... ok
+test reconfig::tests::transcript_participants_mismatch_is_rejected ... ok
+test reconfig::tests::transcript_share_pk_count_mismatch_is_rejected ... ok
+test reconfig::tests::zero_bond_record_filters_to_empty_derivation ... ok
+test sync::tests::pagination_tip_qc_certifies_last_served ... ok
+test sync::tests::empty_sync_accepts_genesis_qc ... ok
+test sync::tests::requester_ahead_gets_qc_only ... ok
+test sync::tests::truncated_ancestry_serves_requested_range ... ok
+test sync::tests::gap_inside_requested_range_yields_qc_only ... ok
+test node::tests::duplicate_evidence_in_two_committed_blocks_slashes_once ... ok
+test weight::tests::quorum_integer_edges ... ok
+test weight::tests::weight_is_pure_stake ... ok
+test node::tests::join_timeout_weighs_historical_set ... ok
+test node::tests::stale_sync_chunk_redelivery_reasks_and_fresh_chunk_repairs ... ok
+test node::tests::stale_timeout_echo_completes_exact_quorum_tc ... ok
+test node::tests::single_ahead_validator_qc_converges_three_exact_quorum_laggards ... ok
+test node::tests::sync_learned_multi_epoch_handovers_cascade ... ok
+test node::tests::timeout_repeated_and_stale_qcs_do_not_rearm_or_regress ... ok
+test node::tests::stale_recovered_frontier_below_gc_slides_bootstrap_window ... ok
+test node::tests::two_chain_commit_resets_timeout_backoff ... ok
+test node::tests::unseeded_restart_reemits_first_carrier_slash ... ok
+test node::tests::staged_node_never_fires_handover_pull ... ok
+test node::tests::committed_evidence_drains_and_leader_proposes_clean ... ok
+test node::tests::expired_evidence_stays_out_of_gate_and_ids ... ok
+test node::tests::jump_to_round_bootstraps_ordered_recovery_but_preserves_live_frontier ... ok
+test node::tests::restart_seeded_gate_suppresses_second_carrier_slash ... ok
+test node::tests::batch_carrying_header_still_reclaims_after_eight_rebroadcasts ... ok
+test node::tests::skipped_round_checkpoint_clears_and_sync_commits_proceed ... ok
+test node::tests::stranded_stager_pulls_certified_handover_before_activation ... ok
+test node::tests::sequential_recovery_bundles_keep_only_new_dag_closure ... ok
+test node::tests::validated_recovery_bundles_bridge_unequal_committed_prefixes ... ok
+test node::tests::parentless_restart_bootstrap_rebroadcast_survives_thirty_second_stagger ... ok
+test node::tests::fresh_core_rejoin_at_unanimity_quorum_resumes_commits ... ok
+test node::tests::jump_to_round_resumes_commits_past_recovery_gap ... ok
+test node::tests::partial_fleet_restart_orders_post_restart_tx ... ok
+test node::tests::skewed_jump_rounds_still_resume_commits ... ok
+test node::tests::staggered_boot_jump_recovers_dag_batch_ordering ... FAILED
+test node::tests::walless_restart_repairs_committed_chain_and_commits has been running for over 60 seconds
+test node::tests::walless_restart_repairs_committed_chain_and_commits ... ok
+
+failures:
+
+---- node::tests::staggered_boot_jump_recovers_dag_batch_ordering stdout ----
+
+thread 'node::tests::staggered_boot_jump_recovers_dag_batch_ordering' (550480) panicked at crates\ascent-consensus-core\src\node.rs:9736:13:
+v0 recovered without sliding its bootstrap window; this test no longer exercises the slide arm it pins
+stack backtrace:
+   0: std::panicking::panic_handler
+             at /rustc/31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd/library\std\src\panicking.rs:689
+   1: core::panicking::panic_fmt
+             at /rustc/31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd/library\core\src\panicking.rs:80
+   2: ascent_consensus_core::node::tests::staggered_boot_jump_recovers_dag_batch_ordering
+             at .\src\node.rs:9736
+   3: ascent_consensus_core::node::tests::staggered_boot_jump_recovers_dag_batch_ordering::closure$0
+             at .\src\node.rs:9639
+   4: core::ops::function::FnOnce::call_once<ascent_consensus_core::node::tests::staggered_boot_jump_recovers_dag_batch_ordering::closure_env$0,tuple$<> >
+             at /rustc/31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd/library\core\src\ops\function.rs:250
+   5: core::ops::function::FnOnce::call_once
+             at /rustc/31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd/library\core\src\ops\function.rs:250
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    node::tests::staggered_boot_jump_recovers_dag_batch_ordering
+
+test result: FAILED. 97 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 124.40s
+
+error: test failed, to rerun pass `-p ascent-consensus-core --lib`
+
+[exit code: 101] [wall time: 346.3s]

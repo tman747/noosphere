@@ -1,0 +1,55 @@
+# crypto-domains-v1.csv — CLOSED registry of every cryptographic context (plan §3.3).
+# CI law: (a) duplicate context strings fail CI; (b) any context string that is a
+# byte-prefix of another registered context string fails CI; (c) any hash/signature/
+# HKDF call site without a registered domain_id fails CI; (d) unknown object/version
+# fails before signature or proof work. Checker: tools/inventory/check_domains.py.
+# provenance in notes: SOURCE = literal from the frozen corpus/plan; ASSIGNED = string
+# minted by this registry (pattern authorized by corpus/plan) pending G0 review.
+# Collision note: none required — all SOURCE strings were mutually prefix-free; all
+# ASSIGNED strings were chosen prefix-free against the full table (verified by checker).
+domain_id,kind,context_string,algorithm,consumer,notes
+D-GENESIS-PARAMS,BLAKE3_CONTEXT,NOOS/GENESIS/PARAMS/V1,BLAKE3-256,genesis,SOURCE plan §2.4; parameter_manifest_hash over canonical GenesisParameterManifestV1
+D-CHAIN-ID,BLAKE3_CONTEXT,NOOS/CHAIN/V1,BLAKE3-256,genesis,SOURCE plan §2.4; chain_id = H(ctx || parameter_manifest_hash)
+D-GENESIS-FINAL,BLAKE3_CONTEXT,NOOS/GENESIS/FINAL/V1,BLAKE3-256,genesis,SOURCE plan §2.4; genesis_hash = H(ctx || chain_id || bitcoin_anchor || dkg_root || canonical body)
+D-NOTE-ID,BLAKE3_CONTEXT,NOOS/NOTE/V1,BLAKE3-256,noos-lumen,SOURCE arch §6.2; note_id = H(ctx || creating_txid || output_index || canonical_note)
+D-GROUND-CHALLENGE,BLAKE3_CONTEXT,NOOS/GROUND/CHALLENGE/V1,BLAKE3-256,noos-consensus,SOURCE arch §4; binds chain_id/parent/target/slot/proposal_commitment/proposer_pubkey
+D-GROUND-TICKET,BLAKE3_KEYED,NOOS/GROUND/TICKET/V1,BLAKE3-256-keyed,noos-consensus,SOURCE arch §4; key = GroundChallenge; input = ctx || nonce_le_u64 || extra_nonce_32
+D-LOOM-CHALLENGE,BLAKE3_CONTEXT,NOOS/LOOM/V1,BLAKE3-256,noos-work-loom,SOURCE arch §5; job challenge binds chain_id/job_id/worker_commit_hash/finalized randomness
+D-TENSOR-ARTIFACT,BLAKE3_CONTEXT,NOOS/TENSOR/ARTIFACT/V1,BLAKE3-256,noos-work-loom,SOURCE arch §5; ArtifactID over canonical tensor descriptor+bytes
+D-TENSOR-WORK,BLAKE3_KEYED,NOOS/TENSOR/WORK/V1,BLAKE3-256-keyed,noos-work-loom,SOURCE arch §5; WorkCommit keyed by challenge; binds ArtifactID/worker_profile_id/trace_root
+D-NEL-MODEL-MANIFEST,BLAKE3_CONTEXT,NOOS/NEL/MANIFEST/V1,BLAKE3-256,noos-nel,SOURCE ch.05 §2; MODEL_MANIFEST object; model_id = H(ctx || body)
+D-NEL-PROMPT-JOB,BLAKE3_CONTEXT,NOOS/NEL/JOB/V1,BLAKE3-256,noos-nel,SOURCE ch.05 §2; PROMPT_JOB object; job_id = H(ctx || opening transaction)
+D-NEL-TOKEN-STATE,BLAKE3_CONTEXT,NOOS/NEL/STATE/V1,BLAKE3-256,noos-nel,SOURCE ch.05 §2.4; TOKEN_STATE_COMMITMENT S_t
+D-NEL-DRAW,BLAKE3_CONTEXT,NOOS/NEL/DRAW/V1,BLAKE3-256,noos-nel,SOURCE ch.05 §7; stochastic-decoding draw; lane disabled until E-NEL-07
+D-NEL-TOKEN-CLAIM,BLAKE3_CONTEXT,NOOS/NEL/TOKEN_CLAIM/V1,BLAKE3-256,noos-nel,ASSIGNED per ch.05 NOOS/NEL/<OBJECT>/V1 template; per-token off-chain claim
+D-NEL-CHUNK-CLAIM,BLAKE3_CONTEXT,NOOS/NEL/CHUNK_CLAIM/V1,BLAKE3-256,noos-nel,ASSIGNED per template; ChunkClaimV1 (T=32; 1634 B)
+D-NEL-FINAL-CHUNK-CLAIM,BLAKE3_CONTEXT,NOOS/NEL/FINAL_CHUNK_CLAIM/V1,BLAKE3-256,noos-nel,ASSIGNED per template; FinalChunkClaimV1 (token_count 1..31; 483+36n B); separately domain-tagged from full chunk by plan §10.2
+D-NEL-ANCHOR-TX,BLAKE3_CONTEXT,NOOS/NEL/ANCHOR_TX/V1,BLAKE3-256,noos-nel,ASSIGNED per template; permissionless anchor transaction
+D-NEL-JOB-RECEIPT,BLAKE3_CONTEXT,NOOS/NEL/JOB_RECEIPT/V1,BLAKE3-256,noos-nel,ASSIGNED per template; JobReceipt settlement object
+D-NEL-EXECUTOR-REG,BLAKE3_CONTEXT,NOOS/NEL/EXECUTOR_REG/V1,BLAKE3-256,noos-nel,ASSIGNED per template; executor registration
+D-NEL-DISPUTE,BLAKE3_CONTEXT,NOOS/NEL/DISPUTE/V1,BLAKE3-256,noos-nel,ASSIGNED per template; dispute open object; dispute_id:Hash32 (plan §10.3)
+D-NEL-BISECT,BLAKE3_CONTEXT,NOOS/NEL/BISECT/V1,BLAKE3-256,noos-nel,ASSIGNED per template; bisection move (round:u16 position:u32)
+D-NEL-LEAF-RECEIPT,BLAKE3_CONTEXT,NOOS/NEL/LEAF_RECEIPT/V1,BLAKE3-256,noos-nel,ASSIGNED per template; canonical leaf-receipt envelope; proof bytes bounded by verifier registry
+D-BLOCK-HEADER,BLAKE3_CONTEXT,NOOS/BLOCK/HEADER/V1,BLAKE3-256,noos-consensus,ASSIGNED; block hash over canonical header incl. proposer signature (arch §9.1 names no literal); G0 review
+D-TX-ID,BLAKE3_CONTEXT,NOOS/TX/ID/V1,BLAKE3-256,noos-lumen,ASSIGNED; txid over non-witness body (arch §6.5); exact layout frozen in constants-v1.toml (G0)
+D-TX-WID,BLAKE3_CONTEXT,NOOS/TX/WID/V1,BLAKE3-256,noos-lumen,ASSIGNED; wtxid over body+witnesses; distinct from txid by construction
+D-SMT-LEAF,BLAKE3_CONTEXT,NOOS/SMT/LEAF/V1,BLAKE3-256,noos-lumen,ASSIGNED; sparse Merkle tree leaf hash (arch §6.1 requires domain-separated leaf/node); vectors in lumen-v1.md
+D-SMT-NODE,BLAKE3_CONTEXT,NOOS/SMT/NODE/V1,BLAKE3-256,noos-lumen,ASSIGNED; sparse Merkle tree internal node hash; empty roots derived recursively
+D-BEACON-COMMIT,BLAKE3_CONTEXT,NOOS/BEACON/COMMIT/V1,BLAKE3-256,noos-consensus,ASSIGNED; delay-VRF commit binding (plan §6.7: chain/epoch/membership root); G0 review
+D-BEACON-MIX,BLAKE3_CONTEXT,NOOS/BEACON/MIX/V1,BLAKE3-256,noos-consensus,ASSIGNED; deterministic membership-ordered reveal mix with previous finalized certificate
+D-SIG-TX,ED25519_PREFIX,NOOS/SIG/TX/V1,Ed25519,noos-lumen,ASSIGNED; SignedIntentV1/TransactionV1 witness signatures; signed hash binds chain_id
+D-SIG-HEADER,ED25519_PREFIX,NOOS/SIG/HEADER/V1,Ed25519,noos-consensus,ASSIGNED; block proposer signature over proposal_commitment
+D-SIG-PEER,ED25519_PREFIX,NOOS/SIG/PEER/V1,Ed25519,noos-p2p,ASSIGNED; libp2p identity binding handshake; binds chain_id+genesis_hash
+D-SIG-WORK-RECEIPT,ED25519_PREFIX,NOOS/SIG/WORK_RECEIPT/V1,Ed25519,noos-work-loom,ASSIGNED; WorkReceipt/PaidDeliveryCertificate signatures
+D-SIG-REFLEX-TICK,ED25519_PREFIX,NOOS/SIG/REFLEX_TICK/V1,Ed25519,noos-reflex,ASSIGNED; reserved; reflex_lane_enabled=false at genesis; NEL object signatures reuse the D-NEL-* domains (ch.05 §2: Ed25519 over domain-separated object hash)
+D-BLS-VOTE,BLS_DST,NOOS-BLS-VOTE-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_,BLS12-381 G2 min-sig,noos-consensus,NEW DST (never ASCENT-*); source/target checkpoint votes
+D-BLS-CERT,BLS_DST,NOOS-BLS-CERT-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_,BLS12-381 G2 min-sig,noos-consensus,NEW DST; aggregate finality certificates (source/target/bitmap/membership root)
+D-BLS-POP,BLS_DST,NOOS-BLS-POP-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_,BLS12-381 G2 min-sig,noos-crypto,NEW DST; proof of possession over the witness public key
+D-BLS-FELDMAN,BLS_DST,NOOS-BLS-FELDMAN-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_,BLS12-381 G2 min-sig,noos-crypto,NEW DST; Feldman commitment verification in DKG share checks
+D-BLS-DKG,BLS_DST,NOOS-BLS-DKG-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_,BLS12-381 G2 min-sig,noos-crypto,NEW DST; DKG transcript/beacon partial signatures; ceremony CSPRNG only (plan §3.2)
+D-BLS-HANDOVER,BLS_DST,NOOS-BLS-HANDOVER-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_,BLS12-381 G2 min-sig,noos-consensus,NEW DST; epoch reconfiguration handover attestation
+D-HKDF-WALLET,HKDF_INFO,NOOS/HKDF/WALLET/V1,HKDF-SHA-256,noos-wallet,hash=SHA-256; salt="NOOS/HKDF/WALLET/SALT/V1"; info=ctx || m/NOOS/1/<sign|view|umbra|agent|recovery>/account/index path bytes (arch §6.2); L=32
+D-HKDF-UMBRA,HKDF_INFO,NOOS/HKDF/UMBRA/V1,HKDF-SHA-256,noos-umbra,hash=SHA-256; salt="NOOS/HKDF/UMBRA/SALT/V1"; info=ctx || suite_id || key_epoch || fiber_id; L=32
+D-HKDF-BESI,HKDF_INFO,NOOS/HKDF/BESI/V1,HKDF-SHA-256,noos-private-besi,hash=SHA-256; salt="NOOS/HKDF/BESI/SALT/V1"; info=ctx || X25519 shared secret context || share_index || direction; L=32 per ChaCha20Poly1305 channel key (plan §11.8)
+D-HKDF-CHANNEL,HKDF_INFO,NOOS/HKDF/CHANNEL/V1,HKDF-SHA-256,noos-p2p,hash=SHA-256; salt="NOOS/HKDF/CHANNEL/SALT/V1"; info=ctx || chain_id || peer pair || session nonce; L=32
+D-HKDF-EPOCH,HKDF_INFO,NOOS/HKDF/EPOCH/V1,HKDF-SHA-256,noos-umbra,hash=SHA-256; salt="NOOS/HKDF/EPOCH/SALT/V1"; info=ctx || key_epoch_le_u64 || parent epoch key commitment; L=32; epoch rotation keys

@@ -1,0 +1,219 @@
+# NOOSPHERE G0 constants table, version 1.
+# Source of truth: C:/tmp/noosphere corpus (ch01/ch04/ch05/ch06) and the approved
+# build plan (local://noosphere-full-build-plan.md). Every value carries a `# source:`
+# citation. Deliberately unfrozen production values are the string "OWNER_BLOCKED"
+# and reference an owner-decision-record (ODR) placeholder; they MUST NOT enter code
+# as developer defaults and block mainnet genesis (plan section 1.7).
+# Values the corpus names but does not number are the string "UNRESOLVED_SOURCE"
+# with the search terms tried recorded alongside.
+#
+# Conventions: all sizes in bytes, all times in the stated unit, all amounts in
+# integer micro-NOOS (six decimals; identity table owned by IdentityFreeze).
+
+schema_version = 1
+constants_version = "v1"
+
+[ground]
+slot_seconds = 6                        # source: ch01 section 4.2 rule 6 (slot = floor((timestamp_ms - genesis_time_ms)/6000))
+slot_ms = 6000                          # source: ch01 section 4.2 rule 6
+epoch_length = 256                      # source: ch01 section 4.1 ("An epoch contains E = 256 block heights in the initial parameter set")
+max_slot_skip = 20                      # source: ch01 section 4.2 rule 6 ("no more than max_slot_skip=20 slots ahead")
+median_time_past_blocks = 11            # source: ch01 section 4.1 ("parent median-time-past over 11 blocks")
+membership_lookback_epochs = 2          # source: ch01 section 4.1 ("computed from the finalized Lumen state at checkpoint e-2")
+challenge_domain = "NOOS/GROUND/CHALLENGE/V1"  # source: ch01 section 4.2; plan section 6.2
+ticket_domain = "NOOS/GROUND/TICKET/V1"        # source: plan section 6.2 (domain named there; ch01 section 4.2 defines challenge+digest construction)
+ground_profile_id_v1 = 1                # source: ch01 section 4.2 rule 1 ("profile_id=1 under Braid version 1")
+extra_nonce_bytes = 32                  # source: ch01 section 4.2 rule 3 ("fixed 32-byte extra_nonce")
+ticket_uniqueness_scope = "no (proposer_pubkey, nonce, extra_nonce) reuse in ancestors after last finalized checkpoint"  # source: ch01 section 4.2 rule 8
+devnet_max_future_drift_ms = 12000      # source: plan section 6.2 (approved plan decision; not stated numerically in corpus)
+mainnet_max_future_drift_ms = "OWNER_BLOCKED"  # source: plan section 6.2 — test {12000,18000,30000} under E-WAN (ch04 E-WAN-01); freeze smallest passing value; if none passes, mainnet stays blocked. ODR-GROUND-001
+
+[pulse]
+target_spacing_seconds = 6              # source: ch01 section 4.3 ("Version 1 fixes target spacing Delta=6 seconds")
+half_life_seconds = 3600                # source: ch01 section 4.3 ("half-life tau=3,600 seconds")
+t_min = 1                               # source: ch01 section 4.3 ("T_min=1")
+t_max = "2^256-1"                       # source: ch01 section 4.3 ("T_max=2^256-1"); string because it exceeds TOML integer range
+exp2_format = "signed Q64.64 fixed point, exp2_q64 constant table committed by params_root, rounded toward negative infinity"  # source: ch01 section 4.3
+anchor = "most recent finalized checkpoint on the branch, (h_a, t_a, T_a)"  # source: ch01 section 4.3
+exp2_q64_table = "UNRESOLVED_SOURCE"    # searched ch01 for: exp2, Q64, constant table, vectors — table values are a protocol-package artifact ("canonical edge vectors are part of the protocol package", ch01 section 4.3) not enumerated in the corpus; must be generated and frozen under protocol/vectors before G1
+
+[witness]
+n_max = 256                             # source: ch01 section 4.6 ("top N_max=256 candidates by r_i")
+n_tail = 32                             # source: ch01 section 4.6 ("N_tail=32 reserve candidates sampled without replacement")
+n_hard = 1024                           # source: ch01 section 4.6 ("up to N_hard=1024")
+weight_model = "linear raw bonded micro-NOOS after minimum bond: r_i = bonded_noos_i"  # source: ch01 section 4.6
+per_key_weight_cap = "strictly below floor(W/3) of total raw AND effective key weight"  # source: ch01 section 4.6 ("No active validator may hold one third"); strict-inequality reading per plan section 6.5
+tie_break = "deterministic hash tie-break"                                              # source: ch01 section 4.6
+emergency_continuation_epochs = 1       # source: ch01 section 4.6 ("previous epoch set continues for one emergency epoch"); then finality halts
+justification_threshold = "floor(2*W/3)+1, evaluated separately on raw and effective total weight; both must pass"  # source: plan section 6.6 (exact-threshold resolution of ch01's two-thirds rule)
+slashable_offenses = ["double vote", "surround vote", "invalid-transition vote"]        # source: ch01 section 4.8
+slash_burn_fraction = "UNRESOLVED_SOURCE"      # searched ch01 for: slash, fraction, burn, penalty, percent — ch01 section 4.8 says "burn a fixed fraction, reward the reporter from another fraction, and lock the remainder until exit" with no numbers; needs owner/G0 decision. ODR-WITNESS-002
+slash_reporter_fraction = "UNRESOLVED_SOURCE"  # same search as slash_burn_fraction; ch01 section 4.8 names the fraction but never numbers it. ODR-WITNESS-002
+inactivity_leak_rate = "UNRESOLVED_SOURCE"     # searched ch01 for: inactivity, leak, delay — ch01 section 4.9 defines a deterministic inactivity leak for future epochs only, no rate given. ODR-WITNESS-003
+activation_delay_epochs = "UNRESOLVED_SOURCE"  # searched ch01 for: activation, delay, exit — ch01 section 4.6 requires "activation and voluntary exit have delay" with no numbers. ODR-WITNESS-004
+exit_delay_epochs = "UNRESOLVED_SOURCE"        # same search as activation_delay_epochs; ch01 section 4.6. ODR-WITNESS-004
+evidence_horizon_epochs = "UNRESOLVED_SOURCE"  # searched ch01 for: evidence horizon, slashable through — ch01 section 4.6/4.8 keep stake "slashable through the evidence horizon" with no number. ODR-WITNESS-005
+mainnet_min_bond = "OWNER_BLOCKED"      # source: plan section 6.5 ("Mainnet minimum bond remains a signed genesis parameter"); ch01 section 4.6 makes it a versioned constant with no value. ODR-ECON-001
+proofpower_theoretical_cap = 0.20       # source: ch01 section 4.7 ("total proofpower-derived weight is capped at twenty percent of Ring weight") — theoretical design cap only; genesis value is zero, see [genesis_controls]; plan section 14.6 additionally bounds any first nonzero cap at <= 1% of Ring weight
+
+[fees]
+formula = "Fee = p_B*B + p_G*G + p_V*V + p_R*R + p_D*D"  # source: ch01 section 6.9
+dimension_b = "canonical bytes"                            # source: ch01 section 6.9
+dimension_g = "Grain steps/memory"                         # source: ch01 section 6.9
+dimension_v = "proof-verification units"                   # source: ch01 section 6.9
+dimension_r = "persistent state-word epochs"               # source: ch01 section 6.9
+dimension_d = "consensus blob bytes"                       # source: ch01 section 6.9
+controller = "block-level base prices updated independently per dimension by bounded integer controllers; priority tip may be added"  # source: ch01 section 6.9
+controller_bounds = "UNRESOLVED_SOURCE"  # searched ch01/ch04 for: controller, coefficient, max change, bound, EIP — corpus mandates bounded integer controllers with explicit maxima (plan section 4.5) but states no numeric coefficients or per-block clamps. ODR-FEES-001
+per_dimension_capacity = "UNRESOLVED_SOURCE"  # searched ch01 for: capacity, block limit, gas limit, maxima — explicit per-block resource maxima required (ch01 section 6.9, plan section 4.5) but not numbered. ODR-FEES-002
+failure_fee = "frozen deterministic failure fee charged from the reservation on trap or failed postcondition; never partially consumes notes"  # source: ch01 section 6.6
+failure_fee_value = "UNRESOLVED_SOURCE"  # searched ch01 for: failure fee, deterministic fee, charge — rule is normative (ch01 section 6.6) but the frozen amount/formula is not stated. ODR-FEES-003
+gate_a_fees = "no dimension exceeds provisioned capacity by more than 10% while paying below measured marginal cost for 24 consecutive hours"  # source: ch04 section 3.1 A-FEES pass criterion; plan section 4.5
+gate_a_fees_kill = "repeatable underpricing attack causing base liveness loss disables the offending operation class and reprices by explicit vote"  # source: ch04 section 3.1 A-FEES falsifier
+workjob_escrow = "external WorkJob escrow is separate from chain fees; chain fee pays only on-chain verification, storage, settlement"  # source: ch01 section 6.9
+
+[lumen]
+state_roots = ["notes_root", "nullifiers_root", "accounts_root", "objects_root", "receipts_root", "params_root"]  # source: ch01 section 6.1
+tree = "versioned sparse Merkle tree, canonical key derivation, domain-separated leaf/node hashes, constant empty roots, order-independent"  # source: ch01 section 6.1
+tree_depth = 256                         # source: plan section 4.2 ("versioned depth-256 sparse Merkle tree"); ch01 section 6.1 does not number the depth — plan resolution is binding
+note_id_domain = "NOOS/NOTE/V1"          # source: ch01 section 6.2 (note_id = H("NOOS/NOTE/V1" || creating_txid || output_index || canonical_note))
+txid_scope = "commits the non-witness transaction body"           # source: ch01 section 6.5
+wtxid_scope = "commits body and segregated witnesses"             # source: ch01 section 6.5
+txid_domain = "NOOS/TX/ID/V1"            # source: protocol/spec/crypto-domains-v1.csv (IdentityFreeze registry, ASSIGNED, flagged for G0 review; not spelled in ch01)
+wtxid_domain = "NOOS/TX/WID/V1"          # source: protocol/spec/crypto-domains-v1.csv (IdentityFreeze registry, ASSIGNED, flagged for G0 review)
+account_nonce_rule = "an account transaction consumes exactly nonce+1"  # source: ch01 section 6.3
+receipts_root_semantics = "post-state compact settled-receipt index, distinct from the block's ordered execution receipts"  # source: ch01 section 6.1; plan section 4.2
+resource_limit_fields = ["bytes", "grain_steps", "proof_units", "state_reads", "state_writes", "blob_bytes"]  # source: ch01 section 6.5 TransactionV1.resource_limits
+collection_maxima = "UNRESOLVED_SOURCE"  # searched ch01 for: maximum, max inputs, max outputs, bounded collections — ch01 section 9.1 requires "explicit maxima" for every variable structure but numbers none; per-collection u32 maxima assigned PROPOSED-G0 in schema-tables/lumen-objects.md
+wallet_derivation_template = "m/NOOS/1/{sign|view|umbra|agent|recovery}/account/index"  # source: ch01 section 6.8
+wallet_derivation_hardened_indices = "UNRESOLVED_SOURCE"  # searched ch01 for: hardened, purpose number, derivation path, BIP — ch01 section 6.8 gives the symbolic path only; numeric hardened purpose/branch constants required by plan section 1.7 are unassigned. ODR-WALLET-001
+
+[nel]
+object_domain_template = "NOOS/NEL/<OBJECT>/V1"    # source: ch05 section 2.1
+manifest_domain = "NOOS/NEL/MANIFEST/V1"           # source: ch05 section 2.2
+job_domain = "NOOS/NEL/JOB/V1"                     # source: ch05 section 2.3
+state_domain = "NOOS/NEL/STATE/V1"                 # source: ch05 section 2.4
+hash_bytes = 32                                    # source: ch05 section 2.1
+signature = "Ed25519, 64 bytes, over domain-separated hash of object body"  # source: ch05 section 2.1
+quorum = "ordered pair of signatures from distinct committee members"       # source: ch05 section 2.1
+committee_size = 3                                 # source: ch05 section 2.3 (committee_params: size u8 = 3)
+committee_quorum = 2                               # source: ch05 section 2.3 (quorum u8 = 2)
+chunk_tokens_t = 32                                # source: ch05 section 2.5 ("The lane's default is T=32")
+chunk_claim_bytes_t32 = 1634                       # source: ch05 section 2.5 table (T=32 -> 1,634 bytes/chunk, 51.06 B/token); plan section 10.2 ("always covers 32 tokens and remains exactly 1,634 bytes")
+chunk_claim_bytes_per_token_t32 = 51.06            # source: ch05 section 2.5 table
+per_token_record_bytes = 36                        # source: ch05 section 2.5 (token_id u32 (4) + logits_root (32))
+toploc_fingerprint_bytes_per_32_tokens = 258       # source: ch05 section 2.5 (ceil(T/32) x 258)
+toploc_bytes_per_token = 8.0625                    # source: ch05 section 1.4 (da_toploc_bytes_per_token)
+token_claim_naive_bytes = 292                      # source: ch05 section 2.5 (da_claim_bytes_per_token_naive; dispute-time single-token fallback form)
+final_chunk_claim_formula = "483 + 36*token_count bytes"  # source: plan section 10.2 (FinalChunkClaimV1; approved wire-law resolution, separately domain-tagged, two signatures)
+final_chunk_claim_token_count_range = "u8 in 1..31"       # source: plan section 10.2 (0 and 32 are invalid final counts)
+final_chunk_claim_bytes_count1 = 519               # source: plan section 10.2 boundary vector (483 + 36*1)
+final_chunk_claim_bytes_count31 = 1599             # source: plan section 10.2 boundary vector (483 + 36*31)
+boundary_vector_job_lengths = [1, 31, 32, 33, 63, 64]  # source: plan section 10.2 (mandatory boundary vectors)
+committed_ops_per_token_step = 386                 # source: ch05 section 2.6 (16 ops/layer x 24 layers + final-norm + LM head)
+trace_leaves_per_chunk_t32 = 12352                 # source: ch05 section 2.6 (T x 386 at T=32)
+bisect_move_calldata_bytes = 200                   # source: ch05 section 2.6 (BisectMove priced at 200 B calldata per move [MODELED])
+leaf_receipt_bytes_modeled = 500                   # source: ch05 section 2.6 ([MODELED] estimate only); plan section 10.3 replaces it: proof bytes length-bounded by the verifier registry, not this constant
+dispute_move_deadline_blocks = 25                  # source: ch05 section 5.2 (per-move response deadline D=25); ch04 E-NEL-04
+dispute_rounds_t32 = 19                            # source: ch05 section 0.2 / section 5.2 (19 rounds at T=32)
+dispute_txs_t32 = 40                               # source: ch05 section 5.2 (about 40 on-chain transactions)
+dispute_calldata_kb_t32 = 8.1                      # source: ch05 section 5.2 (about 8.1 KB calldata)
+dispute_wallclock_max_hours = 3.3                  # source: ch05 section 5.2 (3.3 h at full censorship margin, 40 min without)
+challenge_window_floor_hours = 6                   # source: ch05 section 0.2 decision 2 / section 4.4 ("the window is >= 6 h at 12 s-class anchoring cadence")
+anchor_deadline_blocks = "UNRESOLVED_SOURCE"       # searched ch05 for: anchor_deadline_blocks, deadline after soft-finality — parameter named normatively (ch05 section 2.8) but never numbered. ODR-NEL-001
+lm_head_column_split_rounds = 5                    # source: ch05 section 5.2 (5-round column split for the [896,151936] LM head)
+freivalds_reps_default_v1 = 2                      # source: ch05 section 5.4 REPS policy (REPS=2, 2^-64/span default)
+freivalds_reps_high_value = 4                      # source: ch05 section 5.4 (REPS=4, 2^-128/span above governance value threshold)
+freivalds_reps_production = 4                      # source: plan section 10.9 ("Production NEL uses REPS=4; retain the cheaper profile only under its exact label")
+freivalds_modulus = "exact mod-2^64 integer check, uniform 32-bit challenge words"  # source: ch05 section 5.4; plan section 10.9
+soft_final_latency_p95_ms_modeled = 302            # source: ch05 section 4.1/4.3 (lat_soft_final_p95_ms_global [MODELED])
+latency_gate_p95_ms = 2000                         # source: ch05 section 10, E-NEL-03 (p95 < 2,000 ms)
+latency_gate_p99_ms = 5000                         # source: ch05 section 10, E-NEL-03 (p99 < 5,000 ms)
+da_retrieval_gate = "greater-or-equal 99.9% witness retrieval inside deadlines over 30 days"  # source: ch05 E-NEL-05; ch05 section 6.3
+max_context_phase_ab = 1024                        # source: ch05 section 2.2 (ModelManifest.max_context; 1,024 in Phases A-B)
+max_generation_phase_ab = 128                      # source: ch05 section 2.2 (ModelManifest.max_generation; 128 in Phases A-B)
+model_manifest_body_bytes = 240                    # source: ch05 section 2.2 ("Body: 240 B")
+decoding_v1 = "greedy argmax, ties to lowest token ID"   # source: ch05 section 7.1 / section 1.2; plan section 10.2
+bond_min_rule = "bond_min >= kappa * value_ceiling + dispute_cost_reserve, kappa >= 2 at genesis (v1: kappa = 2)"  # source: ch05 section 9.3; plan section 10.5 fixes v1 kappa = 2
+slash_split_challenger = 0.50                      # source: ch05 section 9.4 (v1 default, governance parameter)
+slash_split_watch_pool = 0.20                      # source: ch05 section 9.4 (v1 default)
+slash_split_burn = 0.30                            # source: ch05 section 9.4 (v1 default)
+activation_trace_bytes_per_token = 21504           # source: ch05 section 6.2 (da_act_full_bytes_per_token, hidden 896 x 24 layers INT8)
+activation_commit_bytes_per_chunk = 768            # source: ch05 section 6.2 (da_act_commit_bytes_per_chunk, 24 x 32 B per-layer root form)
+field_t_width = "u32"                              # source: plan section 10.3 (wire-choice resolution)
+field_rng_cursor_width = "u64"                     # source: plan section 10.3
+field_dispute_id = "Hash32"                        # source: plan section 10.3 (no truncated dispute identifier)
+field_challenger_key_bytes = 32                    # source: plan section 10.3 (Ed25519 challenger key)
+field_round_width = "u16"                          # source: plan section 10.3
+field_position_width = "u32"                       # source: plan section 10.3
+
+[grain]
+opcode_count = 12                        # source: ch01 section 7.2 ("Twelve-opcode semantic core"); ch01 invariant 12
+opcode_range = "0..11"                   # source: ch01 section 7.2 opcode table (0 slot .. 11 hint)
+opcode_12 = "invalid in production"      # source: plan section 5.2; 04-addendum-A E-WEFT-01a records intrinsic opcode 12 as lab-only
+hint_erasability = "erasing opcode 11 hint must leave the same result, trap, and semantic charge"  # source: ch01 section 7.2; plan section 5.2
+eval_signature = "eval(version, subject, formula, meter) -> Result<Noun, GrainTrap>"  # source: ch01 section 7.1
+noun = "unsigned atom or ordered cell [head tail]; canonical atoms have no leading zero words"  # source: ch01 section 7.1
+metering = "charge before each reduction and allocation; cost over semantic operations and noun word sizes, never host nanoseconds; jets charged the registered semantic cost function"  # source: ch01 section 7.3
+trap_classes = ["invalid axis", "atom/cell type mismatch", "exhausted meter", "unavailable mandatory jet", "oversized noun", "unknown opcode/version", "malformed bytes"]  # source: ch01 section 7.1; plan section 5.3
+trap_codes = "PROPOSED-G0"               # source: ch01 section 7.1 requires stable numeric codes but assigns none; proposed sequential assignment in schema-tables/grain.md, marked PROPOSED-G0 for review
+cost_table = "UNRESOLVED_SOURCE"         # searched ch01/ch06 for: cost table, per-operation cost, grain-steps, charge constants — ch06 section 4.1b states its worked constants are "illustrative of the mechanism, not quotations from a frozen cost table; the real table is a chapter 01 section 7.3 artifact and the vector suites pin it". The immutable cost table must be authored and frozen as protocol/vectors/grain cost vectors before G1. ODR-GRAIN-001
+arena_bound_per_tx = "UNRESOLVED_SOURCE" # searched ch01 for: arena, memory bound, per transaction — ch01 section 7.3 requires arena-bounded memory per transaction, no number. ODR-GRAIN-002
+max_noun_bytes = "UNRESOLVED_SOURCE"     # searched ch01 for: oversized noun, formula size, subject size limits — limits are normative (ch01 section 7.3) but unnumbered. ODR-GRAIN-002
+max_formula_bytes = "UNRESOLVED_SOURCE"  # same search as max_noun_bytes; ch01 section 7.3. ODR-GRAIN-002
+max_cell_depth = "UNRESOLVED_SOURCE"     # searched ch01/ch06 for: depth, nesting, recursion bound — plan section 1.7 requires a frozen depth constant; corpus states none. ODR-GRAIN-002
+jet_registry_key = "(grain_version, formula_hash)"  # source: ch01 section 7.4; plan section 5.9
+
+[da]
+consensus_coding = "Reed-Solomon over the block body into fixed-size shards with a Merkle commitment; full reconstruction before acceptance; witnesses never vote an unreconstructed ancestor"  # source: ch01 section 10.1
+light_client_sampling = "probabilistic availability opinion only; never validity for a full node"  # source: ch01 section 10.1
+blob_descriptor_fields = ["namespace", "content_root", "original_bytes", "shard_bytes", "data_shards", "parity_shards", "retention_epochs", "codec_id", "encryption_descriptor?", "access_policy_root?"]  # source: ch01 section 10.2
+body_shard_bytes = "UNRESOLVED_SOURCE"   # searched ch01 for: shard size, fixed-size shards, KiB, MiB — ch01 section 10.1 fixes the shape (fixed-size shards) but no byte size; PROPOSED-G0 value in schema-tables/da.md. ODR-DA-001
+body_data_shards = "UNRESOLVED_SOURCE"   # same search; erasure rate (data:parity) never numbered for consensus bodies (the 8-of-12 figure in ch04 H-SEED is Hearth content distribution, not consensus DA). ODR-DA-001
+body_parity_shards = "UNRESOLVED_SOURCE" # same as body_data_shards. ODR-DA-001
+max_block_body_bytes = "UNRESOLVED_SOURCE"  # searched ch01 for: body cap, block size, max body — explicit maxima required (ch01 section 9.1) but unnumbered. ODR-DA-002
+max_blob_bytes = "UNRESOLVED_SOURCE"     # searched ch01 for: blob limit, max blob — BlobDescriptor bounds required, unnumbered. ODR-DA-002
+p2p_max_frame_bytes = 1048576            # source: plan section 7.4 ("1 MiB bounded frames", ported Ascent pattern); corpus states every message has a maximum decoded size (ch01 section 10.4) without a number
+reconstruction_gate = "99.99% reconstruction in 10^6 randomized in-bound loss trials; zero finalization before the availability certificate"  # source: ch04 section 3.1 A-DA
+model_weight_shard_bytes = "4-16 MiB content-addressed weight shards (per-manifest, shard_erasure_params: shard_size u32, data_shards u16, parity_shards u16)"  # source: ch05 section 2.2 ModelManifest
+
+[genesis_controls]
+# All six-plus radical controls ship disabled/zero at genesis. Enforced by
+# compile-time and state-transition checks (plan section 6.8).
+work_loom_credit_enabled = false         # source: ch01 section 4.7 falsifier response; plan section 6.8; E-DEMAND-WASH-01 (KILLED) keeps it zero
+work_loom_weight_cap = 0                 # source: plan section 6.8; ch01 section 12 forbids raising work_loom_weight_cap above 0.10 ever
+witness_proofpower_bonus_enabled = false # source: plan section 6.8; ch01 section 4.7 (proofpower [THEORY], zero at genesis)
+neural_lane_enabled = false              # source: plan section 1.5 (six genesis controls incl. neural_lane_enabled=false); plan section 6.8
+reflex_lane_enabled = false              # source: plan section 6.8; plan section 12.13 (Reflex v1 WITHDRAWN; lane off until live-devnet drill passes)
+umbra_suite_enabled = false              # source: plan section 6.8 ("every umbra_suite_enabled=false")
+dream_lane_enabled = false               # source: ch01 section 8.5 falsifier ("dream_lane_enabled remains false"); plan section 6.8; E-DREAM-02 KILLED
+class_gate_irreversible_budget = 0       # source: plan section 6.8 / section 12.12 (A-CLASS-GATE.v2 budget constants open per addendum A.4; exactly zero on every network)
+loom_theoretical_max = 0.10              # source: ch01 section 12 ("increase work_loom_weight_cap above 0.10" is prohibited) and ch05 section 1.5 (c_L <= 0.10); theoretical ceiling only — production value is 0
+
+[emission]
+# Production economic values are deliberately absent from the research corpus
+# (plan Assumptions). Mainnet freeze requires the exact signed
+# mainnet-parameters.toml plus owner approval, independent economic review, and
+# counsel for public allocation language (plan section 2.5, section 1.7).
+# None of these may enter code through a developer default.
+max_supply = "OWNER_BLOCKED"                     # ODR-EMISSION-001
+issuance_curve = "OWNER_BLOCKED"                 # ODR-EMISSION-002 (fixed-envelope per-height table/formula, ch01 section 13.2; parameterization unfrozen)
+terminal_height = "OWNER_BLOCKED"                # ODR-EMISSION-003 (plan section 1.7: mainnet table freezes terminal height)
+recipient_share_ground_proposer = "OWNER_BLOCKED"    # ODR-EMISSION-004 (ch01 section 13.2 names the share, no number)
+recipient_share_witness_participation = "OWNER_BLOCKED"  # ODR-EMISSION-004 (claimable after finality and inactivity accounting, ch01 section 13.2)
+recipient_share_treasury = "OWNER_BLOCKED"       # ODR-EMISSION-004 (transparent on-chain budget, ch01 section 13.2)
+rounding_rule = "OWNER_BLOCKED"                  # ODR-EMISSION-005 (plan section 1.7: mainnet table freezes rounding)
+fee_disposition = "OWNER_BLOCKED"                # ODR-EMISSION-006 (plan section 1.7: mainnet table freezes fee disposition)
+allocation = "OWNER_BLOCKED"                     # ODR-EMISSION-007 (treasury/community allocation absent from corpus by design)
+invariants = "no recreated missed/orphan emission; no useful-work mint; Loom redirects only a governance-bounded scheduled portion; duplex reallocation hard-zero under E-DEMAND-WASH-01"  # source: ch01 section 13.2; plan section 4.6
+
+[testnet]
+# Valueless engineering fixtures (plan section 2.5): permit all engineering gates
+# without inventing production tokenomics. These are NOT mainnet values and carry
+# is_test_network=true in every test genesis. Fixture magnitudes below are
+# PROPOSED-G0 (reviewable engineering choices, not owner economics).
+network_name = "NOOS_TEST"               # source: plan section 2.5 / assignment contract
+is_test_network = true                   # source: plan section 2.5 ("explicit is_test_network=true")
+faucet_allocation_micro_noos_test = 1000000000000000  # PROPOSED-G0 fixture: 10^15 micro-NOOS_TEST (10^9 whole units) fixed faucet allocation in the test genesis; plan section 2.5 requires "a fixed faucet allocation in their own genesis" without a value
+testnet_min_bond_micro_noos_test = 1000000000         # PROPOSED-G0 fixture: 10^9 micro-NOOS_TEST (1,000 whole units) so witness-set tests exercise the minimum-bond path; valueless stand-in for OWNER_BLOCKED mainnet_min_bond
+deterministic_fixture_flag = "is_test_fixture=true required on all deterministic dealer/seed material; cannot load on mainnet"  # source: plan section 3.2
