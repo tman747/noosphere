@@ -1,0 +1,15 @@
+[package]
+name = "noos-codec"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "NOOSPHERE canonical consensus codec: fixed-width little-endian fields, bounded length-delimited collections, strict versioned tagged objects"
+
+[dependencies]
+
+[dev-dependencies]
+
+[lints]
+workspace = true

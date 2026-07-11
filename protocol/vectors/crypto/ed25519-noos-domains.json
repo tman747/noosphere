@@ -1,0 +1,55 @@
+{
+ "schema": "noos-crypto/ed25519-noos-domains-v1",
+ "description": "Ed25519 domain-prefixed signature KATs: signature = Ed25519-sign(sk, context_string || bytes) for every ED25519_PREFIX registry row. Key is the RFC 8032 section 7.1 TEST 1 key. Independently generated with the Python 'cryptography' package.",
+ "cases": [
+  {
+   "name": "d-sig-tx-sign",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+   "domain_id": "D-SIG-TX",
+   "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+   "signature": "cd2fa9b1400d1c1ff3385159d1ff7c8c5a6be759a866fdc5bfff24c1f55674041ea01762b5cf755438fc4b3c81e7864d475c4b449671175ec7b9763fe0d32007"
+  },
+  {
+   "name": "d-sig-header-sign",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+   "domain_id": "D-SIG-HEADER",
+   "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+   "signature": "9a217f16d113adf244e34a9375229c0995020c48a08aa98835ec8496bab921607fe7ff6af0e1ace108630491a821c0b760833fe7ad0d5a7129234181ce5eea07"
+  },
+  {
+   "name": "d-sig-peer-sign",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+   "domain_id": "D-SIG-PEER",
+   "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+   "signature": "acf889dde7c81f3f2fdd6f0006a917244760d49661c518a92da33169cb726c3fad9563e73e923be21df3e6d12b6eb317e0d543152c8d1dacdba1b39fd3196c03"
+  },
+  {
+   "name": "d-sig-work-receipt-sign",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+   "domain_id": "D-SIG-WORK-RECEIPT",
+   "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+   "signature": "3e7d3b705f3e871177fcdff019eff8fc98a8a9ab2c478972afae85d22b77535e852323df6d138d3f0be50b551afada512b6bf51f12b5c74b6aa6c3a2448ec80f"
+  },
+  {
+   "name": "d-sig-reflex-tick-sign",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+   "domain_id": "D-SIG-REFLEX-TICK",
+   "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+   "signature": "5364b9410daa0d8134f9c9b1967ec5dd82279f4cbdcfc09248abbb3d4db24dee2d95ce1bc003351de54fee35b3698463c1129dd328eda1364726fa1c645c1901"
+  },
+  {
+   "name": "d-sig-header-rejects-d-sig-tx-signature",
+   "kind": "negative",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+   "domain_id": "D-SIG-HEADER",
+   "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+   "signature": "cd2fa9b1400d1c1ff3385159d1ff7c8c5a6be759a866fdc5bfff24c1f55674041ea01762b5cf755438fc4b3c81e7864d475c4b449671175ec7b9763fe0d32007",
+   "why": "signature binds the D-SIG-TX context prefix; verification under D-SIG-HEADER must fail"
+  }
+ ]
+}

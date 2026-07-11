@@ -1,0 +1,633 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.40s
+     Running unittests src\main.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_cli-e47c14c9b6a3eff0.exe)
+
+running 27 tests
+test operator::tests::regen_dkg_complaint_fixture ... ignored, writes the checked-in complaint-drill fixture
+test validator::tests::existing_registration_requires_exit_unlock_before_reregistration ... ok
+test validator::tests::round_gas_matches_the_stf_schedule ... ok
+test validator::tests::bls_commitment_parses_96_hex_chars_only ... ok
+test validator::tests::dkg_next_step_walks_rounds_in_order ... ok
+test validator::tests::unopened_dkg_fallback_rejects_malformed_bond_and_identity_data ... ok
+test validator::tests::unopened_dkg_fallback_uses_bond_and_exit_boundaries ... ok
+test operator::tests::worker_profile_rejects_empty_label ... ok
+test operator::tests::keygen_uses_fresh_entropy_and_identity_file_parses ... ok
+test operator::tests::worker_join_bootstrap_synthesizes_identity_and_minimal_profile ... ok
+test validator::tests::dkg_state_file_round_trips_and_pins_identity_and_epoch ... ok
+test operator::tests::identity_export_public_verifies_and_detects_tamper ... ok
+test operator::tests::node_config_rejects_zero_outbound_normal_queue_max ... ok
+test operator::tests::observer_config_round_trip_from_public_descriptor ... ok
+test operator::tests::worker_register_intent_signature_verifies ... ok
+test operator::tests::dkg_validate_flags_complaint_fixture ... ok
+test operator::tests::v0_descriptor_falls_back_to_legacy_localhost_listen_addrs ... ok
+test operator::tests::network_descriptor_and_node_config_round_trip ... ok
+test operator::tests::dkg_public_intake_matches_private_intake_config ... ok
+test operator::tests::dkg_cross_ceremony_replay_is_rejected ... ok
+test operator::tests::dkg_validate_catches_corrupted_artifact_and_descriptor ... ok
+test operator::tests::dkg_tampered_share_writes_complaint_and_aborts ... ok
+test operator::tests::dkg_transcript_digest_divergence_aborts_finalize ... ok
+test operator::tests::dkg_public_intake_ceremony_keeps_coordinator_public_only ... ok
+test operator::tests::dkg_fixed_entropy_golden_ceremony_is_byte_stable ... ok
+test operator::tests::join_network_binds_unspecified_and_advertises_localhost_finalizes_without_conflicts ... ok
+test operator::tests::dkg_ceremony_assembles_descriptor_and_join_network_finalizes ... ok
+
+test result: ok. 26 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 12.82s
+
+     Running tests\keystore.rs (C:/tmp/ascent-baseline-target\debug\deps\keystore-43f58cae97652585.exe)
+
+running 3 tests
+test keygen_encrypt_writes_only_encrypted_identity ... ok
+test keystore_migration_round_trips_all_artifacts_and_rejects_ambiguous_state ... ok
+test encrypted_config_join_runs_with_env_passphrase ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 55.90s
+
+     Running tests\webwallet_vectors.rs (C:/tmp/ascent-baseline-target\debug\deps\webwallet_vectors-2832c274bde3ee81.exe)
+
+running 1 test
+test webwallet_vectors_match_committed_json ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests\wp50_dkg_cli.rs (C:/tmp/ascent-baseline-target\debug\deps\wp50_dkg_cli-5cea4fa4f9748778.exe)
+
+running 2 tests
+test dkg_validate_cli_names_corrupted_round_artifact_and_public_descriptor ... ok
+test public_identity_intake_dkg_assembles_network_without_secret_coordinator_artifacts has been running for over 60 seconds
+test public_identity_intake_dkg_assembles_network_without_secret_coordinator_artifacts ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 88.48s
+
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_cogitate-74d378cf80b45ecd.exe)
+
+running 13 tests
+test tests::challenge_flag_at_deadline_slot_cannot_suspend_finalization ... ok
+test tests::claim_window_reopens_at_n_plus_16 ... ok
+test tests::challenge_suspend_resume_preserves_remaining_slot_arithmetic ... ok
+test tests::double_claim_is_rejected ... ok
+test tests::claim_window_accepts_exact_n_plus_8_and_rejects_n_plus_8_plus_1 ... ok
+test tests::double_resume_after_t1_is_rejected_without_deadline_drift ... ok
+test tests::transition_from_wrong_state_is_rejected_with_typed_error ... ok
+test tests::post_miss_slashes_half_odd_bond_and_burn_rounds_up ... ok
+test tests::happy_path_intent_claimed_posted_final_event_sequence_golden ... ok
+test tests::slash_accounting_handles_zero_and_maximal_bonds_without_wrapping ... ok
+test tests::post_deadline_accepts_exact_n_plus_64_only ... ok
+test tests::reverted_refund_and_ring_slash_conserve_value ... ok
+test tests::interleaved_multi_object_lifecycles_do_not_cross_contaminate_accounting ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_consensus_core-46c6d0c7fb14166e.exe)
+
+running 98 tests
+test dag::tests::genesis_qc_shape_is_empty ... ok
+test dag::tests::first_seen_rule_records_only_first_header ... ok
+test leader::tests::permutation_golden_for_fixed_seed ... ok
+test evidence::tests::evidence_rejects_same_digest_wrong_order_and_expired ... ok
+test node::tests::cut_batch_carves_count_limited_batches_without_loss ... ok
+test node::tests::cut_batch_drops_only_unpackable_oversized_tx ... ok
+test dag::tests::parent_coverage_rejects_bad_sets ... ok
+test node::tests::cut_batch_size_limited_cut_flushes_all_txs_within_limits ... ok
+test node::tests::install_beacon_share_rejects_garbage_and_stale_epochs ... ok
+test node::tests::header_production_jumps_past_unreachable_parent_rounds ... ok
+test node::tests::invalid_reconfigures_are_rejected_with_signal ... ok
+test leader::tests::epoch_schedule_is_balanced_and_stake_independent ... ok
+test node::tests::boot_sync_request_rearms_until_response ... ok
+test node::tests::node_new_validates_keys_and_sets_timers ... ok
+test evidence::tests::double_vote_validates_and_slashes_floor ... ok
+test node::tests::header_vote_is_resent_when_header_is_redelivered ... ok
+test node::tests::out_of_set_identity_boots_as_observer_and_wrong_beacon_key_still_errors ... ok
+test node::tests::batch_cut_timer_rebroadcasts_uncertified_headers_with_backoff ... ok
+test node::tests::history_resolves_forward_to_active_set_until_a_recorded_activation ... ok
+test node::tests::duplicate_certificate_is_skipped_without_revalidation ... ok
+test handover::tests::handover_params_inherit_from_predecessor_context ... ok
+test node::tests::dag_activation_round_resets_parent_chain ... ok
+test node::tests::historical_validator_identity_resolves_per_offense_round ... ok
+test node::tests::failed_round_counts_once_toward_backoff ... ok
+test node::tests::proposal_closure_grace_invalid_envelope_times_out_without_grace ... ok
+test node::tests::same_round_timeout_refires_escalate ... ok
+test node::tests::proposal_closure_grace_duplicate_does_not_defer_timeout_twice ... ok
+test node::tests::handover_share_rejections_do_not_poison_aggregation ... ok
+test node::tests::batch_cut_regossips_and_clears_stale_candidate ... ok
+test node::tests::promotion_without_installed_rekey_leaves_node_as_observer ... ok
+test handover::tests::handover_certificate_rejections ... ok
+test node::tests::install_promotion_sparks_signer_lane ... ok
+test node::tests::skewed_clock_entry_caps_round_gate ... ok
+test node::tests::reconfigure_stages_and_promotes_at_activation_round ... ok
+test node::tests::isolated_qc_without_commit_retains_timeout_backoff ... ok
+test handover::tests::handover_chain_and_serving_tail ... ok
+test node::tests::propose_reconfigure_gossips_share_and_stages_on_quorum ... ok
+test node::tests::self_index_is_rederived_when_validator_order_shifts ... ok
+test node::tests::pre_activation_straggler_votes_aggregate_under_old_set ... ok
+test node::tests::staged_beacon_rekey_swaps_share_key_at_promotion ... ok
+test node::tests::stale_beacon_rekeys_are_pruned_at_promotion ... ok
+test node::tests::new_with_handovers_restores_post_activation_context ... ok
+test beacon::tests::combine_is_subset_independent_and_blst_verifies ... ok
+test node::tests::proposal_closure_grace_votes_when_fetch_completes_before_rearmed_timer ... ok
+test node::tests::tampered_sync_handover_discards_response ... ok
+test handover::tests::certified_handover_extends_history_and_gates_qc_verification ... ok
+test node::tests::timeout_invalid_higher_qc_does_not_advance ... ok
+test node::tests::v1_sync_twin_suppressed_once_after_v2_answer ... ok
+test node::tests::handover_pull_counter_resets_on_new_candidate ... ok
+test ordering::tests::ordering_is_arrival_independent_and_dedups_batches ... ok
+test reconfig::tests::activation_epoch_is_registration_epoch_plus_two ... ok
+test node::tests::vote_persist_precedes_vote_broadcast ... ok
+test reconfig::tests::derivation_drops_exited_and_zero_bond_validators ... ok
+test node::tests::stale_timeout_echo_is_thresholded_valid_and_single_shot ... ok
+test node::tests::sync_learned_handover_stages_and_promotes ... ok
+test reconfig::tests::derivation_is_sorted_and_uses_bond_as_stake ... ok
+test reconfig::tests::quorum_and_params_recompute_across_set_sizes ... ok
+test node::tests::timeout_verified_higher_qc_advances_and_arms_next_round ... ok
+test reconfig::tests::empty_active_set_is_rejected ... ok
+test reconfig::tests::recompute_inherits_every_non_count_field_from_base ... ok
+test node::tests::duplicate_evidence_in_two_committed_blocks_slashes_once ... ok
+test reconfig::tests::transcript_derivation_overrides_share_pks_and_group_key ... ok
+test reconfig::tests::zero_bond_record_filters_to_empty_derivation ... ok
+test sync::tests::empty_sync_accepts_genesis_qc ... ok
+test reconfig::tests::transcript_participants_mismatch_is_rejected ... ok
+test reconfig::tests::transcript_share_pk_count_mismatch_is_rejected ... ok
+test sync::tests::gap_inside_requested_range_yields_qc_only ... ok
+test sync::tests::pagination_tip_qc_certifies_last_served ... ok
+test sync::tests::requester_ahead_gets_qc_only ... ok
+test sync::tests::truncated_ancestry_serves_requested_range ... ok
+test weight::tests::quorum_integer_edges ... ok
+test weight::tests::weight_is_pure_stake ... ok
+test node::tests::stale_sync_chunk_redelivery_reasks_and_fresh_chunk_repairs ... ok
+test node::tests::join_timeout_weighs_historical_set ... ok
+test node::tests::stale_timeout_echo_completes_exact_quorum_tc ... ok
+test node::tests::single_ahead_validator_qc_converges_three_exact_quorum_laggards ... ok
+test node::tests::sync_learned_multi_epoch_handovers_cascade ... ok
+test node::tests::timeout_repeated_and_stale_qcs_do_not_rearm_or_regress ... ok
+test node::tests::stale_recovered_frontier_below_gc_slides_bootstrap_window ... ok
+test node::tests::staged_node_never_fires_handover_pull ... ok
+test node::tests::two_chain_commit_resets_timeout_backoff ... ok
+test node::tests::unseeded_restart_reemits_first_carrier_slash ... ok
+test node::tests::committed_evidence_drains_and_leader_proposes_clean ... ok
+test node::tests::expired_evidence_stays_out_of_gate_and_ids ... ok
+test node::tests::restart_seeded_gate_suppresses_second_carrier_slash ... ok
+test node::tests::jump_to_round_bootstraps_ordered_recovery_but_preserves_live_frontier ... ok
+test node::tests::batch_carrying_header_still_reclaims_after_eight_rebroadcasts ... ok
+test node::tests::skipped_round_checkpoint_clears_and_sync_commits_proceed ... ok
+test node::tests::stranded_stager_pulls_certified_handover_before_activation ... ok
+test node::tests::sequential_recovery_bundles_keep_only_new_dag_closure ... ok
+test node::tests::validated_recovery_bundles_bridge_unequal_committed_prefixes ... ok
+test node::tests::parentless_restart_bootstrap_rebroadcast_survives_thirty_second_stagger ... ok
+test node::tests::fresh_core_rejoin_at_unanimity_quorum_resumes_commits ... ok
+test node::tests::jump_to_round_resumes_commits_past_recovery_gap ... ok
+test node::tests::partial_fleet_restart_orders_post_restart_tx ... ok
+test node::tests::skewed_jump_rounds_still_resume_commits ... ok
+test node::tests::staggered_boot_jump_recovers_dag_batch_ordering ... FAILED
+test node::tests::walless_restart_repairs_committed_chain_and_commits has been running for over 60 seconds
+test node::tests::walless_restart_repairs_committed_chain_and_commits ... ok
+
+failures:
+
+---- node::tests::staggered_boot_jump_recovers_dag_batch_ordering stdout ----
+
+thread 'node::tests::staggered_boot_jump_recovers_dag_batch_ordering' (399176) panicked at crates\ascent-consensus-core\src\node.rs:9736:13:
+v0 recovered without sliding its bootstrap window; this test no longer exercises the slide arm it pins
+stack backtrace:
+   0: std::panicking::panic_handler
+             at /rustc/31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd/library\std\src\panicking.rs:689
+   1: core::panicking::panic_fmt
+             at /rustc/31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd/library\core\src\panicking.rs:80
+   2: ascent_consensus_core::node::tests::staggered_boot_jump_recovers_dag_batch_ordering
+             at .\src\node.rs:9736
+   3: ascent_consensus_core::node::tests::staggered_boot_jump_recovers_dag_batch_ordering::closure$0
+             at .\src\node.rs:9639
+   4: core::ops::function::FnOnce::call_once<ascent_consensus_core::node::tests::staggered_boot_jump_recovers_dag_batch_ordering::closure_env$0,tuple$<> >
+             at /rustc/31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd/library\core\src\ops\function.rs:250
+   5: core::ops::function::FnOnce::call_once
+             at /rustc/31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd/library\core\src\ops\function.rs:250
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    node::tests::staggered_boot_jump_recovers_dag_batch_ordering
+
+test result: FAILED. 97 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 121.64s
+
+error: test failed, to rerun pass `-p ascent-consensus-core --lib`
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_crypto-08727e148a59ae77.exe)
+
+running 12 tests
+test tests::domain_hash_differs_from_plain_hash ... ok
+test tests::hash32_display_and_debug_are_hex ... ok
+test tests::blake3_official_test_vectors ... ok
+test tests::bls_aggregate_verify_rejects_duplicate_messages ... ok
+test tests::feldman_verify_share_rejects_valid_bls_scalar_from_wrong_polynomial ... ok
+test tests::bls_fast_aggregate_verify_same_message ... ok
+test tests::bls_min_pk_golden_vectors_and_aggregate_verify ... ok
+test tests::dkg_share_encryption_round_trip_and_aad_authentication ... ok
+test tests::feldman_single_participant_matches_beacon_dealer_coordinates ... ok
+test tests::ed25519_rejects_corrupted_signature ... ok
+test tests::ed25519_rfc8032_test_vector_1 ... ok
+test tests::beacon_threshold_combine_matches_group_secret_signature ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests\x25519_rejection.rs (C:/tmp/ascent-baseline-target\debug\deps\x25519_rejection-0ae449c69be118d0.exe)
+
+running 3 tests
+test ordinary_x25519_peers_still_derive_the_same_nonzero_secret ... ok
+test all_zero_and_known_low_order_public_keys_are_rejected ... ok
+test share_encryption_and_decryption_propagate_low_order_rejection ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_fuzz-c764993f0203bcc3.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\decoder_vm_battery.rs (C:/tmp/ascent-baseline-target\debug\deps\decoder_vm_battery-7ecd990e54f7e692.exe)
+
+running 2 tests
+test vm_program_decode_execute_battery ... ok
+test borsh_decoder_mutation_battery ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_receipts-3c0b9f6b0a0eddbd.exe)
+
+running 19 tests
+test tests::fee_split_ppm_sum_must_equal_one_million ... ok
+test tests::quantize_mulaw_extreme_i32_inputs_clamp_without_overflow ... ok
+test tests::quantize_mulaw_golden_vectors ... ok
+test tests::receipt_merkle_root_is_not_ambiguous_when_last_odd_leaf_is_duplicated ... ok
+test tests::receipt_chain_full_borsh_golden_vector ... ok
+test tests::receipt_merkle_uses_odd_node_promotion ... ok
+test tests::verify_t0_rejects_beacon_from_future_before_signature_work ... ok
+test tests::verify_t0_rejects_tiling_overlap ... ok
+test tests::verify_t0_rejects_tiling_gap ... ok
+test tests::fee_split_wrapping_to_one_million_in_u32_is_rejected_by_u64_sum ... ok
+test tests::verify_t0_rejects_duplicate_stage_range_even_with_valid_signatures ... ok
+test tests::verify_t0_rejects_unsorted_tiling ... ok
+test tests::reordered_stages_cannot_hide_behind_valid_aggregate_and_gateway_signature ... ok
+test tests::verify_t0_rejects_aggregate_signature_missing_one_stage ... ok
+test tests::quantize_mulaw_is_monotonic ... ok
+test tests::verify_t0_accepts_exact_tiling ... ok
+test tests::verify_t0_freshness_boundary ... ok
+test tests::verify_t0_four_stage_aggregate_and_corrupted_stage_failure ... ok
+test tests::bit_flip_sweep_over_valid_receipt_chain_borsh_never_verifies ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.50s
+
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_sim_net-6f9a3791a2ec64b0.exe)
+
+running 20 tests
+test battery::tests::battery_full_10k ... ignored
+test battery::tests::battery_w6_reconfigure_rekey_real_crypto ... ignored
+test battery::tests::parse_seed_ranges ... ok
+test rng::tests::streams_are_deterministic_and_independent ... ok
+test scenario::tests::w6_evidence_restart_plan_is_sound ... ok
+test scenario::tests::scenario_is_deterministic_and_valid ... ok
+test scenario::tests::w6_reconfigure_plans_are_sound ... ok
+test battery::tests::battery_regression_wp49_quorum_restore_rejoin_seed ... ok
+test battery::tests::battery_regression_s5_ordered_batch_seed_8447 ... ok
+test battery::tests::battery_regression_wp27_partition_heal_reconciliation_seeds ... ok
+test battery::tests::battery_regression_wp25_fresh_core_restart_seed ... ok
+test battery::tests::battery_w6_evidence_restart_seed ... ok
+test battery::tests::battery_smoke_env_default has been running for over 60 seconds
+test battery::tests::battery_w6_boundary_deferral_seed has been running for over 60 seconds
+test battery::tests::battery_w6_reconfigure_growth_partition_seed has been running for over 60 seconds
+test battery::tests::battery_w6_reconfigure_growth_seed has been running for over 60 seconds
+test battery::tests::battery_w6_reconfigure_observer_seed has been running for over 60 seconds
+test battery::tests::battery_w6_reconfigure_rekey_seed has been running for over 60 seconds
+test battery::tests::battery_w6_reconfigure_shuffle_seed has been running for over 60 seconds
+test battery::tests::battery_w6_reconfigure_swap_evidence_seed has been running for over 60 seconds
+test battery::tests::battery_w6_boundary_deferral_seed ... ok
+test battery::tests::battery_w6_reconfigure_rekey_seed ... ok
+test battery::tests::battery_w6_reconfigure_growth_seed ... ok
+test battery::tests::battery_w6_reconfigure_swap_evidence_seed ... ok
+test battery::tests::battery_w6_reconfigure_shuffle_seed ... ok
+test battery::tests::battery_w6_reconfigure_observer_seed ... ok
+test battery::tests::battery_smoke_env_default ... ok
+test battery::tests::battery_w6_reconfigure_growth_partition_seed ... ok
+
+test result: ok. 18 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 101.24s
+
+     Running unittests src\bin\battery.rs (C:/tmp/ascent-baseline-target\debug\deps\battery-a704bae3a3e2ccc1.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_state-1419268f95f5ec35.exe)
+
+running 99 tests
+test tests::cog_lane_requires_intent_then_returns_pricing_stub ... ok
+test tests::base_fee_extremes_across_blocks_saturate_without_underflow_or_overflow ... ok
+test tests::fee_arithmetic_golden_vector ... ok
+test tests::fixed_three_note_genesis_state_root_golden_vector ... ok
+test tests::double_spend_inside_one_tx_errors ... ok
+test tests::genesis_state_root_does_not_fold_empty_receipt_registry ... ok
+test tests::conservation_violation_errors_without_partial_state ... ok
+test tests::double_spend_across_txs_aborts_block ... ok
+test tests::duplicate_derived_output_note_id_in_same_tx_is_rejected_atomically ... ok
+test tests::depth_16_lock_spends_and_depth_17_output_is_rejected_through_stf ... ok
+test tests::namespace_fee_aggregates_multiple_paths_by_owner_lock ... ok
+test tests::namespace_registration_rejects_bad_path_entry_and_registered_at ... ok
+test tests::namespace_registration_rejects_duplicate_and_root_witness ... ok
+test tests::namespace_fee_rounds_up_for_one_unit_spend ... ok
+test tests::namespace_fee_rejects_underpaid_by_one_and_accepts_exact_payment ... ok
+test tests::namespace_fee_shared_owner_requires_sum_not_one_path_payment ... ok
+test tests::namespace_registry_root_is_independent_of_insertion_order ... ok
+test tests::namespace_update_rejects_unknown_duplicate_and_same_tx_paths ... ok
+test tests::child_namespace_registration_requires_parent_owner_witness ... ok
+test tests::namespace_fee_has_no_owner_exemption ... ok
+test tests::namespace_update_state_root_golden_vector ... ok
+test tests::namespace_fee_update_applies_only_to_later_spends ... ok
+test tests::full_slash_burns_bond_and_forces_exit ... ok
+test tests::namespace_update_rejects_parent_owner_witness_for_child ... ok
+test tests::namespace_update_transfers_owner_standard_and_fee ... ok
+test tests::partial_slash_replaces_bond_note_and_burns_amount ... ok
+test tests::exit_root_fold_preserves_pre_exit_roots_and_commits_exit_leg ... ok
+test tests::receipt_submission_out_of_gas_rejected ... ok
+test tests::namespace_update_sighash_covers_update_fields ... ok
+test tests::receipt_submission_undecodable_payload_rejected ... ok
+test tests::receipt_submission_oversized_payload_rejected ... ok
+test tests::restore_recomputes_root_from_tampered_note_contents ... ok
+test tests::bond_spend_locked_until_unlock_epoch ... ok
+test tests::restore_rejects_duplicate_note_ids ... ok
+test tests::receipt_submission_verify_t0_failures_reject_atomically ... ok
+test tests::restore_round_trips_snapshot_parts_to_same_state_root ... ok
+test tests::namespace_registration_sighash_covers_path_and_entry ... ok
+test tests::dkg_round0_with_no_candidates_rejected ... ok
+test tests::sighash_golden_vector ... ok
+test tests::root_namespace_registration_is_permissionless_and_burns_segment_fee ... ok
+test tests::state_root_changes_for_different_valid_output_assignment_and_repeats_identically ... ok
+test tests::state_root_is_independent_of_note_store_insertion_order ... ok
+test tests::dkg_out_of_gas_rejected_before_mutation ... ok
+test tests::state_root_is_not_ambiguous_when_last_odd_leaf_is_duplicated ... ok
+test tests::receipt_registry_survives_restore_round_trip ... ok
+test tests::receipt_submission_happy_path_updates_registry ... ok
+test tests::transaction_slot_is_validity_window_origin ... ok
+test tests::time_lock_boundary ... ok
+test tests::dkg_round0_over_participant_cap_rejected ... ok
+test tests::slash_application_is_deterministic ... ok
+test tests::ttl_window_rejects_future_and_overflowed_validity_claims ... ok
+test tests::receipt_duplicate_rejected_across_blocks ... ok
+test tests::dkg_round0_from_non_candidate_rejected ... ok
+test tests::slash_unknown_identity_is_hard_error ... ok
+test tests::receipt_duplicate_rejected_within_one_block ... ok
+test tests::dkg_wrong_window_rejected_early_and_late ... ok
+test tests::restore_with_exits_rejects_invalid_unregistered_and_duplicate_exits ... ok
+test tests::dkg_ceremony_excludes_target_epoch_exit_and_zero_bond_validator ... ok
+test tests::validator_register_bad_bls_share_rejected ... ok
+test tests::dkg_duplicate_round0_rejected ... ok
+test tests::validator_register_bond_lock_mismatch_rejected ... ok
+test tests::validator_register_out_of_gas_rejected ... ok
+test tests::validator_register_bad_signature_rejected ... ok
+test tests::validator_double_register_rejected_across_blocks ... ok
+test tests::worker_register_out_of_gas_rejected ... ok
+test tests::slash_after_bond_spent_post_unlock_reduces_bookkeeping_only ... ok
+test tests::swapped_same_key_witnesses_between_block_txs_cannot_replay_authority ... ok
+test tests::validator_register_happy_path_updates_registry ... ok
+test tests::validator_double_register_rejected_within_one_tx ... ok
+test tests::threshold_and_or_witnesses_are_checked_structurally ... ok
+test tests::worker_register_tampered_body_rejected ... ok
+test tests::validator_exit_schedule_uses_finalized_block_epoch_across_boundary ... ok
+test tests::validator_registry_survives_restore_round_trip ... ok
+test tests::validator_double_exit_rejected ... ok
+test tests::validator_exits_survive_restore_round_trip ... ok
+test tests::worker_register_happy_path_updates_registry ... ok
+test tests::worker_register_bad_signature_rejected ... ok
+test tests::validator_exit_happy_path_records_canonical_schedule ... ok
+test tests::dkg_round1_wrong_commitment_count_rejected ... ok
+test tests::dkg_round1_wrong_share_count_rejected ... ok
+test tests::validator_exit_rejections_leave_state_root_unchanged ... ok
+test tests::witness_malleation_fails_signature_check ... ok
+test tests::worker_registry_survives_restore_round_trip ... ok
+test tests::re_registration_waits_for_unlock_then_overwrites_and_clears_exit ... ok
+test tests::dkg_round1_before_round0_complete_rejected ... ok
+test tests::worker_double_register_rejected_across_blocks ... ok
+test tests::worker_double_register_rejected_within_one_tx ... ok
+test tests::random_valid_tx_sequences_preserve_supply_minus_burned_fees ... ok
+test tests::dkg_round2_before_round1_complete_rejected ... ok
+test tests::dkg_round2_digest_mismatch_rejects_tx_without_abort ... ok
+test tests::validator_register_replay_is_deterministic ... ok
+test tests::dkg_complaint_aborts_ceremony_and_blocks_further_rounds ... ok
+test tests::worker_register_replay_is_deterministic ... ok
+test tests::dkg_root_fold_preserves_pre_dkg_roots_and_commits_dkg_leg ... ok
+test tests::dkg_registry_survives_restore_round_trip ... ok
+test tests::dkg_full_ceremony_finalizes_with_verifiable_keys ... ok
+test tests::dkg_ceremony_replay_is_deterministic ... ok
+test tests::validator_registry_cap_allows_max_and_rejects_crossing_without_root_change ... ok
+test tests::adversarial_lock_spends_never_create_or_destroy_value ... ok
+
+test result: ok. 99 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.43s
+
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_types-b2f3a8b61da8cdc3.exe)
+
+running 43 tests
+test tests::asc_checked_arithmetic_reports_overflow ... ok
+test address::tests::address_rejects_bad_checksum ... ok
+test tests::base_fee_update_boundaries ... ok
+test address::tests::address_encode_vectors ... ok
+test address::tests::address_accepts_uppercase_only ... ok
+test address::tests::address_rejects_wrong_hrp ... ok
+test address::tests::address_rejects_mixed_case ... ok
+test address::tests::address_rejects_flipped_char ... ok
+test tests::lock_validation_rejects_bad_thresholds ... ok
+test address::tests::address_decode_vectors_and_round_trip ... ok
+test tests::ns_path_validation_accepts_only_v0_shape ... ok
+test tests::lock_validation_rejects_depth_greater_than_16 ... ok
+test tests::namespace_entry_invariant_checks_standard_id_and_locks ... ok
+test tests::note_id_stability_golden_vector ... ok
+test tests::ns_lock_resolves_registered_standard_lock ... ok
+test address::tests::address_rejects_bad_length_and_charset ... ok
+test tests::ns_lock_depth_cap_reports_cycle_cleanly ... ok
+test tests::quorum_count_matches_pinned_ceiling_rule ... ok
+test tests::ns_lock_error_matrix_is_typed ... ok
+test tests::validator_activation_epoch_is_registration_epoch_plus_two ... ok
+test tests::golden_serialization_vectors ... ok
+test tests::dkg_body_validate_rejects_bad_shapes ... ok
+test tests::validator_exit_schedule_is_canonical_e_plus_2_plus_unbond ... ok
+test tests::slot_epoch_uses_512_slot_epochs ... ok
+test tests::validator_in_set_rule_covers_activation_exit_and_zero_bond ... ok
+test tests::dkg_artifact_note_data_uses_appended_tag ... ok
+test tests::validator_exit_note_data_uses_appended_tag ... ok
+test tests::validator_registration_note_data_uses_appended_tag ... ok
+test tests::validator_intent_verify_rejects_tampered_body ... ok
+test tests::dkg_transcript_digest_requires_complete_rounds_and_binds_inputs ... ok
+test tests::worker_intent_verify_rejects_tampered_body ... ok
+test tests::worker_registration_note_data_uses_appended_tag ... ok
+test tests::worker_intent_verify_rejects_oversized_shape ... ok
+test tests::validator_intent_verify_rejects_bad_shape ... ok
+test tests::dkg_record_validate_rejects_structural_corruption ... ok
+test tests::worker_intent_verify_accepts_signed_intent ... ok
+test tests::dkg_intent_verify_rejects_tampered_body_and_foreign_signature ... ok
+test tests::validator_intent_verify_accepts_signed_intent ... ok
+test tests::validator_intent_verify_rejects_foreign_signature ... ok
+test tests::worker_intent_verify_rejects_foreign_signature ... ok
+test tests::validator_exit_intent_verifies_and_rejects_tampering ... ok
+test tests::dkg_intent_verify_accepts_all_round_shapes ... ok
+test tests::generated_valid_locks_round_trip ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests\receipt_lock_creation.rs (C:/tmp/ascent-baseline-target\debug\deps\receipt_lock_creation-38728d4bf3730d80.exe)
+
+running 3 tests
+test creation_validation_rejects_receipt_locks_nested_in_composites ... ok
+test receipt_lock_is_restore_compatible_but_rejected_for_new_notes ... ok
+test ordinary_locks_remain_valid_for_new_notes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_verify-a719c8fb7e88b9a1.exe)
+
+running 4 tests
+test tests::sampler_reaches_every_index_across_seeds ... ok
+test tests::sampler_selects_all_when_k_covers_n ... ok
+test tests::sampler_is_deterministic ... ok
+test tests::sampler_has_no_duplicates ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\t1_e2e.rs (C:/tmp/ascent-baseline-target\debug\deps\t1_e2e-be05e26a7445403a.exe)
+
+running 5 tests
+test sampler_hit_rate_matches_k_over_n_envelope ... ok
+test t1_flag_maps_to_cogitate_ladder_failure_input ... ok
+test valid_chain_passes_t0_and_t1 ... ok
+test corrupted_stage_output_passes_t0_but_t1_flags_when_sampled ... ok
+test corrupted_stage_output_passes_t1_when_sampler_misses_it ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_vm-f4a2682c07b9247c.exe)
+
+running 11 tests
+test tests::arithmetic_and_logical_instructions ... ok
+test tests::loads_and_stores_are_little_endian_with_sign_extension ... ok
+test tests::metering_counts_successful_instructions ... ok
+test tests::misaligned_access_traps ... ok
+test tests::ecall_unknown_syscall_and_ebreak_trap ... ok
+test tests::rv32m_multiply_variants ... ok
+test tests::rv32m_division_and_remainder_edges ... ok
+test tests::shifts_mask_shift_amount_to_five_bits ... ok
+test tests::signed_and_unsigned_branches ... ok
+test tests::x0_is_hardwired_zero ... ok
+test tests::deterministic_mixed_program_has_golden_register_hash ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_wallet_core-94a11f0926fab9ed.exe)
+
+running 43 tests
+test keystore::tests::encrypted_artifact_path_appends_enc ... ok
+test http::tests::parses_http_and_https_urls_for_tls_transport ... ok
+test http::tests::parses_http_urls ... ok
+test http::tests::request_builder_uses_mozilla_user_agent ... ok
+test http::tests::parses_content_length_and_chunked_responses ... ok
+test tx::tests::select_exact_cover_has_zero_change ... ok
+test tx::tests::select_rejects_overflowing_requirement ... ok
+test tx::tests::select_insufficient_funds_reports_available_and_required ... ok
+test tx::tests::select_dkg_notes_prices_input_and_explicit_round_gas ... ok
+test tx::tests::select_computes_change_after_fee ... ok
+test tx::tests::select_validator_exit_notes_prices_input_and_exit_gas ... ok
+test tx::tests::select_validator_registration_notes_prices_bond_and_reg_gas ... ok
+test notes::tests::balance_rejects_non_integer_values ... ok
+test notes::tests::balance_sums_live_note_values_from_contract_body ... ok
+test tx::tests::select_is_largest_first_and_regrows_fee_per_input ... ok
+test mnemonic::tests::slip10_ed25519_master_key_vectors ... ok
+test mnemonic::tests::wordlist_is_complete_sorted_and_unique ... ok
+test dkg::tests::restore_rejects_invalid_signing_share_bytes ... ok
+test mnemonic::tests::generated_mnemonics_are_valid_and_distinct ... ok
+test tx::tests::select_worker_registration_prices_input_and_registry_gas ... ok
+test notes::tests::spendable_notes_keep_only_live_sig_plain_rows ... ok
+test mnemonic::tests::mnemonic_rejects_bad_checksum_wrong_count_and_unknown_words ... ok
+test tx::tests::transfer_tx_rejects_duplicate_self_outputs ... ok
+test tests::submit_worker_registration_short_circuits_when_already_registered ... ok
+test tx::tests::transfer_tx_exact_cover_omits_change_output ... ok
+test dkg::tests::round_order_membership_and_epoch_are_enforced ... ok
+test tx::tests::sig_lock_gas_matches_protocol_schedule ... ok
+test tx::tests::dkg_artifact_intent_signs_under_identity_and_rejects_bad_shapes ... ok
+test tx::tests::validator_exit_intent_signs_under_identity_and_rejects_tampering ... ok
+test tx::tests::transfer_tx_roundtrips_and_verifies ... ok
+test dkg::tests::tampered_ciphertext_yields_complaint_against_sender ... ok
+test tx::tests::validator_registration_intent_signs_under_identity_and_rejects_tampering ... ok
+test dkg::tests::exported_state_round_trips_across_process_boundaries ... ok
+test tests::submit_worker_registration_uses_faucet_then_submits_registration_tx ... ok
+test tx::tests::worker_registration_tx_conserves_value_and_applies_to_genesis_snapshot ... ok
+test dkg::tests::three_participant_ceremony_finalizes_and_verifies ... ok
+test tx::tests::dkg_artifact_tx_conserves_value_and_separates_identity_from_funding ... ok
+test tx::tests::validator_exit_tx_conserves_value_and_separates_identity_from_funding ... ok
+test tx::tests::validator_registration_tx_bonds_to_identity_and_returns_change_to_funding ... ok
+test mnemonic::tests::bip39_trezor_24_word_vectors ... ok
+test mnemonic::tests::mnemonic_generate_recover_round_trip ... ok
+test keystore::tests::identity_round_trips_plaintext_and_encrypted ... ok
+test keystore::tests::keystore_encrypt_decrypt_round_trip ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.95s
+
+   Doc-tests ascent_cogitate
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ascent_consensus_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ascent_crypto
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ascent_fuzz
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ascent_receipts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ascent_sim_net
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ascent_state
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ascent_types
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ascent_verify
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ascent_vm
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ascent_wallet_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: 1 target failed:
+    `-p ascent-consensus-core --lib`

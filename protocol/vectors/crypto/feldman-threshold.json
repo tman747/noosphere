@@ -1,0 +1,169 @@
+{
+ "schema": "noos-crypto/feldman-threshold-v1",
+ "description": "Feldman commitment / threshold KATs (t=3, n=5, two contributors) over BLS12-381 min_pk. share_secret(x) = f_A(x)+f_B(x) mod r evaluated at the 1-based index x directly; threshold combine interpolates at 0 using the x-values as-is (x=0 is invalid). Partial signatures use the D-BLS-DKG DST. Independently generated with py_ecc.",
+ "threshold": 3,
+ "participants": 5,
+ "commitments": [
+  [
+   "a5934f5a749ee9d9fd6291ad8b0be6d63b24c175fb07becf97565b00a69d8ea1c891c9ac5254cc92c9115d10960f588d",
+   "860a451d37f3346b0da7cd4138694679484ac70bad55810dcf3bfe63badd0b6727e08e96f1f9b8a9969280c61deb6614",
+   "88bb095e96012a4a58858306d3c941f1b54a3577e3e4d030ee0a039b33365a9a348158d029c87c36f9a1adec598885d0"
+  ],
+  [
+   "b9898563279bbb05794e655d869174f91b2ab277613cec377c18400895a85bdfdcc1a138ac0e1c9ebbef83a894fd3b6f",
+   "ab9f016624a867d38aedd57d38748b7ddf5c839ad5d348b4339c8b792d0527d6ac6bf2101273536b51818c42d3b19d47",
+   "92fea5e2a788336bfbf2db4b06ed05b552791af325b9f18fde4d1724c39216f60e4d9eb28b701746f10b9022c5ec7afa"
+  ]
+ ],
+ "group_public_key": "87743e50003ee8bf32e12638514fd4762bd48b8bbba572c5b1242f1298592bc151df39ede7c7ed73df85325a03975e63",
+ "cases": [
+  {
+   "name": "share-1-pubkey",
+   "kind": "positive",
+   "bytes": "0001",
+   "share_index": 1,
+   "share_public_key": "9115005b832fd9562cc72584c2d8f8cbac86791459ed790d4ada3cc5df86c6a6725b3f906b76384c9219cecd2bb619f1"
+  },
+  {
+   "name": "partial-sig-1",
+   "kind": "positive",
+   "bytes": "1337133713371337133713371337133713371337133713371337133713371337",
+   "share_index": 1,
+   "share_public_key": "9115005b832fd9562cc72584c2d8f8cbac86791459ed790d4ada3cc5df86c6a6725b3f906b76384c9219cecd2bb619f1",
+   "domain_id": "D-BLS-DKG",
+   "signature": "8267f750568ff89b751e41ac7dc15154697adbd124621721443b821ccd6a0b99380212b23f686a036de14f813d65d8a206014136ddccbfd9f1d67285daf48acd6a14aa6b61fcdecd9bdc1969ece17c5cc5af5332012401942ac6ddd44c398b2d"
+  },
+  {
+   "name": "share-2-pubkey",
+   "kind": "positive",
+   "bytes": "0002",
+   "share_index": 2,
+   "share_public_key": "b5f20f7e6c9a255982810c69306777394b4cf458baccb9e22c7d388e53fe692cef84f3f5a617f10700f64b546570f8ef"
+  },
+  {
+   "name": "partial-sig-2",
+   "kind": "positive",
+   "bytes": "1337133713371337133713371337133713371337133713371337133713371337",
+   "share_index": 2,
+   "share_public_key": "b5f20f7e6c9a255982810c69306777394b4cf458baccb9e22c7d388e53fe692cef84f3f5a617f10700f64b546570f8ef",
+   "domain_id": "D-BLS-DKG",
+   "signature": "92d5d0e377e13e6532033e673ebaddc215defac08f81d6a4108f9a449e7bc4e358eaeb7af8c005b452dc26e6222cdd0a0a69e98f9361d30877b8da858f0ac86c1c75f144effd9053017897ea057aa45ea2a650fe305c224e94830d14675cbbcc"
+  },
+  {
+   "name": "share-3-pubkey",
+   "kind": "positive",
+   "bytes": "0003",
+   "share_index": 3,
+   "share_public_key": "b2ca118ea064988ea1537f847ae098db2edbb2b670e0e944b8f26a5b1c4402ecae120fe9784e504a57a77e3dd9c0a002"
+  },
+  {
+   "name": "partial-sig-3",
+   "kind": "positive",
+   "bytes": "1337133713371337133713371337133713371337133713371337133713371337",
+   "share_index": 3,
+   "share_public_key": "b2ca118ea064988ea1537f847ae098db2edbb2b670e0e944b8f26a5b1c4402ecae120fe9784e504a57a77e3dd9c0a002",
+   "domain_id": "D-BLS-DKG",
+   "signature": "a8776c2d7e6e5fbc8e3de3bff5c7f35d061a54e5893586c4407a95ea8e262ab480514be324132128ed6484465886a67200cfc2b3033eacee25f6a2fe763418d7ee9180c563beba76d39b56a91bb38f3d776b114f080af6cce3037398cf664149"
+  },
+  {
+   "name": "share-4-pubkey",
+   "kind": "positive",
+   "bytes": "0004",
+   "share_index": 4,
+   "share_public_key": "97e87996d1958cbcd6b87c48c8272f41466be1501db468b59937e30970c6dda2d02e6a09335dab4765b487dfb71d2ee8"
+  },
+  {
+   "name": "partial-sig-4",
+   "kind": "positive",
+   "bytes": "1337133713371337133713371337133713371337133713371337133713371337",
+   "share_index": 4,
+   "share_public_key": "97e87996d1958cbcd6b87c48c8272f41466be1501db468b59937e30970c6dda2d02e6a09335dab4765b487dfb71d2ee8",
+   "domain_id": "D-BLS-DKG",
+   "signature": "96750f2c9318510a8f37caf32da8666244afbd11138432ca83bcfa93c57e365fb51a758686a93d1b440b9da857760d68129035916e876e3409d09aa940942d25146e1c9d6d972572a7f34cb24f23b2fd147aec6a03635c49942cffa5033d259f"
+  },
+  {
+   "name": "share-5-pubkey",
+   "kind": "positive",
+   "bytes": "0005",
+   "share_index": 5,
+   "share_public_key": "b44642aee1f1a020fbf8c19f29593bcaa344684088e87d5e0251372488fdff593ae05ace978e0c5055e6be07d489e74b"
+  },
+  {
+   "name": "partial-sig-5",
+   "kind": "positive",
+   "bytes": "1337133713371337133713371337133713371337133713371337133713371337",
+   "share_index": 5,
+   "share_public_key": "b44642aee1f1a020fbf8c19f29593bcaa344684088e87d5e0251372488fdff593ae05ace978e0c5055e6be07d489e74b",
+   "domain_id": "D-BLS-DKG",
+   "signature": "a8d73b2fe156d38a03a2d5a4247fee4e488fbadde390b67a0b53d8fe7d82e1ce0d2f1867537d9677b60ee8115436d68c179961fe2422fe26e69bf541f3d2ec41d33b0747e6555742b7e8ab21807622fab8dd2e1969419e95766293ef97a0d869"
+  },
+  {
+   "name": "combine-1-3-5",
+   "kind": "positive",
+   "bytes": "1337133713371337133713371337133713371337133713371337133713371337",
+   "share_indices": [
+    1,
+    3,
+    5
+   ],
+   "partials": [
+    "8267f750568ff89b751e41ac7dc15154697adbd124621721443b821ccd6a0b99380212b23f686a036de14f813d65d8a206014136ddccbfd9f1d67285daf48acd6a14aa6b61fcdecd9bdc1969ece17c5cc5af5332012401942ac6ddd44c398b2d",
+    "a8776c2d7e6e5fbc8e3de3bff5c7f35d061a54e5893586c4407a95ea8e262ab480514be324132128ed6484465886a67200cfc2b3033eacee25f6a2fe763418d7ee9180c563beba76d39b56a91bb38f3d776b114f080af6cce3037398cf664149",
+    "a8d73b2fe156d38a03a2d5a4247fee4e488fbadde390b67a0b53d8fe7d82e1ce0d2f1867537d9677b60ee8115436d68c179961fe2422fe26e69bf541f3d2ec41d33b0747e6555742b7e8ab21807622fab8dd2e1969419e95766293ef97a0d869"
+   ],
+   "combined_signature": "a32e8a1d36b63cd7d5627a6beb14ade133f0c457720edb7929447740edc79be2b88951d29c396e958c6c555ac11736b409d1ca97fd2d257bb05e42e4bf81b2acbf1074e60387ac0e678e3857e39b154dfb4152bc25cd0a37f884f7d91fb34df4",
+   "domain_id": "D-BLS-DKG"
+  },
+  {
+   "name": "combine-2-3-4",
+   "kind": "positive",
+   "bytes": "1337133713371337133713371337133713371337133713371337133713371337",
+   "share_indices": [
+    2,
+    3,
+    4
+   ],
+   "partials": [
+    "92d5d0e377e13e6532033e673ebaddc215defac08f81d6a4108f9a449e7bc4e358eaeb7af8c005b452dc26e6222cdd0a0a69e98f9361d30877b8da858f0ac86c1c75f144effd9053017897ea057aa45ea2a650fe305c224e94830d14675cbbcc",
+    "a8776c2d7e6e5fbc8e3de3bff5c7f35d061a54e5893586c4407a95ea8e262ab480514be324132128ed6484465886a67200cfc2b3033eacee25f6a2fe763418d7ee9180c563beba76d39b56a91bb38f3d776b114f080af6cce3037398cf664149",
+    "96750f2c9318510a8f37caf32da8666244afbd11138432ca83bcfa93c57e365fb51a758686a93d1b440b9da857760d68129035916e876e3409d09aa940942d25146e1c9d6d972572a7f34cb24f23b2fd147aec6a03635c49942cffa5033d259f"
+   ],
+   "combined_signature": "a32e8a1d36b63cd7d5627a6beb14ade133f0c457720edb7929447740edc79be2b88951d29c396e958c6c555ac11736b409d1ca97fd2d257bb05e42e4bf81b2acbf1074e60387ac0e678e3857e39b154dfb4152bc25cd0a37f884f7d91fb34df4",
+   "domain_id": "D-BLS-DKG"
+  },
+  {
+   "name": "share-2-wrong-pubkey",
+   "kind": "negative",
+   "bytes": "0002",
+   "share_index": 2,
+   "share_public_key": "b2ca118ea064988ea1537f847ae098db2edbb2b670e0e944b8f26a5b1c4402ecae120fe9784e504a57a77e3dd9c0a002",
+   "why": "share public key belongs to index 3; Feldman evaluation at index 2 must not match"
+  },
+  {
+   "name": "combine-duplicate-index",
+   "kind": "negative",
+   "bytes": "1337133713371337133713371337133713371337133713371337133713371337",
+   "share_indices": [
+    1,
+    1,
+    3
+   ],
+   "partials": [
+    "8267f750568ff89b751e41ac7dc15154697adbd124621721443b821ccd6a0b99380212b23f686a036de14f813d65d8a206014136ddccbfd9f1d67285daf48acd6a14aa6b61fcdecd9bdc1969ece17c5cc5af5332012401942ac6ddd44c398b2d",
+    "8267f750568ff89b751e41ac7dc15154697adbd124621721443b821ccd6a0b99380212b23f686a036de14f813d65d8a206014136ddccbfd9f1d67285daf48acd6a14aa6b61fcdecd9bdc1969ece17c5cc5af5332012401942ac6ddd44c398b2d",
+    "a8776c2d7e6e5fbc8e3de3bff5c7f35d061a54e5893586c4407a95ea8e262ab480514be324132128ed6484465886a67200cfc2b3033eacee25f6a2fe763418d7ee9180c563beba76d39b56a91bb38f3d776b114f080af6cce3037398cf664149"
+   ],
+   "combined_signature": "a32e8a1d36b63cd7d5627a6beb14ade133f0c457720edb7929447740edc79be2b88951d29c396e958c6c555ac11736b409d1ca97fd2d257bb05e42e4bf81b2acbf1074e60387ac0e678e3857e39b154dfb4152bc25cd0a37f884f7d91fb34df4",
+   "domain_id": "D-BLS-DKG",
+   "why": "duplicate share index must be rejected by threshold combine"
+  },
+  {
+   "name": "share-index-zero-invalid",
+   "kind": "negative",
+   "bytes": "0000",
+   "share_index": 0,
+   "share_public_key": "87743e50003ee8bf32e12638514fd4762bd48b8bbba572c5b1242f1298592bc151df39ede7c7ed73df85325a03975e63",
+   "why": "index 0 would evaluate the polynomial at the secret; it is outside the valid share domain"
+  }
+ ]
+}

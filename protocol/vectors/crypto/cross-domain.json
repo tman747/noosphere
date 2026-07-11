@@ -1,0 +1,56 @@
+{
+ "schema": "noos-crypto/cross-domain-rejection-v1",
+ "description": "Cross-domain rejection corpus (plan section 3.3): artifacts produced under legacy Ascent-era domain separation must FAIL NOOSPHERE verification. Every legacy identity string is hex-encoded (old_*_hex fields) so no forbidden literal enters the tree; decode the hex to reproduce the legacy construction.",
+ "cases": [
+  {
+   "name": "old-bls-attest-dst-rejected-by-noos-vote",
+   "kind": "negative",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021222324252627",
+   "domain_id": "D-BLS-VOTE",
+   "public_key": "a491d1b0ecd9bb917989f0e74f0dea0422eac4a873e5e2644f368dffb9a6e20fd6e10c1b77654d067c0618f6e5a7f79a",
+   "signature": "8e8ac96e23fc5bf5552cc8e3899ec2f436637ab1a30effea845b94934cf193e9bb4441b13a113ba9128348c4e204534d01780fecc523b569204343f10ebb9829883de2c6a4e015b76f6a4f5010ad0a3f6f68d2da1531f652a2e0aa27805b1ef6",
+   "old_dst_hex": "415343454e542d424c532d53544147452d4154544553542d5630",
+   "why": "BLS signature hashed to G2 under the legacy attest DST (old_dst_hex); verification under every NOOS BLS_DST row must fail"
+  },
+  {
+   "name": "old-bls-beacon-dst-rejected-by-noos-dkg",
+   "kind": "negative",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021222324252627",
+   "domain_id": "D-BLS-DKG",
+   "public_key": "a491d1b0ecd9bb917989f0e74f0dea0422eac4a873e5e2644f368dffb9a6e20fd6e10c1b77654d067c0618f6e5a7f79a",
+   "signature": "a2e665d27a676084280dec8c04f0f4c64723becc508428970cbfa058a9dbae14ad05b3defae1b30f4e71aa9039db0ac319b69dfef0109a236fab7363009376022819662094bb76b806426ad498089d85d75a4da1a1c0831055781dc613a12f9e",
+   "old_dst_hex": "415343454e542d424c532d424541434f4e2d5630",
+   "why": "BLS signature under the legacy beacon DST (old_dst_hex); verification under D-BLS-DKG (and all other NOOS DSTs) must fail"
+  },
+  {
+   "name": "old-derive-key-domain-hash-mismatch",
+   "kind": "negative",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021222324252627",
+   "domain_id": "D-TX-ID",
+   "old_context_hex": "617363656e742e776f726b65722d726567",
+   "old_key_material_hex": "617363656e742d7630",
+   "old_hash32": "2606547d13b0f249eb7f73890cf0592638e0a71559d21ad50fbe9df463efb65f",
+   "noos_hash32": "4061c78030c6849ef537fe21fe0af918829f30b465daa331877b1d9ae3461f9e",
+   "why": "legacy chain hashed with keyed BLAKE3 under derive_key(old_context_hex, old_key_material_hex); the NOOS D-TX-ID digest of the same payload must differ"
+  },
+  {
+   "name": "old-ed25519-raw-message-rejected-by-noos-sig-tx",
+   "kind": "negative",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021222324252627",
+   "domain_id": "D-SIG-TX",
+   "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+   "signature": "a04b9d06508b66eca37f87ac1d0620e9a5afa815156d6c1595b8c3bd7eb0feb7cc0feacd4277f355a0b9c4dc0a8a42e63081e550452a786ac6c6e4b59146e901",
+   "why": "legacy chain signed the raw message with no context prefix; NOOS D-SIG-TX verification prepends the registered context and must fail"
+  },
+  {
+   "name": "old-ed25519-legacy-prefix-rejected-by-noos-sig-tx",
+   "kind": "negative",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021222324252627",
+   "domain_id": "D-SIG-TX",
+   "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+   "signature": "a75a76ef9ceb508a42d9187fdd097298283bf5b8568fcfe8fd7c8be10a2de3d1531e57b9d9fda4e248ec534b0b312dab1fd2a9e21cdac51ac169210138c04708",
+   "old_prefix_hex": "415343454e542d54582d5630",
+   "why": "signature binds a legacy uppercase object prefix (old_prefix_hex); NOOS D-SIG-TX verification must fail"
+  }
+ ]
+}

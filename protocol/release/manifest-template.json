@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "manifest_kind": "noosphere-release-manifest",
+  "_comment": "Release manifest template (plan \u00a71.6). Instantiate per release. LAW: every later phase APPENDS evidence to evidence_appendix.entries; no field of an earlier verdict, hash, or signature is ever edited. A corrected verdict is a NEW gate_verdicts entry plus a NEW appendix entry naming what it supersedes. Hash-like values are lowercase 64-hex without 0x unless a field name says otherwise.",
+  "release": {
+    "version": "0.0.0",
+    "channel": "devnet",
+    "date": "1970-01-01",
+    "protocol_version": "v1",
+    "api_version": "v1"
+  },
+  "source": {
+    "corpus_source_index_root": "PENDING_HASH",
+    "spec_revision": "PENDING_GIT_REVISION",
+    "plan_revision": "local://noosphere-full-build-plan.md (approved)",
+    "repo_revision": "PENDING_GIT_REVISION"
+  },
+  "identity": {
+    "_comment": "Derivation: protocol/spec/genesis-identity-v1.md. chain_id and genesis_hash bind into every artifact below; wrong identity fails before read/write/sign (wrong_protocol_identity).",
+    "chain_name": "noos-devnet-1",
+    "is_test_network": true,
+    "parameter_manifest_hash": "PENDING_QUIET_WEEK_FREEZE",
+    "chain_id": "PENDING_QUIET_WEEK_FREEZE",
+    "bitcoin_anchor": {
+      "height": 0,
+      "block_hash_internal_order": "PENDING_CEREMONY"
+    },
+    "dkg_root": "PENDING_CEREMONY",
+    "genesis_hash": "PENDING_CEREMONY"
+  },
+  "clients": [
+    {
+      "name": "noosd",
+      "family": "rust-reference",
+      "role": "production node",
+      "revision": "PENDING_GIT_REVISION",
+      "binary_hashes": {}
+    },
+    {
+      "name": "go-client",
+      "family": "go-independent",
+      "role": "independent header/state/receipt client",
+      "revision": "PENDING_GIT_REVISION",
+      "binary_hashes": {}
+    }
+  ],
+  "verifiers": [
+    {
+      "verifier_id": "EnvelopeV1",
+      "family": "rust-reference",
+      "revision": "PENDING_GIT_REVISION",
+      "verifier_hash": "PENDING_HASH"
+    }
+  ],
+  "toolchain_locks": {
+    "rustc": "PENDING_VERSION",
+    "cargo_lock_hash": "PENDING_HASH",
+    "go": "PENDING_VERSION",
+    "go_sum_hash": "PENDING_HASH",
+    "python": "PENDING_VERSION",
+    "repro_policy": "protocol/release/repro-policy-v1.toml",
+    "builders": [
+      {
+        "id": "PENDING_BUILDER_ID",
+        "platform": "windows-x86_64",
+        "independent_operator": "PENDING"
+      },
+      {
+        "id": "PENDING_BUILDER_ID",
+        "platform": "ubuntu-x86_64",
+        "independent_operator": "PENDING"
+      }
+    ]
+  },
+  "schema_roots": {
+    "claim_registry_root": "PENDING_HASH",
+    "crypto_domains_root": "PENDING_HASH",
+    "constants_root": "PENDING_HASH",
+    "openapi_v1_root": "PENDING_HASH",
+    "telemetry_v1_root": "PENDING_HASH",
+    "conformance_vector_root": "PENDING_HASH",
+    "genesis_vector_root": "PENDING_HASH"
+  },
+  "artifact_hashes": {
+    "_comment": "Map of released artifact path -> hash per the signed repro policy (raw bytes for unsigned artifacts; unsigned-payload manifest for signed installers).",
+    "example/replace-me": "PENDING_HASH"
+  },
+  "gate_verdicts": [
+    {
+      "gate": "G0",
+      "claim_id": "EXAMPLE-REPLACE-ME",
+      "verdict": "PENDING",
+      "evidence_root": "PENDING_HASH",
+      "date": "1970-01-01"
+    }
+  ],
+  "unresolved_findings": [
+    {
+      "finding_id": "EXAMPLE-REPLACE-ME",
+      "severity": "PENDING",
+      "summary": "PENDING",
+      "owner": "PENDING",
+      "status": "OPEN"
+    }
+  ],
+  "signatures": [
+    {
+      "role": "owner",
+      "name": "PENDING",
+      "sig": "PENDING_SIGNATURE",
+      "date": "1970-01-01"
+    },
+    {
+      "role": "independent-economic-review",
+      "name": "PENDING",
+      "sig": "PENDING_SIGNATURE",
+      "date": "1970-01-01"
+    }
+  ],
+  "evidence_appendix": {
+    "_comment": "APPEND-ONLY. Each later phase (G1..G5, canary, production review) appends one entry per run: {phase, command, cwd, revision, toolchain, fixtures_seeds, started, ended, exit_code, raw_log_hashes, thresholds, verdict, exclusions_conflicts, rollback_outcome, supersedes}. Entries are never edited or removed; a correction appends a new entry whose 'supersedes' names the old one. Old verdicts above are likewise never edited.",
+    "entries": []
+  }
+}

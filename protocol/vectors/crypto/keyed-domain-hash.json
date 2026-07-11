@@ -1,0 +1,47 @@
+{
+ "schema": "noos-crypto/keyed-domain-hash-v1",
+ "description": "Keyed BLAKE3-256 KATs: hash32 = BLAKE3-256-keyed(key32, context_string || bytes) for every BLAKE3_KEYED registry row. Independently generated with the Python 'blake3' package (v1.0.9).",
+ "cases": [
+  {
+   "name": "d-ground-ticket-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-GROUND-TICKET",
+   "key32": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa55555555555555555555555555555555",
+   "hash32": "4476400bd86c499207ee86583c4b7fdde3f6b72cc003426c8fd27e3437103206"
+  },
+  {
+   "name": "d-ground-ticket-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-GROUND-TICKET",
+   "key32": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa55555555555555555555555555555555",
+   "hash32": "02749b70b74c79d5f18ee4f4c5834d42eed75e7c52ff3404cd7d197c57397fbd"
+  },
+  {
+   "name": "d-tensor-work-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-TENSOR-WORK",
+   "key32": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa55555555555555555555555555555555",
+   "hash32": "a4a977b3ea1a75606205cb71ecd8924000afa71985f8bf1fd973b0fcc27f6e40"
+  },
+  {
+   "name": "d-tensor-work-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-TENSOR-WORK",
+   "key32": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa55555555555555555555555555555555",
+   "hash32": "81216a5ba71744ff3d00383f3df7ded63e8fb5074ec760d5eefc69ec2005c5ea"
+  },
+  {
+   "name": "d-ground-ticket-wrong-key",
+   "kind": "negative",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-GROUND-TICKET",
+   "key32": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "hash32": "02749b70b74c79d5f18ee4f4c5834d42eed75e7c52ff3404cd7d197c57397fbd",
+   "why": "digest was keyed with a different 32-byte key; recomputation must not match"
+  }
+ ]
+}

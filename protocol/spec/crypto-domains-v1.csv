@@ -11,6 +11,7 @@ domain_id,kind,context_string,algorithm,consumer,notes
 D-GENESIS-PARAMS,BLAKE3_CONTEXT,NOOS/GENESIS/PARAMS/V1,BLAKE3-256,genesis,SOURCE plan §2.4; parameter_manifest_hash over canonical GenesisParameterManifestV1
 D-CHAIN-ID,BLAKE3_CONTEXT,NOOS/CHAIN/V1,BLAKE3-256,genesis,SOURCE plan §2.4; chain_id = H(ctx || parameter_manifest_hash)
 D-GENESIS-FINAL,BLAKE3_CONTEXT,NOOS/GENESIS/FINAL/V1,BLAKE3-256,genesis,SOURCE plan §2.4; genesis_hash = H(ctx || chain_id || bitcoin_anchor || dkg_root || canonical body)
+D-DKG-TRANSCRIPT,BLAKE3_CONTEXT,NOOS/DKG/TRANSCRIPT/V1,BLAKE3-256,genesis,ASSIGNED; dkg_root = H(ctx || canonical ceremony transcript) per spec/genesis-identity-v1.md §6; pending G0 review
 D-NOTE-ID,BLAKE3_CONTEXT,NOOS/NOTE/V1,BLAKE3-256,noos-lumen,SOURCE arch §6.2; note_id = H(ctx || creating_txid || output_index || canonical_note)
 D-GROUND-CHALLENGE,BLAKE3_CONTEXT,NOOS/GROUND/CHALLENGE/V1,BLAKE3-256,noos-consensus,SOURCE arch §4; binds chain_id/parent/target/slot/proposal_commitment/proposer_pubkey
 D-GROUND-TICKET,BLAKE3_KEYED,NOOS/GROUND/TICKET/V1,BLAKE3-256-keyed,noos-consensus,SOURCE arch §4; key = GroundChallenge; input = ctx || nonce_le_u64 || extra_nonce_32

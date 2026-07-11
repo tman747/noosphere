@@ -1,0 +1,63 @@
+{
+ "schema": "noos-crypto/bls-noos-dst-v1",
+ "description": "BLS12-381 min_pk (public keys in G1, signatures hashed to G2 with SSWU/SHA-256) KATs for every BLS_DST registry row. Independently generated with py_ecc 'hash_to_G2' + scalar multiplication; signing key is an eth bls12-381-tests scalar.",
+ "cases": [
+  {
+   "name": "d-bls-vote-sign",
+   "kind": "positive",
+   "bytes": "abababababababababababababababababababababababababababababababab",
+   "domain_id": "D-BLS-VOTE",
+   "public_key": "a491d1b0ecd9bb917989f0e74f0dea0422eac4a873e5e2644f368dffb9a6e20fd6e10c1b77654d067c0618f6e5a7f79a",
+   "signature": "8c7958ae44311f38222546f5dc8385a386cefce06a98a222637791bd84116385f07237586b8bbc6a8d9e28025c936670116a20a6e785699c9952a57b79909a8be529cb22c627c90defbf6f789979f9287dc929e3a46ef0737add80fca778e8e1"
+  },
+  {
+   "name": "d-bls-cert-sign",
+   "kind": "positive",
+   "bytes": "abababababababababababababababababababababababababababababababab",
+   "domain_id": "D-BLS-CERT",
+   "public_key": "a491d1b0ecd9bb917989f0e74f0dea0422eac4a873e5e2644f368dffb9a6e20fd6e10c1b77654d067c0618f6e5a7f79a",
+   "signature": "87d4ae97f6ad7518568ad51a4afc87579e5340a8f1300cfd7bea6daaadd4c0689ca0c8a5ff3576652865347cb494477d0be20ab3daf4400f3c7b7211ce59e127c95c53a27bcc35f313101d44bc30b1ff27dfd1c09462fd895cc6dbe422ca705e"
+  },
+  {
+   "name": "d-bls-pop-sign",
+   "kind": "positive",
+   "bytes": "abababababababababababababababababababababababababababababababab",
+   "domain_id": "D-BLS-POP",
+   "public_key": "a491d1b0ecd9bb917989f0e74f0dea0422eac4a873e5e2644f368dffb9a6e20fd6e10c1b77654d067c0618f6e5a7f79a",
+   "signature": "91df5a1b09cc5343bad7fa76a861a04dc26c1ce143aa68a84118b851fc9d36f0c92b2888c93aa29bbe70895ee7eaf24a0b0c51adc5c491d914acf2beb067f48bef0ab002e10c8f4c42b3db7e020b82a54843fc69ae78bb7d474f55e715097911"
+  },
+  {
+   "name": "d-bls-feldman-sign",
+   "kind": "positive",
+   "bytes": "abababababababababababababababababababababababababababababababab",
+   "domain_id": "D-BLS-FELDMAN",
+   "public_key": "a491d1b0ecd9bb917989f0e74f0dea0422eac4a873e5e2644f368dffb9a6e20fd6e10c1b77654d067c0618f6e5a7f79a",
+   "signature": "a34ae662668f341a6c660e3291f95b7217fa404408e3016487cf0c1c558afd0ede2ac397bb4a7086fb0709c1b5eda69719d34c6e9ad1e6a936ad61cd7afe1a37f954b2e4474aaee6112b096e52ecbe3ba09a180850b60340ca50b379f8da8a5e"
+  },
+  {
+   "name": "d-bls-dkg-sign",
+   "kind": "positive",
+   "bytes": "abababababababababababababababababababababababababababababababab",
+   "domain_id": "D-BLS-DKG",
+   "public_key": "a491d1b0ecd9bb917989f0e74f0dea0422eac4a873e5e2644f368dffb9a6e20fd6e10c1b77654d067c0618f6e5a7f79a",
+   "signature": "b0d0abed97104769859bdc86f5844684da9af5eb4b6b9112e8936e61845780608a677023b774baaf11737cf67fce8b030df30b8c3f3b5fb561ff49a0f1e02ef4816da26a5953b584807217e275818c03afe9176378573ca0f0d3b1c7818c232f"
+  },
+  {
+   "name": "d-bls-handover-sign",
+   "kind": "positive",
+   "bytes": "abababababababababababababababababababababababababababababababab",
+   "domain_id": "D-BLS-HANDOVER",
+   "public_key": "a491d1b0ecd9bb917989f0e74f0dea0422eac4a873e5e2644f368dffb9a6e20fd6e10c1b77654d067c0618f6e5a7f79a",
+   "signature": "a1ec2d1be45409b63ad66bed812a6ea65de22fb958905337f7321f35c78df75e43b926d6fdcbae167704c3030667e8eb1946719b8e1e64cfb66b964dfec5dc557b2223535dc52cf93f5e3751cb1ad7aa9f820aab71c7d91e4f04a772d0178191"
+  },
+  {
+   "name": "d-bls-cert-rejects-d-bls-vote-signature",
+   "kind": "negative",
+   "bytes": "abababababababababababababababababababababababababababababababab",
+   "domain_id": "D-BLS-CERT",
+   "public_key": "a491d1b0ecd9bb917989f0e74f0dea0422eac4a873e5e2644f368dffb9a6e20fd6e10c1b77654d067c0618f6e5a7f79a",
+   "signature": "8c7958ae44311f38222546f5dc8385a386cefce06a98a222637791bd84116385f07237586b8bbc6a8d9e28025c936670116a20a6e785699c9952a57b79909a8be529cb22c627c90defbf6f789979f9287dc929e3a46ef0737add80fca778e8e1",
+   "why": "signature was produced under the D-BLS-VOTE DST; verification under D-BLS-CERT must fail"
+  }
+ ]
+}

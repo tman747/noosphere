@@ -1,0 +1,106 @@
+{
+ "schema": "noos-crypto/hkdf-noos-domains-v1",
+ "description": "HKDF-SHA-256 KATs per HKDF_INFO registry rows: okm32 = HKDF(salt=registry salt, ikm=bytes, info=context_string || info_suffix, L=32). Independently generated with a pure-Python RFC 5869 implementation validated against the RFC appendix-A vectors.",
+ "cases": [
+  {
+   "name": "d-hkdf-wallet-empty-suffix",
+   "kind": "positive",
+   "bytes": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+   "domain_id": "D-HKDF-WALLET",
+   "salt": "NOOS/HKDF/WALLET/SALT/V1",
+   "info_suffix": "",
+   "okm32": "0fe7d934d11291616a4884bbd1a59c8f018739af47fd39f34ce978ab48b30762"
+  },
+  {
+   "name": "d-hkdf-wallet-suffix10",
+   "kind": "positive",
+   "bytes": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+   "domain_id": "D-HKDF-WALLET",
+   "salt": "NOOS/HKDF/WALLET/SALT/V1",
+   "info_suffix": "f0f1f2f3f4f5f6f7f8f9",
+   "okm32": "10cea12e690b4332c1a0c70ece85ff2c38595802422abe4c1d108f701e7192fc"
+  },
+  {
+   "name": "d-hkdf-umbra-empty-suffix",
+   "kind": "positive",
+   "bytes": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+   "domain_id": "D-HKDF-UMBRA",
+   "salt": "NOOS/HKDF/UMBRA/SALT/V1",
+   "info_suffix": "",
+   "okm32": "ba3817339f3cc536a0a7e3a18e0ade662cfdce2795a09cacb83c55dd8a1ed12e"
+  },
+  {
+   "name": "d-hkdf-umbra-suffix10",
+   "kind": "positive",
+   "bytes": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+   "domain_id": "D-HKDF-UMBRA",
+   "salt": "NOOS/HKDF/UMBRA/SALT/V1",
+   "info_suffix": "f0f1f2f3f4f5f6f7f8f9",
+   "okm32": "db7c7f7517ab92b5a090f913d4610cb922fff86200e0242d4bbcf49f9c3e4baa"
+  },
+  {
+   "name": "d-hkdf-besi-empty-suffix",
+   "kind": "positive",
+   "bytes": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+   "domain_id": "D-HKDF-BESI",
+   "salt": "NOOS/HKDF/BESI/SALT/V1",
+   "info_suffix": "",
+   "okm32": "c75a8e16011796362990f59a82caf1b6c94755e546f8d56ddb9f41e50c21216d"
+  },
+  {
+   "name": "d-hkdf-besi-suffix10",
+   "kind": "positive",
+   "bytes": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+   "domain_id": "D-HKDF-BESI",
+   "salt": "NOOS/HKDF/BESI/SALT/V1",
+   "info_suffix": "f0f1f2f3f4f5f6f7f8f9",
+   "okm32": "3ec0726d91355b47b1f5d709bf768f5001e9b5f04cd2116e70c4550f819d8829"
+  },
+  {
+   "name": "d-hkdf-channel-empty-suffix",
+   "kind": "positive",
+   "bytes": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+   "domain_id": "D-HKDF-CHANNEL",
+   "salt": "NOOS/HKDF/CHANNEL/SALT/V1",
+   "info_suffix": "",
+   "okm32": "9e0a0146d15e980b644403e298580ebbf68a8252ee1db6a4a4c0760a8148e56c"
+  },
+  {
+   "name": "d-hkdf-channel-suffix10",
+   "kind": "positive",
+   "bytes": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+   "domain_id": "D-HKDF-CHANNEL",
+   "salt": "NOOS/HKDF/CHANNEL/SALT/V1",
+   "info_suffix": "f0f1f2f3f4f5f6f7f8f9",
+   "okm32": "18be60a6522c4312c429c40720c6c56042d05e04c4a13afb4a1a69dd57d400c3"
+  },
+  {
+   "name": "d-hkdf-epoch-empty-suffix",
+   "kind": "positive",
+   "bytes": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+   "domain_id": "D-HKDF-EPOCH",
+   "salt": "NOOS/HKDF/EPOCH/SALT/V1",
+   "info_suffix": "",
+   "okm32": "756a7c3c44b9e3c23837a0e231f17da1ec38e5a0d325a03b319649d0c9cc3b6f"
+  },
+  {
+   "name": "d-hkdf-epoch-suffix10",
+   "kind": "positive",
+   "bytes": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+   "domain_id": "D-HKDF-EPOCH",
+   "salt": "NOOS/HKDF/EPOCH/SALT/V1",
+   "info_suffix": "f0f1f2f3f4f5f6f7f8f9",
+   "okm32": "bcefe4890f6b74b4b4592761c203243608f2cc446458a2ee7a5d1472bc5136aa"
+  },
+  {
+   "name": "d-hkdf-umbra-mismatch-under-wallet-domain",
+   "kind": "negative",
+   "bytes": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+   "domain_id": "D-HKDF-WALLET",
+   "salt": "NOOS/HKDF/WALLET/SALT/V1",
+   "info_suffix": "f0f1f2f3f4f5f6f7f8f9",
+   "okm32": "db7c7f7517ab92b5a090f913d4610cb922fff86200e0242d4bbcf49f9c3e4baa",
+   "why": "okm32 was derived under the D-HKDF-UMBRA salt/info; derivation under D-HKDF-WALLET must not match"
+  }
+ ]
+}

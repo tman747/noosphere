@@ -1,0 +1,406 @@
+{
+ "schema": "noos-crypto/domain-hash-v1",
+ "description": "BLAKE3-256 domain-hash KATs: hash32 = BLAKE3-256(context_string || bytes) for every BLAKE3_CONTEXT row of protocol/spec/crypto-domains-v1.csv. Independently generated with the Python 'blake3' package (v1.0.9).",
+ "cases": [
+  {
+   "name": "d-genesis-params-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-GENESIS-PARAMS",
+   "hash32": "c8307c0c8a25472e2b4c6dd633e46f42fd8002b8dbc87fd26eb711467f4c4396"
+  },
+  {
+   "name": "d-genesis-params-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-GENESIS-PARAMS",
+   "hash32": "d386dc112b73d32ec5a069d01d35b11b906cf7e22dab9c8a9e6a16fa16b5d112"
+  },
+  {
+   "name": "d-chain-id-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-CHAIN-ID",
+   "hash32": "5d8e6310f96d4b9ef872d8e6bd1f7d8441898a4990aee52d2646fbdddbfda557"
+  },
+  {
+   "name": "d-chain-id-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-CHAIN-ID",
+   "hash32": "2ae3f1c79892b24bd00ae6a425266d154aabf58ce9cd219bb89d7e4ff6ea37fe"
+  },
+  {
+   "name": "d-genesis-final-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-GENESIS-FINAL",
+   "hash32": "4cd9a8c1a7b1db6ced1a1b91bef7d8c2285cddea35a3e8d3580415ab04929954"
+  },
+  {
+   "name": "d-genesis-final-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-GENESIS-FINAL",
+   "hash32": "0ce8a4379549f2c35b25615af434c3992ca191aaa99b1be02365fe5f1985a9c2"
+  },
+  {
+   "name": "d-dkg-transcript-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-DKG-TRANSCRIPT",
+   "hash32": "4a9beefc08d6a5fe05ee5b21537c225df8fe95b75054e4cab810585950cdb7b8"
+  },
+  {
+   "name": "d-dkg-transcript-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-DKG-TRANSCRIPT",
+   "hash32": "57097d1f13ae1529e926f5877e8f74ce1984574329f3f164185ad87bc8ce96aa"
+  },
+  {
+   "name": "d-note-id-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NOTE-ID",
+   "hash32": "a59ccf4df34443d60fc85c0ff1ab2d8d4b1bd3b2618f86e4dde1c9d0386b7450"
+  },
+  {
+   "name": "d-note-id-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NOTE-ID",
+   "hash32": "48d5ffda44d75375924c34c60d473c8184790a8755ff4fe0b614dc787d8923ed"
+  },
+  {
+   "name": "d-ground-challenge-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-GROUND-CHALLENGE",
+   "hash32": "2a543a8d5d01549f6b11a7f45d9a7c99fbc8be75342ce57f84eb49f36254e6e6"
+  },
+  {
+   "name": "d-ground-challenge-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-GROUND-CHALLENGE",
+   "hash32": "ac3502f5a2f3be5649c5152d5a7e1096aea787086cea2357474f66aca3b2b496"
+  },
+  {
+   "name": "d-loom-challenge-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-LOOM-CHALLENGE",
+   "hash32": "77d6292930534909cf3bb243e70b521f073b3a07121c31dd09b76e2c0360fd32"
+  },
+  {
+   "name": "d-loom-challenge-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-LOOM-CHALLENGE",
+   "hash32": "0b9c726b6717300b9ccf919ac23eba56bac136b0b4e98238823851b74e3a5404"
+  },
+  {
+   "name": "d-tensor-artifact-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-TENSOR-ARTIFACT",
+   "hash32": "d9db7f9913f6d0448b658e12c3510c7a07f7d3abdf0258e17871b08ea6e682f9"
+  },
+  {
+   "name": "d-tensor-artifact-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-TENSOR-ARTIFACT",
+   "hash32": "4141e556311e049631cf596e46b114904719603d68fb22032a211cecc3a53bb4"
+  },
+  {
+   "name": "d-nel-model-manifest-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NEL-MODEL-MANIFEST",
+   "hash32": "37fcf2c36b439f452cf31f41be8590863f6a400398b64c33ddedd4e2e02cb2c6"
+  },
+  {
+   "name": "d-nel-model-manifest-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NEL-MODEL-MANIFEST",
+   "hash32": "c5b7e20ece0953fdd470e24e4f3a860832a803eef903999c4536f0b12a6011db"
+  },
+  {
+   "name": "d-nel-prompt-job-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NEL-PROMPT-JOB",
+   "hash32": "681a7f811cd4a7db7532d916f6f8fb15a717ecd499ef6985b46d97d4da9a76d2"
+  },
+  {
+   "name": "d-nel-prompt-job-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NEL-PROMPT-JOB",
+   "hash32": "298639837e3445f1118ee6c5914379b7fea197a6a8ee620e1d9285944ee2f752"
+  },
+  {
+   "name": "d-nel-token-state-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NEL-TOKEN-STATE",
+   "hash32": "36111b3a256c669de1e55be22f8753e4eaa522c97846b53d5673311d1afd4e91"
+  },
+  {
+   "name": "d-nel-token-state-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NEL-TOKEN-STATE",
+   "hash32": "6d46ed91ff9f925a736d7914d1fa46d23db1a49ca45aaed76cb2fdfbde435bf2"
+  },
+  {
+   "name": "d-nel-draw-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NEL-DRAW",
+   "hash32": "ffba7a70e88763e3dfbc9424cf6ae6317e4472cd87ab7c1eefc2b185f14ed7d6"
+  },
+  {
+   "name": "d-nel-draw-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NEL-DRAW",
+   "hash32": "a16fa326221a7d96c1334561c6f39ca7ed64fb908837c8fe68581e427e044f48"
+  },
+  {
+   "name": "d-nel-token-claim-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NEL-TOKEN-CLAIM",
+   "hash32": "16349cefb8004d6670c98b8db484221b9bf1c55f9915b84c94d23f9c10eb8fda"
+  },
+  {
+   "name": "d-nel-token-claim-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NEL-TOKEN-CLAIM",
+   "hash32": "fb36936cee4f21787bdbe5684ada397f70cf7b3bbdc8c1b9097cef6699dbeaba"
+  },
+  {
+   "name": "d-nel-chunk-claim-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NEL-CHUNK-CLAIM",
+   "hash32": "7f480935fa4fee2689716271091e46b92dff0a8db42cd0968bad0dd437604c2f"
+  },
+  {
+   "name": "d-nel-chunk-claim-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NEL-CHUNK-CLAIM",
+   "hash32": "86143e125b6bceee27d7ecc322e35c5a0e8e9aa1ade58cae6b6a9adb9d9a687f"
+  },
+  {
+   "name": "d-nel-final-chunk-claim-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NEL-FINAL-CHUNK-CLAIM",
+   "hash32": "ba1e891297e56c573aeb5109bd7e703f2b3c1a32827ee42b3065c56f4f8ce4ba"
+  },
+  {
+   "name": "d-nel-final-chunk-claim-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NEL-FINAL-CHUNK-CLAIM",
+   "hash32": "7d45e5850a482d6e26f13e53b674fbd7ea68cd77dc6c107486351b1c70fceffa"
+  },
+  {
+   "name": "d-nel-anchor-tx-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NEL-ANCHOR-TX",
+   "hash32": "1153f7884c95c17c3aac5e6c0857f9715a0d570d7c5ea470e38f37ed09736428"
+  },
+  {
+   "name": "d-nel-anchor-tx-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NEL-ANCHOR-TX",
+   "hash32": "c89220d8141e525980b669c258c247432efd2dfd7819758f3dd11934d06dcdf8"
+  },
+  {
+   "name": "d-nel-job-receipt-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NEL-JOB-RECEIPT",
+   "hash32": "3df2bdbad03aea72c780c3cd9e5a6fbe31b522177175fbc8e5f1ab7b089e48a1"
+  },
+  {
+   "name": "d-nel-job-receipt-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NEL-JOB-RECEIPT",
+   "hash32": "ae1919f5b460b0844f02ba50a3c0be0a4b0ea0e805f6bd00793e4cf13e307164"
+  },
+  {
+   "name": "d-nel-executor-reg-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NEL-EXECUTOR-REG",
+   "hash32": "e68906fa9585ffe8137dae1ac55cc03fcd07b747c996ee33d2ea3c9d9822750c"
+  },
+  {
+   "name": "d-nel-executor-reg-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NEL-EXECUTOR-REG",
+   "hash32": "2925338045e42286e1b4b649b08bc22394cd41d790257a83457853160f764c01"
+  },
+  {
+   "name": "d-nel-dispute-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NEL-DISPUTE",
+   "hash32": "b90b2a87f44ebf8f8d34615331e3fad59eb323ba3b6bc3e1fb93f7b88b572511"
+  },
+  {
+   "name": "d-nel-dispute-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NEL-DISPUTE",
+   "hash32": "966800f4ccd986335ce156378a54b704461ed728bda2d86d5fb642cbbf07495b"
+  },
+  {
+   "name": "d-nel-bisect-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NEL-BISECT",
+   "hash32": "d13d32f94f720a0678523239cb77c6d93794f08641ac64437332a442b1000d2e"
+  },
+  {
+   "name": "d-nel-bisect-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NEL-BISECT",
+   "hash32": "53849e40ea76aa5823400b42860c1f1c6766d720d81fcb054a64614e77eb42c5"
+  },
+  {
+   "name": "d-nel-leaf-receipt-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-NEL-LEAF-RECEIPT",
+   "hash32": "1f8d006abb8cabcd5bce1da6f9c3deebbb004783ca814eb04847f394b5df48bb"
+  },
+  {
+   "name": "d-nel-leaf-receipt-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-NEL-LEAF-RECEIPT",
+   "hash32": "efde6984873131f82be16f503d6ef56d21784bb3b01ce2bbecb3049ff4b50a69"
+  },
+  {
+   "name": "d-block-header-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-BLOCK-HEADER",
+   "hash32": "97dec6a49fa3741f8dba4f579070cc8ef8b49fd0262b3d9554a43f616a4839f3"
+  },
+  {
+   "name": "d-block-header-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-BLOCK-HEADER",
+   "hash32": "145b6d749843c1f29b01fd2684ad22fea1d4ba3a0fbe139730b309c55d68d343"
+  },
+  {
+   "name": "d-tx-id-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-TX-ID",
+   "hash32": "8ba15cbe45aa76b619352ff68b0cbc3f0b17341c80c70e63b55de33a660553b2"
+  },
+  {
+   "name": "d-tx-id-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-TX-ID",
+   "hash32": "c778c81de2cfa37714bcf2df91c49879269198e5e037a34715ca922637564975"
+  },
+  {
+   "name": "d-tx-wid-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-TX-WID",
+   "hash32": "7e410e5833213605d12a96e458bcb6b82d3710f1fb5ca44f850d7c73696fdd52"
+  },
+  {
+   "name": "d-tx-wid-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-TX-WID",
+   "hash32": "47c45f888417c1ea40f60971f952ab8c3784eb50a4caef471603b0fa6782d8ce"
+  },
+  {
+   "name": "d-smt-leaf-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-SMT-LEAF",
+   "hash32": "ba597d9f2fcb2e302d8852f0bbf34c2548b72fd43707d33aba758886490e00d9"
+  },
+  {
+   "name": "d-smt-leaf-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-SMT-LEAF",
+   "hash32": "ed20bce6a0510adc5716f9d1b96c5b6d439003f75fc013fad88d5b48d91efc8b"
+  },
+  {
+   "name": "d-smt-node-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-SMT-NODE",
+   "hash32": "0873b0fbb974f8ec0418dfb0d24ea2b01377a6d27a4aa8beb4719990932f440b"
+  },
+  {
+   "name": "d-smt-node-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-SMT-NODE",
+   "hash32": "5086208f50eda031efe65e5e8ad138a9e108980c925bc8236c6ccd5cd7fabdc1"
+  },
+  {
+   "name": "d-beacon-commit-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-BEACON-COMMIT",
+   "hash32": "24695b3b6c69f45cf3fcb03b8f4024f8f571740c54f2f3330981d84686252b06"
+  },
+  {
+   "name": "d-beacon-commit-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-BEACON-COMMIT",
+   "hash32": "c7812b63d061a25bdc12c9f2d942fbe60f030411e006adce82ca1e22349a4a95"
+  },
+  {
+   "name": "d-beacon-mix-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-BEACON-MIX",
+   "hash32": "ccf812786d64b24536c054ae10d295b0ca7291d95676c5a2ddb7d08ba8ca10d6"
+  },
+  {
+   "name": "d-beacon-mix-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-BEACON-MIX",
+   "hash32": "d8193c26b72c81c2aa0fbe0cd049ff6c2085a43edc3c948a7ccc0e3426e6b6ae"
+  },
+  {
+   "name": "d-tx-wid-mismatch-under-txid-context",
+   "kind": "negative",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-TX-WID",
+   "hash32": "c778c81de2cfa37714bcf2df91c49879269198e5e037a34715ca922637564975",
+   "why": "digest was computed under the D-TX-ID context; verifying it as D-TX-WID must fail"
+  }
+ ]
+}
