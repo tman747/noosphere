@@ -8,6 +8,7 @@
 
 mod util;
 
+mod claims;
 mod contract_exec;
 mod devnet_finality;
 mod e2e;

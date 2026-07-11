@@ -34,6 +34,7 @@ mod body;
 mod dag;
 mod fork;
 mod header;
+mod keyless;
 
 #[doc(hidden)]
 pub mod vector_gen;
@@ -57,4 +58,8 @@ pub use fork::{u256_saturating_add, ForkScore};
 pub use header::{
     BlockHeaderV1, Bytes48, Bytes96, CheckpointRef, HeaderError, ResourcePriceVectorV1,
     ResourceVectorV1, EPOCH_LENGTH, TAG_GROUND_TICKET_ROOT, TAG_PROPOSER_SIGNATURE, ZERO_ROOT,
+};
+pub use keyless::{
+    DecryptAuthorization, KeylessConsensus, KeylessError, WorkloadKeyCustody,
+    MAX_KEY_COMMITTEE_MEMBERS,
 };

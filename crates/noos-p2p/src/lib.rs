@@ -35,6 +35,7 @@
 
 mod backoff;
 mod envelope;
+mod fault;
 mod frame;
 mod identity;
 mod limits;
@@ -49,6 +50,10 @@ pub use envelope::{
     SnapshotChunkRequestV1, SnapshotReplyV1, TxPushV1, VotePushV1, APP_PROTOCOLS, MAX_BODY_BYTES,
     MAX_HEADER_BYTES, MAX_RANGE_HEADERS, MAX_RECEIPT_BYTES, MAX_SHARD_BYTES,
     MAX_SNAPSHOT_CHUNK_BYTES, MAX_TX_BYTES, MAX_VOTE_BYTES, RANGE_REPLY_BYTE_BUDGET,
+};
+pub use fault::{
+    Delivery, DropReason, WanCase, WAN_FAULT_BOUND, WAN_LATENCY_SWEEP_MS, WAN_LOSS_SWEEP_PERMILLE,
+    WAN_REGION_COUNT, WAN_VALIDATOR_COUNT,
 };
 pub use frame::{
     read_frame, write_frame, write_raw_declared, FrameError, MAX_FRAME_BYTES,

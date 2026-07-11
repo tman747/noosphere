@@ -163,5 +163,6 @@ def run(a):
 def main():
  p=argparse.ArgumentParser();p.add_argument("--generated",type=int,default=100_000);p.add_argument("--parameterized-max",type=int,default=10_000_000);p.add_argument("--seed",type=lambda x:int(x,0),default=0x4E4F4F53);p.add_argument("--start",type=int,default=0);p.add_argument("--max-mismatches",type=int,default=10);p.add_argument("--restart-every",type=int,default=25_000);p.add_argument("--process-matrix",action=argparse.BooleanOptionalAction,default=True);a=p.parse_args()
  if min(a.generated,a.parameterized_max,a.max_mismatches)<1 or a.start<0:p.error("counts must be positive and start non-negative")
+ if a.generated>a.parameterized_max:p.error("--generated exceeds the declared parameterized maximum")
  return run(a)
 if __name__=="__main__":raise SystemExit(main())

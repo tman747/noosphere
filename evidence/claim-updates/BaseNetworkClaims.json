@@ -1,0 +1,33 @@
+{
+  "claims": {
+    "A-KEYLESS-CONSENSUS": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-braid", "noos-node"],
+      "command": "python tools/gates/run_base_network_claim.py --claim A-KEYLESS-CONSENSUS",
+      "rollback_command": "python tools/gates/run_base_network_claim.py --claim A-KEYLESS-CONSENSUS --rollback-check",
+      "notes": "KeylessConsensus makes a universal decrypt scope and secret key/share bytes unrepresentable in consensus state: client-held custody has no consensus authorization path; threshold custody is workload-scoped, member-bounded, exact-key-epoch, expiring, and counts distinct authenticated holders only. Exhaustive adaptive-corruption subsets reject below threshold; duplicate/foreign/old shares reject; rotation succeeds while a real NodeCore continues ordinary transfers, block production, and checkpoint finality with every optional lane disabled. The policy authorizes an opaque event only and never performs or stores decryption."
+    },
+    "E-BASE-01": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-node"],
+      "command": "python tools/gates/run_base_network_claim.py --claim E-BASE-01 --generated 10000",
+      "rollback_command": "python tools/gates/run_base_network_claim.py --claim E-BASE-01 --rollback-check",
+      "notes": "Executable local precursor: parameterized differential gate accepts 1..10^7 generated cases and compares separate Rust/Go processes with a local arbitrary-precision Python oracle and AA/AB/BA/BB matrix. Dedicated real NodeCore falsifiers cover durable restart with exact state/finality recovery, finalized snapshot reconstruction, deterministic below-finality reorg, and production-wire unknown-mandatory-field rejection. PARTIAL: the full 10^7 run is not claimed by a smaller invocation, management/authorship/review are not independent in this worktree, and no local process can self-certify those external properties."
+    },
+    "E-BLACKOUT-01": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-node"],
+      "command": "python tools/gates/run_base_network_claim.py --claim E-BLACKOUT-01",
+      "rollback_command": "python tools/gates/run_base_network_claim.py --claim E-BLACKOUT-01 --rollback-check",
+      "notes": "Real NodeCore precursor starts with controls_bits=0 (all optional lanes disabled), settles ordinary Lumen transfers before and after epoch boundaries, produces Ground-paced blocks, rotates the narrow key policy without interruption, and finalizes every block old enough for the one-epoch FFG lag. PARTIAL: this invocation does not claim 30 simulated days, seven public-testnet days, a separately operated maximum-load NEL service fleet killed mid-window, or repeated post-release external runs."
+    },
+    "E-WAN-01": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-p2p", "noos-node"],
+      "command": "python tools/gates/run_base_network_claim.py --claim E-WAN-01",
+      "rollback_command": "python tools/gates/run_base_network_claim.py --claim E-WAN-01 --rollback-check",
+      "notes": "Deterministic P2P fault scheduler covers the exact latency endpoints/cross-sweep 50,200,400,800 ms and loss 0,2,5,10%, reordering, bandwidth asymmetry, validator crash, DA withholding, regional eclipse, an in-bound minority partition, and minority-only AI reachability metadata for 10 validators/fault bound 3. Real production header envelopes and DA shards are fed to four NodeCore views; unavailable blocks park without finality, targeted repair heals eclipse/partition, ordinary state and finalized checkpoints converge, and conflicting finality is exactly zero within two epochs. NodeCore now binds future-drift validation to genesis and exercises {12000,18000,30000}, selecting 12000 as the smallest passing value. PARTIAL: no four external regions/independent carriers, real six-hour partition, external operators, or public elapsed duration were available."
+    }
+  },
+  "notes": "Base-network claim cluster: real local keyless policy and deterministic NodeCore/P2P behavior/falsifier precursors. External independence, operators, carriers, regions, and duration are explicitly not claimed."
+}

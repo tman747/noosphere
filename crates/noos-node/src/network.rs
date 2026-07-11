@@ -66,7 +66,10 @@ fn decode_header_ticket(bytes: &[u8]) -> Result<(BlockHeaderV1, GroundTicketV1),
     Ok((header, ticket))
 }
 
-fn encode_header_ticket(header: &BlockHeaderV1, ticket: &GroundTicketV1) -> Vec<u8> {
+/// Encodes the production header-announcement payload consumed by
+/// [`decode_header_announce`].  Deterministic fault harnesses use this exact
+/// boundary rather than inventing a simulation-only message shape.
+pub fn encode_header_announce(header: &BlockHeaderV1, ticket: &GroundTicketV1) -> Vec<u8> {
     let mut bytes = header.encode_canonical();
     bytes.extend_from_slice(&ticket.encode());
     bytes
@@ -209,7 +212,7 @@ impl P2pNetworkEdge {
     /// [`NetworkEdge::announce_header`] wraps the same wire form for the
     /// consensus thread).
     pub async fn push_header(&self, header: &BlockHeaderV1, ticket: &GroundTicketV1) {
-        let bytes = encode_header_ticket(header, ticket);
+        let bytes = encode_header_announce(header, ticket);
         for peer in self.peers() {
             let _ = self.handle.announce_header(peer, bytes.clone()).await;
         }
@@ -288,7 +291,7 @@ impl NetworkEdge for P2pNetworkEdge {
     }
 
     fn announce_header(&mut self, header: &BlockHeaderV1, ticket: &GroundTicketV1) {
-        let bytes = encode_header_ticket(header, ticket);
+        let bytes = encode_header_announce(header, ticket);
         for peer in self.peers() {
             let _ = self
                 .runtime

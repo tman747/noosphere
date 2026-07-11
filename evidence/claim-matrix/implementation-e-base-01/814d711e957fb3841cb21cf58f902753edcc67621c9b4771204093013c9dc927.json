@@ -1,0 +1,157 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "C:\\Users\\ntrap\\AppData\\Local\\Programs\\Python\\Python310\\python.exe",
+          "tools/gates/differential_transitions.py",
+          "--generated",
+          "10000",
+          "--parameterized-max",
+          "10000000",
+          "--restart-every",
+          "10000",
+          "--process-matrix"
+        ],
+        "exit_code": 0,
+        "stdout_sha256": "5feb6910b6a12b8a2f104405424eed4d0e5c27b86b4843c3674064a8db99025c"
+      },
+      "name": "deterministic behavior/falsifier precursor",
+      "passed": true
+    },
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-node",
+          "e2e_happy_path_finality_and_restart_recovery",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "stdout_sha256": "6271c8b210f37cc74534df325d314166a005c1ce5420840cf447130a07651354"
+      },
+      "name": "deterministic behavior/falsifier precursor",
+      "passed": true
+    },
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-node",
+          "snapshot_sync_assembles_from_multiple_sources_and_recovers_state",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "stdout_sha256": "eec08075db841133f33649cdb1d6b8c94e1a9df69873e407e9535c3c8613e791"
+      },
+      "name": "deterministic behavior/falsifier precursor",
+      "passed": true
+    },
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-node",
+          "reorg_below_finality_rolls_back_and_replays",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "stdout_sha256": "48255163cfa158f639eb18951cd1d557be229b3e6f9056b653bb138e6a471768"
+      },
+      "name": "deterministic behavior/falsifier precursor",
+      "passed": true
+    },
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-node",
+          "claim_e_base_unknown_fields_fail_closed_on_the_production_wire",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "stdout_sha256": "6aa7a44a284210ef3bda97536c9dd62f3ff239f3652885c69028f0f6755981e6"
+      },
+      "name": "deterministic behavior/falsifier precursor",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-BASE-01": "0e78af0886c5f852119c878f2e18dc78d79e063eaa0c2424eeed3867d7a4efaf"
+  },
+  "claims": [
+    "E-BASE-01"
+  ],
+  "command": [
+    "tools/gates/run_base_network_claim.py",
+    "--claim",
+    "E-BASE-01",
+    "--generated",
+    "10000"
+  ],
+  "evidence_sha256": "814d711e957fb3841cb21cf58f902753edcc67621c9b4771204093013c9dc927",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-e-base-01",
+  "limitations": [
+    "Evidence exercises real local NodeCore/P2P paths; it is not external evidence.",
+    "This run exercised 10000 of the required 10000000 generated transitions.",
+    "The Rust and Go clients are separate codebases/processes but are not independently managed for this run.",
+    "The Python small-state oracle is local and cannot self-certify independent authorship or review."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-braid/src/keyless.rs": "bf81aebe61f1460b3e547b570e6a522c91f84c7791fa1ae852d778b2731bfd0a",
+    "crates/noos-braid/src/lib.rs": "f65a0aac3f4245f5d97f2c6f632596eb40f07efaf007dd85317503f6ec52ef61",
+    "crates/noos-node/src/consensus.rs": "c23d62739d7d43b68f275faefc3f14d56819642338f1703e55685f93acc3c591",
+    "crates/noos-node/src/network.rs": "6af96394dc03c2403c8c5b0e5babb33db4a50d19bb394e3abefaa9a2dea70e27",
+    "crates/noos-node/src/tests/claims.rs": "d78ec4279db0918b9aed17c27cead3a853f63f283ec763d507cff501cf3b00bf",
+    "crates/noos-node/src/tests/e2e.rs": "ab6e82f054257bae31c3008d18944d5964a7752c98cf8853a65468d4d953caad",
+    "crates/noos-node/src/tests/import_matrix.rs": "a042a500d331ad37011f2a8cc77a749b133bba50fbb523468180e785c6b3528f",
+    "crates/noos-node/src/tests/sync_tests.rs": "0cdb72d4b3c964ef7d7803bfdf414e6bc2b2dc9ebdb8bd15cc14075e82f9bf2a",
+    "crates/noos-p2p/src/fault.rs": "8e29557f117d51f6463764ef1d00f4abe5ef1ff7a97a78d23270e1d3cf4ae967",
+    "crates/noos-p2p/src/lib.rs": "c8fc77855aa7876fc6390b4927e7df948c3ef9799b91fe270a4c3b3433523a14",
+    "tools/gates/differential_transitions.py": "e8eb550e432b6d00860f0184048ea142f454be2243cbde509f4b53027804d940",
+    "tools/gates/run_base_network_claim.py": "2c281fa7bae3e38d21e1cff3a3a2b33695878562a884749bbc7e19b03b29ea45"
+  }
+}
