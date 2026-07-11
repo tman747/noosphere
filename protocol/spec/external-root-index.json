@@ -1,0 +1,518 @@
+{
+ "schema_version": 1,
+ "generated_by": "tools/inventory/crawl_sources.py",
+ "verification_ledger": "C:/tmp/noosphere/VERIFICATION-2026-07-11.md",
+ "verification_roots": [
+  "weft-v0",
+  "chorus-quorum-lab",
+  "nel-quarantine-lab",
+  "dream-lane",
+  "nel-real-inference",
+  "nel-dispute-ladder",
+  "noosphere/research/nel-quant",
+  "frontier-lab/math",
+  "swarm-agent-sim",
+  "reflex-lane-lab",
+  "gate1-gpu-lab",
+  "class-gate-lab",
+  "reflex-fraud-lab",
+  "oracle-court-lab",
+  "gradient-market-lab",
+  "demand-wash-lab"
+ ],
+ "explicit_required_roots": [
+  "kt-verification-ladder",
+  "nel-private-inference-lab"
+ ],
+ "root_count": 26,
+ "roots": [
+  {
+   "root": "weft-v0",
+   "resolved_path": "C:/tmp/weft-v0",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 30,
+   "aggregate_sha256": "e1b49a5340666bc8c29bb67cb286bbedad9d5f318dcf1d4f6d826d227886145c",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "E-WEFT-01a",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "04-addendum-A.md",
+    "10-competitive-audit.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "chorus-quorum-lab",
+   "resolved_path": "C:/tmp/chorus-quorum-lab",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 3,
+   "aggregate_sha256": "6a676c2c676551432d7ff0d7cc8d6c51c13e0cf6dc8dfdfe29a2fa4d71229051",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "M-LINEAGE-QUORUM",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "04-addendum-A.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "nel-quarantine-lab",
+   "resolved_path": "C:/tmp/nel-quarantine-lab",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 3,
+   "aggregate_sha256": "4b4131471cef0aef1f3b0de327adc0e97665d681c21f9c4b7132499a74b1c3dc",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "M-QUARANTINE-SETTLE",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "04-addendum-A.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "dream-lane",
+   "resolved_path": "C:/tmp/dream-lane",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 11,
+   "aggregate_sha256": "ff381b42a87e338f517b374e81e7b97f194e157e82d827349fb64e4ab7aedf51",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "E-DREAM-02",
+   "mechanism_disposition": "KILLED",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "03-living-model.md",
+    "04-addendum-A.md",
+    "04-experiments-and-falsifiers.md",
+    "09-the-identity.md",
+    "10-competitive-audit.md",
+    "README.md"
+   ],
+   "required": true,
+   "per_file_entries": true,
+   "notes": "E-DREAM-02 preregistered KILL 2026-07-10; lane stays dead; files retained as evidence."
+  },
+  {
+   "root": "nel-real-inference",
+   "resolved_path": "C:/tmp/nel-real-inference",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 64,
+   "aggregate_sha256": "7e8bcee4a8f95b1daa6e665ffe92ab4d6a643bc1652c4899733bcd59cb6e325d",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "E-NEL-01a",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "04-addendum-A.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "nel-dispute-ladder",
+   "resolved_path": "C:/tmp/nel-dispute-ladder",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 9,
+   "aggregate_sha256": "6efc3522c21e281b8e3affde2a883813af4fe3c547da737706fb4eceb61aa0fc",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "E-NEL-01",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "05-neural-lane.md",
+    "10-competitive-audit.md",
+    "README.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "noosphere/research/nel-quant",
+   "resolved_path": "C:/tmp/noosphere/research/nel-quant",
+   "exists": true,
+   "resolved_via": "corpus-internal",
+   "file_count": 3,
+   "aggregate_sha256": "c7d6a6d1de6ffd705c6fe14c65290825cb5674fc915ec27eadd2e87fa27fc341",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "E-NEL-01",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "frontier-lab/math",
+   "resolved_path": "C:/tmp/frontier-lab/math",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 4,
+   "aggregate_sha256": "85de6dcabbaa8ea204e0c57d5d8eb3a4f0eeb73b80c302cb7f318b0ccfaf1498",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "M-HDF-ENERGY",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "swarm-agent-sim",
+   "resolved_path": "C:/tmp/swarm-agent-sim",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 7,
+   "aggregate_sha256": "b2d5f63bab07661e2bb9bf88604f78b382d2089c3eeb7c821aa41af5fed31d65",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "S-SWARM",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "07-hearth-and-swarm.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "reflex-lane-lab",
+   "resolved_path": "C:/tmp/reflex-lane-lab",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 5,
+   "aggregate_sha256": "c8e6887cbda0eff40328215d3e433fefba409d9e2cb87eef98f655e5fe0a363c",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "E-REFLEX-02",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "04-addendum-A.md"
+   ],
+   "required": true,
+   "per_file_entries": true,
+   "notes": "Contains WITHDRAWN v1 instrument reflex_sim.py (zero evidentiary weight) alongside passing rebuilt reflex_sim_v2.py."
+  },
+  {
+   "root": "gate1-gpu-lab",
+   "resolved_path": "C:/tmp/gate1-gpu-lab",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 2,
+   "aggregate_sha256": "70679f352d0fa5baec49008af605c2fd6b3f378d0830af14f14140dfa81c7cb1",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "E-NEL-01b",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "04-addendum-A.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "class-gate-lab",
+   "resolved_path": "C:/tmp/class-gate-lab",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 2,
+   "aggregate_sha256": "8b4c71d36003948c466be66e6b4fc2c0cc94b2673cff0e8639112c1e299f1bc4",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "A-CLASS-GATE.v2",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "04-addendum-A.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "reflex-fraud-lab",
+   "resolved_path": "C:/tmp/reflex-fraud-lab",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 2,
+   "aggregate_sha256": "e73a4b5734398946721f717a545e9b68af1b9dc9480af7529e3dadd4a4be052b",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "A-REFLEX-F9",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "04-addendum-A.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "oracle-court-lab",
+   "resolved_path": "C:/tmp/oracle-court-lab",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 2,
+   "aggregate_sha256": "6c4cbe9cb69c02a7c96e3a437b6374e283a70aa2d1cf2a4a28a8941f5665ad42",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "E-ORACLE-01",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "04-addendum-A.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "gradient-market-lab",
+   "resolved_path": "C:/tmp/gradient-market-lab",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 4,
+   "aggregate_sha256": "39249e532b24c0586693eb0c45f86c1e0929f893f69c8b8d76ba67e750c1d5b1",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "E-GRAD-01",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "04-addendum-A.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "demand-wash-lab",
+   "resolved_path": "C:/tmp/demand-wash-lab",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 4,
+   "aggregate_sha256": "f13780a515f50917bccbce4068b81736d7609c45b51cfa83b1f0b9bcc3f9403d",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "E-DEMAND-WASH-01",
+   "mechanism_disposition": "KILLED",
+   "referenced_by": [
+    "VERIFICATION-2026-07-11.md",
+    "04-addendum-A.md"
+   ],
+   "required": true,
+   "per_file_entries": true,
+   "notes": "E-DEMAND-WASH-01 preregistered KILL for consensus activation 2026-07-10; shadow accounting only."
+  },
+  {
+   "root": "kt-verification-ladder",
+   "resolved_path": "C:/tmp/kt-verification-ladder",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 9,
+   "aggregate_sha256": "dbc09d0bc9ceca2b7ee3fa7621d64550009e2121e840479cb400e97af63d0f06",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "E-NEL-01",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "05-neural-lane.md",
+    "06-weft-language.md",
+    "07-hearth-and-swarm.md",
+    "10-competitive-audit.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "nel-private-inference-lab",
+   "resolved_path": "C:/tmp/nel-private-inference-lab",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 17,
+   "aggregate_sha256": "41459ca677399eac54675f22b44c7b155f6a0864c2ab8760eb71e0b708ed8249",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "E-NEL-PRIVATE-01",
+   "mechanism_disposition": "PARTIAL",
+   "referenced_by": [
+    "04-addendum-A.md",
+    "11-private-inference-fiber.md"
+   ],
+   "required": true,
+   "per_file_entries": true
+  },
+  {
+   "root": "NCK",
+   "resolved_path": "C:/tmp/nockchain-octra-ai-research-handoff/L1-plans/NOCKCHAIN",
+   "exists": true,
+   "resolved_via": "alias",
+   "file_count": 14,
+   "aggregate_sha256": "4f9fe9042f5d4d316def94d8ca204587c75df49a5c03b313196c7ba0489cfda6",
+   "classification": "EVIDENCE",
+   "source_role": "competitor-audit-corpus",
+   "owning_mechanism": null,
+   "mechanism_disposition": null,
+   "referenced_by": [
+    "10-competitive-audit.md"
+   ],
+   "required": false,
+   "per_file_entries": true,
+   "notes": "Nockchain competitor audit corpus (chapter 10 shorthand NCK/), delivered under nockchain-octra-ai-research-handoff/L1-plans/NOCKCHAIN."
+  },
+  {
+   "root": "OCT",
+   "resolved_path": "C:/tmp/nockchain-octra-ai-research-handoff/L1-plans/OCTRA",
+   "exists": true,
+   "resolved_via": "alias",
+   "file_count": 18,
+   "aggregate_sha256": "37227651f2c81f2313b078e5975b914a84294014162c4e65f6d673f5d2f226e6",
+   "classification": "EVIDENCE",
+   "source_role": "competitor-audit-corpus",
+   "owning_mechanism": null,
+   "mechanism_disposition": null,
+   "referenced_by": [
+    "10-competitive-audit.md"
+   ],
+   "required": false,
+   "per_file_entries": true,
+   "notes": "Octra competitor audit corpus (chapter 10 shorthand OCT/), delivered under nockchain-octra-ai-research-handoff/L1-plans/OCTRA."
+  },
+  {
+   "root": "decentralized-ai-l1-experiment",
+   "resolved_path": "C:/tmp/decentralized-ai-l1-experiment",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 789,
+   "aggregate_sha256": "d8de835930cebd87107d18b5d8ab10ec97713cba1c3eac3dc4daaafc63f6de44",
+   "classification": "HISTORICAL",
+   "source_role": "historical-design-experiment",
+   "owning_mechanism": null,
+   "mechanism_disposition": null,
+   "referenced_by": [
+    "08-memetics-and-launch.md"
+   ],
+   "required": false,
+   "per_file_entries": true,
+   "notes": "Predecessor design experiment cited by chapter 08; historical input, no implementation action."
+  },
+  {
+   "root": "frontier-lab",
+   "resolved_path": "C:/tmp/frontier-lab",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 13,
+   "aggregate_sha256": "1852427dd6d7f1d3423928b7db777e2b29c834001d4986267d99744780a369d4",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "M-HDF-ENERGY",
+   "mechanism_disposition": "PASS",
+   "referenced_by": [
+    "02-mathematics.md",
+    "10-competitive-audit.md",
+    "README.md"
+   ],
+   "required": false,
+   "per_file_entries": true,
+   "notes": "Superset of the VERIFICATION-named frontier-lab/math root (adds gpu-conformance and red-team)."
+  },
+  {
+   "root": "l1-blockchain",
+   "resolved_path": "C:/tmp/l1-blockchain",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 8375,
+   "aggregate_sha256": "71fc1bf0a470839c30a7809c936856a9be81b291679335719e9167e582a94314",
+   "classification": "EVIDENCE",
+   "source_role": "memetics-research-corpus",
+   "owning_mechanism": null,
+   "mechanism_disposition": null,
+   "referenced_by": [
+    "08-memetics-and-launch.md",
+    "10-competitive-audit.md"
+   ],
+   "required": false,
+   "per_file_entries": false,
+   "skipped_unreadable": [
+    {
+     "path": "C:/tmp/l1-blockchain/raw/nock_deep/hoon/common/hoon.hoon",
+     "reason": "unreadable: The file cannot be accessed by the system"
+    }
+   ],
+   "notes": "Raw memetics/due-diligence corpus cited by chapter 08; bulk root, aggregate hash only."
+  },
+  {
+   "root": "nockchain-octra-ai-research-handoff",
+   "resolved_path": "C:/tmp/nockchain-octra-ai-research-handoff",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 748,
+   "aggregate_sha256": "e359a6589937245b7118d4ad6ea9df75efaebbd66f427d57a0be0dedc278f3fd",
+   "classification": "EVIDENCE",
+   "source_role": "competitor-audit-corpus",
+   "owning_mechanism": null,
+   "mechanism_disposition": null,
+   "referenced_by": [
+    "08-memetics-and-launch.md",
+    "10-competitive-audit.md"
+   ],
+   "required": false,
+   "per_file_entries": true
+  },
+  {
+   "root": "research",
+   "resolved_path": "C:/tmp/research",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 3,
+   "aggregate_sha256": "1b35da556046a4ddc50c11ff6f3ad2f117ac69fb58dadd62805bcbe3f4c74489",
+   "classification": "EVIDENCE",
+   "source_role": "research-survey",
+   "owning_mechanism": null,
+   "mechanism_disposition": null,
+   "referenced_by": [
+    "10-competitive-audit.md"
+   ],
+   "required": false,
+   "per_file_entries": true
+  },
+  {
+   "root": "zkvm-port",
+   "resolved_path": "C:/tmp/zkvm-port",
+   "exists": true,
+   "resolved_via": "C:/tmp",
+   "file_count": 8853,
+   "aggregate_sha256": "c854ebecba71e24c2a87b5bb78c7dbe20b30a3938da715f98c5e5eaa1b98bc8a",
+   "classification": "EVIDENCE",
+   "source_role": "lab-artifact",
+   "owning_mechanism": "E-NEL-01",
+   "mechanism_disposition": "PARTIAL",
+   "referenced_by": [
+    "10-competitive-audit.md"
+   ],
+   "required": false,
+   "per_file_entries": false,
+   "notes": "RISC Zero span-verify port cited by chapter 10 (288 B Groth16 settlement receipt); bulk root (build target/ retained), aggregate hash only."
+  }
+ ],
+ "missing_roots": []
+}
