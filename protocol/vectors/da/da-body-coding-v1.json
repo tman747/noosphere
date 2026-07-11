@@ -1,0 +1,55 @@
+{
+  "schema": "noos-da/body-coding-v1",
+  "cases": [
+    {
+      "name": "coding-empty-body",
+      "kind": "positive",
+      "bytes": "",
+      "content_root": "47fbfa42831a611654553f4a8c7cec8d72d9591f5957929d122a262579225dc2",
+      "shard_root": "471b59ae8a746c9216f53de021a52e17ae1d52da088323c1b866ea2d5725fa66",
+      "note": "zero-length body: 16 all-zero data shards, still committed"
+    },
+    {
+      "name": "coding-one-byte",
+      "kind": "positive",
+      "bytes": "07",
+      "content_root": "0f518da71cffdb25090fb661a6c5d69cb0f875cf6048321c6ec65b103144b6b7",
+      "shard_root": "4b211a60064f1e5ed54711b4b60de7442605c4b198f970e2c64e85bbf5f5334e",
+      "note": "one byte then 1,048,575 zero-padding bytes"
+    },
+    {
+      "name": "coding-small-inline",
+      "kind": "positive",
+      "bytes": "0726456483a2c1e004234261809fbedd01203f5e7d9cbbdaf91d3c5b7a99b8d7f61a39587796b5d4f31736557493b2d1f01433527190afceed11304f6e8daccbea0e2d4c6b8aa9c8e70b2a496887a6c5e40827466584a3c2e10524436281a0bfde0221405f7e9dbcdbfa1e3d5c7b9ab9d8f71b3a597897b6d5f41837567594b3d2f11534537291b0cfee1231506f8eadcceb0f2e4d6c8baac9e80c2b4a6988a7c6e50928476685a4c3e20625446382a1c0df032241607f9ebddc001f3e5d7c9bbad9f81c3b5a7998",
+      "content_root": "bb1d754c55e231ad4528bc3d268f5495eaa28df21ad8cc2755ce7c32335e9d9c",
+      "shard_root": "429b94e8da0e654df7c3c1bce4c3096f1998ca3202740b5ccc7435797ac76b1a",
+      "note": "200 patterned bytes carried inline"
+    },
+    {
+      "name": "coding-exact-one-shard",
+      "kind": "positive",
+      "bytes": "",
+      "content_root": "b5e4b542bb75e19d5a97f5583b234e3a19089f7ebee4f9af27d18409cad15df1",
+      "shard_root": "15c03ca2910c3b22558189005760cbbd29e4d6a6afa00a878c0af5f1b963d708",
+      "body_len": "65536",
+      "note": "body exactly fills data shard 0; shards 1..16 all zero"
+    },
+    {
+      "name": "coding-exact-max",
+      "kind": "positive",
+      "bytes": "",
+      "content_root": "598a888c1fc117159ce36dadf24c436f1680674dbb5f28ce9b88e54d1440bd66",
+      "shard_root": "84f6105b1231904f32a604b9d5c8dcaa8f3f3cd568a60ce21c18833785d5588b",
+      "body_len": "1048576",
+      "note": "body exactly fills all 16 data shards; zero padding bytes"
+    },
+    {
+      "name": "coding-max-plus-one",
+      "kind": "negative",
+      "bytes": "",
+      "body_len": "1048577",
+      "error_class": "body_too_large",
+      "note": "1,048,577 bytes exceed the 16 x 64 KiB data capacity"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "schema": "noos-da/shard-sample-v1",
+  "cases": [
+    {
+      "name": "sample-data-shard-valid",
+      "kind": "positive",
+      "bytes": "03000000599a5b6740f231a4140e38f065648c07420cbee93a4cbd798613c75f89eaf9cd1a282c6322027c384a3a199f3476446696e2c4fd200a552931d40ce8f95dc2e9b32a4110a85e627e4b0f4e1ed3de161e8e24fa373749b4fbbacdebc138fa10ff57822a505a897d0c25819371c5fe6dd75adee870e92bb82ea638977e334c3ca3307cb6be286c418b510dfee917544f396aad73c56dae948a63e4e8b2fc1ea7a9",
+      "content_root": "d794cb73add755febaf27833f3fc10477df2d15b5453e9b0b69836958c2e34d4",
+      "shard_root": "aaa10a899b69125ecc42e0a43d3c038c9bbc26c86eb9ccd350d59991490b9403",
+      "body_len": "100000",
+      "note": "honest branch for data shard 3 verifies; OPINION only, never acceptance"
+    },
+    {
+      "name": "sample-parity-shard-valid",
+      "kind": "positive",
+      "bytes": "1f00000042f9d3af726f68641d43f3fd8dc738d36853a42b11cf7182dd58d927d69c951a0f81958ca66c3d60ee44006c2ac00832562a1f175647a41d32a6377470d0c215448f24ae0c279848bb5e171491f347220f6d8439450b6ceed08aed9fd168897f65d1fb8dfae7971e196d47fbce0af9e2f8c1cdc7482cdf5a6dfcffb6ffbe442fc8979de194db03033c1039a0888a31918c8db1fbea18826474e5b6b9e60d5187",
+      "content_root": "d794cb73add755febaf27833f3fc10477df2d15b5453e9b0b69836958c2e34d4",
+      "shard_root": "aaa10a899b69125ecc42e0a43d3c038c9bbc26c86eb9ccd350d59991490b9403",
+      "body_len": "100000",
+      "note": "honest branch for the last parity shard verifies"
+    },
+    {
+      "name": "sample-tampered-shard",
+      "kind": "negative",
+      "bytes": "050000002bb3148197b53f3fab8ffa4be1b101fece82985c6728989ac9192d7a2a2768f136ae3362eee6e8421c0ba889e2ebbe2f13315776c5188dc8850db35d160a6266cb7fb7552e100a8a9a15e7821167ebdee5d52f01635bdaa059ae1931f2dd6d5e57822a505a897d0c25819371c5fe6dd75adee870e92bb82ea638977e334c3ca3307cb6be286c418b510dfee917544f396aad73c56dae948a63e4e8b2fc1ea7a9",
+      "content_root": "d794cb73add755febaf27833f3fc10477df2d15b5453e9b0b69836958c2e34d4",
+      "shard_root": "aaa10a899b69125ecc42e0a43d3c038c9bbc26c86eb9ccd350d59991490b9403",
+      "body_len": "100000",
+      "tamper": "flip_shard_byte",
+      "error_class": "shard_proof_mismatch",
+      "note": "first shard byte flipped by the executor: leaf changes, branch fails"
+    },
+    {
+      "name": "sample-tampered-branch",
+      "kind": "negative",
+      "bytes": "050000002ab3148197b53f3fab8ffa4be1b101fece82985c6728989ac9192d7a2a2768f136ae3362eee6e8421c0ba889e2ebbe2f13315776c5188dc8850db35d160a6266cb7fb7552e100a8a9a15e7821167ebdee5d52f01635bdaa059ae1931f2dd6d5e57822a505a897d0c25819371c5fe6dd75adee870e92bb82ea638977e334c3ca3307cb6be286c418b510dfee917544f396aad73c56dae948a63e4e8b2fc1ea7a9",
+      "content_root": "d794cb73add755febaf27833f3fc10477df2d15b5453e9b0b69836958c2e34d4",
+      "shard_root": "aaa10a899b69125ecc42e0a43d3c038c9bbc26c86eb9ccd350d59991490b9403",
+      "body_len": "100000",
+      "error_class": "shard_proof_mismatch",
+      "note": "level-0 sibling hash flipped inside the carried branch"
+    },
+    {
+      "name": "sample-index-out-of-range",
+      "kind": "negative",
+      "bytes": "2000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "content_root": "d794cb73add755febaf27833f3fc10477df2d15b5453e9b0b69836958c2e34d4",
+      "shard_root": "aaa10a899b69125ecc42e0a43d3c038c9bbc26c86eb9ccd350d59991490b9403",
+      "body_len": "100000",
+      "error_class": "shard_index_out_of_range",
+      "note": "index 32 outside 0..32 rejects before any hashing"
+    },
+    {
+      "name": "sample-transplanted-content-root",
+      "kind": "negative",
+      "bytes": "03000000599a5b6740f231a4140e38f065648c07420cbee93a4cbd798613c75f89eaf9cd1a282c6322027c384a3a199f3476446696e2c4fd200a552931d40ce8f95dc2e9b32a4110a85e627e4b0f4e1ed3de161e8e24fa373749b4fbbacdebc138fa10ff57822a505a897d0c25819371c5fe6dd75adee870e92bb82ea638977e334c3ca3307cb6be286c418b510dfee917544f396aad73c56dae948a63e4e8b2fc1ea7a9",
+      "content_root": "d794cb73add755febaf27833f3fc10477df2d15b5453e9b0b69836958c2e34d4",
+      "shard_root": "aaa10a899b69125ecc42e0a43d3c038c9bbc26c86eb9ccd350d59991490b9403",
+      "body_len": "100000",
+      "tamper": "foreign_content_root",
+      "error_class": "shard_proof_mismatch",
+      "note": "verifying under a foreign content root: the leaf binding breaks"
+    }
+  ]
+}

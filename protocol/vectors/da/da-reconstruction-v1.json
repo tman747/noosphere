@@ -1,0 +1,127 @@
+{
+  "schema": "noos-da/reconstruction-v1",
+  "cases": [
+    {
+      "name": "reconstruct-all-data",
+      "kind": "positive",
+      "bytes": "",
+      "content_root": "b77743b706875dbbd8a8cd25cc8b8a48ad44adda44789635eede58bfe661b899",
+      "shard_root": "f1e039cd3aaaf55e3140e99b749ceb2c7e67dd8a16202e7e60c05ceedd4a6e3d",
+      "body_len": "300000",
+      "subset": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15",
+      "note": "all 16 data shards: pure passthrough reconstruction"
+    },
+    {
+      "name": "reconstruct-all-parity",
+      "kind": "positive",
+      "bytes": "",
+      "content_root": "b77743b706875dbbd8a8cd25cc8b8a48ad44adda44789635eede58bfe661b899",
+      "shard_root": "f1e039cd3aaaf55e3140e99b749ceb2c7e67dd8a16202e7e60c05ceedd4a6e3d",
+      "body_len": "300000",
+      "subset": "16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "note": "all 16 parity shards: full erasure decode"
+    },
+    {
+      "name": "reconstruct-mixed",
+      "kind": "positive",
+      "bytes": "",
+      "content_root": "b77743b706875dbbd8a8cd25cc8b8a48ad44adda44789635eede58bfe661b899",
+      "shard_root": "f1e039cd3aaaf55e3140e99b749ceb2c7e67dd8a16202e7e60c05ceedd4a6e3d",
+      "body_len": "300000",
+      "subset": "0,3,5,6,9,11,13,14,17,19,21,22,25,27,29,30",
+      "note": "8 data + 8 parity shards"
+    },
+    {
+      "name": "reconstruct-duplicate-candidates",
+      "kind": "positive",
+      "bytes": "",
+      "content_root": "b77743b706875dbbd8a8cd25cc8b8a48ad44adda44789635eede58bfe661b899",
+      "shard_root": "f1e039cd3aaaf55e3140e99b749ceb2c7e67dd8a16202e7e60c05ceedd4a6e3d",
+      "body_len": "300000",
+      "subset": "0,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,15",
+      "note": "duplicate submissions of one index count once and stay harmless"
+    },
+    {
+      "name": "reconstruct-fifteen-shards",
+      "kind": "negative",
+      "bytes": "",
+      "content_root": "b77743b706875dbbd8a8cd25cc8b8a48ad44adda44789635eede58bfe661b899",
+      "shard_root": "f1e039cd3aaaf55e3140e99b749ceb2c7e67dd8a16202e7e60c05ceedd4a6e3d",
+      "body_len": "300000",
+      "subset": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14",
+      "error_class": "not_enough_valid_shards",
+      "note": "15 valid shards are typed unavailability, never a partial body"
+    },
+    {
+      "name": "reconstruct-corrupt-shard-dropped",
+      "kind": "positive",
+      "bytes": "",
+      "content_root": "b77743b706875dbbd8a8cd25cc8b8a48ad44adda44789635eede58bfe661b899",
+      "shard_root": "f1e039cd3aaaf55e3140e99b749ceb2c7e67dd8a16202e7e60c05ceedd4a6e3d",
+      "body_len": "300000",
+      "subset": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16",
+      "tamper": "corrupt_first_candidate",
+      "note": "17 candidates, first corrupted: it is rejected individually and the rest reconstruct"
+    },
+    {
+      "name": "reconstruct-corrupt-shard-starves",
+      "kind": "negative",
+      "bytes": "",
+      "content_root": "b77743b706875dbbd8a8cd25cc8b8a48ad44adda44789635eede58bfe661b899",
+      "shard_root": "f1e039cd3aaaf55e3140e99b749ceb2c7e67dd8a16202e7e60c05ceedd4a6e3d",
+      "body_len": "300000",
+      "subset": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15",
+      "tamper": "corrupt_first_candidate",
+      "error_class": "not_enough_valid_shards",
+      "note": "16 candidates, one corrupt: only 15 survive the branch law"
+    },
+    {
+      "name": "reconstruct-inconsistent-parity-commitment",
+      "kind": "negative",
+      "bytes": "",
+      "content_root": "b77743b706875dbbd8a8cd25cc8b8a48ad44adda44789635eede58bfe661b899",
+      "shard_root": "5bb2510aa93e5af33ad4cfb71cb9c8dab6838318f27c273b6e79edf85bc3cad3",
+      "body_len": "300000",
+      "subset": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15",
+      "tamper": "inconsistent_parity",
+      "error_class": "commitment_mismatch",
+      "note": "proposer committed a tree over garbage parity shard 31; 16 valid branches still reject at the recomputed-root check - no partial acceptance"
+    },
+    {
+      "name": "reconstruct-nonzero-padding",
+      "kind": "negative",
+      "bytes": "",
+      "content_root": "ddc8b8ebdd5a69c5b0d275722a69f2a9ce6f9e35575cd0e63ef2a674deaaeef1",
+      "shard_root": "c1237cb223364e6be95337c7eb89c6b9e4bd5913e1314e2758e9dcd3c8f74bec",
+      "body_len": "5",
+      "subset": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15",
+      "tamper": "nonzero_padding",
+      "error_class": "non_zero_padding",
+      "note": "consistent codeword with a nonzero byte in the padding region rejects"
+    },
+    {
+      "name": "reconstruct-forged-content-root",
+      "kind": "negative",
+      "bytes": "",
+      "content_root": "7777777777777777777777777777777777777777777777777777777777777777",
+      "shard_root": "cb72cac673e27ffc97cdf2e056e05cddf185cacb7408b84dfb5edabfaf038bae",
+      "body_len": "5",
+      "subset": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15",
+      "tamper": "forged_content_root",
+      "error_class": "content_root_mismatch",
+      "note": "leaves bind a forged content root; the reconstructed body unmasks it"
+    },
+    {
+      "name": "reconstruct-oversize-claim",
+      "kind": "negative",
+      "bytes": "",
+      "content_root": "b77743b706875dbbd8a8cd25cc8b8a48ad44adda44789635eede58bfe661b899",
+      "shard_root": "f1e039cd3aaaf55e3140e99b749ceb2c7e67dd8a16202e7e60c05ceedd4a6e3d",
+      "body_len": "300000",
+      "subset": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15",
+      "tamper": "oversize_claim",
+      "error_class": "body_too_large",
+      "note": "claimed original_bytes over the body maximum rejects before any decode"
+    }
+  ]
+}

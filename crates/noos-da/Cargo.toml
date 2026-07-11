@@ -1,0 +1,24 @@
+[package]
+name = "noos-da"
+version = "0.1.0"
+description = "NOOSPHERE data availability (plan §7.1-7.2): consensus-body Reed-Solomon coding into fixed 64 KiB shards (16 data + 16 parity), domain-separated Merkle shard commitments, full reconstruction-before-acceptance, the body_available ledger primitive for consensus, the probabilistic light-sampling verification primitive, and BlobDescriptorV1 namespace/codec/retention semantics with the consensus-body vs artifact storage boundary. No networking (noos-p2p owns shard transport), no storage internals (noos-store), no sampling protocol."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+noos-braid = { path = "../noos-braid" }
+noos-codec = { path = "../noos-codec" }
+noos-crypto = { path = "../noos-crypto" }
+noos-lumen = { path = "../noos-lumen" }
+# Erasure codec: pure-Rust GF(2^8) Reed-Solomon (the optional simd-accel C
+# path is NOT enabled; default = std only). Pinned exactly: the encoding
+# matrix is consensus-observable through shard bytes and the Merkle root.
+reed-solomon-erasure = "=6.0.0"
+
+[dev-dependencies]
+hex = "=0.4.3"
+
+[lints]
+workspace = true
