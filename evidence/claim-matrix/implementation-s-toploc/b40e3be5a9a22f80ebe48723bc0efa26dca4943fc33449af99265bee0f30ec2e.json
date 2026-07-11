@@ -1,0 +1,74 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-training",
+          "claim_toploc",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "filter": "claim_toploc",
+        "log_sha256": "2aff45fe0978020d2051a1970c5df09add2f5ea8849263a6bbf40ceb96aace63",
+        "package": "noos-training"
+      },
+      "name": "claim-specific behavior and falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-TOPLOC": "8ded7b753de33d07ba6aae42a2d164405c1305ab9378a192628b4b0708af6d40"
+  },
+  "claims": [
+    "S-TOPLOC"
+  ],
+  "command": [
+    "tools/gates/run_species_reaction_claim.py",
+    "--claim",
+    "S-TOPLOC"
+  ],
+  "evidence_sha256": "b40e3be5a9a22f80ebe48723bc0efa26dca4943fc33449af99265bee0f30ec2e",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-s-toploc",
+  "limitations": [
+    "The committed-seed named-model/profile fingerprint precursor is local only.",
+    "No published attack corpus, 99% confidence detection estimate, false-positive SLA measurement, or adaptive collision campaign exists."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-training/Cargo.toml": "edfcafaf40f74e6478ab052fc08d6714d48cda11538d9f48f64dcacca22800ce",
+    "crates/noos-training/src/lib.rs": "ba9d3c49240c4a08c054497d4b1b32e4da1d4c79dc13740de5d0c5c76363ae7e",
+    "crates/noos-training/src/toploc.rs": "ab194f9975feae9ebc9b5ede6eb890fab59c0fe2159e35862740f1a53330e827",
+    "tools/gates/run_species_reaction_claim.py": "be395b72fbc0b199648cd11bed85f62352e03dc8b1cf364c5ec435bf9ab582b1"
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-species",
+          "claim_quotient",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "filter": "claim_quotient",
+        "log_sha256": "e8de91db9d83564d0ffe64bd0facced5bdfae04f2faff4800ec539686a384652",
+        "package": "noos-species"
+      },
+      "name": "claim-specific behavior and falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-QUOTIENT": "f30087b6098d8c8621e34f52834f6167a319f6ad7d0c596ad8473f709032c28e"
+  },
+  "claims": [
+    "M-QUOTIENT"
+  ],
+  "command": [
+    "tools/gates/run_species_reaction_claim.py",
+    "--claim",
+    "M-QUOTIENT"
+  ],
+  "evidence_sha256": "6e8cc82acf649662233270cd446baa93824a07c517de55e87fc0d6ce4eaffc22",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-m-quotient",
+  "limitations": [
+    "No rotating public plus post-commit hidden suite or 99% confidence campaign exists locally.",
+    "No external semantic ground truth establishes a false-equivalence rate below 1%."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-species/Cargo.toml": "0aa308ddb798097808b3e81c2d89bfc81319edf452fc2526785e6fb42f0296ca",
+    "crates/noos-species/src/lib.rs": "27026acf0ce2d7731d727b5fc44e4758e6358faa7defb647484b11fa734ea76e",
+    "crates/noos-species/src/quotient.rs": "1b2771742d60580e6f9f8025bd135618a6fd7c2679556175960d1ca926019e1b",
+    "tools/gates/run_species_reaction_claim.py": "be395b72fbc0b199648cd11bed85f62352e03dc8b1cf364c5ec435bf9ab582b1"
+  }
+}

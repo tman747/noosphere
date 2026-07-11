@@ -1,0 +1,67 @@
+{
+  "claims": {
+    "S-ARTIFACT": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-species"],
+      "command": "python tools/gates/run_species_reaction_claim.py --claim S-ARTIFACT",
+      "rollback_command": "python tools/gates/run_species_reaction_claim.py --claim S-ARTIFACT --rollback-check",
+      "notes": "Content identity binds the frozen Artifact fields and payload through a length-delimited canonical encoding; schema, length, and digest validate before use. The declared local erasure profile is k data plus exactly one XOR parity shard, reconstructs after every single-shard loss, and rejects corrupt shard digests or descriptor/payload splices. Deterministic topology selection forbids any non-local-site shard for interactive per-token traffic while allowing topology-ranked batch/replica retrieval. Immutable derivation edges bind ordered parents, output, transform, recipe, provenance, and height. Local behavior and rollback laws are complete; production promoted-corpus and geographic E-WAN-01 evidence remain external and are not claimed."
+    },
+    "S-SPECIES": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-species"],
+      "command": "python tools/gates/run_species_reaction_claim.py --claim S-SPECIES",
+      "rollback_command": "python tools/gates/run_species_reaction_claim.py --claim S-SPECIES --rollback-check",
+      "notes": "Immutable insert-once artifact/derivation/manifest/revision/relation storage now resolves deterministic member and directional edge views scoped by species, numeric profile, suite commitment, and half-open height interval; admitted members must bind locally verified artifact content, current_weights remains forbidden, and tolerance transitivity remains forbidden. Map-index and reference-scan resolver paths return byte-identical view IDs in local tests. PARTIAL because these are two paths in one Rust implementation, not independent resolver families, and the frozen 10^7 generated E-SPECIES-01 campaign has not run."
+    },
+    "M-QUOTIENT": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-species"],
+      "command": "python tools/gates/run_species_reaction_claim.py --claim M-QUOTIENT",
+      "rollback_command": "python tools/gates/run_species_reaction_claim.py --claim M-QUOTIENT --rollback-check",
+      "notes": "Finite suite/profile/tolerance-scoped quotient construction is deterministic, refuses any critical-safety failure, and proves transitivity over the offered finite relation before emitting classes; the explicit A~B, B~C, A!~C tolerance counterexample rejects with the three member IDs. PARTIAL because no rotating public and post-commit hidden suite, external semantic ground truth, 99% confidence bound, or measured false-equivalence rate below 1% exists. Rollback is the implemented refusal/split to finite exact relations."
+    },
+    "S-REACTION": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-training", "noos-species"],
+      "command": "python tools/gates/run_species_reaction_claim.py --claim S-REACTION",
+      "rollback_command": "python tools/gates/run_species_reaction_claim.py --claim S-REACTION --rollback-check",
+      "notes": "Immutable Reaction identity binds parent, canonical packet, content-bound integer adapter capsule, numeric profile, candidate, reproduced composition, and all transition heights. Controller submission actually applies the checked adapter delta to content-bound parent weights and requires byte-exact candidate state/root replay; inexact division, overflow, tamper, splice, replay, stale parent, premature availability/admission, and successful challenges reject. The only mutable pointer is private to PromotionController and moves Proposed -> Available -> Challengeable -> Admitted only after the deadline; rollback restores the retained parent without rewriting history. This completes the local transition/reproduction/rollback contract, not independent production-operator evidence."
+    },
+    "S-UPDATE": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-species"],
+      "command": "python tools/gates/run_species_reaction_claim.py --claim S-UPDATE",
+      "rollback_command": "python tools/gates/run_species_reaction_claim.py --claim S-UPDATE --rollback-check",
+      "notes": "Strict length-delimited UpdatePacket encoding binds ordered base members, delta kind/payload, applicability, tokenizer, numeric profile, recipe/capsules, exact policy version, privacy/rights, provenance, nonempty availability commitments, contributors, evaluations, and expiry. Decoder rejects unknown tags, duplicate/unsorted collections, trailing bytes, omitted bindings, ID tamper, stale policy, expired packet, and unavailable parent/payload/tokenizer; encode-decode-reencode is byte-identical locally. PARTIAL because the pass threshold requires a second independently implemented decoder/replay engine and profile-tolerance differential evidence."
+    },
+    "S-RL-LAG": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-training"],
+      "command": "python tools/gates/run_species_reaction_claim.py --claim S-RL-LAG",
+      "rollback_command": "python tools/gates/run_species_reaction_claim.py --claim S-RL-LAG --rollback-check",
+      "notes": "Typed rollouts always bind policy, tokenizer, and environment versions. Validated configured bands classify exact accept/downweight/reject/hard-cancel boundaries; future-version spoofing errors, tokenizer/environment mismatch cancels, and one hard-stale member cancels its whole group. The test exhausts all 500,500 rollout/current policy pairs for current versions 0..999 and asserts no weighted/accepted rollout beyond the downweight band and hard-max cancellation. PARTIAL because preregistered training-stability fault injection has not been conducted."
+    },
+    "S-TOPLOC": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-training"],
+      "command": "python tools/gates/run_species_reaction_claim.py --claim S-TOPLOC",
+      "rollback_command": "python tools/gates/run_species_reaction_claim.py --claim S-TOPLOC --rollback-check",
+      "notes": "A deterministic signed-projection hidden-state fingerprint binds named model, numeric profile, hidden width, projection count, and a seed fixed by commitment before reveal. Seed/profile/model substitution rejects, and the local cheaper-hidden-state plus copied target-prefill falsifier exceeds the configured mismatch threshold. The API returns only execution-fidelity evidence and never semantic quality. PARTIAL because no published attack corpus, adaptive collision campaign, 99% confidence detection rate, or measured false-positive SLA exists."
+    },
+    "S-QUALITY": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-swarm"],
+      "command": "python tools/gates/run_species_reaction_claim.py --claim S-QUALITY",
+      "rollback_command": "python tools/gates/run_species_reaction_claim.py --claim S-QUALITY --rollback-check",
+      "notes": "Content-bound contextual QualityReceipt validation rejects task/rubric/candidate splices. Evaluator control domains are insert-once externally supplied identities; each domain contributes its conservative minimum and the aggregate is the median domain score, so twenty same-domain high-score Sybils do not change score or domain count. Any safety-critical reject is a zero-score veto. Deadline escrow pays one matching receipt once or becomes mechanically refundable after expiry, preventing double pay and trapped escrow locally. PARTIAL because no preregistered E-COLLUSION-01 task campaign demonstrates under-1% rank capture or independent real evaluator/payment behavior."
+    },
+    "S-GLOBAL-ORGANISM": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-swarm"],
+      "command": "python tools/gates/run_species_reaction_claim.py --claim S-GLOBAL-ORGANISM",
+      "rollback_command": "python tools/gates/run_species_reaction_claim.py --claim S-GLOBAL-ORGANISM --rollback-check",
+      "notes": "Finite application-scoped component evidence can be merged only across disjoint component IDs with checked conservation of observations, useful-work units, rights violations, weighted decision benefit, minimum semantic continuity, and maximum control concentration; partitioned and one-shot aggregation are identical and duplicates reject. The aggregate deliberately returns establishes_global_organism=false and zero proposal/finality weight. PARTIAL permanently at G0: the frozen row has no production threshold and global resilience/control/continuity/rights/benefit observables are not preregistered."
+    }
+  }
+}

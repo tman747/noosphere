@@ -6,6 +6,15 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
+pub mod organism;
+pub mod quality;
+
+pub use organism::{ComponentEvidence, OrganismAggregate};
+pub use quality::{
+    aggregate_quality, DiversityRegistry, QualityAggregate, QualityEscrow, QualityEscrowState,
+    QualityReceipt,
+};
+
 pub type Hash32 = [u8; 32];
 pub const LIFECYCLE: &str = "EXPERIMENTAL";
 pub const RESULT: &str = "SHADOW_ONLY";
@@ -209,6 +218,22 @@ pub enum SwarmError {
     EmptyTelemetry,
     #[error("integer overflow")]
     Overflow,
+    #[error("invalid quality receipt")]
+    InvalidQualityReceipt,
+    #[error("invalid or duplicate diversity identity")]
+    InvalidDiversityIdentity,
+    #[error("unknown evaluator diversity identity")]
+    UnknownEvaluator,
+    #[error("quality evidence is empty")]
+    EmptyQualityEvidence,
+    #[error("quality receipts were duplicated or spliced across contexts")]
+    SplicedQualityEvidence,
+    #[error("global-organism component evidence is empty")]
+    EmptyOrganismEvidence,
+    #[error("invalid global-organism component evidence")]
+    InvalidOrganismEvidence,
+    #[error("global-organism component was counted twice")]
+    DuplicateOrganismComponent,
 }
 
 #[cfg(test)]

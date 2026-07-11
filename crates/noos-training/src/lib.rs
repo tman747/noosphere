@@ -12,6 +12,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 pub mod adjoint;
+pub mod reaction;
+pub mod rl_lag;
+pub mod toploc;
+
+pub use reaction::{
+    CandidateState, PromotionController, Reaction, ReactionCapsule, ReactionReplay,
+};
+pub use rl_lag::{classify_group, classify_rollout, LagClass, LagPolicy, RolloutVersions};
+pub use toploc::{
+    commit_seed, fingerprint, mismatch_count, verifies_execution, ToplocFingerprint, ToplocProfile,
+};
 
 pub const LIFECYCLE: &str = "EXPERIMENTAL";
 pub const RESULT: &str = "SHADOW_ONLY";
@@ -420,6 +431,44 @@ pub enum TrainingError {
     IdentTamper,
     #[error("E-IDENT-03 failed")]
     Ident03,
+    #[error("invalid canonical update packet")]
+    InvalidUpdatePacket,
+    #[error("invalid immutable reaction")]
+    InvalidReaction,
+    #[error("reaction parent is stale")]
+    StaleParent,
+    #[error("reaction replay")]
+    ReactionReplay,
+    #[error("unknown reaction")]
+    UnknownReaction,
+    #[error("invalid reaction lifecycle transition")]
+    InvalidReactionTransition,
+    #[error("challenge did not falsify the candidate")]
+    ChallengeFailed,
+    #[error("invalid rollout lag policy")]
+    InvalidLagPolicy,
+    #[error("rollout names a future policy version")]
+    FuturePolicyVersion,
+    #[error("rollout lag arithmetic failed")]
+    LagArithmetic,
+    #[error("rollout group is empty")]
+    EmptyRolloutGroup,
+    #[error("invalid TOPLOC profile")]
+    InvalidToplocProfile,
+    #[error("TOPLOC seed does not match its prior commitment")]
+    ToplocSeedSubstitution,
+    #[error("TOPLOC model or profile substitution")]
+    ToplocProfileSubstitution,
+    #[error("TOPLOC hidden width is unsupported")]
+    ToplocWidth,
+    #[error("TOPLOC projection arithmetic failed")]
+    ToplocArithmetic,
+    #[error("invalid or tampered reaction capsule")]
+    InvalidReactionCapsule,
+    #[error("reaction arithmetic overflow")]
+    ReactionArithmetic,
+    #[error("reaction is not exact under its numeric profile")]
+    InexactReactionProfile,
 }
 
 #[cfg(test)]
@@ -490,6 +539,8 @@ mod tests {
             policy_version: None,
             privacy_parameters_root: None,
             rights_expression: h(12),
+            provenance_root: h(17),
+            availability_commitments: vec![h(18)],
             contributor_set: vec![],
             evaluation_receipts: vec![],
             expiry: None,
