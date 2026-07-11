@@ -16,6 +16,7 @@ blake3 = "1.8"
 serde_json = "1.0"
 noos-weft-compile = { path = "../noos-weft-compile" }
 noos-weft-syntax = { path = "../noos-weft-syntax" }
+noos-jet = { path = "../noos-jet" }
 
 [lints]
 workspace = true

@@ -700,6 +700,138 @@ pub fn compile_program(p: &Program) -> Result<Compilation, Vec<Diagnostic>> {
     })
 }
 
+/// Stable identifier for a value in the post-elaboration beacon-flow IR.
+pub type FlowValue = u32;
+
+/// Operations whose observable result must preserve beacon taint. These
+/// are the four laundering surfaces named by E-WEFT-05.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BeaconAdapter {
+    Jet,
+    TrapRecovery,
+    Serialization,
+    DreamReentry,
+}
+
+/// Minimal post-elaboration flow IR audited before a formula is eligible
+/// for commit-then-beacon admission. An adapter cannot declare a value
+/// clean: taint is propagated by the checker, not trusted from the caller.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BeaconFlowOp {
+    Source {
+        out: FlowValue,
+    },
+    Commit {
+        index: u32,
+        input: FlowValue,
+        out: FlowValue,
+    },
+    Beacon {
+        index: u32,
+        committed: FlowValue,
+        out: FlowValue,
+    },
+    Adapt {
+        adapter: BeaconAdapter,
+        input: FlowValue,
+        out: FlowValue,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BeaconFlowError {
+    DuplicateValue(FlowValue),
+    UnknownValue(FlowValue),
+    BeaconBeforeCommit { index: u32 },
+    BeaconIndexMismatch { expected: u32, actual: u32 },
+    BeaconInfluencesCommitment { index: u32 },
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct BeaconFlowReport {
+    pub operations: u32,
+    pub commitments: u32,
+    pub beacons: u32,
+    pub adapters: u32,
+}
+
+/// Deterministic indexed-taint audit for commit-then-beacon ordering.
+///
+/// A beacon result is tainted by its index. Jets, trap recovery,
+/// serialization, and dream re-entry preserve that taint. Committing a
+/// value tainted by the same index is a hard rejection, and a beacon may
+/// only consume a preceding commitment carrying exactly its own index.
+pub fn audit_beacon_flow(ops: &[BeaconFlowOp]) -> Result<BeaconFlowReport, BeaconFlowError> {
+    let mut taint: BTreeMap<FlowValue, BTreeSet<u32>> = BTreeMap::new();
+    let mut commitments: BTreeMap<FlowValue, u32> = BTreeMap::new();
+    let mut report = BeaconFlowReport::default();
+
+    for op in ops {
+        report.operations = report.operations.saturating_add(1);
+        let out = match *op {
+            BeaconFlowOp::Source { out }
+            | BeaconFlowOp::Commit { out, .. }
+            | BeaconFlowOp::Beacon { out, .. }
+            | BeaconFlowOp::Adapt { out, .. } => out,
+        };
+        if taint.contains_key(&out) {
+            return Err(BeaconFlowError::DuplicateValue(out));
+        }
+
+        match *op {
+            BeaconFlowOp::Source { out } => {
+                taint.insert(out, BTreeSet::new());
+            }
+            BeaconFlowOp::Commit { index, input, out } => {
+                let dependencies = taint
+                    .get(&input)
+                    .ok_or(BeaconFlowError::UnknownValue(input))?;
+                if dependencies.contains(&index) {
+                    return Err(BeaconFlowError::BeaconInfluencesCommitment { index });
+                }
+                taint.insert(out, dependencies.clone());
+                commitments.insert(out, index);
+                report.commitments = report.commitments.saturating_add(1);
+            }
+            BeaconFlowOp::Beacon {
+                index,
+                committed,
+                out,
+            } => {
+                let Some(actual) = commitments.get(&committed).copied() else {
+                    return Err(BeaconFlowError::BeaconBeforeCommit { index });
+                };
+                if actual != index {
+                    return Err(BeaconFlowError::BeaconIndexMismatch {
+                        expected: index,
+                        actual,
+                    });
+                }
+                let mut dependencies = taint
+                    .get(&committed)
+                    .ok_or(BeaconFlowError::UnknownValue(committed))?
+                    .clone();
+                dependencies.insert(index);
+                taint.insert(out, dependencies);
+                report.beacons = report.beacons.saturating_add(1);
+            }
+            BeaconFlowOp::Adapt {
+                adapter: _,
+                input,
+                out,
+            } => {
+                let dependencies = taint
+                    .get(&input)
+                    .ok_or(BeaconFlowError::UnknownValue(input))?
+                    .clone();
+                taint.insert(out, dependencies);
+                report.adapters = report.adapters.saturating_add(1);
+            }
+        }
+    }
+    Ok(report)
+}
+
 /// Frozen W8A8v1 reference arithmetic: exact i32 accumulation.
 // Dims are validated <= 65535, so index arithmetic is in-bounds and every
 // i8 x i8 product plus u16-bounded accumulation fits i64 exactly.
@@ -758,6 +890,10 @@ pub struct SpanCertificate {
     pub n: u16,
     pub reps: u8,
     pub rbits: u8,
+    /// Ledger payout identity bound into the transcript. A certificate is
+    /// never transferable to another beneficiary, even when every tensor
+    /// byte is otherwise identical.
+    pub payout: [u8; 32],
     pub commitment: String,
     pub challenge: [u32; 2],
     pub projections: Vec<u64>,
@@ -772,6 +908,8 @@ pub enum CertificateError {
     Profile,
     AccumOverflow,
     Soundness,
+    /// The certificate names a different ledger payout identity.
+    Payout,
     Commitment,
     Projection,
     Output,
@@ -786,7 +924,7 @@ fn i8_bytes(v: &[i8]) -> Vec<u8> {
     v.iter().map(|x| x.to_le_bytes()[0]).collect()
 }
 /// Frozen span transcript commitment: `H(A || B || C32 || C8 || m || k ||
-/// n || mult || shift)` under the W8A8 commit domain. Public so falsifier
+/// n || mult || shift || payout)` under the W8A8 commit domain. Public so falsifier
 /// harnesses can forge internally consistent transcripts over a wrong
 /// product and prove exactly where each admission path rejects them.
 #[must_use]
@@ -801,6 +939,7 @@ pub fn commit_span_transcript(
     n: u16,
     mult: u32,
     shift: u8,
+    payout: [u8; 32],
 ) -> String {
     let mut transcript = Vec::new();
     transcript.extend(i8_bytes(a));
@@ -812,6 +951,7 @@ pub fn commit_span_transcript(
     transcript.extend(n.to_le_bytes());
     transcript.extend(mult.to_le_bytes());
     transcript.push(shift);
+    transcript.extend(payout);
     hash("NOOS/WEFT/W8A8/COMMIT/V1", &transcript)
 }
 
@@ -842,6 +982,7 @@ pub fn derive_span_certificate(
     n: u16,
     mult: u32,
     shift: u8,
+    payout: [u8; 32],
     challenge: [u32; 2],
 ) -> Result<SpanCertificate, CertificateError> {
     let c = gemm_i8(a, b, m.into(), k.into(), n.into())?;
@@ -852,7 +993,8 @@ pub fn derive_span_certificate(
         n,
         reps: 2,
         rbits: 32,
-        commitment: commit_span_transcript(a, b, &c, &c8, m, k, n, mult, shift),
+        payout,
+        commitment: commit_span_transcript(a, b, &c, &c8, m, k, n, mult, shift, payout),
         challenge,
         projections: project_span(&c, challenge),
         c32_hash: hash("NOOS/WEFT/W8A8/C32/V1", &ints_bytes(&c)),
@@ -867,9 +1009,13 @@ pub fn admit_span_certificate(
     b: &[i8],
     claimed_c: &[i32],
     claimed_c8: &[i8],
+    expected_payout: [u8; 32],
 ) -> Result<(), CertificateError> {
     if cert.reps != 2 || cert.rbits != 32 {
         return Err(CertificateError::Soundness);
+    }
+    if cert.payout != expected_payout {
+        return Err(CertificateError::Payout);
     }
     let fresh = derive_span_certificate(
         a,
@@ -879,6 +1025,7 @@ pub fn admit_span_certificate(
         cert.n,
         cert.mult,
         cert.shift,
+        cert.payout,
         cert.challenge,
     )?;
     if fresh.commitment != cert.commitment {
@@ -975,9 +1122,13 @@ pub fn admit_span_certificate_freivalds(
     b: &[i8],
     claimed_c: &[i32],
     claimed_c8: &[i8],
+    expected_payout: [u8; 32],
 ) -> Result<(), CertificateError> {
     if cert.reps != 2 || cert.rbits != 32 {
         return Err(CertificateError::Soundness);
+    }
+    if cert.payout != expected_payout {
+        return Err(CertificateError::Payout);
     }
     if claimed_c8.len() != usize::from(cert.m) * usize::from(cert.n) {
         return Err(CertificateError::Shape);
@@ -986,7 +1137,16 @@ pub fn admit_span_certificate_freivalds(
         return Err(CertificateError::Output);
     }
     let commitment = commit_span_transcript(
-        a, b, claimed_c, claimed_c8, cert.m, cert.k, cert.n, cert.mult, cert.shift,
+        a,
+        b,
+        claimed_c,
+        claimed_c8,
+        cert.m,
+        cert.k,
+        cert.n,
+        cert.mult,
+        cert.shift,
+        cert.payout,
     );
     if commitment != cert.commitment {
         return Err(CertificateError::Commitment);
@@ -1029,12 +1189,16 @@ mod tests {
         let b = vec![2i8; 16];
         let c = gemm_i8(&a, &b, 4, 4, 4).unwrap();
         let c8 = requant_w8a8(&c, 1, 1).unwrap();
-        let cert = derive_span_certificate(&a, &b, 4, 4, 4, 1, 1, [7, 9]).unwrap();
-        assert_eq!(admit_span_certificate(&cert, &a, &b, &c, &c8), Ok(()));
+        let payout = [0xA5; 32];
+        let cert = derive_span_certificate(&a, &b, 4, 4, 4, 1, 1, payout, [7, 9]).unwrap();
+        assert_eq!(
+            admit_span_certificate(&cert, &a, &b, &c, &c8, payout),
+            Ok(())
+        );
         let mut bad = c.clone();
         bad[0] += 1;
         assert_eq!(
-            admit_span_certificate(&cert, &a, &b, &bad, &c8),
+            admit_span_certificate(&cert, &a, &b, &bad, &c8, payout),
             Err(CertificateError::Output)
         );
     }

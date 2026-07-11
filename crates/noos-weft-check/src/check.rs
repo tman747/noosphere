@@ -19,7 +19,7 @@ use crate::{
     WEFT_V0_GRAIN_VERSION, ZERO_HASH,
 };
 use noos_codec::NoosEncode;
-use noos_grain::{decode_formula, decode_subject, eval, GrainTrap, Meter};
+use noos_grain::{decode_formula, decode_subject, encode_noun, eval, GrainTrap, Meter};
 
 // ---------------------------------------------------------------------------
 // Content addressing
@@ -110,6 +110,89 @@ pub fn certified_bound(cert: &CostCertificateV0, sizes: &[u64]) -> Result<u64, W
         best = best.max(sum);
     }
     u64::try_from(best).map_err(|_| WeftError::CertBoundOverflow)
+}
+
+/// Which admission path executed a cost-certificate trial. Unsupported
+/// numeric profiles are explicitly demoted to raw Grain; callers cannot
+/// mistake fallback execution for v0 certification.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum V0ExecutionMode {
+    Certified,
+    RawGrainFallback { profile_error: WeftError },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V0Execution {
+    pub mode: V0ExecutionMode,
+    pub value: Vec<u8>,
+    pub spent: u64,
+    pub arena_used: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum V0FallbackError {
+    Certificate(WeftError),
+    TrialIndex,
+    FallbackBudget,
+    GrainTrap(u16),
+}
+
+/// Execute one cost-certificate trial under v0 when `profile` is admitted,
+/// or under the authoritative raw-Grain meter when it is unsupported.
+///
+/// Fallback ignores the certificate's cost polynomial, but never its
+/// semantic identity: canonical formula decoding, formula-id binding, and
+/// canonical subject decoding are mandatory on both paths. Thus fallback
+/// can remove Weft execution preference without silently changing meaning.
+pub fn execute_v0_or_grain_fallback(
+    profile: &NumericProfileV0,
+    cert: &CostCertificateV0,
+    trial_index: usize,
+    fallback_step_limit: u64,
+) -> Result<V0Execution, V0FallbackError> {
+    let profile_result = check_profile(profile);
+    if profile_result.is_ok() {
+        check_cost_certificate(cert).map_err(V0FallbackError::Certificate)?;
+    } else if fallback_step_limit == 0 || fallback_step_limit > MAX_TRIAL_CHARGE {
+        return Err(V0FallbackError::FallbackBudget);
+    }
+
+    if cert.grain_version != WEFT_V0_GRAIN_VERSION {
+        return Err(V0FallbackError::Certificate(WeftError::CertGrainVersion));
+    }
+    let formula = decode_formula(&cert.formula_bytes.0)
+        .map_err(|_| V0FallbackError::Certificate(WeftError::CertFormulaInvalid))?;
+    if formula_id(&cert.formula_bytes.0) != cert.formula_id {
+        return Err(V0FallbackError::Certificate(
+            WeftError::CertFormulaHashMismatch,
+        ));
+    }
+    let trial = cert
+        .trials
+        .0
+        .get(trial_index)
+        .ok_or(V0FallbackError::TrialIndex)?;
+    let subject = decode_subject(&trial.subject.0)
+        .map_err(|_| V0FallbackError::Certificate(WeftError::CertTrialSubjectInvalid))?;
+    let (mode, step_limit) = match profile_result {
+        Ok(()) => (
+            V0ExecutionMode::Certified,
+            certified_bound(cert, &trial.sizes.0).map_err(V0FallbackError::Certificate)?,
+        ),
+        Err(profile_error) => (
+            V0ExecutionMode::RawGrainFallback { profile_error },
+            fallback_step_limit,
+        ),
+    };
+    let mut meter = Meter::new(step_limit, MAX_TRIAL_ARENA_WORDS);
+    let value = eval(WEFT_V0_GRAIN_VERSION, subject, formula, &mut meter)
+        .map_err(|trap| V0FallbackError::GrainTrap(trap.code()))?;
+    Ok(V0Execution {
+        mode,
+        value: encode_noun(&value),
+        spent: meter.spent(),
+        arena_used: meter.arena_used(),
+    })
 }
 
 // ---------------------------------------------------------------------------

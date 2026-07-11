@@ -1,0 +1,39 @@
+{
+  "claims": {
+    "E-WEFT-03": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-weft-compile"],
+      "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-03",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-03 --rollback-check",
+      "notes": "The local 32^3 and 64^3 derived-verifier precursor now binds payout identity in the transcript and compares the derived certificate byte-for-byte with an independently restated hand-built construction. Both re-derivation and O(n^2) Freivalds admission paths reject all seven 32^3 relation/tamper/transplant/splice gates, including an actual payout transplant; a self-consistent wrong-product transcript dies exactly on CertificateError::Relation. The deterministic scaling exponent is 2.0. PARTIAL: the pass threshold also requires real RISC Zero hand-built kt-ladder run-27 cycle measurements (<=1.15x61,175 at 32^3 and the 64^3 envelope), which are not local evidence."
+    },
+    "E-WEFT-05": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-weft-syntax", "noos-weft-compile"],
+      "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-05",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-05 --rollback-check",
+      "notes": "The source grind corpus remains 100% ill-typed and required commit-then-beacon patterns remain expressible. A deterministic post-elaboration indexed-taint audit now rejects beacon-before-commit, index substitution, and same-index adaptation through jets, trap recovery, serialization, and dream re-entry; 65,536 independently indexed accepted flow traces have zero beacon-to-preimage paths. PARTIAL: the frozen threshold is 10^6 accepted language elaborations under the analyzer, not 65,536 post-elaboration flow traces."
+    },
+    "E-WEFT-06": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-weft-compile", "noos-weft-check", "noos-jet"],
+      "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-06",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-06 --rollback-check",
+      "notes": "The 4096-case bounded challenger still finds the planted divergence at case 255 with zero flags against an equivalent implementation. New noos-jet-backed falsifiers prove that recomputing a forged certificate digest does not survive semantic-hash re-derivation and that an economically cheaper substitute implementation is rejected at equivalence replay before registry admission; an honest implementation under the same certificate admits. PARTIAL: two independent profitable challengers, bond griefing and wash-trade resistance, and false-slash appeal outcomes require a live bonded market and E-JET-01."
+    },
+    "E-WEFT-07": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-weft-syntax", "noos-weft-compile"],
+      "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-07",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-07 --rollback-check",
+      "notes": "Rights inference remains deterministic and exact on the frozen mini-corpus. Ambiguous duplicate rows now reject instead of silently deduplicating; empty or over-width rows reject; carrier nesting beyond the fixed decidability budget rejects; and a 4096-step revocation storm shows no right resurrection or order dependence. PARTIAL and still DREAM-labeled: the exact pass threshold requires a frozen production transform corpus, typed-versus-ledgered repair-closure comparison, a preregistered over-approximation bound, and an annotation-burden ceiling."
+    },
+    "E-WEFT-08": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-weft-check"],
+      "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-08",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-08 --rollback-check",
+      "notes": "The release corpus remains 100% expressible through the total v0 checker with no false accepts in the under-declared-bound, identity-transplant, trap, and malformed probes. Unsupported numeric profiles now return an explicit RawGrainFallback outcome whose formula identity is still checked and whose value bytes, traps, charge, and arena use match direct noos-grain evaluation; formula transplant and insufficient-meter probes cannot silently weaken semantics. PARTIAL: deciding language necessity requires two consecutive quarters of real admission share, audit-cost, and incident-class telemetry."
+    }
+  }
+}

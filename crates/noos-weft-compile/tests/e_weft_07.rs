@@ -95,3 +95,54 @@ fn declassification_requires_the_disclose_right() {
     .unwrap_err();
     assert_eq!(bare[0].code, "E-RIGHT-002");
 }
+
+#[test]
+fn ambiguous_and_unbounded_rights_rows_reject_stably() {
+    let duplicate =
+        compile("fn f(x: u64 & rights {Own, Own}) -> u64 ! {} cost 16 dec 0 { 1 }").unwrap_err();
+    assert_eq!(duplicate[0].code, "E-RIGHT-003");
+
+    let oversized = (0..17)
+        .map(|i| format!("Right{i}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let source =
+        format!("fn f(x: u64 & rights {{{oversized}}}) -> u64 ! {{}} cost 16 dec 0 {{ 1 }}");
+    let unbounded = compile(&source).unwrap_err();
+    assert!(unbounded.iter().any(|d| d.code == "E-RIGHT-004"));
+
+    let empty = compile("fn f(x: u64 & rights {}) -> u64 ! {} cost 16 dec 0 { 1 }").unwrap_err();
+    assert!(empty.iter().any(|d| d.code == "E-RIGHT-004"));
+}
+
+#[test]
+fn pathological_rights_carrier_depth_rejects_inside_a_fixed_budget() {
+    let nested = format!(
+        "{}u64 & rights {{Own}}{}",
+        "Dream<".repeat(129),
+        "> ".repeat(129)
+    );
+    let source = format!("fn f(x: {nested}) -> u64 ! {{}} cost 16 dec 0 {{ 1 }}");
+    let err = compile(&source).unwrap_err();
+    assert!(
+        err.iter().any(|d| d.code == "E-RIGHT-004"),
+        "unexpected diagnostics: {err:?}"
+    );
+}
+
+#[test]
+fn revocation_storm_has_no_resurrection_or_order_dependence() {
+    for i in 0..4096u32 {
+        let row = match i % 4 {
+            0 => "Own, Use, Disclose",
+            1 => "Own, Use",
+            2 => "Own",
+            _ => "Use",
+        };
+        let source = format!("fn f(x: u64 & rights {{{row}}}) -> u64 ! {{}} cost 16 dec 0 {{ 1 }}");
+        let compiled = compile(&source).unwrap();
+        let rights = &compiled.units[0].meaning_contract.rights;
+        assert_eq!(rights.iter().any(|right| right == "Disclose"), i % 4 == 0);
+        assert_eq!(rights.iter().any(|right| right == "Own"), i % 4 != 3);
+    }
+}

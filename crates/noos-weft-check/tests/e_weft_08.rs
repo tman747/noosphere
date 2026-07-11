@@ -11,7 +11,9 @@
 //! The two-quarter admission-telemetry study that decides full-language
 //! necessity is external; locally the v0 coverage census is 100%, which
 //! supports keeping the full language in research (never a kill of
-//! Grain/v0).
+//! Grain/v0). Unsupported profiles are explicitly demoted to raw Grain;
+//! the fallback preserves formula identity, result bytes, traps, and meter
+//! behavior rather than silently weakening semantics.
 #![allow(
     clippy::unwrap_used,
     clippy::arithmetic_side_effects,
@@ -20,9 +22,9 @@
 
 use noos_grain::{decode_formula, decode_subject, encode_noun, eval, Meter, Noun};
 use noos_weft_check::{
-    check_cost_certificate, formula_id, BranchList, CostBranch, CostCertificateV0, CostTerm,
-    CostTrial, Exponents, FormulaBytes, SizeList, SizeVarList, SubjectBytes, TermList, TrialList,
-    WeftError,
+    check_cost_certificate, execute_v0_or_grain_fallback, formula_id, BranchList, CostBranch,
+    CostCertificateV0, CostTerm, CostTrial, Exponents, FormulaBytes, SizeList, SizeVarList,
+    SubjectBytes, TermList, TrialList, V0ExecutionMode, V0FallbackError, WeftError,
 };
 use noos_weft_compile::compile;
 use noos_weft_syntax::{parse, Type};
@@ -200,4 +202,63 @@ fn checker_is_not_a_mock_verifier() {
         check_cost_certificate(&garbage),
         Err(WeftError::CertFormulaInvalid)
     );
+}
+
+// ---------------------------------------------------------------------------
+// Unsupported profiles explicitly fall back to raw Grain without changing
+// formula identity, result bytes, or meter behavior.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn unsupported_profile_falls_back_to_exact_raw_grain_semantics() {
+    let fixture = noos_weft_check::vectors::build_fixture(&Default::default());
+    let mut unsupported = fixture.profile;
+    unsupported.activation_bits = 16;
+
+    let outcome = execute_v0_or_grain_fallback(&unsupported, &fixture.cost, 0, 1 << 20).unwrap();
+    assert_eq!(
+        outcome.mode,
+        V0ExecutionMode::RawGrainFallback {
+            profile_error: WeftError::ProfileWidthInadmissible,
+        }
+    );
+
+    let formula = decode_formula(&fixture.cost.formula_bytes.0).unwrap();
+    let subject = decode_subject(&fixture.cost.trials.0[0].subject.0).unwrap();
+    let mut meter = Meter::new(1 << 20, 1 << 20);
+    let direct = encode_noun(&eval(1, subject, formula, &mut meter).unwrap());
+    assert_eq!(outcome.value, direct);
+    assert_eq!(outcome.spent, meter.spent());
+    assert_eq!(outcome.arena_used, meter.arena_used());
+}
+
+#[test]
+fn fallback_never_silently_weakens_formula_binding_or_metering() {
+    let fixture = noos_weft_check::vectors::build_fixture(&Default::default());
+    let mut unsupported = fixture.profile;
+    unsupported.activation_bits = 16;
+
+    let mut transplanted = fixture.cost.clone();
+    let other = noos_weft_check::vectors::inc_chain_formula(2);
+    transplanted.formula_bytes = FormulaBytes(other);
+    assert_eq!(
+        execute_v0_or_grain_fallback(&unsupported, &transplanted, 0, 1 << 20),
+        Err(V0FallbackError::Certificate(
+            WeftError::CertFormulaHashMismatch
+        ))
+    );
+
+    // Raw Grain remains authoritative, including its out-of-fuel trap.
+    assert!(matches!(
+        execute_v0_or_grain_fallback(&unsupported, &fixture.cost, 0, 1),
+        Err(V0FallbackError::GrainTrap(_))
+    ));
+}
+
+#[test]
+fn admitted_profile_uses_the_certified_path() {
+    let fixture = noos_weft_check::vectors::build_fixture(&Default::default());
+    let outcome =
+        execute_v0_or_grain_fallback(&fixture.profile, &fixture.cost, 0, 1 << 20).unwrap();
+    assert_eq!(outcome.mode, V0ExecutionMode::Certified);
 }

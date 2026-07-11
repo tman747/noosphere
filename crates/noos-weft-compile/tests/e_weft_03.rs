@@ -3,7 +3,8 @@
 //! Claim under test: a verifier derived from `Tensor<i8,[m,k],@W8A8v1>`
 //! reproduces the kt-ladder Freivalds span relation, transcript, and
 //! tamper behavior at 32^3. Pass: byte-identical roots; all seven
-//! tamper/transplant/splice gates reject; verifier scaling exponent in
+//! tamper/transplant/splice gates reject, including a payout identity
+//! transplant; verifier scaling exponent in
 //! [1.9, 2.1]. Kill: any tamper acceptance.
 //!
 //! Both admission paths run on every gate: the re-derivation path
@@ -44,6 +45,7 @@ struct Batch {
     b: Vec<i8>,
     c: Vec<i32>,
     c8: Vec<i8>,
+    payout: [u8; 32],
     cert: SpanCertificate,
 }
 
@@ -52,8 +54,16 @@ fn batch(side: usize, salt: i32) -> Batch {
     let c = gemm_i8(&a, &b, side, side, side).unwrap();
     let c8 = requant_w8a8(&c, MULT, SHIFT).unwrap();
     let s = side as u16;
-    let cert = derive_span_certificate(&a, &b, s, s, s, MULT, SHIFT, CHALLENGE).unwrap();
-    Batch { a, b, c, c8, cert }
+    let payout = [salt as u8; 32];
+    let cert = derive_span_certificate(&a, &b, s, s, s, MULT, SHIFT, payout, CHALLENGE).unwrap();
+    Batch {
+        a,
+        b,
+        c,
+        c8,
+        payout,
+        cert,
+    }
 }
 
 /// Every falsifier must be rejected by BOTH admission paths.
@@ -65,16 +75,17 @@ fn assert_both_reject(
     b: &[i8],
     c: &[i32],
     c8: &[i8],
+    expected_payout: [u8; 32],
     want_rederive: CertificateError,
     want_freivalds: CertificateError,
 ) {
     assert_eq!(
-        admit_span_certificate(cert, a, b, c, c8),
+        admit_span_certificate(cert, a, b, c, c8, expected_payout),
         Err(want_rederive),
         "re-derivation path accepted or misclassified: {label}"
     );
     assert_eq!(
-        admit_span_certificate_freivalds(cert, a, b, c, c8),
+        admit_span_certificate_freivalds(cert, a, b, c, c8, expected_payout),
         Err(want_freivalds),
         "Freivalds path accepted or misclassified: {label}"
     );
@@ -88,11 +99,11 @@ fn assert_both_reject(
 fn honest_32_cubed_admits_on_both_paths() {
     let x = batch(32, 3);
     assert_eq!(
-        admit_span_certificate(&x.cert, &x.a, &x.b, &x.c, &x.c8),
+        admit_span_certificate(&x.cert, &x.a, &x.b, &x.c, &x.c8, x.payout),
         Ok(())
     );
     assert_eq!(
-        admit_span_certificate_freivalds(&x.cert, &x.a, &x.b, &x.c, &x.c8),
+        admit_span_certificate_freivalds(&x.cert, &x.a, &x.b, &x.c, &x.c8, x.payout),
         Ok(())
     );
 }
@@ -101,11 +112,11 @@ fn honest_32_cubed_admits_on_both_paths() {
 fn honest_64_cubed_admits_on_both_paths() {
     let x = batch(64, 9);
     assert_eq!(
-        admit_span_certificate(&x.cert, &x.a, &x.b, &x.c, &x.c8),
+        admit_span_certificate(&x.cert, &x.a, &x.b, &x.c, &x.c8, x.payout),
         Ok(())
     );
     assert_eq!(
-        admit_span_certificate_freivalds(&x.cert, &x.a, &x.b, &x.c, &x.c8),
+        admit_span_certificate_freivalds(&x.cert, &x.a, &x.b, &x.c, &x.c8, x.payout),
         Ok(())
     );
 }
@@ -113,13 +124,67 @@ fn honest_64_cubed_admits_on_both_paths() {
 #[test]
 fn roots_are_byte_identical_across_independent_derivations() {
     let x = batch(32, 3);
-    let y = batch(32, 3);
-    assert_eq!(x.cert, y.cert);
+    let hand_built = SpanCertificate {
+        m: 32,
+        k: 32,
+        n: 32,
+        reps: 2,
+        rbits: 32,
+        payout: x.payout,
+        commitment: hand_built_commitment(&x),
+        challenge: CHALLENGE,
+        projections: hand_built_projections(&x.c),
+        c32_hash: hash_c32(&x.c),
+        c8_hash: hash_c8(&x.c8),
+        mult: MULT,
+        shift: SHIFT,
+    };
+    assert_eq!(x.cert, hand_built);
     assert_eq!(
         serde_json::to_vec(&x.cert).unwrap(),
-        serde_json::to_vec(&y.cert).unwrap(),
-        "serialized certificate roots must be byte-identical"
+        serde_json::to_vec(&hand_built).unwrap(),
+        "derived and hand-built transcript roots must be byte-identical"
     );
+}
+
+/// Hand-built kt-ladder transcript construction, intentionally restated
+/// without calling the derivation helpers under test.
+fn hand_built_commitment(x: &Batch) -> String {
+    let mut h = blake3::Hasher::new();
+    h.update(b"NOOS/WEFT/W8A8/COMMIT/V1");
+    for value in &x.a {
+        h.update(&value.to_le_bytes());
+    }
+    for value in &x.b {
+        h.update(&value.to_le_bytes());
+    }
+    for value in &x.c {
+        h.update(&value.to_le_bytes());
+    }
+    for value in &x.c8 {
+        h.update(&value.to_le_bytes());
+    }
+    h.update(&32u16.to_le_bytes());
+    h.update(&32u16.to_le_bytes());
+    h.update(&32u16.to_le_bytes());
+    h.update(&MULT.to_le_bytes());
+    h.update(&[SHIFT]);
+    h.update(&x.payout);
+    h.finalize().to_hex().to_string()
+}
+
+fn hand_built_projections(c: &[i32]) -> Vec<u64> {
+    CHALLENGE
+        .iter()
+        .map(|challenge| {
+            c.iter().enumerate().fold(0u64, |total, (i, value)| {
+                total.wrapping_add(
+                    (*value as i64 as u64)
+                        .wrapping_mul(u64::from(challenge.rotate_left((i % 32) as u32))),
+                )
+            })
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -141,6 +206,7 @@ fn gate_1_c32_tamper_rejects() {
         &x.b,
         &c,
         &x.c8,
+        x.payout,
         CertificateError::Output,
         CertificateError::Commitment,
     );
@@ -158,6 +224,7 @@ fn gate_2_c8_tamper_rejects() {
         &x.b,
         &x.c,
         &c8,
+        x.payout,
         CertificateError::Output,
         CertificateError::Output,
     );
@@ -175,6 +242,7 @@ fn gate_3_input_tamper_rejects() {
         &x.b,
         &x.c,
         &x.c8,
+        x.payout,
         CertificateError::Commitment,
         CertificateError::Commitment,
     );
@@ -182,18 +250,20 @@ fn gate_3_input_tamper_rejects() {
 
 #[test]
 fn gate_4_payout_transplant_rejects() {
-    // Certificate from batch 1 presented against batch 2's honest data.
+    // Tensor bytes and certificate are unchanged, but the ledger attempts
+    // to settle them to another payout identity.
     let x = batch(32, 3);
     let y = batch(32, 4);
     assert_both_reject(
-        "transplanted certificate",
+        "transplanted payout",
         &x.cert,
-        &y.a,
-        &y.b,
-        &y.c,
-        &y.c8,
-        CertificateError::Commitment,
-        CertificateError::Commitment,
+        &x.a,
+        &x.b,
+        &x.c,
+        &x.c8,
+        y.payout,
+        CertificateError::Payout,
+        CertificateError::Payout,
     );
 }
 
@@ -210,6 +280,7 @@ fn gate_5_projection_splice_rejects() {
         &x.b,
         &x.c,
         &x.c8,
+        x.payout,
         CertificateError::Projection,
         CertificateError::Projection,
     );
@@ -229,6 +300,7 @@ fn gate_6_challenge_splice_rejects() {
         &x.b,
         &x.c,
         &x.c8,
+        x.payout,
         CertificateError::Projection,
         CertificateError::Projection,
     );
@@ -248,6 +320,7 @@ fn gate_7_soundness_downgrade_rejects() {
             &x.b,
             &x.c,
             &x.c8,
+            x.payout,
             CertificateError::Soundness,
             CertificateError::Soundness,
         );
@@ -271,7 +344,7 @@ fn forged_self_consistent_transcript_dies_on_the_span_relation() {
     c[17] += 1;
     let c8 = requant_w8a8(&c, MULT, SHIFT).unwrap();
     let forged = SpanCertificate {
-        commitment: commit_span_transcript(&x.a, &x.b, &c, &c8, 32, 32, 32, MULT, SHIFT),
+        commitment: commit_span_transcript(&x.a, &x.b, &c, &c8, 32, 32, 32, MULT, SHIFT, x.payout),
         projections: project_span(&c, CHALLENGE),
         // The attacker hashes the claimed outputs under the frozen output
         // domains (restated below independently of the crate internals).
@@ -280,12 +353,12 @@ fn forged_self_consistent_transcript_dies_on_the_span_relation() {
         ..x.cert.clone()
     };
     assert_eq!(
-        admit_span_certificate(&forged, &x.a, &x.b, &c, &c8),
+        admit_span_certificate(&forged, &x.a, &x.b, &c, &c8, x.payout),
         Err(CertificateError::Commitment),
         "re-derivation path must reject the forgery when recomputing the true product"
     );
     assert_eq!(
-        admit_span_certificate_freivalds(&forged, &x.a, &x.b, &c, &c8),
+        admit_span_certificate_freivalds(&forged, &x.a, &x.b, &c, &c8, x.payout),
         Err(CertificateError::Relation),
         "the Freivalds relation is the only gate left standing — it must hold"
     );
@@ -395,11 +468,11 @@ fn shape_gate_rejects_dimension_forgery() {
     let mut cert = x.cert.clone();
     cert.m = 16;
     assert!(matches!(
-        admit_span_certificate_freivalds(&cert, &x.a, &x.b, &x.c, &x.c8),
+        admit_span_certificate_freivalds(&cert, &x.a, &x.b, &x.c, &x.c8, x.payout),
         Err(CertificateError::Shape)
     ));
     assert!(matches!(
-        admit_span_certificate(&cert, &x.a, &x.b, &x.c, &x.c8),
+        admit_span_certificate(&cert, &x.a, &x.b, &x.c, &x.c8, x.payout),
         Err(CertificateError::Shape | CertificateError::Commitment)
     ));
 }

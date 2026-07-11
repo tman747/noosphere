@@ -34,8 +34,9 @@ pub mod vectors;
 
 pub use check::{
     certified_bound, check_cost_certificate, check_jet_certificate, check_meaning_contract,
-    check_profile, check_span_statement, content_id, cost_certificate_id, jet_certificate_id,
-    meaning_id, profile_id, span_id, WeftStoreV0,
+    check_profile, check_span_statement, content_id, cost_certificate_id,
+    execute_v0_or_grain_fallback, jet_certificate_id, meaning_id, profile_id, span_id, V0Execution,
+    V0ExecutionMode, V0FallbackError, WeftStoreV0,
 };
 pub use objects::{
     BeaconPolicy, BranchList, CostBranch, CostCertificateV0, CostTerm, CostTrial, Exponents,

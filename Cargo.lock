@@ -2317,6 +2317,7 @@ dependencies = [
  "blake3",
  "noos-codec",
  "noos-grain",
+ "noos-jet",
  "noos-weft-compile",
  "noos-weft-syntax",
  "serde_json",

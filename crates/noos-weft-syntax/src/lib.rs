@@ -560,7 +560,14 @@ impl Parser {
             let mut rs = BTreeSet::new();
             if !self.sym('}') {
                 loop {
-                    rs.insert(self.id()?);
+                    let right = self.id()?;
+                    if !rs.insert(right.clone()) {
+                        return Err(Diagnostic {
+                            code: "E-RIGHT-003",
+                            span: self.cur().s,
+                            message: format!("ambiguous duplicate right '{right}'"),
+                        });
+                    }
                     if self.sym('}') {
                         break;
                     }
@@ -1103,7 +1110,23 @@ fn infer(
         )),
     }
 }
+const MAX_RIGHTS_ROW_WIDTH: usize = 16;
+const MAX_RIGHTS_TYPE_DEPTH: usize = 128;
+
 fn validate_type(ty: &Type, span: Span, diagnostics: &mut Vec<Diagnostic>) {
+    validate_type_at_depth(ty, span, diagnostics, 0)
+}
+
+fn validate_type_at_depth(ty: &Type, span: Span, diagnostics: &mut Vec<Diagnostic>, depth: usize) {
+    if depth > MAX_RIGHTS_TYPE_DEPTH {
+        diagnostics.push(Diagnostic {
+            code: "E-RIGHT-004",
+            span,
+            message: "rights carrier nesting exceeds the decidable v1 budget".into(),
+        });
+        return;
+    }
+    let next_depth = depth.saturating_add(1);
     match ty {
         Type::Tensor(element, dimensions, profile) => {
             let element_ok = match profile.as_str() {
@@ -1148,18 +1171,27 @@ fn validate_type(ty: &Type, span: Span, diagnostics: &mut Vec<Diagnostic>) {
                         .into(),
                 })
             }
-            validate_type(element, span, diagnostics)
+            validate_type_at_depth(element, span, diagnostics, next_depth)
         }
         Type::Tuple(elements) => {
             for element in elements {
-                validate_type(element, span, diagnostics)
+                validate_type_at_depth(element, span, diagnostics, next_depth)
             }
+        }
+        Type::Rights(element, rights) => {
+            if rights.is_empty() || rights.len() > MAX_RIGHTS_ROW_WIDTH {
+                diagnostics.push(Diagnostic {
+                    code: "E-RIGHT-004",
+                    span,
+                    message: "rights row is empty or exceeds the v1 width budget".into(),
+                });
+            }
+            validate_type_at_depth(element, span, diagnostics, next_depth)
         }
         Type::Vec(element, _)
         | Type::Linear(element)
-        | Type::Rights(element, _)
         | Type::Committed(element, _)
-        | Type::Dream(element) => validate_type(element, span, diagnostics),
+        | Type::Dream(element) => validate_type_at_depth(element, span, diagnostics, next_depth),
         _ => {}
     }
 }
