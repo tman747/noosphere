@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindchain.network/protocol/genesis/allocation-list.proposal.schema.json",
+  "title": "NOOS mainnet genesis allocation owner-proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version","list_kind","status","signature_status","address_law_id","expected_total_micro_noos","categories","entries","allocations_root","review"],
+  "properties": {
+    "$schema": {"type":"string"},
+    "schema_version": {"const":1},
+    "list_kind": {"const":"NOOS_MAINNET_GENESIS_ALLOCATION_PROPOSAL"},
+    "status": {"enum":["DRAFT","OWNER_APPROVED"]},
+    "signature_status": {"enum":["UNSIGNED","SIGNED"]},
+    "address_law_id": {"const":"noos-bech32m-v1"},
+    "expected_total_micro_noos": {"type":"integer","minimum":1,"maximum":1000000000000000},
+    "categories": {
+      "type":"array","minItems":5,"maxItems":5,"uniqueItems":true,
+      "items": {
+        "type":"object","additionalProperties":false,
+        "required":["category_id","amount_micro_noos","share_of_max_supply_bp"],
+        "properties": {
+          "category_id":{"enum":["COMMUNITY_TREASURY","ECOSYSTEM_PUBLIC_GOODS","PUBLIC_OPERATOR_BOOTSTRAP","PROTOCOL_CONTRIBUTORS","PUBLIC_DISTRIBUTION_AND_ACCESS"]},
+          "amount_micro_noos":{"type":"integer","minimum":1},
+          "share_of_max_supply_bp":{"type":"integer","minimum":1,"maximum":10000}
+        }
+      }
+    },
+    "entries": {
+      "oneOf": [
+        {"const":"OWNER_INPUT_REQUIRED"},
+        {
+          "type":"array","minItems":1,
+          "items": {
+            "type":"object","additionalProperties":false,
+            "required":["entry_id","category_id","recipient_address","amount_micro_noos","unlock_height","memo"],
+            "properties": {
+              "entry_id":{"type":"string","pattern":"^[A-Z0-9_-]{1,64}$"},
+              "category_id":{"enum":["COMMUNITY_TREASURY","ECOSYSTEM_PUBLIC_GOODS","PUBLIC_OPERATOR_BOOTSTRAP","PROTOCOL_CONTRIBUTORS","PUBLIC_DISTRIBUTION_AND_ACCESS"]},
+              "recipient_address":{"type":"string","pattern":"^noos1[023456789acdefghjklmnpqrstuvwxyz]+$"},
+              "amount_micro_noos":{"type":"integer","minimum":1},
+              "unlock_height":{"type":"integer","minimum":0,"maximum":525600000},
+              "memo":{"type":"string","maxLength":256}
+            }
+          }
+        }
+      ]
+    },
+    "allocations_root":{"type":"string","pattern":"^(OWNER_INPUT_REQUIRED|[0-9a-f]{64})$"},
+    "review": {
+      "type":"object","additionalProperties":false,
+      "required":["owner_approved","independent_economist","counsel"],
+      "properties": {
+        "owner_approved":{"type":"boolean"},
+        "independent_economist":{"type":"string"},
+        "counsel":{"type":"string"}
+      }
+    }
+  }
+}

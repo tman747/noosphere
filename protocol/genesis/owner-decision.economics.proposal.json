@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "record_kind": "OWNER_DECISION_PROPOSAL",
+  "proposal_id": "ODR-ECONOMICS-2026-07-11-V1",
+  "status": "DRAFT",
+  "signature_status": "UNSIGNED",
+  "production_effect": "NONE",
+  "owner_approval": false,
+  "independent_economic_review": "NOT_PERFORMED",
+  "counsel_review": "NOT_PERFORMED",
+  "statement": "These are recommendations only. They do not replace OWNER_BLOCKED or UNRESOLVED_SOURCE markers until the exact artifact is independently reviewed and signed by the selected release owner.",
+  "records": [
+    {
+      "odr_id": "ODR-GROUND-001",
+      "constants_key": "ground.mainnet_max_future_drift_ms",
+      "current_marker": "OWNER_BLOCKED",
+      "proposal": "PENDING_E_WAN_01",
+      "reason": "Registry E-WAN-01 is NOT_STARTED, UNMEASURED, and locally MISSING. Selecting 12000, 18000, or 30000 ms would fabricate evidence."
+    },
+    {
+      "odr_id": "ODR-ECON-001",
+      "constants_key": "witness.mainnet_min_bond",
+      "current_marker": "OWNER_BLOCKED",
+      "proposal": {"min_bond_micro_noos":250000000000},
+      "reason": "250,000 NOOS is 0.025% of the one-billion-NOOS cap. At 256 minimum bonds, 64 million NOOS (6.4% of cap) is bonded and one-third-plus-one is about 21.333 million NOOS before price/liquidity effects."
+    },
+    {
+      "odr_id": "ODR-EMISSION-001",
+      "constants_key": "emission.max_supply",
+      "current_marker": "OWNER_BLOCKED",
+      "proposal": {"max_supply_micro_noos":1000000000000000},
+      "reason": "A round one-billion-NOOS hard cap is simple to audit; all consensus arithmetic remains integer micro-NOOS."
+    },
+    {
+      "odr_id": "ODR-EMISSION-002",
+      "constants_key": "emission.issuance_curve",
+      "current_marker": "OWNER_BLOCKED",
+      "proposal": {"initial_per_height_micro_noos":3436932,"era_length_heights":105120000,"decay_numerator":1,"decay_denominator":2,"table_root":"616a3cf355c64ae62f2a20f4f99f9c3da5d72b4f1bedae6aba17f53ad8117b35"},
+      "reason": "Five exact 20-year eras halve by integer floor. Scheduled emission is 699,999,861,600,000 micro-NOOS, 138,400,000 below its 700 million NOOS envelope."
+    },
+    {
+      "odr_id": "ODR-EMISSION-003",
+      "constants_key": "emission.terminal_height",
+      "current_marker": "OWNER_BLOCKED",
+      "proposal": {"terminal_height":525600000,"target_spacing_years":100},
+      "reason": "At six-second target spacing, 525,600,000 heights is exactly 100 nominal 365-day years; every later height emits zero."
+    },
+    {
+      "odr_id": "ODR-EMISSION-004",
+      "constants_key": "emission.recipient_shares",
+      "current_marker": "OWNER_BLOCKED",
+      "proposal": {"ground_bp":5000,"witness_bp":4000,"treasury_bp":1000},
+      "reason": "Ninety percent remains direct base security subsidy; treasury is capped at 10%. At year one, scheduled issuance is about 18.065 million NOOS: about 9.032 million Ground, 7.226 million Witness, and 1.806 million treasury before missed heights."
+    },
+    {
+      "odr_id": "ODR-EMISSION-005",
+      "constants_key": "emission.rounding_rule",
+      "current_marker": "OWNER_BLOCKED",
+      "proposal": "witness floor; treasury floor; Ground receives exact remainder",
+      "reason": "Matches noos-lumen's checked implementation and conserves every emission amount to one micro-NOOS."
+    },
+    {
+      "odr_id": "ODR-EMISSION-006",
+      "constants_key": "emission.fee_disposition",
+      "current_marker": "OWNER_BLOCKED",
+      "proposal": {"base_fee":"100% burn","failure_fee":"100% burn","priority_tip":"100% Ground proposer","workjob_escrow":"separate transfer"},
+      "reason": "Burn is the least discretionary base-fee destination and cannot recreate forfeited emission. Explicit tips retain a direct inclusion incentive."
+    },
+    {
+      "odr_id": "ODR-EMISSION-007",
+      "constants_key": "emission.allocation",
+      "current_marker": "OWNER_BLOCKED",
+      "proposal": {"limit_micro_noos":300000000000000,"categories_bp":[1200,800,400,300,300],"recipient_entries":"OWNER_INPUT_REQUIRED","allocations_root":"OWNER_INPUT_REQUIRED"},
+      "reason": "Genesis allocation is capped at 30% of maximum supply. Category envelopes are exact, but no recipient, address, vesting entry, or root is invented; counsel and owner must supply and review the complete list."
+    },
+    {
+      "odr_id": "ODR-WITNESS-002",
+      "constants_key": "witness.slash_burn_fraction,witness.slash_reporter_fraction",
+      "current_marker": "UNRESOLVED_SOURCE",
+      "proposal": {"burn_bp":5000,"reporter_bp":1000,"locked_remainder_bp":4000,"rounding":"burn floor; reporter floor; locked remainder"},
+      "reason": "A proven slash destroys or transfers 60% of the offense bond, pays a bounded 10% evidence incentive, and keeps 40% locked through exit. This is the already exercised test fixture split, proposed here as a reviewed production value rather than a code default."
+    },
+    {
+      "odr_id": "ODR-WITNESS-003",
+      "constants_key": "witness.inactivity_leak_rate",
+      "current_marker": "UNRESOLVED_SOURCE",
+      "proposal": {"delay_epochs":8,"leak_ppm_per_epoch":5000,"rounding":"floor remaining weight each epoch"},
+      "reason": "The leak waits about 3.41 hours, then removes 0.5% of remaining nonvoter weight per epoch; nominal half-life is about 138 leak epochs or 58.9 hours. It affects future snapshots only."
+    },
+    {
+      "odr_id": "ODR-WITNESS-004",
+      "constants_key": "witness.activation_delay_epochs,witness.exit_delay_epochs",
+      "current_marker": "UNRESOLVED_SOURCE",
+      "proposal": {"activation_delay_epochs":4,"exit_delay_epochs":8192},
+      "reason": "Activation waits four epochs (about 1.71 hours), exceeding the two-epoch membership lookback. Exit remains locked about 145.6 days at target spacing, matching the evidence horizon."
+    },
+    {
+      "odr_id": "ODR-WITNESS-005",
+      "constants_key": "witness.evidence_horizon_epochs",
+      "current_marker": "UNRESOLVED_SOURCE",
+      "proposal": {"evidence_horizon_epochs":8192},
+      "reason": "About 145.6 target-spacing days gives public operators time to propagate and submit objective evidence while the bond remains locked."
+    },
+    {
+      "odr_id": "ODR-FEES-001",
+      "constants_key": "fees.controller_bounds",
+      "current_marker": "UNRESOLVED_SOURCE",
+      "proposal": {"min_price":1,"max_price":1000000000000,"initial_prices":[1,1,10,10,1],"max_change_ppm":125000,"target":"capacity/2","activation_delay_heights":100800},
+      "reason": "A 12.5% full-block step approximately doubles price in six blocks while remaining bounded and integer-only. Parameter changes wait seven nominal days. Initial prices are explicit and carry no fiat-price claim."
+    },
+    {
+      "odr_id": "ODR-FEES-002",
+      "constants_key": "fees.per_dimension_capacity",
+      "current_marker": "UNRESOLVED_SOURCE",
+      "proposal": {"B":1048576,"G":50000000,"V":100000,"R":250000,"D":4194304},
+      "reason": "B matches the 1 MiB frozen-candidate block-body maximum; D covers sixteen 256 KiB descriptors; G, V, and R deliberately bound work below u64 maxima and must still pass the A-FEES 24-hour marginal-cost gate."
+    },
+    {
+      "odr_id": "ODR-FEES-003",
+      "constants_key": "fees.failure_fee_value",
+      "current_marker": "UNRESOLVED_SOURCE",
+      "proposal": {"failure_fee_micro_noos":1000000,"rule":"min(reservation,1000000), then burn"},
+      "reason": "One NOOS is simple, nonzero, reservation-bounded, and deterministic. It is an anti-spam floor, not a claim that it covers measured marginal cost; A-FEES must validate it."
+    },
+    {
+      "odr_id": "ODR-NEL-001",
+      "constants_key": "nel.anchor_deadline_blocks",
+      "current_marker": "UNRESOLVED_SOURCE",
+      "proposal": {"anchor_deadline_blocks":100,"nominal_seconds":600},
+      "reason": "Ten nominal minutes is over 1,900 times the modeled 302 ms soft-final p95 and well below the six-hour challenge floor. NEL remains disabled at genesis."
+    },
+    {
+      "odr_id": "ODR-GRAIN-001",
+      "constants_key": "grain.cost_table",
+      "current_marker": "UNRESOLVED_SOURCE",
+      "proposal": {"cons":4,"slot_base":2,"slot_step":1,"quote":1,"apply":4,"iscell":2,"inc_base":2,"inc_word":1,"equal_base":2,"equal_node":1,"equal_word":1,"if":3,"compose":3,"push":3,"arm":4,"edit_base":4,"edit_step":4,"hint":0},
+      "reason": "Adopts the implemented PROPOSED-G0 Grain v1 table with Rust/Go vectors; hint remains zero to preserve erasability."
+    },
+    {
+      "odr_id": "ODR-GRAIN-002",
+      "constants_key": "grain.arena_bound_per_tx,grain.max_noun_bytes,grain.max_formula_bytes,grain.max_cell_depth",
+      "current_marker": "UNRESOLVED_SOURCE",
+      "proposal": {"arena_words":4194304,"arena_bytes":33554432,"max_atom_bytes":65536,"max_noun_bytes":1048576,"max_subject_bytes":1048576,"max_formula_bytes":65536,"max_cell_depth":1048576},
+      "reason": "Adopts the implemented PROPOSED-G0 Grain v1 limits so production parameters do not diverge from the vector-checked interpreter."
+    }
+  ],
+  "signatures": []
+}

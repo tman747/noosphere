@@ -1,0 +1,174 @@
+# NOOSPHERE production economics OWNER-PROPOSAL
+#
+# STATUS: DRAFT / UNSIGNED / NOT PRODUCTION LOADABLE.
+# This is a recommendation for owner, independent economist, and counsel
+# review. It is not an approval, freeze, signed genesis manifest, or legal or
+# economic opinion. Production loaders and the freeze gate MUST refuse it.
+
+schema_version = 1
+proposal_kind = "OWNER-PROPOSAL"
+proposal_id = "ODR-ECONOMICS-2026-07-11-V1"
+status = "DRAFT"
+signature_status = "UNSIGNED"
+chain_name = "MindChain Mainnet"
+is_test_network = false
+is_template = false
+is_proposal = true
+production_loadable = false
+owner_signed = false
+independent_economic_review = "NOT_PERFORMED"
+counsel_review = "NOT_PERFORMED"
+
+[token]
+symbol = "NOOS"
+decimals = 6
+base_unit = "micro-NOOS"
+
+[consensus]
+slot_seconds = 6
+epoch_length = 256
+max_slot_skip = 20
+median_time_past_blocks = 11
+witness_membership_lookback_epochs = 2
+pulse_target_spacing_seconds = 6
+pulse_half_life_seconds = 3600
+# E-WAN-01 is NOT_STARTED/UNMEASURED. No candidate is evidence-supported.
+max_future_drift_ms = "PENDING_E_WAN_01"
+max_future_drift_candidates_ms = [12000, 18000, 30000]
+max_future_drift_selection_rule = "smallest candidate passing E-WAN-01; no pass means mainnet remains blocked"
+
+[witness_ring]
+n_max = 256
+n_tail = 32
+n_hard = 1024
+min_bond_micro_noos = 250000000000
+activation_delay_epochs = 4
+exit_delay_epochs = 8192
+evidence_horizon_epochs = 8192
+slash_burn_bp = 5000
+slash_reporter_bp = 1000
+slash_locked_bp = 4000
+slash_rounding_rule_id = "burn_floor_reporter_floor_locked_remainder_v1"
+inactivity_delay_epochs = 8
+inactivity_leak_ppm_per_epoch = 5000
+inactivity_rounding_rule_id = "remaining_weight_floor_each_epoch_v1"
+
+[emission]
+max_supply_micro_noos = 1000000000000000
+genesis_allocation_limit_micro_noos = 300000000000000
+scheduled_emission_limit_micro_noos = 700000000000000
+initial_per_height_micro_noos = 3436932
+era_length_heights = 105120000
+decay_numerator = 1
+decay_denominator = 2
+emission_terminal_height = 525600000
+emission_table_format = "noos-emission-range-table-v1"
+emission_table_path = "protocol/genesis/emission-table-v1.csv"
+emission_table_root_algorithm = "BLAKE3-256"
+emission_table_root = "616a3cf355c64ae62f2a20f4f99f9c3da5d72b4f1bedae6aba17f53ad8117b35"
+recipient_share_ground_bp = 5000
+recipient_share_witness_bp = 4000
+recipient_share_treasury_bp = 1000
+rounding_rule_id = "witness_floor_treasury_floor_ground_remainder_v1"
+fee_disposition_id = "base_and_failure_burn_priority_tip_ground_v1"
+missed_or_orphaned_emission = "FORFEIT_NEVER_RECREATED"
+useful_work_mint = false
+duplex_issuance_enabled = false
+
+[fees]
+formula_id = "B_G_V_R_D_integer_dot_product_v1"
+min_price_micro_noos_per_unit = 1
+max_price_micro_noos_per_unit = 1000000000000
+initial_prices_micro_noos = [1, 1, 10, 10, 1]
+max_change_ppm_per_block = 125000
+target_capacity_fraction = "1/2"
+capacity_b_canonical_bytes = 1048576
+capacity_g_grain_steps = 50000000
+capacity_v_proof_units = 100000
+capacity_r_state_word_epochs = 250000
+capacity_d_blob_bytes = 4194304
+failure_fee_micro_noos = 1000000
+failure_fee_rule_id = "min(reservation,failure_fee)_then_burn_v1"
+parameter_activation_delay_heights = 100800
+priority_tip_disposition = "GROUND_PROPOSER_100_PERCENT"
+base_fee_disposition = "BURN_100_PERCENT"
+failure_fee_disposition = "BURN_100_PERCENT"
+workjob_escrow_is_fee = false
+
+[nel]
+neural_lane_enabled_at_genesis = false
+anchor_deadline_blocks = 100
+anchor_deadline_seconds_at_target_spacing = 600
+challenge_window_floor_hours = 6
+
+[grain]
+grain_version = 1
+word_bytes = 8
+max_atom_bytes = 65536
+max_noun_bytes = 1048576
+max_subject_bytes = 1048576
+max_formula_bytes = 65536
+max_cell_depth = 1048576
+arena_max_words_per_tx = 4194304
+arena_max_bytes_per_tx = 33554432
+
+[grain.cost_table]
+cons = 4
+slot_base = 2
+slot_step = 1
+quote = 1
+apply = 4
+iscell = 2
+inc_base = 2
+inc_word = 1
+equal_base = 2
+equal_node = 1
+equal_word = 1
+if = 3
+compose = 3
+push = 3
+arm = 4
+edit_base = 4
+edit_step = 4
+hint = 0
+
+[controls]
+work_loom_credit_enabled = false
+work_loom_weight_cap = 0
+witness_proofpower_bonus_enabled = false
+neural_lane_enabled = false
+reflex_lane_enabled = false
+umbra_suite_enabled = false
+dream_lane_enabled = false
+class_gate_irreversible_budget = 0
+
+[allocations]
+address_law_id = "noos-bech32m-v1"
+allocation_list_path = "protocol/genesis/mainnet-allocations.proposal.json"
+allocation_schema_path = "protocol/genesis/allocation-list.proposal.schema.json"
+expected_total_micro_noos = 300000000000000
+allocations_root = "OWNER_INPUT_REQUIRED"
+recipient_entries = "OWNER_INPUT_REQUIRED"
+
+[release_authority]
+signature_scheme = "Ed25519"
+required_roles = ["release-owner"]
+release_owner_public_key = "OWNER_INPUT_REQUIRED"
+detached_signature_record = "OWNER_INPUT_REQUIRED"
+
+[dkg]
+participants = 7
+threshold = 5
+operator_model = "SELF_HOSTED_PUBLIC_OPERATORS"
+participant_identities = "OWNER_INPUT_REQUIRED"
+transcript_root = "POST_QUIET_WEEK_CEREMONY_REQUIRED"
+
+[commitments]
+claim_registry_root = "QUIET_WEEK_INPUT_REQUIRED"
+conformance_vector_root = "QUIET_WEEK_INPUT_REQUIRED"
+software_manifest_root = "QUIET_WEEK_INPUT_REQUIRED"
+
+[review]
+owner_decision_record = "protocol/genesis/owner-decision.economics.proposal.json"
+review_checklist = "protocol/genesis/OWNER-PROPOSAL-ECONOMICS.md"
+sensitivity_analysis = "evidence/economics/production-economics-sensitivity-v1.json"

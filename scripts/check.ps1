@@ -142,6 +142,8 @@ Invoke-Step 'check_api' @('python', 'tools/gates/check_api.py') $Root
 Invoke-Step 'check_telemetry' @('python', 'tools/gates/check_telemetry.py') $Root
 Invoke-Step 'check_repro_policy' @('python', 'tools/gates/check_repro_policy.py') $Root
 Invoke-Step 'check_base_evidence' @('python', 'tools/gates/check_base_evidence.py') $Root
+Invoke-Step 'check_mainnet_template_refusal' @('python', 'tools/gates/check_mainnet_template.py', '--self-test') $Root
+Invoke-Step 'check_economics_proposal_draft' @('python', 'tools/gates/check_economics_proposal.py', '--allow-draft') $Root
 Invoke-Step 'check_docs' @('python', 'tools/gates/check_docs.py') $Root
 Invoke-Step 'check_promotion' @('python', 'tools/gates/check_promotion.py') $Root
 Invoke-Step 'stage_evidence' @('python', 'tools/gates/stage_evidence.py', 'validate') $Root

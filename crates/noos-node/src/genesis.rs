@@ -761,3 +761,24 @@ pub fn mine_ticket(
         })?;
     }
 }
+
+#[cfg(test)]
+mod production_proposal_refusal_tests {
+    use super::DevnetParams;
+
+    /// The only node parameter loader is deliberately devnet-only. Keep an
+    /// executable regression proving that a filled-but-unsigned owner proposal
+    /// cannot become production configuration merely because its economics are
+    /// numerically complete.
+    #[test]
+    fn unsigned_owner_proposal_is_refused_by_node_loader() {
+        let proposal = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../protocol/genesis/mainnet-parameters.proposal.toml"
+        ));
+        assert!(
+            DevnetParams::parse(proposal).is_err(),
+            "an unsigned owner proposal must never load as node parameters"
+        );
+    }
+}

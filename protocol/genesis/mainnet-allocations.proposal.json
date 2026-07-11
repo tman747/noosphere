@@ -1,0 +1,23 @@
+{
+  "$schema": "allocation-list.proposal.schema.json",
+  "schema_version": 1,
+  "list_kind": "NOOS_MAINNET_GENESIS_ALLOCATION_PROPOSAL",
+  "status": "DRAFT",
+  "signature_status": "UNSIGNED",
+  "address_law_id": "noos-bech32m-v1",
+  "expected_total_micro_noos": 300000000000000,
+  "categories": [
+    {"category_id":"COMMUNITY_TREASURY","amount_micro_noos":120000000000000,"share_of_max_supply_bp":1200},
+    {"category_id":"ECOSYSTEM_PUBLIC_GOODS","amount_micro_noos":80000000000000,"share_of_max_supply_bp":800},
+    {"category_id":"PUBLIC_OPERATOR_BOOTSTRAP","amount_micro_noos":40000000000000,"share_of_max_supply_bp":400},
+    {"category_id":"PROTOCOL_CONTRIBUTORS","amount_micro_noos":30000000000000,"share_of_max_supply_bp":300},
+    {"category_id":"PUBLIC_DISTRIBUTION_AND_ACCESS","amount_micro_noos":30000000000000,"share_of_max_supply_bp":300}
+  ],
+  "entries": "OWNER_INPUT_REQUIRED",
+  "allocations_root": "OWNER_INPUT_REQUIRED",
+  "review": {
+    "owner_approved": false,
+    "independent_economist": "NOT_REVIEWED",
+    "counsel": "NOT_REVIEWED"
+  }
+}
