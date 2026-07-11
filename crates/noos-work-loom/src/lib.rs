@@ -9,6 +9,8 @@
 use noos_lumen::engine::{EscrowError as LumenEscrowError, WorkJobEscrow};
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod economics;
+
 pub type Hash32 = [u8; 32];
 pub type AccountId = Hash32;
 pub type RegistryId = u32;
@@ -59,6 +61,17 @@ pub enum Assurance {
     V1,
     V2,
     V3,
+}
+
+impl Assurance {
+    const fn tag(self) -> u8 {
+        match self {
+            Self::V0 => 0,
+            Self::V1 => 1,
+            Self::V2 => 2,
+            Self::V3 => 3,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -269,6 +282,24 @@ pub enum Delivery {
     Available,
     Acknowledged,
 }
+
+/// Immutable delivery condition selected when escrow is opened. Availability
+/// is sufficient for ordinary compute settlement; paid acknowledgement binds
+/// the requester's delivery certificate before funds can leave escrow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeliveryRule {
+    Availability,
+    PaidAcknowledgement,
+}
+
+impl DeliveryRule {
+    const fn tag(self) -> u8 {
+        match self {
+            Self::Availability => 0,
+            Self::PaidAcknowledgement => 1,
+        }
+    }
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Quality {
     NotEvaluated,
@@ -308,10 +339,16 @@ impl JobState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OpenJob {
     pub requester: AccountId,
+    /// Precommitted refund destination. Cancellation and every timeout path
+    /// use this field; no terminal caller chooses a refund direction.
+    pub refund_account: AccountId,
     pub class_id: RegistryId,
+    pub required_assurance: Assurance,
     pub input_root: Hash32,
     pub model_or_program_root: Hash32,
     pub delivery_pubkey: Hash32,
+    pub delivery_rule: DeliveryRule,
+    pub settlement_accounts: SettlementAccounts,
     pub max_resources: ResourceVector,
     pub fee_escrow: u128,
     pub evaluator_escrow: u128,
@@ -554,6 +591,9 @@ impl WorkLoom {
     }
     pub fn open_job(&mut self, job: OpenJob) -> Result<Hash32, LoomError> {
         let class = self.registries.job_class(job.class_id)?;
+        if job.required_assurance != class.assurance {
+            return Err(LoomError::InvalidRegistryEntry);
+        }
         if !(job.opened_height < job.commit_deadline
             && job.commit_deadline < job.submit_deadline
             && job.submit_deadline <= job.expiry_height)
@@ -859,6 +899,14 @@ impl WorkLoom {
         if record.state != JobState::Challengeable {
             return Err(LoomError::InvalidState);
         }
+        if accounts != record.job.settlement_accounts {
+            return Err(LoomError::AccountConflict);
+        }
+        if record.job.delivery_rule == DeliveryRule::PaidAcknowledgement
+            && record.delivery_certificate.is_none()
+        {
+            return Err(LoomError::InvalidSettlement);
+        }
         let start = record.challenge_start.ok_or(LoomError::Ordering)?;
         let end = start
             .checked_add(
@@ -888,8 +936,16 @@ impl WorkLoom {
             .as_ref()
             .ok_or(LoomError::InvalidCommit)?
             .bond;
-        self.pay_split(worker, split, accounts)?;
-        self.release_locked(worker, bond)?;
+        self.distribute_locked(
+            &[
+                (worker, split.worker),
+                (accounts.verifier, split.verifier),
+                (accounts.evaluator, split.evaluator),
+                (accounts.da_provider, split.da_provider),
+                (worker, bond),
+            ],
+            0,
+        )?;
         let record = self.jobs.get_mut(&job_id).ok_or(LoomError::UnknownJob)?;
         record.state = JobState::Settled;
         self.assert_conserved()
@@ -912,7 +968,8 @@ impl WorkLoom {
             .fee_escrow
             .checked_add(record.job.evaluator_escrow)
             .ok_or(LoomError::ArithmeticOverflow)?;
-        self.release_locked(requester, refund)?;
+        let refund_account = record.job.refund_account;
+        self.release_locked(refund_account, refund)?;
         self.jobs
             .get_mut(&job_id)
             .ok_or(LoomError::UnknownJob)?
@@ -927,23 +984,30 @@ impl WorkLoom {
         let allowed = match record.state {
             JobState::Open => height > record.job.commit_deadline,
             JobState::Committed | JobState::Running => height > record.job.submit_deadline,
-            JobState::Submitted => height > record.job.expiry_height,
+            JobState::Submitted | JobState::Challengeable | JobState::Disputed => {
+                height > record.job.expiry_height
+            }
             _ => false,
         };
         if !allowed {
             return Err(LoomError::Deadline);
         }
-        let requester = record.job.requester;
+        let refund_account = record.job.refund_account;
         let escrow = record
             .job
             .fee_escrow
             .checked_add(record.job.evaluator_escrow)
             .ok_or(LoomError::ArithmeticOverflow)?;
         let worker_refund = record.worker_commit.as_ref().map(|c| (c.worker, c.bond));
-        self.release_locked(requester, escrow)?;
-        if let Some((worker, bond)) = worker_refund {
-            self.release_locked(worker, bond)?;
+        let challenger_refund = record.dispute.as_ref().map(|d| (d.challenger, d.bond));
+        let mut refunds = vec![(refund_account, escrow)];
+        if let Some(refund) = worker_refund {
+            refunds.push(refund);
         }
+        if let Some(refund) = challenger_refund {
+            refunds.push(refund);
+        }
+        self.distribute_locked(&refunds, 0)?;
         self.jobs
             .get_mut(&job_id)
             .ok_or(LoomError::UnknownJob)?
@@ -968,7 +1032,10 @@ impl WorkLoom {
         accounts: SettlementAccounts,
     ) -> Result<(), LoomError> {
         let record = self.jobs.get(&job_id).ok_or(LoomError::UnknownJob)?;
-        let requester = record.job.requester;
+        if accounts != record.job.settlement_accounts {
+            return Err(LoomError::AccountConflict);
+        }
+        let requester = record.job.refund_account;
         let worker_bond = record
             .worker_commit
             .as_ref()
@@ -982,9 +1049,16 @@ impl WorkLoom {
         if split.total()? != worker_bond {
             return Err(LoomError::InvalidSettlement);
         }
-        self.release_locked(requester, escrow)?;
-        self.release_locked(dispute.challenger, dispute.bond)?;
-        self.pay_slash(dispute.challenger, split, accounts)?;
+        self.distribute_locked(
+            &[
+                (requester, escrow),
+                (dispute.challenger, dispute.bond),
+                (dispute.challenger, split.worker),
+                (accounts.verifier, split.verifier),
+                (accounts.evaluator, split.evaluator),
+            ],
+            split.da_provider,
+        )?;
         let record = self.jobs.get_mut(&job_id).ok_or(LoomError::UnknownJob)?;
         if let Some(receipt) = record.receipt.as_mut() {
             receipt.correctness = Correctness::Rejected;
@@ -992,42 +1066,58 @@ impl WorkLoom {
         record.state = JobState::Rejected;
         Ok(())
     }
-    fn pay_split(
-        &mut self,
-        worker: AccountId,
-        split: SettlementSplit,
-        accounts: SettlementAccounts,
-    ) -> Result<(), LoomError> {
-        self.release_locked(worker, split.worker)?;
-        self.release_locked(accounts.verifier, split.verifier)?;
-        self.release_locked(accounts.evaluator, split.evaluator)?;
-        self.release_locked(accounts.da_provider, split.da_provider)
-    }
-    fn pay_slash(
-        &mut self,
-        challenger: AccountId,
-        split: SettlementSplit,
-        accounts: SettlementAccounts,
-    ) -> Result<(), LoomError> {
-        self.release_locked(challenger, split.worker)?;
-        self.release_locked(accounts.verifier, split.verifier)?;
-        self.release_locked(accounts.evaluator, split.evaluator)?;
-        self.locked = self
-            .locked
-            .checked_sub(split.da_provider)
-            .ok_or(LoomError::InvalidSettlement)?;
-        self.burned = self
-            .burned
-            .checked_add(split.da_provider)
-            .ok_or(LoomError::ArithmeticOverflow)?;
-        Ok(())
-    }
     fn release_locked(&mut self, account: AccountId, amount: u128) -> Result<(), LoomError> {
-        self.locked = self
+        self.distribute_locked(&[(account, amount)], 0)
+    }
+
+    /// Preflight an entire terminal distribution before touching balances.
+    /// Recipient aliases are aggregated, and overflow or direction mistakes
+    /// leave escrow, balances, and burn accounting byte-for-byte unchanged.
+    fn distribute_locked(
+        &mut self,
+        payouts: &[(AccountId, u128)],
+        burn: u128,
+    ) -> Result<(), LoomError> {
+        let mut aggregated = BTreeMap::<AccountId, u128>::new();
+        for (account, amount) in payouts {
+            let prior = aggregated.get(account).copied().unwrap_or(0);
+            aggregated.insert(
+                *account,
+                prior
+                    .checked_add(*amount)
+                    .ok_or(LoomError::ArithmeticOverflow)?,
+            );
+        }
+        let payout_total = aggregated.values().try_fold(0u128, |sum, amount| {
+            sum.checked_add(*amount)
+                .ok_or(LoomError::ArithmeticOverflow)
+        })?;
+        let released = payout_total
+            .checked_add(burn)
+            .ok_or(LoomError::ArithmeticOverflow)?;
+        let next_locked = self
             .locked
-            .checked_sub(amount)
+            .checked_sub(released)
             .ok_or(LoomError::InvalidSettlement)?;
-        credit(&mut self.balances, account, amount)
+        let next_burned = self
+            .burned
+            .checked_add(burn)
+            .ok_or(LoomError::ArithmeticOverflow)?;
+        let next_balances = aggregated
+            .iter()
+            .map(|(account, amount)| {
+                self.balance(account)
+                    .checked_add(*amount)
+                    .map(|next| (*account, next))
+                    .ok_or(LoomError::ArithmeticOverflow)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        for (account, next) in next_balances {
+            self.balances.insert(account, next);
+        }
+        self.locked = next_locked;
+        self.burned = next_burned;
+        Ok(())
     }
 }
 
@@ -1036,10 +1126,27 @@ fn job_id(job: &OpenJob) -> Hash32 {
         domains::JOB_ID,
         &[
             &job.requester,
+            &job.refund_account,
             &job.class_id.to_le_bytes(),
+            &[job.required_assurance.tag()],
             &job.input_root,
             &job.model_or_program_root,
+            &job.delivery_pubkey,
+            &[job.delivery_rule.tag()],
+            &job.settlement_accounts.verifier,
+            &job.settlement_accounts.evaluator,
+            &job.settlement_accounts.da_provider,
+            &job.max_resources.bytes.to_le_bytes(),
+            &job.max_resources.compute.to_le_bytes(),
+            &job.max_resources.verification.to_le_bytes(),
+            &job.max_resources.reads.to_le_bytes(),
+            &job.max_resources.da_bytes.to_le_bytes(),
+            &job.fee_escrow.to_le_bytes(),
+            &job.evaluator_escrow.to_le_bytes(),
             &job.opened_height.to_le_bytes(),
+            &job.commit_deadline.to_le_bytes(),
+            &job.submit_deadline.to_le_bytes(),
+            &job.expiry_height.to_le_bytes(),
             &job.nonce.to_le_bytes(),
         ],
     )
@@ -1115,14 +1222,14 @@ pub struct ProductionInfluence {
 }
 
 pub mod shadow {
-    use super::{DemandClassification, Hash32};
+    use super::{economics::DemandEvidence, Hash32};
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct Inputs {
         pub ground_work: u128,
         pub settled_value: u128,
         pub calibration_units: u128,
         pub raw_stake: u128,
-        pub demand: DemandClassification,
+        pub demand_evidence: DemandEvidence,
         pub delivered: bool,
         pub paid_certificate: bool,
     }
@@ -1137,9 +1244,8 @@ pub mod shadow {
     }
     #[must_use]
     pub fn calculate(input: Inputs, _receipt: Hash32) -> Outputs {
-        let external = input.demand == DemandClassification::Independent
-            && input.delivered
-            && input.paid_certificate;
+        let external =
+            input.demand_evidence.qualifies() && input.delivered && input.paid_certificate;
         let cap = input.ground_work / 9;
         Outputs {
             counterfactual_loom_credit: if external {
@@ -1147,16 +1253,11 @@ pub mod shadow {
             } else {
                 0
             },
-            counterfactual_proofpower: if external {
-                input.settled_value.min(input.raw_stake / 4)
-            } else {
-                0
-            },
-            counterfactual_duplex: if external {
-                input.settled_value / 100
-            } else {
-                0
-            },
+            // Proofpower and Duplex require stateful maturity/duplicate/cap
+            // accounting. The legacy stateless quote cannot bypass the exact
+            // economics books by manufacturing a self-labelled receipt.
+            counterfactual_proofpower: 0,
+            counterfactual_duplex: 0,
             ..Outputs::default()
         }
     }

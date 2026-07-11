@@ -10,6 +10,31 @@ use super::*;
 fn h(byte: u8) -> Hash32 {
     [byte; 32]
 }
+
+fn demand_evidence(classification: DemandClassification) -> economics::DemandEvidence {
+    use economics::{CompletionEvidence, ControlEvidence, FundingEvidence};
+    let mut evidence = economics::DemandEvidence {
+        on_chain_escrow: true,
+        delivered: true,
+        requester_worker_control: ControlEvidence::Independent,
+        requester_evaluator_control: ControlEvidence::Independent,
+        completion: CompletionEvidence::RequesterAccepted,
+        funding: FundingEvidence::ExternalNoCircularDetected,
+    };
+    match classification {
+        DemandClassification::Independent => {}
+        DemandClassification::Related => {
+            evidence.requester_worker_control = ControlEvidence::CommonControl;
+        }
+        DemandClassification::Subsidized => {
+            evidence.funding = FundingEvidence::SubsidizedOrRebated;
+        }
+        DemandClassification::Unknown => {
+            evidence.requester_worker_control = ControlEvidence::Unknown;
+        }
+    }
+    evidence
+}
 fn accounts() -> SettlementAccounts {
     SettlementAccounts {
         verifier: h(3),
@@ -104,10 +129,14 @@ fn registries() -> Registries {
 fn open() -> OpenJob {
     OpenJob {
         requester: h(1),
+        refund_account: h(1),
         class_id: 1,
+        required_assurance: Assurance::V2,
         input_root: h(20),
         model_or_program_root: h(21),
         delivery_pubkey: h(22),
+        delivery_rule: DeliveryRule::Availability,
+        settlement_accounts: accounts(),
         max_resources: ResourceVector {
             bytes: 10,
             compute: 20,
@@ -205,6 +234,21 @@ fn availability() -> AvailabilityCertificate {
         availability_root: h(36),
         retriever_count: 2,
         finalized_height: 35,
+    }
+}
+
+fn paid_delivery(job_id: Hash32) -> PaidDeliveryCertificate {
+    PaidDeliveryCertificate {
+        job_id,
+        requester_domain: h(1),
+        worker_domain: h(2),
+        evaluator_domain: Some(h(4)),
+        artifact_id: artifact_id(b"tensor:f32le:1x1", &[42, 0, 0, 0]),
+        output_commitment: h(32),
+        encrypted_delivery_commitment: h(33),
+        delivery_ack_signature: [8; 64],
+        payment_txid: h(70),
+        independence_domains_root: h(71),
     }
 }
 
@@ -345,12 +389,42 @@ fn malformed_settlement_is_atomic() {
 }
 
 #[test]
+fn settlement_accounts_are_job_bound_and_mutation_is_atomic() {
+    let mut l = loom();
+    let id = reach_submitted(&mut l, 48);
+    l.finalize_availability(id, availability()).unwrap();
+    let locked = l.locked();
+    let mut confused = accounts();
+    confused.evaluator = h(99);
+    assert_eq!(
+        l.settle(id, 46, payout(), confused),
+        Err(LoomError::AccountConflict)
+    );
+    assert_eq!(l.locked(), locked);
+    assert_eq!(l.balance(&h(99)), 0);
+    assert_eq!(l.job(&id).unwrap().state, JobState::Challengeable);
+}
+
+#[test]
 fn cancellation_refunds_all_escrow() {
     let mut l = loom();
     let id = l.open_job(open()).unwrap();
     l.cancel_open(id, h(1), 11).unwrap();
     assert_eq!(l.balance(&h(1)), 1_000);
     assert_eq!(l.job(&id).unwrap().state, JobState::Cancelled);
+    l.assert_conserved().unwrap();
+}
+
+#[test]
+fn refund_direction_is_precommitted_not_chosen_by_terminal_caller() {
+    let mut l = loom();
+    let mut job = open();
+    job.refund_account = h(9);
+    let id = l.open_job(job).unwrap();
+    l.cancel_open(id, h(1), 11).unwrap();
+    assert_eq!(l.balance(&h(1)), 900);
+    assert_eq!(l.balance(&h(9)), 100);
+    assert_eq!(l.locked(), 0);
     l.assert_conserved().unwrap();
 }
 
@@ -363,6 +437,21 @@ fn expiry_releases_job_and_worker_funds() {
     assert_eq!(l.balance(&h(1)), 1_000);
     assert_eq!(l.balance(&h(2)), 1_000);
     assert_eq!(l.locked(), 0);
+}
+
+#[test]
+fn unresolved_dispute_timeout_has_no_trapped_escrow() {
+    let mut l = loom();
+    let id = reach_submitted(&mut l, 47);
+    l.finalize_availability(id, availability()).unwrap();
+    l.open_dispute(id, h(6), 10, h(7), 36).unwrap();
+    l.expire(id, 61).unwrap();
+    assert_eq!(l.job(&id).unwrap().state, JobState::Expired);
+    assert_eq!(l.balance(&h(1)), 1_000);
+    assert_eq!(l.balance(&h(2)), 1_000);
+    assert_eq!(l.balance(&h(6)), 1_000);
+    assert_eq!(l.locked(), 0);
+    l.assert_conserved().unwrap();
 }
 
 #[test]
@@ -512,6 +601,157 @@ fn paid_delivery_is_optional_for_settlement_but_required_for_external_label() {
 }
 
 #[test]
+fn paid_acknowledgement_rule_is_bound_before_escrow() {
+    let mut l = loom();
+    let mut job = open();
+    job.delivery_rule = DeliveryRule::PaidAcknowledgement;
+    job.nonce = 90;
+    let id = l.open_job(job).unwrap();
+    let commit_hash = l.commit_worker(commit(id, 1)).unwrap();
+    let challenge = l.assign_finalized_challenge(id, h(99), h(98), 16).unwrap();
+    l.submit_receipt(receipt(id, commit_hash, challenge, 1, h(90)), 30)
+        .unwrap();
+    l.finalize_availability(id, availability()).unwrap();
+    assert_eq!(
+        l.settle(id, 46, payout(), accounts()),
+        Err(LoomError::InvalidSettlement)
+    );
+    l.attach_paid_delivery(id, paid_delivery(id)).unwrap();
+    l.settle(id, 46, payout(), accounts()).unwrap();
+    assert_eq!(l.job(&id).unwrap().state, JobState::Settled);
+}
+
+#[test]
+fn job_id_binds_every_market_and_refund_term() {
+    let base = open();
+    let expected = job_id(&base);
+    let mutations: Vec<OpenJob> = vec![
+        OpenJob {
+            requester: h(99),
+            ..base.clone()
+        },
+        OpenJob {
+            refund_account: h(99),
+            ..base.clone()
+        },
+        OpenJob {
+            required_assurance: Assurance::V3,
+            ..base.clone()
+        },
+        OpenJob {
+            input_root: h(99),
+            ..base.clone()
+        },
+        OpenJob {
+            model_or_program_root: h(99),
+            ..base.clone()
+        },
+        OpenJob {
+            delivery_pubkey: h(99),
+            ..base.clone()
+        },
+        OpenJob {
+            delivery_rule: DeliveryRule::PaidAcknowledgement,
+            ..base.clone()
+        },
+        OpenJob {
+            settlement_accounts: SettlementAccounts {
+                evaluator: h(99),
+                ..accounts()
+            },
+            ..base.clone()
+        },
+        OpenJob {
+            fee_escrow: 79,
+            ..base.clone()
+        },
+        OpenJob {
+            commit_deadline: 19,
+            ..base.clone()
+        },
+        OpenJob {
+            submit_deadline: 39,
+            ..base.clone()
+        },
+        OpenJob {
+            expiry_height: 61,
+            ..base.clone()
+        },
+    ];
+    for mutation in mutations {
+        assert_ne!(
+            job_id(&mutation),
+            expected,
+            "unbound mutation: {mutation:?}"
+        );
+    }
+}
+
+#[test]
+fn seeded_adversarial_market_traces_are_terminal_and_conserved() {
+    for seed in 0..4_096u64 {
+        let mut l = loom();
+        let mut job = open();
+        job.nonce = 1_000 + seed;
+        let id = l.open_job(job).unwrap();
+        match seed & 7 {
+            0 => l.cancel_open(id, h(1), 11).unwrap(),
+            1 => l.expire(id, 21).unwrap(),
+            mode => {
+                let commit_hash = l.commit_worker(commit(id, 1)).unwrap();
+                if mode == 2 {
+                    l.expire(id, 41).unwrap();
+                } else {
+                    let challenge = l.assign_finalized_challenge(id, h(99), h(98), 16).unwrap();
+                    let nullifier = domain_hash("NOOS/LOOM/TRACE/V1", &[&seed.to_le_bytes()]);
+                    l.submit_receipt(receipt(id, commit_hash, challenge, 1, nullifier), 30)
+                        .unwrap();
+                    if mode == 3 {
+                        l.expire(id, 61).unwrap();
+                    } else {
+                        l.finalize_availability(id, availability()).unwrap();
+                        match mode {
+                            4 => l.settle(id, 46, payout(), accounts()).unwrap(),
+                            5 => {
+                                l.open_dispute(id, h(6), 10, h(7), 36).unwrap();
+                                l.resolve_dispute(
+                                    id,
+                                    DisputeVerdict::WorkerFault,
+                                    SettlementSplit {
+                                        worker: 20,
+                                        verifier: 10,
+                                        evaluator: 5,
+                                        da_provider: 15,
+                                    },
+                                    accounts(),
+                                )
+                                .unwrap();
+                            }
+                            6 => {
+                                l.open_dispute(id, h(6), 10, h(7), 36).unwrap();
+                                l.expire(id, 61).unwrap();
+                            }
+                            _ => {
+                                l.attach_paid_delivery(id, paid_delivery(id)).unwrap();
+                                l.settle(id, 46, payout(), accounts()).unwrap();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(l.job(&id).unwrap().state.terminal(), "seed {seed}");
+        assert_eq!(l.locked(), 0, "seed {seed}");
+        l.assert_conserved().unwrap();
+        assert_eq!(
+            l.cancel_open(id, h(1), 11),
+            Err(LoomError::InvalidState),
+            "seed {seed} double terminal mutation"
+        );
+    }
+}
+
+#[test]
 fn artifact_stable_and_work_commit_challenge_bound() {
     let a = artifact_id(b"d", b"bytes");
     assert_eq!(a, artifact_id(b"d", b"bytes"));
@@ -535,15 +775,15 @@ fn zero_jobs_and_shadow_never_influence_production() {
             settled_value: 100,
             calibration_units: 200,
             raw_stake: 1_000,
-            demand: DemandClassification::Independent,
+            demand_evidence: demand_evidence(DemandClassification::Independent),
             delivered: true,
             paid_certificate: true,
         },
         h(1),
     );
     assert!(out.counterfactual_loom_credit > 0);
-    assert!(out.counterfactual_proofpower > 0);
-    assert!(out.counterfactual_duplex > 0);
+    assert_eq!(out.counterfactual_proofpower, 0);
+    assert_eq!(out.counterfactual_duplex, 0);
     assert_eq!(
         (
             out.production_loom_credit,
@@ -570,7 +810,7 @@ fn demand_classification_is_telemetry_only() {
                 settled_value: 100,
                 calibration_units: 100,
                 raw_stake: 1_000,
-                demand,
+                demand_evidence: demand_evidence(demand),
                 delivered: true,
                 paid_certificate: true,
             },
@@ -584,6 +824,16 @@ fn demand_classification_is_telemetry_only() {
             ),
             (0, 0, 0)
         );
+        if demand != DemandClassification::Independent {
+            assert_eq!(
+                (
+                    out.counterfactual_loom_credit,
+                    out.counterfactual_proofpower,
+                    out.counterfactual_duplex
+                ),
+                (0, 0, 0)
+            );
+        }
     }
 }
 

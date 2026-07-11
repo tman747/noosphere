@@ -102,11 +102,7 @@ impl IssuanceParamsV1 {
             if e == 0 {
                 return Ok(0);
             }
-            e = e
-                .checked_mul(u128::from(self.decay_numerator))
-                .ok_or(IssuanceError::Overflow)?
-                .checked_div(u128::from(self.decay_denominator))
-                .ok_or(IssuanceError::Overflow)?;
+            e = mul_div_floor(e, self.decay_numerator, self.decay_denominator)?;
             k = k.checked_add(1).ok_or(IssuanceError::Overflow)?;
         }
         Ok(e)
@@ -149,11 +145,7 @@ impl IssuanceParamsV1 {
             total = total
                 .checked_add(e.checked_mul(heights).ok_or(IssuanceError::Overflow)?)
                 .ok_or(IssuanceError::Overflow)?;
-            e = e
-                .checked_mul(u128::from(self.decay_numerator))
-                .ok_or(IssuanceError::Overflow)?
-                .checked_div(u128::from(self.decay_denominator))
-                .ok_or(IssuanceError::Overflow)?;
+            e = mul_div_floor(e, self.decay_numerator, self.decay_denominator)?;
             start = match end.checked_add(1) {
                 Some(s) => s,
                 None => break, // terminal_height == u64::MAX and fully covered
@@ -197,17 +189,8 @@ impl EmissionSharesV1 {
     /// takes the exact remainder (frozen rounding rule).
     pub fn split(&self, emission: u128) -> Result<EmissionSplit, IssuanceError> {
         self.validate()?;
-        let ppm = u128::from(Self::PPM);
-        let witness = emission
-            .checked_mul(u128::from(self.witness_ppm))
-            .ok_or(IssuanceError::Overflow)?
-            .checked_div(ppm)
-            .ok_or(IssuanceError::Overflow)?;
-        let treasury = emission
-            .checked_mul(u128::from(self.treasury_ppm))
-            .ok_or(IssuanceError::Overflow)?
-            .checked_div(ppm)
-            .ok_or(IssuanceError::Overflow)?;
+        let witness = mul_div_floor(emission, self.witness_ppm, Self::PPM)?;
+        let treasury = mul_div_floor(emission, self.treasury_ppm, Self::PPM)?;
         let proposer = emission
             .checked_sub(witness)
             .and_then(|p| p.checked_sub(treasury))
@@ -228,6 +211,33 @@ impl EmissionSharesV1 {
             treasury_ppm: 150_000,
         }
     }
+}
+
+/// Exact `floor(value * numerator / denominator)` without an overflowing
+/// intermediate product. Both issuance decay and recipient splitting are
+/// consensus integer arithmetic, so a representable result must not be
+/// rejected merely because the naive multiplication does not fit in `u128`.
+fn mul_div_floor(value: u128, numerator: u32, denominator: u32) -> Result<u128, IssuanceError> {
+    if denominator == 0 {
+        return Err(IssuanceError::InvalidParams);
+    }
+    let denominator = u128::from(denominator);
+    let numerator = u128::from(numerator);
+    let quotient = value
+        .checked_div(denominator)
+        .ok_or(IssuanceError::Overflow)?;
+    let remainder = value
+        .checked_rem(denominator)
+        .ok_or(IssuanceError::Overflow)?;
+    quotient
+        .checked_mul(numerator)
+        .and_then(|whole| {
+            remainder
+                .checked_mul(numerator)
+                .and_then(|part| part.checked_div(denominator))
+                .and_then(|part| whole.checked_add(part))
+        })
+        .ok_or(IssuanceError::Overflow)
 }
 
 #[cfg(test)]
@@ -253,6 +263,23 @@ mod tests {
         assert_eq!(p.emission_at(u64::MAX).unwrap(), 0);
         assert!(p.emission_at(1).unwrap() > 0);
         assert!(p.emission_at(p.terminal_height).unwrap() > 0 || p.era_emission(19).unwrap() == 0);
+    }
+
+    #[test]
+    fn terminal_height_and_first_post_terminal_height_are_exact() {
+        let p = IssuanceParamsV1 {
+            max_supply: 40,
+            initial_per_height: 7,
+            era_length: 3,
+            decay_numerator: 1,
+            decay_denominator: 2,
+            terminal_height: 4,
+        };
+        p.validate().unwrap();
+        assert_eq!(p.emission_at(3).unwrap(), 7);
+        assert_eq!(p.emission_at(4).unwrap(), 3);
+        assert_eq!(p.emission_at(5).unwrap(), 0);
+        assert_eq!(p.total_scheduled().unwrap(), 24);
     }
 
     #[test]
@@ -324,6 +351,55 @@ mod tests {
         );
     }
 
+    /// Seeded adversarial transition attempts cover duplicate heights,
+    /// backwards heights, skipped emission, terminal crossing, and very large
+    /// heights. Accepted transitions are strictly increasing, so no missed or
+    /// orphaned amount is recreated.
+    #[test]
+    #[ignore = "10^7 seeded issuance transition attempts; run explicitly in release"]
+    fn issuance_adversarial_paths_10m() {
+        let p = IssuanceParamsV1 {
+            max_supply: 2_000_000,
+            initial_per_height: 10_000,
+            era_length: 16,
+            decay_numerator: 9,
+            decay_denominator: 10,
+            terminal_height: 128,
+        };
+        p.validate().unwrap();
+        let scheduled_total = p.total_scheduled().unwrap();
+        let mut rng = SplitMix64(0xEC0A_10C5_D00D_F00D);
+        for path in 0..10_000_000u64 {
+            let first = rng.next_u64() % 256;
+            let mode = rng.next_u64() & 7;
+            let second = match mode {
+                0 => first,
+                1 => first.saturating_sub(rng.next_u64() & 31),
+                2 => first.saturating_add(1),
+                3 => first.saturating_add((rng.next_u64() & 63) + 2),
+                4 => p.terminal_height,
+                5 => p.terminal_height.saturating_add(1),
+                6 => u64::MAX,
+                _ => rng.next_u64() % 256,
+            };
+            let third = match rng.next_u64() & 3 {
+                0 => second,
+                1 => second.saturating_sub(1),
+                2 => second.saturating_add(1),
+                _ => rng.next_u64() % 256,
+            };
+            let mut last = 0u64;
+            let mut minted = 0u128;
+            for height in [first, second, third] {
+                if height > last {
+                    minted = minted.checked_add(p.emission_at(height).unwrap()).unwrap();
+                    last = height;
+                }
+            }
+            assert!(minted <= scheduled_total, "path {path}");
+        }
+    }
+
     #[test]
     fn invalid_params_reject() {
         let mut p = IssuanceParamsV1::testnet_fixture();
@@ -359,5 +435,35 @@ mod tests {
             treasury_ppm: 1,
         };
         assert_eq!(bad.validate(), Err(IssuanceError::InvalidParams));
+    }
+
+    #[test]
+    fn maximum_integer_rounding_is_exact_without_intermediate_overflow() {
+        let shares = EmissionSharesV1 {
+            proposer_ppm: 1,
+            witness_ppm: 499_999,
+            treasury_ppm: 500_000,
+        };
+        let split = shares.split(u128::MAX).unwrap();
+        assert_eq!(split.total(), Some(u128::MAX));
+        assert_eq!(
+            split.witness,
+            mul_div_floor(u128::MAX, 499_999, 1_000_000).unwrap()
+        );
+        assert_eq!(
+            split.treasury,
+            mul_div_floor(u128::MAX, 500_000, 1_000_000).unwrap()
+        );
+
+        let p = IssuanceParamsV1 {
+            max_supply: u128::MAX,
+            initial_per_height: u128::MAX,
+            era_length: 1,
+            decay_numerator: 1,
+            decay_denominator: 2,
+            terminal_height: 1,
+        };
+        p.validate().unwrap();
+        assert_eq!(p.era_emission(1).unwrap(), u128::MAX / 2);
     }
 }

@@ -527,7 +527,11 @@ impl LumenLedger {
         if new_total > issuance.max_supply {
             return Err(EmissionError::Overflow);
         }
-        let mut delta = BTreeMap::new();
+        // Aggregate aliases before touching state (the same account may fill
+        // multiple recipient roles), then preflight every resulting balance.
+        // This makes overflow rejection atomic instead of leaving an earlier
+        // recipient credited when a later recipient overflows.
+        let mut credits = BTreeMap::<Hash32, u128>::new();
         for (id, amount) in [
             (proposer, split.proposer),
             (witness_pool, split.witness),
@@ -536,9 +540,24 @@ impl LumenLedger {
             if amount == 0 {
                 continue;
             }
-            let current = self.balance(id, &NOOS_ASSET);
-            let next = current.checked_add(amount).ok_or(EmissionError::Overflow)?;
-            self.set_balance_direct(id, &NOOS_ASSET, next, &mut delta);
+            let prior = credits.get(id).copied().unwrap_or(0);
+            credits.insert(
+                *id,
+                prior.checked_add(amount).ok_or(EmissionError::Overflow)?,
+            );
+        }
+        let next_balances = credits
+            .iter()
+            .map(|(id, amount)| {
+                self.balance(id, &NOOS_ASSET)
+                    .checked_add(*amount)
+                    .map(|next| (*id, next))
+                    .ok_or(EmissionError::Overflow)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut delta = BTreeMap::new();
+        for (id, next) in next_balances {
+            self.set_balance_direct(&id, &NOOS_ASSET, next, &mut delta);
         }
         self.total_minted = new_total;
         self.last_emission_height = height;
