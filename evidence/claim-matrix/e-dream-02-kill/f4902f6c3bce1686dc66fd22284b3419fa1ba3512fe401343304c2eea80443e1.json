@@ -1,0 +1,151 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-reflex",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-reflex"
+        ]
+      },
+      "name": "integer preregistration evaluator and disabled lifecycle",
+      "passed": true
+    },
+    {
+      "controls": [
+        "dream_lane_enabled"
+      ],
+      "name": "activation controls remain off",
+      "passed": true
+    },
+    {
+      "artifact_sha256": {
+        "C:/tmp/dream-lane/results-v2-p0.json": "fd05e1672ff50bc531d96874c15bad7a9e63e88e4c6613256c578439869b95a4",
+        "C:/tmp/dream-lane/results-v2-p1084.json": "f6b3679b7868290cf9fe80027f6a4ef17eb76421d97ff753b2f2676f052cce62",
+        "C:/tmp/dream-lane/results-v2-p271.json": "abdd8c6e192bb2c1dcba1cbb839f0baf4276aa2076750ac7c08ea86bace103d6",
+        "C:/tmp/dream-lane/results-v2-p542.json": "d439b21219ae2b8563d18edc00acce88008ac25a5186c627a48495cc2866a2cb",
+        "C:/tmp/dream-lane/results-v2-p813.json": "ef59e0efe344b7bf231f30d5bff4f5c9c5473808857cdaeda9b8fe3542c85fa1"
+      },
+      "common_manipulator_entry_uT_per_event": "1605.6299",
+      "eligible_passes": [],
+      "events_per_arm": 100000,
+      "name": "frozen preregistered premium sweep re-evaluation",
+      "passed": true,
+      "quality_threshold_mB": "75",
+      "rows": [
+        {
+          "eligible": false,
+          "honest_net_uT_per_event": "1139.0996",
+          "main_improve_mB": "167.54353582132964",
+          "manip_arm_improve_mB": "176.8064171907344",
+          "manipulator_excluded": true,
+          "manipulator_net_uT_per_event": "0.0",
+          "passes": false,
+          "premium_uT": 0
+        },
+        {
+          "eligible": false,
+          "honest_net_uT_per_event": "1139.0996",
+          "main_improve_mB": "167.64290868412635",
+          "manip_arm_improve_mB": "215.09295823470697",
+          "manipulator_excluded": false,
+          "manipulator_net_uT_per_event": "1334.6299",
+          "passes": false,
+          "premium_uT": 271
+        },
+        {
+          "eligible": true,
+          "honest_net_uT_per_event": "1139.0996",
+          "main_improve_mB": "167.64290868412635",
+          "manip_arm_improve_mB": "215.09295823470697",
+          "manipulator_excluded": false,
+          "manipulator_net_uT_per_event": "1063.6299",
+          "passes": false,
+          "premium_uT": 542
+        },
+        {
+          "eligible": true,
+          "honest_net_uT_per_event": "1139.0996",
+          "main_improve_mB": "167.64290868412635",
+          "manip_arm_improve_mB": "215.09295823470697",
+          "manipulator_excluded": false,
+          "manipulator_net_uT_per_event": "792.6299",
+          "passes": false,
+          "premium_uT": 813
+        },
+        {
+          "eligible": true,
+          "honest_net_uT_per_event": "1139.0996",
+          "main_improve_mB": "167.64290868412635",
+          "manip_arm_improve_mB": "215.09295823470697",
+          "manipulator_excluded": false,
+          "manipulator_net_uT_per_event": "521.6299",
+          "passes": false,
+          "premium_uT": 1084
+        }
+      ],
+      "seed": 20260710,
+      "verdict": "KILLED"
+    }
+  ],
+  "claim_fingerprints": {
+    "E-DREAM-02": "5cfccf791301e89494af620fee2a5dd97574b8712718dd030ae648deb43e0aa6"
+  },
+  "claims": [
+    "E-DREAM-02"
+  ],
+  "command": [
+    "tools/gates/run_dream_chorus_claim.py",
+    "--claim",
+    "E-DREAM-02"
+  ],
+  "evidence_sha256": "f4902f6c3bce1686dc66fd22284b3419fa1ba3512fe401343304c2eea80443e1",
+  "expected_result": "KILLED",
+  "gate": "e-dream-02-kill",
+  "limitations": [
+    "The frozen simulator artifacts are re-evaluated, not represented as independent or cross-vendor evidence.",
+    "The repository module is a deterministic instrument/lifecycle precursor; it does not regenerate the 100,000-event arms.",
+    "The kill is preserved without sweep extension or threshold adjustment."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "KILLED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-reflex/Cargo.toml": "2977f4aa461766279a10cc9e383eacefe528051602182c048a287da669ed3149",
+    "crates/noos-reflex/src/dream.rs": "27d73a5dcd36a8d2999478af4857f732875fccba989ec705e170074071a70128",
+    "crates/noos-reflex/src/lib.rs": "874c0160676b9b79ed9d528a1a4096f7dda78973afbda33d097b4d5ac820ae73",
+    "protocol/spec/constants-v1.toml": "d1575f8f50a58648762f91555c3267deddefab0556fae63e5921c57e8a486258",
+    "tools/gates/run_dream_chorus_claim.py": "3ad3a3f34032534bd3541dd0579257af96fd1e148786e9e2b1fd81f904835b44"
+  }
+}

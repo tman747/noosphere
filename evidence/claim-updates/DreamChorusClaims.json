@@ -1,0 +1,32 @@
+{
+  "claims": {
+    "S-CHORUS": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-chorus"],
+      "command": "python tools/gates/run_dream_chorus_claim.py --claim S-CHORUS",
+      "rollback_command": "python tools/gates/run_dream_chorus_claim.py --claim S-CHORUS --rollback-check",
+      "notes": "Signed software-attestation precursor implements task/beacon-derived random projection assignment, commitment/availability binding, identity/profile validity windows, inclusive clock-skew bounds, duplicate/finalized-stale rejection, deterministic multi-party replay, fork/equivocation removal, lineage/failure-domain quotient aggregation, receipts, aggregation rollback, retained optional local verification, and hard zero proposal/finality/slash weight. Local behavior/falsifier suite and generated chorus-mesh evidence are green. PARTIAL: S-CHORUS's exact threshold still requires consenting physical low-end phones/laptops plus emulator/root/replay/ASN/selective-withholding trials, 10x Sybil influence measurement, and observed p95 latency/bytes/battery/attrition; software signatures are not hardware attestation or real diversity evidence."
+    },
+    "S-DREAM": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-reflex"],
+      "command": "python tools/gates/run_dream_chorus_claim.py --claim S-DREAM",
+      "rollback_command": "python tools/gates/run_dream_chorus_claim.py --claim S-DREAM --rollback-check",
+      "notes": "Dream-only noos-reflex module implements owner/persona separation, consent-scoped TwinProfile identity binding, owner-signed revocation and quarantine, plural sealed branch families, deterministic reconciliation and hash-chained non-authoritative receipts, exact clock boundaries, independent resolver binding, influence invalidation, reveal commitments, and globally one-shot realization only through a distinct owner-signed capability. Persona output grants zero identity/authority and carries zero payout/proposal/finality weight. PARTIAL: the exact claim threshold also requires held-out preregistered forecasts beating a non-persona proper-scoring baseline by at least 10% without increased protected-group harm; no local fixture is presented as that evidence."
+    },
+    "S-DREAM-LANE": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-reflex"],
+      "command": "python tools/gates/run_dream_chorus_claim.py --claim S-DREAM-LANE",
+      "rollback_command": "python tools/gates/run_dream_chorus_claim.py --claim S-DREAM-LANE --rollback-check",
+      "notes": "The killed general market remains non-enableable. Only the frozen surviving boundary is executable: private, payout-free, causally insulated, action-firewalled research notebooks; action influence invalidates resolution; persona self-realization fails; rollback quarantines the profile, discards application families/nullifiers, preserves the base root bit-for-bit, and leaves proposal/finality weight zero. Generated runner result is DISABLED. PARTIAL: the row's 90 real-day external-paid-demand and production causal-insulation threshold cannot be satisfied by local time or local fixtures, and the registered manipulation kill remains binding."
+    },
+    "E-DREAM-02": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-reflex"],
+      "command": "python tools/gates/run_dream_chorus_claim.py --claim E-DREAM-02",
+      "rollback_command": "python tools/gates/run_dream_chorus_claim.py --claim E-DREAM-02 --rollback-check",
+      "notes": "DreamInstrumentV1 is an exact integer evaluator precursor for the preregistered premiums {0,271,542,813,1084}, events=100000, seed=20260710, insulated-only policy, P=0 exclusion ineligibility, eligible [542,1084] interval, manipulator/honest sign tests, and both 75 mB quality gates. The dedicated runner hashes and re-evaluates the frozen C:/tmp/dream-lane result artifacts: mechanism gates remain green, the nonzero arms share exact raw entry margin 1605.6299 uT/event before premium, no eligible premium passes, and result remains KILLED without repricing or sweep extension. PARTIAL: repository code is a lifecycle/instrument precursor and artifact re-evaluator; it does not regenerate the 100000-event arms and is not independent, public-duration, or cross-vendor evidence."
+    }
+  }
+}

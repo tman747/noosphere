@@ -1,0 +1,79 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-chorus",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-chorus"
+        ]
+      },
+      "name": "signed deterministic advisory mesh precursor",
+      "passed": true
+    },
+    {
+      "name": "physical low-end device and 10x Sybil threshold",
+      "passed": false,
+      "reason": "requires consenting physical devices, emulator farms, latency, bytes, battery, attrition, and real diversity observations",
+      "status": "EXTERNAL_BLOCKED"
+    }
+  ],
+  "claim_fingerprints": {
+    "S-CHORUS": "03f32582be0b7e8dff68f911f887f722e75011c4ef6503159c0d375c55ed0df0"
+  },
+  "claims": [
+    "S-CHORUS"
+  ],
+  "command": [
+    "tools/gates/run_dream_chorus_claim.py",
+    "--claim",
+    "S-CHORUS"
+  ],
+  "evidence_sha256": "e55fd88b2fd910120d8fe876eb2cdf9744511bb381b92216bdf9eacf294d73c1",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "chorus-mesh",
+  "limitations": [
+    "Software signatures are a local identity/profile-binding precursor, not hardware attestation.",
+    "No phone p95, 20 MB, battery, attrition, or real 10x Sybil influence result is claimed.",
+    "Chorus output is advisory with zero proposal/finality weight and zero slashing."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-chorus/Cargo.toml": "5b0d521c7519e54073f251ea091ef731ff85e1c823fe9ff6c6a62b9655b225a7",
+    "crates/noos-chorus/src/lib.rs": "e0a1e7ca1359998ec971b6c63c8cd8821c1404fdf15058fe700017aa73fb10c1",
+    "tools/gates/run_dream_chorus_claim.py": "3ad3a3f34032534bd3541dd0579257af96fd1e148786e9e2b1fd81f904835b44"
+  }
+}

@@ -1,6 +1,8 @@
 //! Disabled application-only Reflex tick stream. A tick commits transaction,
 //! receipt, and cumulative-gas roots; this API deliberately has no state root.
 #![forbid(unsafe_code)]
+pub mod dream;
+
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
