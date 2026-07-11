@@ -1,0 +1,15 @@
+[package]
+name = "noos-lumen"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "NOOSPHERE Lumen: typed authenticated public state, canonical transaction envelope, five-dimensional fees, fixed-envelope issuance (storage-agnostic, emits ordered StateDelta)"
+
+[dependencies]
+noos-codec = { path = "../noos-codec" }
+blake3 = "1.8"
+
+[lints]
+workspace = true

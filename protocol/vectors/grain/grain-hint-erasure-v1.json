@@ -1,0 +1,10 @@
+{
+  "schema": "noos/grain/hint-erasure-v1",
+  "cases": [
+    {"name":"erase_preserves_value","kind":"positive","bytes":"0100010000000b01010001000000010001000000010100010000000100010000002a","subject":"0000000000","erased_formula":"0100010000000100010000002a","meter_limit":1000000,"arena_limit":1000000,"expect":{"kind":"value","noun":"00010000002a","trap_code":null,"charge":1}},
+    {"name":"erase_preserves_allocation_charge","kind":"positive","bytes":"0100010000000b0100000000000100010000000401000100000001000100000005","subject":"0000000000","erased_formula":"0100010000000401000100000001000100000005","meter_limit":1000000,"arena_limit":1000000,"expect":{"kind":"value","noun":"000100000006","trap_code":null,"charge":6}},
+    {"name":"erase_nested_hints","kind":"positive","bytes":"0100010000000b0100000000000100010000000b010100010000000100010000000101000100000001000100000007","subject":"0000000000","erased_formula":"01000100000001000100000007","meter_limit":1000000,"arena_limit":1000000,"expect":{"kind":"value","noun":"000100000007","trap_code":null,"charge":1}},
+    {"name":"erase_preserves_trap","kind":"negative","bytes":"0100010000000b0100000000000100000000000000000000","subject":"0000000000","erased_formula":"0100000000000000000000","meter_limit":1000000,"arena_limit":1000000,"expect":{"kind":"trap","noun":null,"trap_code":1,"charge":0}},
+    {"name":"erase_preserves_meter_exhaustion","kind":"negative","bytes":"0100010000000b0100000000000100010000000201010000000000000100000001010000000000000100000001","subject":"0100010000000201010000000000000100000001010000000000000100000001","erased_formula":"0100010000000201010000000000000100000001010000000000000100000001","meter_limit":100,"arena_limit":1000000,"expect":{"kind":"trap","noun":null,"trap_code":3,"charge":100}}
+  ]
+}

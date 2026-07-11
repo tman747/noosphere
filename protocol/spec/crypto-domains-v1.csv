@@ -34,6 +34,8 @@ D-NEL-LEAF-RECEIPT,BLAKE3_CONTEXT,NOOS/NEL/LEAF_RECEIPT/V1,BLAKE3-256,noos-nel,A
 D-BLOCK-HEADER,BLAKE3_CONTEXT,NOOS/BLOCK/HEADER/V1,BLAKE3-256,noos-consensus,ASSIGNED; block hash over canonical header incl. proposer signature (arch §9.1 names no literal); G0 review
 D-TX-ID,BLAKE3_CONTEXT,NOOS/TX/ID/V1,BLAKE3-256,noos-lumen,ASSIGNED; txid over non-witness body (arch §6.5); exact layout frozen in constants-v1.toml (G0)
 D-TX-WID,BLAKE3_CONTEXT,NOOS/TX/WID/V1,BLAKE3-256,noos-lumen,ASSIGNED; wtxid over body+witnesses; distinct from txid by construction
+D-TX-WROOT,BLAKE3_CONTEXT,NOOS/TX/WROOT/V1,BLAKE3-256,noos-lumen,ASSIGNED; witness_root = H(ctx || canonical lock_reveals list) — programs only; signatures excluded so txid->signature binding stays acyclic (lumen-v1.md; arch §6.5 names no literal); G0 review
+D-OBJECT-ID,BLAKE3_CONTEXT,NOOS/OBJECT/ID/V1,BLAKE3-256,noos-lumen,ASSIGNED; object_id = H(ctx || creating_txid || action_index_u32_le || class_id_u32_le) for CreateObject (arch §6.4 names no literal); G0 review
 D-SMT-LEAF,BLAKE3_CONTEXT,NOOS/SMT/LEAF/V1,BLAKE3-256,noos-lumen,ASSIGNED; sparse Merkle tree leaf hash (arch §6.1 requires domain-separated leaf/node); vectors in lumen-v1.md
 D-SMT-NODE,BLAKE3_CONTEXT,NOOS/SMT/NODE/V1,BLAKE3-256,noos-lumen,ASSIGNED; sparse Merkle tree internal node hash; empty roots derived recursively
 D-BEACON-COMMIT,BLAKE3_CONTEXT,NOOS/BEACON/COMMIT/V1,BLAKE3-256,noos-consensus,ASSIGNED; delay-VRF commit binding (plan §6.7: chain/epoch/membership root); G0 review

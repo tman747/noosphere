@@ -1,3 +1,6 @@
+$ cargo test --workspace --exclude ascent-node --no-fail-fast
+(SUPPLEMENTARY RUN, not part of the mandated 5-command baseline; cwd=C:/ascent, RUST_BACKTRACE=1, ASCENT_TEST_TIME_MULTIPLIER=3, CARGO_TARGET_DIR=C:/tmp/ascent-baseline-target)
+
     Finished `test` profile [unoptimized + debuginfo] target(s) in 0.40s
      Running unittests src\main.rs (C:/tmp/ascent-baseline-target\debug\deps\ascent_cli-e47c14c9b6a3eff0.exe)
 
@@ -631,3 +634,5 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 error: 1 target failed:
     `-p ascent-consensus-core --lib`
+
+[exit code: 101] [wall time: 406.7s]

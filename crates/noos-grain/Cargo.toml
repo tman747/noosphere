@@ -1,0 +1,15 @@
+[package]
+name = "noos-grain"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Grain v1: the NOOSPHERE 12-opcode deterministic consensus interpreter (nouns, canonical bytes, bounded arena, metered eval, stable traps)"
+
+[dependencies]
+
+[dev-dependencies]
+
+[lints]
+workspace = true
