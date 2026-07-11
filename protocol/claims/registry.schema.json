@@ -32,6 +32,10 @@
         "implementation_status",
         "evidence_status",
         "lifecycle",
+        "local_implementation_state",
+        "local_evidence_state",
+        "owner_blockers",
+        "external_blockers",
         "result",
         "enabled",
         "claim",
@@ -60,7 +64,14 @@
         "date",
         "scope",
         "provenance",
-        "supersedes"
+        "supersedes",
+        "actionable",
+        "command",
+        "evidence_root",
+        "evidence_sha256",
+        "expected_result",
+        "rollback_command",
+        "reproduction_command"
       ],
       "properties": {
         "claim_id": {
@@ -92,6 +103,34 @@
             "INDEPENDENTLY_REPRODUCED",
             "AUDITED"
           ]
+        },
+        "local_implementation_state": {
+          "enum": [
+            "IMPLEMENTED",
+            "PARTIAL",
+            "MISSING"
+          ]
+        },
+        "local_evidence_state": {
+          "enum": [
+            "VERIFIED",
+            "PARTIAL",
+            "MISSING"
+          ]
+        },
+        "owner_blockers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "external_blockers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "lifecycle": {
           "enum": [
@@ -260,6 +299,47 @@
           "minLength": 1
         },
         "supersedes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "actionable": {
+          "type": "boolean"
+        },
+        "command": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "evidence_root": {
+          "type": "string",
+          "pattern": "^evidence/claim-matrix/"
+        },
+        "evidence_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(PENDING|[0-9a-f]{64})$"
+        },
+        "expected_result": {
+          "enum": [
+            "IMPLEMENTED",
+            "PASSED",
+            "KILLED",
+            "DISABLED",
+            "EXTERNAL_BLOCKED",
+            "LOCAL_MISSING"
+          ]
+        },
+        "rollback_command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reproduction_command": {
           "type": [
             "string",
             "null"

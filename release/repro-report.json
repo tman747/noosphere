@@ -1,0 +1,44 @@
+{
+  "builders": {
+    "windows-x86_64-a": {
+      "clean_target": true,
+      "hashes": {
+        "artifact-hashes.json": "bbae5247b4c8318f5d537f40272227f18576ecc9a11c9e36a588aa7b76d8c883",
+        "noos-transition-go.exe": "bf88ea7242e76575fe344e5302a5654b900b73a287e853bbbe9168632f853b25",
+        "noos-transition-rust.exe": "0696719393d292c42510216c5a43b674c421108bc9fb7160395802a788ab9e01"
+      },
+      "platform": "windows-x86_64"
+    },
+    "windows-x86_64-b": {
+      "clean_target": true,
+      "hashes": {
+        "artifact-hashes.json": "bbae5247b4c8318f5d537f40272227f18576ecc9a11c9e36a588aa7b76d8c883",
+        "noos-transition-go.exe": "bf88ea7242e76575fe344e5302a5654b900b73a287e853bbbe9168632f853b25",
+        "noos-transition-rust.exe": "0696719393d292c42510216c5a43b674c421108bc9fb7160395802a788ab9e01"
+      },
+      "platform": "windows-x86_64"
+    }
+  },
+  "comparisons": [
+    {
+      "a": "windows-x86_64-a",
+      "b": "windows-x86_64-b",
+      "equal": true,
+      "law": "raw_bytes"
+    }
+  ],
+  "created": "2026-07-11T11:13:44.279425+00:00",
+  "external_blocked": [
+    "ubuntu-x86_64-a",
+    "ubuntu-x86_64-b",
+    "ubuntu-aarch64-a",
+    "ubuntu-aarch64-b"
+  ],
+  "policy_sha256": "2a4af9299cd8bc3827ddef53704a2ece0ed47a78530f3900645d1cdc0d46ceb4",
+  "policy_signature_errors": [
+    "policy state is not SIGNED",
+    "detached signature record missing"
+  ],
+  "schema": "noos/repro-report/v1",
+  "smoke_only": true
+}

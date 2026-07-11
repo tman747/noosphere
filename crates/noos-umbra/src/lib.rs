@@ -10,6 +10,11 @@ use hkdf::Hkdf;
 use sha2::Sha256;
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod branch;
+pub mod fiber_dag;
+pub mod hidden;
+pub mod stealth;
+
 pub type Hash32 = [u8; 32];
 
 macro_rules! id32 {

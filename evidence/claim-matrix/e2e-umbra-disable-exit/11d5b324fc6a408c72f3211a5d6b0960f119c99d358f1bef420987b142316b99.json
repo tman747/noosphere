@@ -1,0 +1,73 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "controls": [
+        "umbra_suite_enabled"
+      ],
+      "name": "activation controls remain off",
+      "passed": true
+    },
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-umbra"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-umbra"
+        ]
+      },
+      "name": "local scenario fault/rollback contracts",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-UMBRA-BASE": "45e89894b2845f50c3216c18fce7ac25669808be409172cf64b77c31eba17d30"
+  },
+  "claims": [
+    "A-UMBRA-BASE"
+  ],
+  "command": [
+    "tools/e2e/run_network.py",
+    "--scenario",
+    "umbra-disable-exit"
+  ],
+  "evidence_sha256": "11d5b324fc6a408c72f3211a5d6b0960f119c99d358f1bef420987b142316b99",
+  "expected_result": "PASSED",
+  "gate": "e2e-umbra-disable-exit",
+  "limitations": [],
+  "registry_schema_version": "1.1.0",
+  "result": "PASSED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-umbra/Cargo.toml": "2b36d9646815dccfd68008086e901a426a106b1c6c69be54b3c1455a5f9766fe",
+    "crates/noos-umbra/src/lib.rs": "063b2f7e6f12ae0ae63e7c27c6efc9267bd4e8817eef17e68937ea1e7d20cd72"
+  }
+}

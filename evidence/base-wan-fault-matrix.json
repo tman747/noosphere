@@ -1,5 +1,5 @@
 {
-  "bundle_sha256": "8e5e7863d165261e24daa66ec0e94fd6761becfd4213e4fd460dc0f4edc10c83",
+  "bundle_sha256": "0c200a04c9c3e17b11cb677be9ce1575810c5db0c0fbe77db5e7221a49eeca73",
   "command": [
     "C:\\Users\\ntrap\\AppData\\Local\\Programs\\Python\\Python310\\python.exe",
     "C:\\noosphere\\tools\\e2e\\run_network.py",
@@ -15,7 +15,7 @@
   "cwd": "C:\\noosphere",
   "environment": {
     "LIBCLANG_PATH": "C:/Users/ntrap/AppData/Local/Programs/Swift/Toolchains/6.3.2+Asserts/usr/bin",
-    "RUST_BACKTRACE": "1"
+    "RUST_BACKTRACE": null
   },
   "exclusions": {
     "G3_EXTERNAL_NOT_SATISFIED": [
@@ -868,6 +868,7 @@
     "kill_every_fsync_boundary": false,
     "max_ai_load": false,
     "max_faults": null,
+    "requested_client_pairs": null,
     "seed_file": {
       "path": "protocol/vectors/wan-seeds.txt",
       "sha256": "997b48581e34466ada5e4c53a3d0c57bc363dcd15641fed519a8f9cb9449cf1b"
@@ -882,13 +883,13 @@
     "sha256": "d036a447de45988b16461bca7d7d8be3e14dc9c5f558dceadd10a9f375c6e388"
   },
   "revision": {
-    "git_head": "666b735a5b457f95b207b6d90fb24995d9bc2c90",
+    "git_head": "3ed1c845520d2245eb331a28c8302a0721c7a2d4",
     "source_sha256": {
-      "Cargo.lock": "bb816485d8d2f10f871ccaab5afc8f809f117cbfb93e1b94834441575ed368ca",
+      "Cargo.lock": "a54e2f4145dbd728e98311ebedea634f523fd283e8411b003930ea6fb4f90240",
       "crates/noos-sim-net/Cargo.toml": "361d18fd6ca243362c1370c8b3e611cf612fa1d51d2555a74bdb49dd26b0e7d4",
       "crates/noos-sim-net/src/lib.rs": "ce6d7f776eeeedef265d8a6d980fb1710dc68c8a6dec41832ddd7ce39a254629",
       "crates/noos-sim-net/src/main.rs": "e703c60d5734bee2350f403234ac9476529f0b7ac9c4633cae97fe5680502547",
-      "tools/e2e/run_network.py": "cbb7a9d97fabfbf652fff123295d5a2ef0688ba6e371a9bdd5e9726fd95e76e7"
+      "tools/e2e/run_network.py": "9a7e8dc4d86341bb9ab592d1805be50286f0d4586a265b51e6a0c71207170022"
     },
     "working_tree": "exact source files are hash-bound; this remains G2-only evidence"
   },
@@ -1283,8 +1284,8 @@
     "trapped_escrow_max": 0
   },
   "timestamps": {
-    "ended_utc": "2026-07-11T10:33:11.046Z",
-    "started_utc": "2026-07-11T10:32:58.148Z"
+    "ended_utc": "2026-07-11T15:17:14.473Z",
+    "started_utc": "2026-07-11T15:17:02.649Z"
   },
   "toolchain": {
     "cargo": "cargo 1.96.1 (356927216 2026-06-26)",

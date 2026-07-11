@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-crypto"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-crypto"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-RING": "01609b4ef4e07f7b0b6cc5f7a36c670c5fe12a962b60e83f6687dd14cdfd4696"
+  },
+  "claims": [
+    "A-RING"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-RING"
+  ],
+  "evidence_sha256": "17e6fe06b9c73efceb3935671856219c1d7fb0ad6536b9c6e6f37e49ff535c21",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-ring",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-crypto/Cargo.toml": "ad5fe4d400afe72fbc0bc25df035dc38b2209613fd3d7af8516e40336bde9df6",
+    "crates/noos-crypto/src/lib.rs": "0c4a914848271860cf9fb220cf13d3925dd0fe9c59283c775ad98741891969d1"
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "4872e6b98255cfecf5aea94bd7c526e3c8987c26673906cb624d918e9017905b",
+      "evidence/base-base-transfer-contract.json": "d120db9e228cec6a99b828dd919a0e1c7daaae8e7c6470c6513a3eb552c3e20d",
+      "evidence/base-crash-matrix.json": "62b45c91fb123ba3e9e016a776f218a222cfda097686d8fe131aa70f53c02c59"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-private-besi",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-private-besi"
+        ]
+      },
+      "name": "claim-specific crate tests with falsifiers",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-3PC-MALICIOUS": "603a4e6f92bc5df71689859aa75bed69c7ebcc5e9f027c3505a1a848eca94ddf"
+  },
+  "claims": [
+    "M-3PC-MALICIOUS"
+  ],
+  "command": [
+    "tools/gates/run_privacy_claim.py",
+    "--claim",
+    "M-3PC-MALICIOUS"
+  ],
+  "evidence_sha256": "909cb1387320e5cdb543fe66132e4eadcd7f408b7327ba88765af7f9ec94bd6e",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-m-3pc-malicious",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-private-besi/Cargo.toml": "1a7fa58553b0285dfe833b02626c3479f85f6a464f0bd115531109b6267e9ac3",
+    "crates/noos-private-besi/src/mpc3.rs": "980dd17e72444ba3287cc701c8e68ce649956ec6ae376b7fa0df026968f75199"
+  }
+}

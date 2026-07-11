@@ -7,10 +7,10 @@
   "command": ["cargo","run","-p","noos-sim-net","--release","--locked","--","battery","--seeds","0..10000","--crypto","real","--out","evidence/base-battery.json"],
   "simulator_invocation": ["E:\\cargo-target\\noesis-l1\\release\\noos-sim-net.exe","battery","--seeds","0..10000","--crypto","real","--out","evidence/base-battery.json"],
   "cwd": "C:\\noosphere",
-  "revision": {"git_head": "666b735a5b457f95b207b6d90fb24995d9bc2c90", "source_sha256": {"crates/noos-sim-net/src/main.rs": "e703c60d5734bee2350f403234ac9476529f0b7ac9c4633cae97fe5680502547", "crates/noos-sim-net/src/lib.rs": "ce6d7f776eeeedef265d8a6d980fb1710dc68c8a6dec41832ddd7ce39a254629", "crates/noos-sim-net/Cargo.toml": "361d18fd6ca243362c1370c8b3e611cf612fa1d51d2555a74bdb49dd26b0e7d4", "Cargo.lock": "bb816485d8d2f10f871ccaab5afc8f809f117cbfb93e1b94834441575ed368ca"}},
+  "revision": {"git_head": "3ed1c845520d2245eb331a28c8302a0721c7a2d4", "source_sha256": {"crates/noos-sim-net/src/main.rs": "e703c60d5734bee2350f403234ac9476529f0b7ac9c4633cae97fe5680502547", "crates/noos-sim-net/src/lib.rs": "ce6d7f776eeeedef265d8a6d980fb1710dc68c8a6dec41832ddd7ce39a254629", "crates/noos-sim-net/Cargo.toml": "361d18fd6ca243362c1370c8b3e611cf612fa1d51d2555a74bdb49dd26b0e7d4", "Cargo.lock": "a54e2f4145dbd728e98311ebedea634f523fd283e8411b003930ea6fb4f90240"}},
   "toolchain": {"cargo": "cargo 1.96.1 (356927216 2026-06-26)", "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)\nbinary: rustc\ncommit-hash: 31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd\ncommit-date: 2026-06-26\nhost: x86_64-pc-windows-msvc\nrelease: 1.96.1\nLLVM version: 22.1.2"},
-  "environment": {"LIBCLANG_PATH": "C:/Users/ntrap/AppData/Local/Programs/Swift/Toolchains/6.3.2+Asserts/usr/bin", "RUST_BACKTRACE": "1"},
-  "timestamps": {"started_unix_ms": 1783765970505, "ended_unix_ms": 1783765973017},
+  "environment": {"LIBCLANG_PATH": "C:/Users/ntrap/AppData/Local/Programs/Swift/Toolchains/6.3.2+Asserts/usr/bin", "RUST_BACKTRACE": ""},
+  "timestamps": {"started_unix_ms": 1783782981796, "ended_unix_ms": 1783782984661},
   "exit": {"simulator": 0},
   "raw_log": {"path": "evidence\\logs\\battery-4dcb175c2b91ff8640b6005b48cc84279da36725f5c22248a4aa4669bb222074.raw.log", "sha256": "4dcb175c2b91ff8640b6005b48cc84279da36725f5c22248a4aa4669bb222074", "bytes": 1074},
   "thresholds": {"conflicting_finalizations_max": 0, "false_certificates_max": 0, "root_divergences_max": 0, "fork_divergences_max": 0, "honest_slashes_max": 0, "trapped_escrow_max": 0, "eligible_finalization_ratio_min": 0.99, "recovery_slots_max": 512, "historical_receipts_verified": true},
@@ -31,5 +31,5 @@
   "rollback": {"verdict": "PASS", "ordinary_base_live": true, "result": "fault removal retained deterministic base finality and state agreement"},
   "exclusions": {"G3_EXTERNAL_NOT_SATISFIED": ["public adversarial testnet duration (90 days)", "seven uninterrupted public AI-off days required by A-BRAID", "open participation and funded red team", "independent consensus/network/state/crypto audit and cryptanalysis"]},
   "verdict": "PASS",
-  "bundle_sha256": "70decfc20c7ab2ec5a5aa9c1dbae76be867617d1bb1ab471ca6d2b458a865140"
+  "bundle_sha256": "f69613b91c50d495ac96d0e303e043fb81310ca053b83ca215bd865cf2b51d2f"
 }

@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-braid"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-braid"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-PULSE": "0c653bf37884b338f3758f8baf3f818a5fe2c2b48f1a0cccb12e66d8f3c3b344"
+  },
+  "claims": [
+    "A-PULSE"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-PULSE"
+  ],
+  "evidence_sha256": "5d2428ad41f2d6c4c4bc10ba324f99ec1d240ffd5f27a6841bf89b9bd3225f22",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-pulse",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-braid/Cargo.toml": "af8febe91195fceee44aeb9aaeb65481d56261caea96cd01018da9d6b9556f4e",
+    "crates/noos-braid/src/lib.rs": "268ed2e34e5c616bff8dc6732f3267c1b29b1900554347d82a96e97f82984154"
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "10fb6b92fb548e6760237769e5e0374e1d81a5e001bea808918a2c507b0e6611",
+      "evidence/base-base-transfer-contract.json": "4732560ee4f80d982af6442590e2d34b444593cc115114682bb12ef324cdc217",
+      "evidence/base-crash-matrix.json": "80890b604ba4a0dd47a0e28967031287476f405d22e300fcd59a76fd65a9e1bc"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-hearth"
+        ],
+        "exit_code": 0,
+        "log_sha256": "d05ed7a2dc31f3869e4d082b2ae65af3609d6e198165cc1cd5421c6f0d24a58b",
+        "packages": [
+          "noos-hearth"
+        ]
+      },
+      "name": "local Hearth deterministic and fault tests",
+      "passed": true
+    },
+    {
+      "name": "cross-vendor measured campaign",
+      "passed": false,
+      "reason": "no immutable CPU/AMD/NVIDIA measurement corpus or independent operators is registered",
+      "requested_devices": [
+        "amd",
+        "cpu",
+        "nvidia"
+      ],
+      "requested_instances": 1000000000,
+      "required_devices": [
+        "amd",
+        "cpu",
+        "nvidia"
+      ],
+      "required_instances": 1000000000,
+      "status": "EXTERNAL_BLOCKED"
+    }
+  ],
+  "claim_fingerprints": {
+    "E-HEARTH-01": "4e372caef15010d2aba35490a897c7b4e85e2b684cefc5991017da06d6f31cb6",
+    "E-HEARTH-02": "a8b5d85953c1d478037c647c064c54fa8d0f6a3b5c4047be59b68349a7388d08",
+    "E-HEARTH-03": "2c9ed4ce610d93210ef54853c45dff8fa07a59cb930d2b3868ae2bcc84178125",
+    "E-HEARTH-04": "a6542bb19e6ffb53c4e15fe0f7ff65ecde40a1858c6156a008d6ff95449f9aa6",
+    "E-HEARTH-05": "79d6a4f49516e39d0fc4b17a73446fec9dac610bce35584b145c5e589a3a8c9f",
+    "E-HEARTH-06": "49b28ecbde04ffe671d8a4417d67f482aad6c55bdbc7ea7ce52161a850311156",
+    "E-HEARTH-07": "a10adf9074b478b723984f0c262c5e67b0f151547ce5a36205af0cb1c406d621",
+    "E-HEARTH-08": "f2e17ddab8a6ea29dbb528ab1cd6a31783847a1340aaea072054d5c2c3794cea"
+  },
+  "claims": [
+    "E-HEARTH-01",
+    "E-HEARTH-02",
+    "E-HEARTH-03",
+    "E-HEARTH-04",
+    "E-HEARTH-05",
+    "E-HEARTH-06",
+    "E-HEARTH-07",
+    "E-HEARTH-08"
+  ],
+  "command": [
+    "tools/gates/run_hearth_matrix.py",
+    "--models",
+    "0.5B,1.5B",
+    "--devices",
+    "cpu,amd,nvidia",
+    "--instances",
+    "1000000000"
+  ],
+  "evidence_sha256": "21e07d567a4aaf8b70495d841ec006247721132287385f39cb7fad8a96f02d9a",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "hearth-matrix",
+  "limitations": [
+    "Local tests pass; billion-instance and real-device claims remain externally blocked."
+  ],
+  "registry_schema_version": "1.1.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-hearth/Cargo.toml": "a623eacb1395837a76ce4a36ca87442dcf367e66842fb1fd88a5b3f09c707faa",
+    "crates/noos-hearth/src/lib.rs": "d9c94ba1e3603bbd7b42298da2f741ea1af450c2467b805df8671286a16bd6b0"
+  }
+}

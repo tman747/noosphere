@@ -1,0 +1,58 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "10fb6b92fb548e6760237769e5e0374e1d81a5e001bea808918a2c507b0e6611",
+      "evidence/base-base-transfer-contract.json": "4732560ee4f80d982af6442590e2d34b444593cc115114682bb12ef324cdc217",
+      "evidence/base-crash-matrix.json": "80890b604ba4a0dd47a0e28967031287476f405d22e300fcd59a76fd65a9e1bc"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "enabled": false,
+      "lifecycle": "ACTIVE",
+      "name": "registered disposition",
+      "passed": true,
+      "registry_result": "PASSED"
+    }
+  ],
+  "claim_fingerprints": {
+    "M-QUARANTINE-SETTLE": "1d3d94bad28c2aef78dc6bd15f3e5ca8d5d844af4f63aedf8cf58db9f114bcbf"
+  },
+  "claims": [
+    "M-QUARANTINE-SETTLE"
+  ],
+  "command": [
+    "tools/gates/reproduce_claim.py",
+    "--claim",
+    "M-QUARANTINE-SETTLE",
+    "--expected-result",
+    "PASSED"
+  ],
+  "evidence_sha256": "020e14cae2e51fbdd00544f41dec204a6b7a3f5011abab86c81039555cfa8463",
+  "expected_result": "PASSED",
+  "gate": "claim-m-quarantine-settle",
+  "limitations": [],
+  "registry_schema_version": "1.1.0",
+  "result": "PASSED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "protocol/claims/registry.schema.json": "e99f4310b1fe2fbe9ff555f89f437ad8495360a800360cfd5a0e179d656ab24e",
+    "protocol/spec/constants-v1.toml": "d1575f8f50a58648762f91555c3267deddefab0556fae63e5921c57e8a486258"
+  }
+}

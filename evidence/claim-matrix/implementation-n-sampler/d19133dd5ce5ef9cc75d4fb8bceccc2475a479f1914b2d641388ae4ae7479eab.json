@@ -1,0 +1,70 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "cbec5f6b6db0d7de6564c04548d81fd7df468e5e1e5caebe1bbc72341a0ff2f2",
+      "evidence/base-base-transfer-contract.json": "44d0e5d8919839f780bac8a684a04d9f19035574527a84e62ad12b1fc0629ee0",
+      "evidence/base-crash-matrix.json": "c037970639fb893b098e197ba4532310690e683aa2683f3074cb45b095339408"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-nel"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-nel"
+        ]
+      },
+      "name": "claim-specific crate tests with falsifiers",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "N-SAMPLER": "9bf10ad98e1da4b413f8291f4deef4c90a45a035bbb4a53d5f3cf1a0406e55ba"
+  },
+  "claims": [
+    "N-SAMPLER"
+  ],
+  "command": [
+    "tools/gates/run_nel_claim.py",
+    "--claim",
+    "N-SAMPLER"
+  ],
+  "evidence_sha256": "d19133dd5ce5ef9cc75d4fb8bceccc2475a479f1914b2d641388ae4ae7479eab",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-n-sampler",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-nel/Cargo.toml": "17d2ecfb2e392c496e7dfaa14c28d1b89a4b97a16095b984434f3b81cfc99189",
+    "crates/noos-nel/src/inference.rs": "89f6c6b879f0f562fd071ea75941daee94ef7142f35a87533deaefb127bcee8f",
+    "crates/noos-nel/src/luts.rs": "80d6ecea395a61c2d5fe103cd20aad2b8b7608d1442b0dcebb4ec017629c7acb",
+    "protocol/vectors/nel/forward-w8a8-v1.json": "afa7a0ac2466f878cafbb41edc510a04ad595e0ceaac39aabed5c34dd8eeab9a"
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "10fb6b92fb548e6760237769e5e0374e1d81a5e001bea808918a2c507b0e6611",
+      "evidence/base-base-transfer-contract.json": "4732560ee4f80d982af6442590e2d34b444593cc115114682bb12ef324cdc217",
+      "evidence/base-crash-matrix.json": "80890b604ba4a0dd47a0e28967031287476f405d22e300fcd59a76fd65a9e1bc"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-chorus"
+        ],
+        "exit_code": 0,
+        "log_sha256": "f1a118132d0d32a75f309348dd804d8d89680390ac4fff38698aa10212dc474f",
+        "packages": [
+          "noos-chorus"
+        ]
+      },
+      "name": "local lineage/failure-domain falsifiers",
+      "passed": true
+    },
+    {
+      "name": "consenting heterogeneous physical mesh",
+      "passed": false,
+      "reason": "requested counts do not constitute evidence and no immutable 1,000-device consenting deployment corpus is registered",
+      "requested_devices": 1000,
+      "requested_simulations": 10000,
+      "status": "EXTERNAL_BLOCKED"
+    }
+  ],
+  "claim_fingerprints": {
+    "E-HEARTH-07": "a10adf9074b478b723984f0c262c5e67b0f151547ce5a36205af0cb1c406d621",
+    "E-HEARTH-08": "f2e17ddab8a6ea29dbb528ab1cd6a31783847a1340aaea072054d5c2c3794cea",
+    "S-CHORUS": "71a2f3af06a8f6fd8ff9fb602704bd811edab9c4f81e835cf7b6652d41e93731"
+  },
+  "claims": [
+    "E-HEARTH-07",
+    "E-HEARTH-08",
+    "S-CHORUS"
+  ],
+  "command": [
+    "tools/gates/run_chorus_mesh.py",
+    "--devices",
+    "1000",
+    "--simulations",
+    "10000"
+  ],
+  "evidence_sha256": "de22218d8674535e812a8a9641730957fdbf9f0da8b80527cbf271c64887d660",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "chorus-mesh",
+  "limitations": [
+    "Chorus remains non-slashable advisory availability."
+  ],
+  "registry_schema_version": "1.1.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-chorus/Cargo.toml": "77eb7fa77310457b8515e6d28e0c1971e9e39a7646d9b60e793e7ecf201b1cc3",
+    "crates/noos-chorus/src/lib.rs": "beca87938d135820b2b7701b958abeed3726bd43075e4035d9bb78b673f04c1d"
+  }
+}

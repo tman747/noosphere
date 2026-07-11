@@ -12,14 +12,19 @@ name = "noosd"
 path = "src/bin/noosd.rs"
 
 [dependencies]
+getrandom = "0.2"
 noos-braid = { path = "../noos-braid" }
+noos-contracts = { path = "../noos-contracts" }
 noos-codec = { path = "../noos-codec" }
 noos-crypto = { path = "../noos-crypto" }
 noos-da = { path = "../noos-da" }
+noos-grain = { path = "../noos-grain" }
 noos-ground = { path = "../noos-ground" }
 noos-lumen = { path = "../noos-lumen" }
+noos-p2p = { path = "../noos-p2p" }
 noos-store = { path = "../noos-store" }
 noos-witness = { path = "../noos-witness" }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
 
 [lints]
 workspace = true

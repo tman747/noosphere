@@ -1,0 +1,108 @@
+# NOOSPHERE mainnet genesis parameters — TEMPLATE, NOT A NETWORK
+#
+# STATUS: OWNER_BLOCKED. Every value marked "OWNER_BLOCKED" below is an owner
+# decision that does not exist yet: the signed economic parameter freeze
+# (plan §1.7, §2.5), the E-WAN drift selection (plan §6.2), and the genesis
+# ceremony outputs. tools/gates/check_mainnet_template.py REFUSES to treat
+# this file as a real parameter set until every placeholder is replaced AND
+# the owner signature block verifies. Nothing here may be invented by
+# engineering; honest blockage beats fabricated values.
+#
+# Structure mirrors protocol/genesis/devnet-parameters.toml plus the frozen
+# mainnet-only manifest fields of protocol/spec/genesis-identity-v1.md §3
+# (fields 25-33). chain_id is NEVER hand-written: it is derived as
+#   H("NOOS/CHAIN/V1" || H("NOOS/GENESIS/PARAMS/V1" || canonical(manifest)))
+# after the Quiet Week freeze. No is_test_fixture material may appear in
+# this file: nodes refuse fixtures wherever is_test_network = false.
+
+schema_version = 1
+chain_name = "OWNER_BLOCKED"           # OWNER_BLOCKED: public mainnet name, frozen at Quiet Week
+is_test_network = false
+
+# Template state. The owner flips owner_signed to true ONLY alongside a valid
+# [signatures] block; check_mainnet_template.py fails any file that claims
+# owner_signed = true while placeholders remain or signatures are missing.
+is_template = true
+owner_signed = false
+
+[token]
+symbol = "NOOS"
+decimals = 6
+base_unit = "micro-NOOS"
+
+[consensus]
+# Frozen structural timing (plan §6.2; architecture ch.01 §4). These match
+# the compile-frozen crate constants and are NOT owner-selectable.
+slot_seconds = 6
+epoch_length = 256
+max_slot_skip = 20
+median_time_past_blocks = 11
+witness_membership_lookback_epochs = 2
+pulse_target_spacing_seconds = 6
+pulse_half_life_seconds = 3600
+# OWNER_BLOCKED: selected under E-WAN-01 from {12000, 18000, 30000} — the
+# smallest passing value; if none passes, mainnet stays blocked (plan §6.2).
+max_future_drift_ms = "OWNER_BLOCKED"
+
+[witness_ring]
+# Structural caps (plan §6.5) — frozen.
+n_max = 256
+n_tail = 32
+n_hard = 1024
+# OWNER_BLOCKED: mainnet minimum witness bond is a signed genesis parameter
+# (constants-v1.toml [witness]); the devnet fixture value must never be copied.
+min_bond_micro_noos = "OWNER_BLOCKED"
+
+[controls]
+# The genesis controls (plan §1.5, §6.8). ALL radical controls are off at
+# genesis on every network. These are NOT owner-selectable; a template with
+# any control enabled is rejected outright.
+work_loom_credit_enabled = false
+work_loom_weight_cap = 0
+witness_proofpower_bonus_enabled = false
+neural_lane_enabled = false
+reflex_lane_enabled = false
+umbra_suite_enabled = false
+dream_lane_enabled = false
+class_gate_irreversible_budget = 0
+
+[emission]
+# OWNER_BLOCKED (genesis-identity-v1.md §3 fields 25-32; constants-v1.toml
+# [emission]): the issuance envelope of ch01 §13.2. Engineering uses
+# valueless NOOS_TEST fixtures only; no number here may originate from the
+# research corpus.
+max_supply_micro_noos = "OWNER_BLOCKED"
+emission_terminal_height = "OWNER_BLOCKED"
+# BLAKE3-256 root of the canonical integer per-height emission table blob,
+# published beside the manifest at Quiet Week.
+emission_table_root = "OWNER_BLOCKED"
+recipient_share_ground_bp = "OWNER_BLOCKED"    # basis points; three shares sum to 10000
+recipient_share_witness_bp = "OWNER_BLOCKED"
+recipient_share_treasury_bp = "OWNER_BLOCKED"
+rounding_rule_id = "OWNER_BLOCKED"
+fee_disposition_id = "OWNER_BLOCKED"
+
+[allocations]
+# OWNER_BLOCKED (field 33): root of the signed canonical genesis allocation
+# list. Mainnet has NO faucet; a [faucet] section in a mainnet file is
+# rejected as fixture material.
+allocations_root = "OWNER_BLOCKED"
+
+[commitments]
+# Quiet-Week roots (genesis-identity-v1.md §3 fields 34-36), computed over
+# the published artifacts at freeze time — not before.
+claim_registry_root = "OWNER_BLOCKED"
+conformance_vector_root = "OWNER_BLOCKED"
+software_manifest_root = "OWNER_BLOCKED"
+
+[dkg]
+# Real multi-party ceremony only (plan §3.2): participants/threshold are
+# owner decisions; deterministic dealer fixtures cannot load on mainnet.
+participants = "OWNER_BLOCKED"
+threshold = "OWNER_BLOCKED"
+
+[signatures]
+# Detached Ed25519 signature record over the canonical manifest bytes,
+# supplied by the owner at the freeze. Roles mirror the release policy.
+record_path = "OWNER_BLOCKED"
+required_roles = ["release-owner", "independent-build-reviewer"]

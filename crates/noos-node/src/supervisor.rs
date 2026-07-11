@@ -8,7 +8,7 @@
 //! │               reaches it only through the bounded StoreClient channel
 //! ├── rpc         localhost operator RPC (never shares consensus state;
 //! │               talks over the same bounded inbox)
-//! ├── sync        NetworkEdge driver (optional until the noos-p2p bind)
+//! ├── p2p/sync   async noos-p2p event loop; bounded consensus/store bridge
 //! └── pool        bounded proof-check verdict pool (crate::pool)
 //! ```
 //!
@@ -21,22 +21,29 @@
 //! never corrupt consensus state.
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use noos_braid::{BlockHeaderV1, CheckpointRef, FinalityCertificateV1};
-use noos_da::{BodyDaClaimV1, ShardCandidateV1};
+use noos_codec::NoosDecode;
+use noos_da::{encode_body, BodyDaClaimV1, ShardCandidateV1, BODY_TOTAL_SHARDS};
 use noos_ground::GroundTicketV1;
 use noos_lumen::objects::ReceiptV1;
 use noos_lumen::state::LumenRoots;
+use noos_p2p::{
+    BodyReplyV1, ChainIdentity, InboundItem, Multiaddr, P2pConfig, P2pEvent, P2pHandle, P2pNode,
+};
 use noos_store::WriteSet;
+use noos_witness::vote::FinalityVoteV1;
+use tokio::runtime::Handle;
 
 use crate::consensus::{ImportOutcome, NodeConfig, NodeCore};
 use crate::genesis::GenesisSpec;
 use crate::mempool::AdmitError;
 use crate::metrics::Metrics;
+use crate::network::{decode_header_announce, decode_tx_push, NodeProtocolStore, P2pNetworkEdge};
 use crate::store_port::{InProcStore, StorePort};
 use crate::view::{BlockSummary, TxStatus, ViewLookup};
 use crate::{Hash32, NodeError};
@@ -236,6 +243,14 @@ pub enum ConsensusMsg {
         cert: Box<FinalityCertificateV1>,
         reply: Reply<Result<(), String>>,
     },
+    InboundVote {
+        vote: Box<FinalityVoteV1>,
+    },
+    /// Devnet fixture finality driver tick (TEST NETWORKS ONLY; no-op
+    /// unless `NodeConfig::devnet_fixture_finality`).
+    DevnetFinalityTick {
+        reply: Reply<Result<bool, String>>,
+    },
     Status {
         reply: Reply<StatusSnapshot>,
     },
@@ -251,6 +266,13 @@ pub enum ConsensusMsg {
     /// Test hook: panic the consensus task to prove containment.
     InjectCrash,
     Shutdown,
+}
+
+/// Outbound gossip from the consensus task to the p2p edge. Best-effort:
+/// a full channel drops the push (peers recover via the pull sync path).
+pub enum OutboundGossip {
+    Header(Box<BlockHeaderV1>, GroundTicketV1),
+    Tx(Vec<u8>, Vec<u8>),
 }
 
 fn status_of<P: StorePort>(core: &NodeCore<P>, observer: bool) -> StatusSnapshot {
@@ -274,6 +296,7 @@ fn core_loop<P: StorePort>(
     core: &mut NodeCore<P>,
     observer: bool,
     rx: &Receiver<ConsensusMsg>,
+    gossip: Option<&tokio::sync::mpsc::Sender<OutboundGossip>>,
 ) -> bool {
     while let Ok(msg) = rx.recv() {
         match msg {
@@ -283,7 +306,13 @@ fn core_loop<P: StorePort>(
                 source,
                 reply,
             } => {
-                let _ = reply.send(core.submit_tx(&tx_bytes, &wit_bytes, source));
+                let result = core.submit_tx(&tx_bytes, &wit_bytes, source);
+                if result.is_ok() {
+                    if let Some(gossip) = gossip {
+                        let _ = gossip.try_send(OutboundGossip::Tx(tx_bytes, wit_bytes));
+                    }
+                }
+                let _ = reply.send(result);
             }
             ConsensusMsg::ImportBlock {
                 header,
@@ -295,17 +324,37 @@ fn core_loop<P: StorePort>(
                 let result = core
                     .import_block(&header, &ticket, &claim, &shards)
                     .map_err(|e| e.to_string());
+                // Re-announce newly executed blocks so gossip crosses more
+                // than one hop; the p2p layer suppresses duplicate pushes.
+                if let (Ok(ImportOutcome::Executed { .. }), Some(gossip)) = (&result, gossip) {
+                    let _ = gossip.try_send(OutboundGossip::Header(header, ticket));
+                }
                 let _ = reply.send(result);
             }
             ConsensusMsg::ProduceBlock { reply } => {
-                let result = core
-                    .produce_block()
-                    .map(|p| p.hash)
-                    .map_err(|e| e.to_string());
+                let result = core.produce_block().map_err(|e| e.to_string());
+                let result = match result {
+                    Ok(produced) => {
+                        if let Some(gossip) = gossip {
+                            let _ = gossip.try_send(OutboundGossip::Header(
+                                Box::new(produced.header),
+                                produced.ticket,
+                            ));
+                        }
+                        Ok(produced.hash)
+                    }
+                    Err(e) => Err(e),
+                };
                 let _ = reply.send(result);
             }
             ConsensusMsg::QueueCertificate { cert, reply } => {
                 let _ = reply.send(core.queue_certificate(*cert).map_err(|e| e.to_string()));
+            }
+            ConsensusMsg::InboundVote { vote } => {
+                let _ = core.ingest_network_vote(*vote);
+            }
+            ConsensusMsg::DevnetFinalityTick { reply } => {
+                let _ = reply.send(core.devnet_finality_tick().map_err(|e| e.to_string()));
             }
             ConsensusMsg::Status { reply } => {
                 let _ = reply.send(status_of(core, observer));
@@ -343,6 +392,227 @@ fn core_loop<P: StorePort>(
     true // inbox closed: orderly stop
 }
 
+async fn import_wire_block(
+    consensus: &SyncSender<ConsensusMsg>,
+    p2p: &P2pHandle,
+    peer: noos_p2p::PeerId,
+    announced: &[u8],
+) {
+    let Ok((header, ticket)) = decode_header_announce(announced) else {
+        return;
+    };
+    let Ok(BodyReplyV1::Body(body)) = p2p.request_body(peer, header.body_da_root).await else {
+        return;
+    };
+    // The blob lane serves the CANONICAL body encoding; the DA commitment
+    // is over the padded DA form (ch01 §4.3 step 5) — re-derive it exactly.
+    let Ok(body_v1) = noos_braid::BlockBodyV1::decode_canonical(&body.0) else {
+        return;
+    };
+    let Ok(encoded) = encode_body(&crate::roots::da_form_bytes(&body_v1)) else {
+        return;
+    };
+    if encoded.shard_root().as_bytes() != &header.body_da_root {
+        return;
+    }
+    let mut shards = Vec::with_capacity(BODY_TOTAL_SHARDS);
+    for index in 0..u32::try_from(BODY_TOTAL_SHARDS).unwrap_or(0) {
+        let Ok(candidate) = encoded.candidate(index) else {
+            return;
+        };
+        shards.push(candidate);
+    }
+    let (reply, _) = sync_channel(1);
+    let _ = consensus.try_send(ConsensusMsg::ImportBlock {
+        header: Box::new(header),
+        ticket,
+        claim: *encoded.claim(),
+        shards,
+        reply,
+    });
+}
+
+async fn sync_ready_peer(
+    consensus: &SyncSender<ConsensusMsg>,
+    p2p: &P2pHandle,
+    peer: noos_p2p::PeerId,
+) {
+    let Ok(range) = p2p.request_range(peer, 1, 256).await else {
+        return;
+    };
+    for header in range.headers.0 {
+        import_wire_block(consensus, p2p, peer, &header.0).await;
+    }
+}
+
+fn load_or_create_p2p_seed(data_dir: &Path) -> Result<[u8; 32], NodeError> {
+    let path = data_dir.join("p2p-key");
+    match std::fs::read(&path) {
+        Ok(bytes) => {
+            return <[u8; 32]>::try_from(bytes.as_slice())
+                .map_err(|_| NodeError::Config("p2p-key must be exactly 32 bytes".into()))
+        }
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+            return Err(NodeError::Config(format!("read p2p-key: {error}")));
+        }
+        Err(_) => {}
+    }
+    std::fs::create_dir_all(data_dir)
+        .map_err(|error| NodeError::Config(format!("create data directory: {error}")))?;
+    let mut seed = [0_u8; 32];
+    getrandom::getrandom(&mut seed)
+        .map_err(|error| NodeError::Config(format!("OS CSPRNG for p2p-key: {error}")))?;
+    match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+    {
+        Ok(mut file) => {
+            use std::io::Write as _;
+            file.write_all(&seed)
+                .and_then(|()| file.sync_all())
+                .map_err(|error| NodeError::Config(format!("persist p2p-key: {error}")))?;
+            Ok(seed)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            let bytes = std::fs::read(&path).map_err(|read_error| {
+                NodeError::Config(format!("read raced p2p-key: {read_error}"))
+            })?;
+            <[u8; 32]>::try_from(bytes.as_slice())
+                .map_err(|_| NodeError::Config("p2p-key must be exactly 32 bytes".into()))
+        }
+        Err(error) => Err(NodeError::Config(format!("create p2p-key: {error}"))),
+    }
+}
+
+fn spawn_network(
+    settings: crate::network::NetworkSettings,
+    chain_id: Hash32,
+    genesis_hash: Hash32,
+    store: StoreClient,
+    consensus: SyncSender<ConsensusMsg>,
+    mut gossip_rx: tokio::sync::mpsc::Receiver<OutboundGossip>,
+) -> Result<(tokio::sync::oneshot::Sender<()>, JoinHandle<()>, Multiaddr), NodeError> {
+    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+    let (startup_tx, startup_rx) = sync_channel(1);
+    let thread = std::thread::Builder::new()
+        .name("noos-p2p".into())
+        .spawn(move || {
+            let runtime = match tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .worker_threads(2)
+                .build()
+            {
+                Ok(runtime) => runtime,
+                Err(error) => {
+                    let _ = startup_tx.send(Err(format!("runtime: {error}")));
+                    return;
+                }
+            };
+            runtime.block_on(async move {
+                let identity = ChainIdentity {
+                    chain_id,
+                    genesis_hash,
+                    protocol_version: 1,
+                };
+                let Some(keypair_seed) = settings.keypair_seed else {
+                    let _ = startup_tx.send(Err("missing p2p identity seed".into()));
+                    return;
+                };
+                let mut config = P2pConfig::loopback(identity, keypair_seed);
+                config.listen_addr = settings.listen;
+                let protocol_store = Arc::new(NodeProtocolStore::new(store));
+                let (p2p, mut events) = match P2pNode::spawn(config, protocol_store) {
+                    Ok(pair) => pair,
+                    Err(error) => {
+                        let _ = startup_tx.send(Err(error.to_string()));
+                        return;
+                    }
+                };
+                let address = p2p.listen_addr().await;
+                let _ = startup_tx.send(Ok(address));
+                for peer in settings.bootstrap {
+                    p2p.connect(peer);
+                }
+
+                let edge = P2pNetworkEdge::new(p2p.clone(), Handle::current());
+                let mut shutdown_rx = shutdown_rx;
+                loop {
+                    tokio::select! {
+                        _ = &mut shutdown_rx => {
+                            p2p.shutdown();
+                            break;
+                        }
+                        gossip = gossip_rx.recv() => {
+                            match gossip {
+                                Some(OutboundGossip::Header(header, ticket)) => {
+                                    edge.push_header(&header, &ticket).await;
+                                }
+                                Some(OutboundGossip::Tx(tx_bytes, wit_bytes)) => {
+                                    edge.push_tx(&tx_bytes, &wit_bytes).await;
+                                }
+                                None => {}
+                            }
+                        }
+                        event = events.recv() => {
+                            let Some(event) = event else { break };
+                            match event {
+                                P2pEvent::PeerReady { peer, .. } => {
+                                    edge.peer_ready(peer);
+                                    sync_ready_peer(&consensus, &p2p, peer).await;
+                                }
+                                P2pEvent::PeerDisconnected { peer }
+                                | P2pEvent::HandshakeRejected { peer, .. } => {
+                                    edge.peer_gone(&peer);
+                                }
+                                P2pEvent::Inbound { peer, item } => match item {
+                                    InboundItem::HeaderAnnounce { header } => {
+                                        import_wire_block(&consensus, &p2p, peer, &header).await;
+                                    }
+                                    InboundItem::Tx { tx } => {
+                                        if let Ok((tx_bytes, wit_bytes)) = decode_tx_push(&tx) {
+                                            let (reply, _) = sync_channel(1);
+                                            let source = peer
+                                                .to_bytes()
+                                                .get(..8)
+                                                .and_then(|bytes| bytes.try_into().ok())
+                                                .map(u64::from_le_bytes)
+                                                .unwrap_or(0);
+                                            let _ = consensus.try_send(ConsensusMsg::SubmitTx {
+                                                tx_bytes: tx_bytes.to_vec(),
+                                                wit_bytes: wit_bytes.to_vec(),
+                                                source,
+                                                reply,
+                                            });
+                                        }
+                                    }
+                                    InboundItem::Vote { vote } => {
+                                        if let Ok(vote) = FinalityVoteV1::decode_canonical(&vote) {
+                                            let _ = consensus.try_send(ConsensusMsg::InboundVote {
+                                                vote: Box::new(vote),
+                                            });
+                                        }
+                                    }
+                                    InboundItem::LoomReceipt { .. } => {}
+                                },
+                                P2pEvent::Listening { .. }
+                                | P2pEvent::Violation { .. }
+                                | P2pEvent::CooldownRefused { .. }
+                                | P2pEvent::OutgoingConnectionFailed { .. } => {}
+                            }
+                        }
+                    }
+                }
+            });
+        })
+        .map_err(|error| NodeError::Config(format!("spawn p2p task: {error}")))?;
+    let address = startup_rx
+        .recv()
+        .map_err(|_| NodeError::ChannelClosed("p2p startup"))?
+        .map_err(|error| NodeError::Config(format!("p2p startup: {error}")))?;
+    Ok((shutdown_tx, thread, address))
+}
+
 // ---------------------------------------------------------------------------
 // Supervisor
 // ---------------------------------------------------------------------------
@@ -352,9 +622,13 @@ fn core_loop<P: StorePort>(
 pub struct NodeHandle {
     pub consensus_tx: SyncSender<ConsensusMsg>,
     pub metrics: Arc<Metrics>,
+    /// Live QUIC listen address when networking is enabled.
+    pub p2p_addr: Option<Multiaddr>,
     consensus_handle: Option<JoinHandle<()>>,
     store_tx: SyncSender<StoreMsg>,
     store_handle: Option<JoinHandle<()>>,
+    network_shutdown: Option<tokio::sync::oneshot::Sender<()>>,
+    network_handle: Option<JoinHandle<()>>,
 }
 
 impl NodeHandle {
@@ -377,6 +651,13 @@ impl NodeHandle {
             .map_err(NodeError::Config)
     }
 
+    /// Devnet fixture finality driver tick (TEST NETWORKS ONLY): `Ok(true)`
+    /// when an epoch-boundary certificate was signed and queued.
+    pub fn devnet_finality_tick(&self) -> Result<bool, NodeError> {
+        self.round_trip(|reply| ConsensusMsg::DevnetFinalityTick { reply })?
+            .map_err(NodeError::Config)
+    }
+
     pub fn set_now(&self, now_ms: u64) -> Result<(), NodeError> {
         self.consensus_tx
             .send(ConsensusMsg::SetNow(now_ms))
@@ -394,6 +675,12 @@ impl NodeHandle {
 
     /// Orderly shutdown of every task.
     pub fn shutdown(mut self) {
+        if let Some(stop) = self.network_shutdown.take() {
+            let _ = stop.send(());
+        }
+        if let Some(h) = self.network_handle.take() {
+            let _ = h.join();
+        }
         let _ = self.consensus_tx.send(ConsensusMsg::Shutdown);
         if let Some(h) = self.consensus_handle.take() {
             let _ = h.join();
@@ -413,6 +700,10 @@ pub fn start(
 ) -> Result<NodeHandle, NodeError> {
     let metrics = Arc::new(Metrics::default());
     let built = spec.build()?;
+    let mut network_settings = cfg.network.clone();
+    if network_settings.enabled && network_settings.keypair_seed.is_none() {
+        network_settings.keypair_seed = Some(load_or_create_p2p_seed(&data_dir)?);
+    }
 
     // Store task.
     let store = InProcStore::open(data_dir, &built.chain_id, &built.genesis_hash)?;
@@ -427,7 +718,12 @@ pub fn start(
     let store_client = StoreClient {
         tx: store_tx.clone(),
     };
+    let network_store = store_client.clone();
+    let network_chain_id = built.chain_id;
+    let network_genesis_hash = built.genesis_hash;
     let observer = cfg.observer;
+    let (gossip_sender, gossip_rx) = tokio::sync::mpsc::channel::<OutboundGossip>(256);
+    let gossip_tx = network_settings.enabled.then_some(gossip_sender);
     let task_metrics = Arc::clone(&metrics);
     let consensus_handle = std::thread::Builder::new()
         .name("noos-consensus".into())
@@ -449,7 +745,7 @@ pub fn start(
                     Err(_) => return, // typed fatal: store refused startup
                 };
                 let done = catch_unwind(AssertUnwindSafe(|| {
-                    core_loop(&mut core, observer, &consensus_rx)
+                    core_loop(&mut core, observer, &consensus_rx, gossip_tx.as_ref())
                 }));
                 match done {
                     Ok(_) => return, // orderly shutdown or closed inbox
@@ -463,11 +759,28 @@ pub fn start(
         })
         .map_err(|e| NodeError::Config(format!("spawn consensus task: {e}")))?;
 
+    let (network_shutdown, network_handle, p2p_addr) = if network_settings.enabled {
+        let (shutdown, thread, address) = spawn_network(
+            network_settings,
+            network_chain_id,
+            network_genesis_hash,
+            network_store,
+            consensus_tx.clone(),
+            gossip_rx,
+        )?;
+        (Some(shutdown), Some(thread), Some(address))
+    } else {
+        (None, None, None)
+    };
+
     Ok(NodeHandle {
         consensus_tx,
         metrics,
+        p2p_addr,
         consensus_handle: Some(consensus_handle),
         store_tx,
         store_handle: Some(store_handle),
+        network_shutdown,
+        network_handle,
     })
 }

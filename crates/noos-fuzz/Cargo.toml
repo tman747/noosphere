@@ -1,0 +1,15 @@
+[package]
+name = "noos-fuzz"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dev-dependencies]
+noos-codec = { path = "../noos-codec" }
+noos-grain = { path = "../noos-grain" }
+noos-lumen = { path = "../noos-lumen" }
+
+[lints]
+workspace = true

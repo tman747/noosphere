@@ -2,6 +2,8 @@
 //! explicit immutable context and mediates every object read/write/call.
 #![forbid(unsafe_code)]
 
+pub mod router;
+
 use noos_grain::{encode_noun, eval, GrainTrap, Meter, Noun, GRAIN_VERSION};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -414,5 +416,43 @@ mod tests {
             h.upgrade([1; 32], [2; 32], &f, fh, [0; 32], 100, 100),
             Err(ContractError::Immutable)
         );
+    }
+    #[test]
+    fn meter_exhaustion_traps_exactly_and_charges_spent_equal_to_limit() {
+        let mut h = ContractHost::new([]);
+        h.install(
+            [1; 32],
+            record(UpgradePolicy::Immutable, ReentrancyPolicy::Allowed),
+        );
+        let context = ContractContext {
+            chain_id: [8; 32],
+            genesis_hash: [9; 32],
+            txid: [10; 32],
+            caller: [0; 32],
+            callee: [1; 32],
+            block_height: 5,
+            finalized_prestate_root: [11; 32],
+            call_depth: 0,
+        };
+        // `[0 1]` charges COST_SLOT_BASE (2) up front; a 1-step budget
+        // exhausts on the FIRST charge with the exact stable trap.
+        let formula = Noun::cell(Noun::atom_u64(0), Noun::atom_u64(1)).unwrap();
+        let err = h
+            .execute_grain([1; 32], &context, &formula, Noun::atom_u64(3), 1, 100)
+            .unwrap_err();
+        assert_eq!(err, ContractError::Grain(GrainTrap::MeterExhausted));
+
+        // Meter law: exhaustion pins the reported charge to EXACTLY the
+        // limit (never less, never more), so a trapped call always bills
+        // spent == limit.
+        let subject = context
+            .subject(Noun::atom_u64(7), Noun::atom_u64(3))
+            .unwrap();
+        let mut meter = Meter::new(1, 100);
+        assert!(matches!(
+            eval(GRAIN_VERSION, subject, formula, &mut meter),
+            Err(GrainTrap::MeterExhausted)
+        ));
+        assert_eq!(meter.spent(), 1, "spent == limit on exhaustion");
     }
 }

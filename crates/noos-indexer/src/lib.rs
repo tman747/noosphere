@@ -24,6 +24,8 @@ use std::{
 };
 use tokio::sync::RwLock;
 
+pub mod ingest;
+
 pub const API_VERSION: &str = "v1";
 pub const MEDIA_TYPE: &str = "application/vnd.noos.v1+json";
 const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -37,6 +39,11 @@ pub enum IndexerError {
     Io(String),
     SchemaMismatch,
     NonMonotonicHead,
+    /// Live node source failed (transport, auth, or malformed frame).
+    Source(String),
+    /// A fork's ancestor is older than the retained checkpoint tail;
+    /// resuming would silently skip rollback, so ingestion fails closed.
+    ReorgBeyondCheckpoint,
 }
 impl std::fmt::Display for IndexerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -46,6 +53,8 @@ impl std::fmt::Display for IndexerError {
             Self::Io(v) => write!(f, "I/O: {v}"),
             Self::SchemaMismatch => f.write_str("index schema identity mismatch"),
             Self::NonMonotonicHead => f.write_str("non-monotonic head update"),
+            Self::Source(v) => write!(f, "node source: {v}"),
+            Self::ReorgBeyondCheckpoint => f.write_str("reorg beyond checkpoint tail"),
         }
     }
 }
@@ -136,6 +145,9 @@ struct IndexState {
     justified: Option<ChainPoint>,
     finalized: Option<ChainPoint>,
     blocks: BTreeMap<u64, IndexedBlock>,
+    /// txids carried by each ingested height — the exact row set a
+    /// reorg rollback must delete (ingest::sync_from_node).
+    block_txids: BTreeMap<u64, Vec<String>>,
     transactions: HashMap<String, Value>,
     evidence: HashMap<String, Value>,
     telemetry: TelemetryParser,

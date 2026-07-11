@@ -1,0 +1,78 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "4872e6b98255cfecf5aea94bd7c526e3c8987c26673906cb624d918e9017905b",
+      "evidence/base-base-transfer-contract.json": "d120db9e228cec6a99b828dd919a0e1c7daaae8e7c6470c6513a3eb552c3e20d",
+      "evidence/base-crash-matrix.json": "62b45c91fb123ba3e9e016a776f218a222cfda097686d8fe131aa70f53c02c59"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-weft-syntax",
+          "-p",
+          "noos-weft-compile",
+          "-p",
+          "noos-weftc"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-weft-syntax",
+          "noos-weft-compile",
+          "noos-weftc"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-WEFT-01": "e77950b1e1192c174db1d170981b068ed9390884e39620cd501d075f7697a2b5"
+  },
+  "claims": [
+    "E-WEFT-01"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "E-WEFT-01"
+  ],
+  "evidence_sha256": "0a9cae6c57e5b8796c4190f96046f80caae75b033e159dae86f2ba0e03803e1e",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-e-weft-01",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-weft-compile/Cargo.toml": "3a98d2a6f7ed8a8b7f5b61abfc5bb9ed4dcaf70249ade80a417f27ff93d93fbd",
+    "crates/noos-weft-compile/src/lib.rs": "e591ab563c684be4760473112b2a0d96b79114f9fe0d3cc7ccfc2caf856176e0",
+    "crates/noos-weft-syntax/Cargo.toml": "b410bc82cf5095fdbfe330e8fd3bf413f10bc0af7cd5cc9c4c0233569a2872dc",
+    "crates/noos-weft-syntax/src/lib.rs": "0831d8eaf0aec589282c5c2b438d4b38c8111597448cf05afd5185991ee26ed2",
+    "crates/noos-weftc/Cargo.toml": "af5c5012d0cccff78315998b7fef645af7dd4b3de19edb980d7c60e8f25344b8",
+    "crates/noos-weftc/src/main.rs": "f1c7c72fcd23f1be11a1c95795ede7aae6dcb1f457ca76c64ea4a187a41e03ae"
+  }
+}

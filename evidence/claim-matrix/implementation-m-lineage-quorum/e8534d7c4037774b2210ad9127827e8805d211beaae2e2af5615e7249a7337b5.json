@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-training"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-training"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-LINEAGE-QUORUM": "f1c0c1f7b45abf74f7931b5090399fa8ca67f2f31a43c179cd0e23b9d2b1984f"
+  },
+  "claims": [
+    "M-LINEAGE-QUORUM"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "M-LINEAGE-QUORUM"
+  ],
+  "evidence_sha256": "e8534d7c4037774b2210ad9127827e8805d211beaae2e2af5615e7249a7337b5",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-m-lineage-quorum",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-training/Cargo.toml": "edfcafaf40f74e6478ab052fc08d6714d48cda11538d9f48f64dcacca22800ce",
+    "crates/noos-training/src/lib.rs": "69c469abb21225ef4c64e5dd26fb2b6648466c3aa38288eb2709427f3dfb14b3"
+  }
+}

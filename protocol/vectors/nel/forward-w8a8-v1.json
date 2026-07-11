@@ -1,0 +1,44 @@
+{
+  "schema": "NOOS/NEL/FORWARD-W8A8/V1",
+  "description": "Frozen mini W8A8 integer decoder profile vector. Generated once by noos_nel::inference::run_lane on the deterministic reference model (job_id = 0x07*32, prompt [1,2,3,4], 8 greedy tokens, 12 states) and frozen; any implementation of the profile must reproduce every positive case bit-for-bit and must never produce the negative case. A mismatch is a profile falsifier (N-PROFILE / N-TOKEN-STATE).",
+  "prompt": [1, 2, 3, 4],
+  "n_generate": 8,
+  "states": 12,
+  "cases": [
+    {
+      "name": "lut-root",
+      "kind": "positive",
+      "bytes": "66bbff851cd4d233b1c010a7ec14b32c053efe8c7e42f1aa9ed816e90ba21b52"
+    },
+    {
+      "name": "profile-id",
+      "kind": "positive",
+      "bytes": "060ef04656317cfc8d9814eb9454f75a8ba3e85944f7628b98a73e8016dfa962"
+    },
+    {
+      "name": "weight-root",
+      "kind": "positive",
+      "bytes": "f2a4538c0c6c69d3723454e65a77cbf43af2517e3e5e60f7ff650b6795586ef7"
+    },
+    {
+      "name": "tokens-u32le",
+      "kind": "positive",
+      "bytes": "010000000200000003000000040000001600000033000000070000001700000017000000170000001700000017000000"
+    },
+    {
+      "name": "s-end",
+      "kind": "positive",
+      "bytes": "88630fac8db5b0a97e3e6ec2c43cef3a15bd529296ab8361b5f0bddcf848f028"
+    },
+    {
+      "name": "chunk-trace-root",
+      "kind": "positive",
+      "bytes": "bbf75ae4485bd93bafb92fb29846a54fb33d47e2919a3260c3069fe0aa189f47"
+    },
+    {
+      "name": "s-end-single-bit-corruption",
+      "kind": "negative",
+      "bytes": "89630fac8db5b0a97e3e6ec2c43cef3a15bd529296ab8361b5f0bddcf848f028"
+    }
+  ]
+}

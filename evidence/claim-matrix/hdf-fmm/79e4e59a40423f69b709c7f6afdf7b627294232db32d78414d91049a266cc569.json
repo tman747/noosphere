@@ -1,0 +1,77 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "10fb6b92fb548e6760237769e5e0374e1d81a5e001bea808918a2c507b0e6611",
+      "evidence/base-base-transfer-contract.json": "4732560ee4f80d982af6442590e2d34b444593cc115114682bb12ef324cdc217",
+      "evidence/base-crash-matrix.json": "80890b604ba4a0dd47a0e28967031287476f405d22e300fcd59a76fd65a9e1bc"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-analytics"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-analytics"
+        ]
+      },
+      "name": "HDF counterexamples and energy-scope analytics regressions",
+      "passed": true
+    },
+    {
+      "detail": "universal M-HDF is retired; energy/FMM outputs are shadow credit only",
+      "name": "production influence",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-HDF": "b5d6adb93805ad770b245d40665b1ce482c48b9a4a2f88f752c6ea6904a8fa29",
+    "M-HDF-ENERGY": "cc3a587c205f50320457d11d0b1cf2c3969d80458bd9ce8b6ef168c24f62fcfa",
+    "M-OMEGA": "ed4b63c08b2339c9b31f01bd55645f03c0c98efaff5d724ce96f9dd0cded9b61"
+  },
+  "claims": [
+    "M-HDF",
+    "M-HDF-ENERGY",
+    "M-OMEGA"
+  ],
+  "command": [
+    "tools/gates/run_hdf_fmm.py",
+    "--energy-scope-only",
+    "--shadow-only"
+  ],
+  "evidence_sha256": "79e4e59a40423f69b709c7f6afdf7b627294232db32d78414d91049a266cc569",
+  "expected_result": "DISABLED",
+  "gate": "hdf-fmm",
+  "limitations": [
+    "No Ground, Ring, issuance, or exact Freivalds influence."
+  ],
+  "registry_schema_version": "1.1.0",
+  "result": "DISABLED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-analytics/Cargo.toml": "d1af1318d679b7efc79ecd514f963d194e3cbd7285017955628f0369dee93d87",
+    "crates/noos-analytics/src/lib.rs": "a901ca2c2489cc050d4bb3e1ba411b88c3d888a19d2a3b0f7c54b0cf967bba16"
+  }
+}

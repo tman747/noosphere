@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "cbec5f6b6db0d7de6564c04548d81fd7df468e5e1e5caebe1bbc72341a0ff2f2",
+      "evidence/base-base-transfer-contract.json": "224b1463430761a96608ae40fde2c6f287c94e761876e12e9d4fcc4321dec413",
+      "evidence/base-crash-matrix.json": "0425fec51e098f88256feea6cb48975781f446c3b1863e9d1c75b7eebd4e81a3"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-private-besi"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-private-besi"
+        ]
+      },
+      "name": "claim-specific crate tests with falsifiers",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "P2-S-FUSED-AUDIT": "277c11164ec8cef3dbf32e4992c1a6672ebef070dcc99189fb882c3f0a7bbdf8"
+  },
+  "claims": [
+    "P2-S-FUSED-AUDIT"
+  ],
+  "command": [
+    "tools/gates/run_privacy_claim.py",
+    "--claim",
+    "P2-S-FUSED-AUDIT"
+  ],
+  "evidence_sha256": "d73534d1db897d0442968c39c58021490fa2115a6328b3acfade9e614fc0870d",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-p2-s-fused-audit",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-private-besi/Cargo.toml": "1a7fa58553b0285dfe833b02626c3479f85f6a464f0bd115531109b6267e9ac3",
+    "crates/noos-private-besi/src/fused_audit.rs": "070ea8be376c153e618e3e4d83e03f8f7d696f5435be814ff4f7566df7ed42ba"
+  }
+}

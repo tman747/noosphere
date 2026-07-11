@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-reflex"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-reflex"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-REFLEX-F9": "4fe1adff83347afed97f524ab7aff99ccf23eee8bcc5d4b07195d7558c4f706c"
+  },
+  "claims": [
+    "A-REFLEX-F9"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-REFLEX-F9"
+  ],
+  "evidence_sha256": "18462a84b313994276e406277017cd189f9e40f42074f23cf1c6104d163ac536",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-reflex-f9",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-reflex/Cargo.toml": "2977f4aa461766279a10cc9e383eacefe528051602182c048a287da669ed3149",
+    "crates/noos-reflex/src/lib.rs": "abc58585fde71d4f239f6a0a5313b0fb030787b0486c94696ce357138a74bbc3"
+  }
+}

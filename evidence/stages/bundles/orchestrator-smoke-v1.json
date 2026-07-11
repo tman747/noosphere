@@ -1,0 +1,70 @@
+{
+  "bundle_id": "orchestrator-smoke-v1",
+  "evaluation": {
+    "conflicts": [],
+    "exclusions": [
+      "All protocol, independent-review, network, ceremony, economic, audit, duration, and sign-off requirements."
+    ],
+    "measurements": {
+      "promotion_claimed": false
+    },
+    "thresholds": {
+      "orchestrator_smoke": "command exits 0 and retained stdout/stderr hashes validate"
+    },
+    "verdict": "BLOCKED",
+    "verdict_basis": "Tooling smoke only; no G0 protocol requirement or promotion gate is claimed."
+  },
+  "execution": {
+    "command": [
+      "python",
+      "--version"
+    ],
+    "cwd": "C:\\noosphere",
+    "ended_at_utc": "2026-07-11T11:00:56.504768Z",
+    "exit_code": 0,
+    "started_at_utc": "2026-07-11T11:00:56.493768Z",
+    "toolchain_environment": {
+      "architecture": "x86_64",
+      "os": "Windows_NT",
+      "python": "3.10.11"
+    }
+  },
+  "inputs": {
+    "fixtures": [],
+    "seeds": []
+  },
+  "producer": {
+    "host_class": "windows-x86_64-local",
+    "orchestrator": "tools/gates/stage_evidence.py"
+  },
+  "protocol_binding": {
+    "api_version": "v1",
+    "chain_id": "OWNER_BLOCKED",
+    "genesis_hash": "OWNER_BLOCKED",
+    "protocol_version": "v1",
+    "release_version": "0.0.0-preproduction",
+    "revision": "3ed1c845520d2245eb331a28c8302a0721c7a2d4"
+  },
+  "raw_artifacts": [
+    {
+      "bytes": 16,
+      "path": "evidence/stages/bundles/orchestrator-smoke-v1/stdout.raw",
+      "sha256": "125a353ba9cd603e069d1e1a5ee22e961bac9b7c82e4116f2d42c00ef82c7a58"
+    },
+    {
+      "bytes": 0,
+      "path": "evidence/stages/bundles/orchestrator-smoke-v1/stderr.raw",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "rollback": {
+    "action": "No rollback required for read-only Python version command",
+    "evidence_refs": [],
+    "outcome": "NOT_REQUIRED",
+    "target": "No protocol or deployed state changed",
+    "triggered": false
+  },
+  "schema_version": 1,
+  "signatures": [],
+  "stage": "G0"
+}

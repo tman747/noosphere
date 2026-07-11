@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-nel"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-nel"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-NEL-01b": "59e50e32f2897e46ebb092a938fc25bef1c838845d8d310b0f9d3d79de9dd6b8"
+  },
+  "claims": [
+    "E-NEL-01b"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "E-NEL-01b"
+  ],
+  "evidence_sha256": "5e28e8e55b372be33c74d682500e5c81222e113f8e4b56ff813f07c92aa4d8f5",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-e-nel-01b",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-nel/Cargo.toml": "feb9764c9a7672e340e6167678fe27f2a54acbc27e7948577e5e76580f925c3b",
+    "crates/noos-nel/src/lib.rs": "9c30887eca8777ce8ca3f2b34c267e075bce7abd0d51f41b80aaf1a217474dd4"
+  }
+}

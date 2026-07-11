@@ -235,63 +235,43 @@ production are dropped from the pool.
   identity, proof samples — so a corrupt byte from a lying peer surfaces
   as a typed open failure, never as accepted state.
 
-### 6.4 NetworkEdge / noos-p2p binding status
+### 6.4 NetworkEdge / noos-p2p production binding
 
-`noos-node` talks to the network through the thin synchronous
-`NetworkEdge` trait (typed requests + fire-and-forget announces) and
-serves snapshots through `SnapshotSource`. `noos-p2p` landed with an
-async, peer-scoped surface: `P2pHandle` (per-peer `request_header`,
-`request_body`, `request_range`, `request_snapshot_chunk`,
-`request_shard`, `push_*`), the `ProtocolStore` serving trait
-(`&self`, `Send + Sync + 'static`), and `P2pEvent::Inbound` push
-delivery.
+`noosd` enables the production `P2pNetworkEdge` by default. The adapter
+owns a deterministic round-robin picker over handshake-complete peers and
+bridges the synchronous `NetworkEdge` contract to the async `P2pHandle`.
+The supervisor owns the Tokio runtime and bounded consensus/store inboxes;
+transport callbacks never mutate consensus state directly.
 
-**Decision: the binding is RECORDED AS A SEAM here, not forced in this
-pass.** Neither side is rewritten. The mapping the binding pass
-implements:
+| node abstraction                    | noos-p2p surface |
+|-------------------------------------|------------------|
+| `NetworkEdge::request_headers`      | `request_range` (`/noos/sync/range/1`) |
+| targeted body repair                | `request_body` (`/noos/braid/body/1`) and derived shard service (`/noos/blob/shard/1`) |
+| `announce_header/tx/vote`           | `announce_header` / `push_tx` / `push_vote` |
+| inbound gossip                      | `P2pEvent::Inbound` decoded and sent through the bounded `ConsensusMsg` inbox |
+| serving side                        | `NodeProtocolStore` round trips to the sole store task |
+| finalized snapshot transport        | `/noos/sync/snapshot/1` |
+| disabled Loom lane                  | `/noos/loom/receipt/1` returns the transport's explicit `FeatureDisabled` response |
 
-| node abstraction                    | noos-p2p surface                                   | status |
-|-------------------------------------|----------------------------------------------------|--------|
-| `NetworkEdge::request_headers`      | `P2pHandle::request_range` (`/noos/sync/range/1`)  | seam   |
-| `NetworkEdge::request_body`         | `request_body` + `request_shard` (`/noos/braid/body/1`, `/noos/blob/shard/1`) | seam |
-| `NetworkEdge::request_certificates` | certificates travel INSIDE `/noos/sync/range/1` payload bytes (agreed with the transport owner) | seam |
-| `NetworkEdge::announce_header/tx/vote` | `announce_header` / `push_tx` / `push_vote`      | seam   |
-| inbound gossip → consensus inbox    | `P2pEvent::Inbound { HeaderAnnounce, Tx, Vote }` → `ConsensusMsg` | seam |
-| serving side                        | `ProtocolStore` over the store task                | seam   |
-| `SnapshotSource`                    | `request_snapshot_chunk` (`/noos/sync/snapshot/1`) | seam   |
+`NodeProtocolStore` never opens the database. Its read-only
+`ProtocolStore` implementation uses the existing cloneable `StoreClient`,
+so headers, ranges and bodies are point-in-time store-task answers and
+there is still exactly one durable writer. DA shards are a bounded derived
+cache of already durable canonical bodies.
 
-Two structural mismatches justify deferring the glue (they are transport
-plumbing, not law):
+Peer readiness enables request selection; disconnect/rejection removes the
+peer immediately. The transport owns deterministic reconnect backoff.
+Every range/header response is canonically decoded, every repaired body is
+re-encoded to its committed DA root, and all resulting objects enter the
+ordinary import pipeline. Transaction pushes carry canonical transaction
+and segregated-witness bytes together. Vote pushes enter the normal
+Witness validation/quorum/certificate path.
 
-1. **Sync vs async, peer-less vs peer-scoped.** `NetworkEdge` is a
-   blocking, peer-agnostic pull surface owned by the consensus thread;
-   `P2pHandle` is tokio-async and peer-addressed. The adapter needs a
-   peer-selection/rotation policy and a runtime bridge (bounded blocking
-   waits), which belongs with the supervisor's sync task.
-2. **`ProtocolStore` is `&self + Sync`; the store is single-writer
-   `&mut self`.** Serving headers/bodies to peers requires a read-only
-   store view (or a channel round trip into the store task) that the
-   current `StorePort` deliberately does not expose. The binding pass
-   adds a read-only serving handle on the store task, NOT a second
-   writer.
-
-Binding-pass pointers agreed with the transport owner (no noos-p2p
-changes required for either):
-
-* `ProtocolStore` is deliberately `&self + Sync` and infallible-`Option`:
-  an adapter holding a read-only snapshot handle — or an mpsc query
-  channel into the store task with a bounded `blocking_recv` — satisfies
-  it without touching the single-writer invariant. Serving stale-by-one
-  reads is fine; peers re-request.
-* For the sync/peer-less `NetworkEdge`: keep a peer picker over
-  `P2pEvent::PeerReady`/`PeerDisconnected` and round-robin `request_*`
-  per call; every `P2pHandle` `request_*` future is `Send + 'static`, so
-  a small block_on bridge task closes the sync/async gap.
-
-Until the binding pass, `noosd` runs with `NullEdge` (isolated node
-serving its operator RPC) — stated in `noosd --help`. Every sync law
-above is proven against in-process edges (§10.5), so the binding pass is
-transport plumbing with no consensus-semantics surface.
+The application protocol list remains exactly the eight frozen
+`/noos/*/1` protocols. Certificates remain block/range-carried; no ninth
+protocol is introduced. `NullEdge` exists only as a `cfg(test)` fixture.
+`--no-network` is an explicit maintenance/test override, not the daemon
+default.
 
 ## 7. Task topology and persist-before-vote
 
@@ -303,7 +283,7 @@ noosd supervisor
 │               reaches it only through the bounded StoreClient channel
 ├── rpc         localhost operator RPC (never shares consensus state;
 │               talks over the same bounded inbox)
-├── sync        NetworkEdge driver (NullEdge until the noos-p2p bind)
+├── p2p/sync    async noos-p2p event loop + bounded NetworkEdge bridge
 └── pool        bounded proof-check verdict pool (crate::pool): a worker
                 crash is a typed verdict, never consensus corruption
 ```
@@ -379,8 +359,8 @@ Independently re-proven in §10.3 (`tests/retention.rs`).
 
 * **G1** — public REST API v1, workers, installers: later product phases
   by plan; the operator RPC is deliberately minimal.
-* **G2** — `NetworkEdge`/`noos-p2p` glue: recorded seam (§6.4);
-  `NullEdge` until the binding pass.
+* **G2** — closed: production `P2pNetworkEdge`, store serving adapter,
+  inbound dispatch and reconnect/shutdown are wired (§6.4).
 * **G3** — beacon randomness: epoch snapshots consume the
   `DEVNET_BEACON_RANDOMNESS` fixture until the live delay-VRF beacon
   output is wired through membership; witness bonds are devnet fixtures

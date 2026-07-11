@@ -56,13 +56,14 @@ dream_lane_enabled = false
 class_gate_irreversible_budget = 0
 
 [faucet]
-# Fixed valueless faucet fixture (plan §2.5). The Ed25519 public key below is a
-# deterministic TEST FIXTURE (BLAKE3 of "noos-devnet-1/faucet/0" keyseed), not
-# ceremony output; nodes MUST refuse to load any is_test_fixture material on a
-# network where is_test_network = false.
+# Fixed valueless faucet fixture (plan §2.5). The Ed25519 SIGNING SEED is the
+# deterministic TEST FIXTURE BLAKE3-256("noos-devnet-1/faucet/0"); the public
+# key below is derived from that seed, so devnet tooling can sign faucet
+# transactions. This is not ceremony output; nodes MUST refuse to load any
+# is_test_fixture material on a network where is_test_network = false.
 enabled = true
 allocation_micro_noos_test = 1000000000000000
-account_pubkey_ed25519_hex = "0f4a6e1c8b2d9350a7e6c41f5d38b90217c4ae85f0d3962b1e7c05a48d6f31b9"
+account_pubkey_ed25519_hex = "c9e967496427ad970fa540f15c274f214c0892aa0a3ce7364b9bb96583cb6b1d"
 is_test_fixture = true
 per_request_micro_noos_test = 1000000000
 cooldown_seconds = 60

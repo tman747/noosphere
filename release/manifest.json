@@ -1,0 +1,75 @@
+{
+  "artifact_hashes": {
+    "release/artifacts/noos-transition-go.exe": "cbd4c74b864519a602cf55c0b0b957ec38504cadb769341c9aa537da70df018e",
+    "release/artifacts/noos-transition-rust.exe": "441f91ff4b21f703e051d90ea34a503b1f98a3b65db86fc3bdd2bf35c399d93a",
+    "release/artifacts/noos-verify.exe": "f9c6a4a93087a882d1636d3908c3435a0805bdb167506b9c921f3639b29511ee"
+  },
+  "checksums": {
+    "path": "release/SHA256SUMS",
+    "sha256": "a282af3ae95ccc012038ad1da1df276bb55f33b6fa652078cc6491e1d18555ba"
+  },
+  "gate_verdicts": [],
+  "generated_at": "2026-07-11T17:03:16.748647+00:00",
+  "host": "Windows-10-10.0.22000-SP0",
+  "identity": {
+    "chain_id": "EXTERNAL_BLOCKED_QUIET_WEEK",
+    "genesis_hash": "EXTERNAL_BLOCKED_CEREMONY",
+    "is_test_network": true
+  },
+  "manifest_kind": "noosphere-release-manifest",
+  "provenance": {
+    "format": "SLSA-v1/in-toto",
+    "path": "release/provenance.intoto.jsonl",
+    "sha256": "7714e9067b5a272ae314d289ba7fff120e21bd7e2ba9de31777c5258288686b5"
+  },
+  "release": {
+    "api_version": "v1",
+    "channel": "devnet",
+    "date": "2026-07-11",
+    "protocol_version": "v1",
+    "version": "0.1.0-dev"
+  },
+  "sbom": {
+    "format": "CycloneDX-1.5",
+    "path": "release/sbom.cdx.json",
+    "sha256": "9ee74c3765e0f9caab1647739bdd293666e5a22ff792d25fbc6a4709d20a9f7f"
+  },
+  "schema_version": 1,
+  "signatures": [],
+  "source": {
+    "repo_revision": "3ed1c845520d2245eb331a28c8302a0721c7a2d4",
+    "spec_revision": "d1575f8f50a58648762f91555c3267deddefab0556fae63e5921c57e8a486258"
+  },
+  "toolchain_locks": {
+    "cargo_lock_hash": "a54e2f4145dbd728e98311ebedea634f523fd283e8411b003930ea6fb4f90240",
+    "go": "go version go1.25.4 windows/amd64",
+    "go_sum_hash": "0d729ac633c3c6c68800fdfd3fcb2ab11f6fdcd08f998cabb9be94b930c99393",
+    "python": "3.10.11",
+    "repro_policy_hash": "2a4af9299cd8bc3827ddef53704a2ece0ed47a78530f3900645d1cdc0d46ceb4",
+    "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)"
+  },
+  "unresolved_findings": [
+    {
+      "code": "UNSIGNED_REPRO_POLICY",
+      "status": "EXTERNAL_BLOCKED"
+    },
+    {
+      "code": "INDEPENDENT_BUILDER_REQUIRED",
+      "status": "EXTERNAL_BLOCKED",
+      "target": "linux-x86_64"
+    },
+    {
+      "code": "INDEPENDENT_BUILDER_REQUIRED",
+      "status": "EXTERNAL_BLOCKED",
+      "target": "linux-aarch64"
+    },
+    {
+      "code": "GENESIS_CEREMONY_REQUIRED",
+      "status": "EXTERNAL_BLOCKED"
+    },
+    {
+      "code": "HUMAN_RELEASE_SIGNATURES_REQUIRED",
+      "status": "EXTERNAL_BLOCKED"
+    }
+  ]
+}

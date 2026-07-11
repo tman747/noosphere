@@ -1,3 +1,9 @@
+param(
+    [switch]$DifferentialHeavy,
+    [switch]$FuzzHeavy,
+    [switch]$Release
+)
+
 # check.ps1 - noosphere_core_gate driver.
 #
 # Runs, in order, from the repository root:
@@ -12,6 +18,12 @@
 #   python tools/gates/check_telemetry.py
 #   python tools/gates/check_repro_policy.py
 #   python tools/gates/check_base_evidence.py
+#   python tools/gates/run_claim_matrix.py --registry protocol/claims/registry.json --all-actionable --include-negative-results --require-command --require-evidence --require-rollback --fail-on-missing
+#   python tools/gates/check_docs.py
+#   python tools/gates/check_promotion.py
+#   python tools/gates/stage_evidence.py validate
+# Optional heavy switches: -DifferentialHeavy (10m transitions),
+# -FuzzHeavy (2.4m mutations), and -Release (both plus supply-chain gates).
 #
 # Each step logs [PASS]/[FAIL]/[SKIP]. Emits `RESULT noosphere_core_gate=PASS`
 # and exits 0 only when every executed step exits 0; otherwise emits
@@ -130,6 +142,27 @@ Invoke-Step 'check_api' @('python', 'tools/gates/check_api.py') $Root
 Invoke-Step 'check_telemetry' @('python', 'tools/gates/check_telemetry.py') $Root
 Invoke-Step 'check_repro_policy' @('python', 'tools/gates/check_repro_policy.py') $Root
 Invoke-Step 'check_base_evidence' @('python', 'tools/gates/check_base_evidence.py') $Root
+Invoke-Step 'check_docs' @('python', 'tools/gates/check_docs.py') $Root
+Invoke-Step 'check_promotion' @('python', 'tools/gates/check_promotion.py') $Root
+Invoke-Step 'stage_evidence' @('python', 'tools/gates/stage_evidence.py', 'validate') $Root
+Invoke-Step 'differential_transitions_smoke' @('python', 'tools/gates/differential_transitions.py', '--generated', '500', '--restart-every', '100') $Root
+
+if ($DifferentialHeavy -or $Release) {
+    Invoke-Step 'differential_transitions_10m' @('python', 'tools/gates/differential_transitions.py', '--generated', '10000000') $Root
+}
+if ($FuzzHeavy -or $Release) {
+    $previousFuzzIters = $env:NOOS_FUZZ_ITERS
+    $env:NOOS_FUZZ_ITERS = '2400000'
+    Invoke-Step 'decoder_vm_protocol_battery_2_4m' @('cargo', 'test', '-p', 'noos-fuzz', '--test', 'decoder_vm_protocol_battery', '--', '--nocapture') $Root
+    $env:NOOS_FUZZ_ITERS = $previousFuzzIters
+}
+if ($Release) {
+    Invoke-Step 'run_claim_matrix_release' @('python', 'tools/gates/run_claim_matrix.py', '--registry', 'protocol/claims/registry.json', '--all-actionable', '--include-negative-results', '--require-command', '--require-evidence', '--require-rollback', '--fail-on-missing') $Root
+    Invoke-Step 'client_matrix' @('python', 'tools/e2e/run_network.py', '--scenario', 'client-matrix', '--pairs', 'AA,AB,BA,BB') $Root
+    Invoke-Step 'repro_build' @('python', 'tools/gates/repro_build.py', '--builders', 'windows-x86_64-a,windows-x86_64-b,ubuntu-x86_64-a,ubuntu-x86_64-b,ubuntu-aarch64-a,ubuntu-aarch64-b', '--locked', '--frozen') $Root
+    Invoke-Step 'generate_release_manifest' @('python', 'tools/gates/generate_release.py') $Root
+    Invoke-Step 'verify_release' @('python', 'tools/gates/verify_release.py', 'release/manifest.json') $Root
+}
 
 # --- Verdict ----------------------------------------------------------------
 Write-Host ''

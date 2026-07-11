@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use noos_node::consensus::{NodeConfig, NodeMode};
 use noos_node::genesis::{DevnetParams, GenesisSpec};
+use noos_node::network::NetworkSettings;
 use noos_node::rpc::{self, RpcConfig};
 use noos_node::supervisor;
 
@@ -28,8 +29,25 @@ OPTIONS:
                            default: 127.0.0.1:8632)
     --rpc-token <token>    Bearer token for the operator RPC (required to
                            serve RPC; without it RPC stays off)
+    --validator            Devnet fixture validator (TEST NETWORKS ONLY):
+                           installs the fixture witness set, produces blocks
+                           on a fixed cadence, and drives fixture finality
+                           at epoch boundaries. Refused when the loaded
+                           parameters set is_test_network = false.
+    --produce-interval-ms <ms>
+                           Block production cadence for --validator
+                           (default: 6000 = one block per devnet slot)
+    --devnet-account <account-id-hex>
+                           Pre-provision a zero-balance account in genesis
+                           (repeatable; TEST NETWORKS ONLY)
     --observer             Observer mode: transaction submission disabled
                            (explicit feature_disabled, never empty success)
+    --p2p-listen <multiaddr>
+                           QUIC listen address
+                           (default: /ip4/127.0.0.1/udp/0/quic-v1)
+    --peer <multiaddr>     Bootstrap peer (repeatable; reconnects with
+                           deterministic bounded backoff)
+    --no-network           Explicitly disable P2P (tests/maintenance only)
     --light                Light mode: headers + finality only
     --retention <blocks>   Chain-view retention window (0 = archive)
     --social-checkpoint <epoch:hash-hex>
@@ -39,8 +57,9 @@ OPTIONS:
     -h, --help             Print this help
     --version              Print version
 
-The network edge is not yet bound (noos-p2p binding is a follow-up pass);
-noosd runs as an isolated single node serving its operator RPC.
+The production network edge is enabled by default. Request/reply sync,
+targeted body repair, transaction/header/vote gossip, snapshots and DA
+substreams all use the closed eight-protocol noos-p2p surface.
 ";
 
 fn parse_social(arg: &str) -> Option<noos_braid::CheckpointRef> {
@@ -61,9 +80,13 @@ fn main() -> ExitCode {
     let mut rpc_bind: SocketAddr = "127.0.0.1:8632".parse().unwrap_or_else(|_| unreachable!());
     let mut rpc_token: Option<String> = None;
     let mut observer = false;
+    let mut validator = false;
+    let mut produce_interval_ms: u64 = 6000;
+    let mut devnet_accounts: Vec<noos_node::Hash32> = Vec::new();
     let mut light = false;
     let mut retention: u64 = 0;
     let mut social: Option<noos_braid::CheckpointRef> = None;
+    let mut network = NetworkSettings::default();
 
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -111,6 +134,40 @@ fn main() -> ExitCode {
                 Some(v) => rpc_token = Some(v),
                 None => return ExitCode::from(2),
             },
+            "--p2p-listen" => match take("--p2p-listen").and_then(|v| v.parse().ok()) {
+                Some(v) => network.listen = v,
+                None => {
+                    eprintln!("error: --p2p-listen expects a QUIC multiaddr");
+                    return ExitCode::from(2);
+                }
+            },
+            "--peer" => match take("--peer").and_then(|v| v.parse().ok()) {
+                Some(v) => network.bootstrap.push(v),
+                None => {
+                    eprintln!("error: --peer expects a multiaddr");
+                    return ExitCode::from(2);
+                }
+            },
+            "--no-network" => network.enabled = false,
+            "--validator" => validator = true,
+            "--produce-interval-ms" => {
+                match take("--produce-interval-ms").and_then(|v| v.parse().ok()) {
+                    Some(v) => produce_interval_ms = v,
+                    None => {
+                        eprintln!("error: --produce-interval-ms expects milliseconds");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            "--devnet-account" => {
+                match take("--devnet-account").as_deref().and_then(rpc::unhex32) {
+                    Some(account) => devnet_accounts.push(account),
+                    None => {
+                        eprintln!("error: --devnet-account expects 32-byte hex");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
             "--observer" => observer = true,
             "--light" => light = true,
             "--retention" => match take("--retention").and_then(|v| v.parse().ok()) {
@@ -144,7 +201,34 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let spec = GenesisSpec::devnet(params, genesis_time_ms);
+    if validator && !params.is_test_network {
+        // Fixture-refusal law (plan §2.5): fixture keys never run mainnet.
+        eprintln!("error: --validator is a devnet fixture mode; is_test_network = false");
+        return ExitCode::FAILURE;
+    }
+    if !devnet_accounts.is_empty() && !params.is_test_network {
+        eprintln!("error: --devnet-account is a devnet fixture; is_test_network = false");
+        return ExitCode::FAILURE;
+    }
+    let min_bond = params.min_bond_micro;
+    let witness_bonds = if validator {
+        match noos_node::devnet_fixture::fixture_witness_bonds(4) {
+            Ok(bonds) => bonds,
+            Err(e) => {
+                eprintln!("error: fixture witness set: {e}");
+                return ExitCode::FAILURE;
+            }
+        }
+    } else {
+        Vec::new()
+    };
+    devnet_accounts.sort_unstable();
+    devnet_accounts.dedup();
+    let mut spec = GenesisSpec::devnet(params, genesis_time_ms);
+    spec.extra_accounts = devnet_accounts
+        .into_iter()
+        .map(|account| (account, 0))
+        .collect();
     let cfg = NodeConfig {
         mode: if light {
             NodeMode::Light
@@ -154,6 +238,10 @@ fn main() -> ExitCode {
         observer,
         view_retention_blocks: retention,
         social_checkpoint: social,
+        network,
+        witness_bonds,
+        min_bond,
+        devnet_fixture_finality: validator,
         ..NodeConfig::default()
     };
 
@@ -173,6 +261,9 @@ fn main() -> ExitCode {
                 status.head_height,
                 status.finalized.epoch
             );
+            if let Some(addr) = &handle.p2p_addr {
+                println!("p2p ready at {addr}");
+            }
         }
         Err(e) => {
             eprintln!("error: consensus task failed to boot: {e}");
@@ -208,17 +299,30 @@ fn main() -> ExitCode {
         }
     };
 
-    // Clock feeder + ctrl-c wait.
+    // Clock feeder + devnet production/finality driver + ctrl-c wait.
     let stop = Arc::new(AtomicBool::new(false));
     let stop_ctrl = Arc::clone(&stop);
     let _ = ctrlc_handler(move || stop_ctrl.store(true, Ordering::SeqCst));
+    let mut last_produce_ms: u64 = 0;
     while !stop.load(Ordering::SeqCst) {
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
             .unwrap_or(0);
         let _ = handle.set_now(now_ms);
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        if validator && now_ms.saturating_sub(last_produce_ms) >= produce_interval_ms {
+            last_produce_ms = now_ms;
+            match handle.produce_block() {
+                Ok(_) => {
+                    // Advance the fixture FFG ladder as far as it reaches.
+                    while matches!(handle.devnet_finality_tick(), Ok(true)) {}
+                }
+                Err(e) => eprintln!("produce: {e}"),
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(
+            100.min(produce_interval_ms.max(1)),
+        ));
     }
     handle.shutdown();
     ExitCode::SUCCESS

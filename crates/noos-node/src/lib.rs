@@ -18,9 +18,10 @@
 //!   floor, per-payer FIFO ordering, byte/count caps, per-source limits,
 //!   duplicate cache, fee-density eviction, deterministic template
 //!   assembly under the body caps;
-//! * [`sync`] — the thin [`sync::NetworkEdge`] trait (bound to `noos-p2p`
-//!   in a later pass), header-first full sync, finalized snapshot sync
-//!   over a multi-peer [`sync::SnapshotSource`] set, light mode, and the
+//! * [`sync`] and [`network`] — the thin [`sync::NetworkEdge`] trait bound
+//!   to the production `noos-p2p` adapter, header-first full sync, and
+//!   finalized snapshot sync over a multi-peer
+//!   [`sync::SnapshotSource`] set, light mode, and the
 //!   SOCIAL-INPUT weak-subjectivity checkpoint law (never overrides local
 //!   finality);
 //! * [`witness_role`] — persist-before-vote: the `noos-witness`
@@ -51,9 +52,11 @@
 
 pub mod auth;
 pub mod consensus;
+pub mod devnet_fixture;
 pub mod genesis;
 pub mod mempool;
 pub mod metrics;
+pub mod network;
 pub mod pool;
 pub mod roots;
 pub mod rpc;

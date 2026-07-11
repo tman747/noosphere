@@ -1,0 +1,17 @@
+[package]
+name = "noos-jet"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "NOOSPHERE jet system (M-JET / A-JET-CERT): certified jet registry with semantics-hash-bound JetCertV1 and re-verified equivalence corpora, an opcode-12 dispatch hook that never fires an uncertified jet, charge-exact native jets, the frozen RV32I integer lowering ABI with byte-exact golden vectors, and proof dispatch (image-id binding, receipt-verification interface, deterministic local re-execution checker)"
+
+[dependencies]
+noos-grain = { path = "../noos-grain" }
+blake3 = "1.8"
+
+[dev-dependencies]
+
+[lints]
+workspace = true

@@ -1,5 +1,5 @@
 {
-  "bundle_sha256": "c13f146a444c3c2c1556195f4f7ecef71472de0a793f98737a0327d104ecf70a",
+  "bundle_sha256": "a5428cdba6770e0f0598efd3fc6e0ac524efc5929e2b41341144f853cfad04e0",
   "command": [
     "C:\\Users\\ntrap\\AppData\\Local\\Programs\\Python\\Python310\\python.exe",
     "C:\\noosphere\\tools\\e2e\\run_network.py",
@@ -14,7 +14,7 @@
   "cwd": "C:\\noosphere",
   "environment": {
     "LIBCLANG_PATH": "C:/Users/ntrap/AppData/Local/Programs/Swift/Toolchains/6.3.2+Asserts/usr/bin",
-    "RUST_BACKTRACE": "1"
+    "RUST_BACKTRACE": null
   },
   "exclusions": {
     "G3_EXTERNAL_NOT_SATISFIED": [
@@ -111,6 +111,7 @@
     "kill_every_fsync_boundary": false,
     "max_ai_load": true,
     "max_faults": null,
+    "requested_client_pairs": null,
     "seed_file": null,
     "simulated_days": 30,
     "tx_load": 64,
@@ -122,13 +123,13 @@
     "sha256": "8dd661acd2ae312271455d6b204ce7778435b1802eab8982d7c2ffe59dadbc96"
   },
   "revision": {
-    "git_head": "666b735a5b457f95b207b6d90fb24995d9bc2c90",
+    "git_head": "3ed1c845520d2245eb331a28c8302a0721c7a2d4",
     "source_sha256": {
-      "Cargo.lock": "bb816485d8d2f10f871ccaab5afc8f809f117cbfb93e1b94834441575ed368ca",
+      "Cargo.lock": "a54e2f4145dbd728e98311ebedea634f523fd283e8411b003930ea6fb4f90240",
       "crates/noos-sim-net/Cargo.toml": "361d18fd6ca243362c1370c8b3e611cf612fa1d51d2555a74bdb49dd26b0e7d4",
       "crates/noos-sim-net/src/lib.rs": "ce6d7f776eeeedef265d8a6d980fb1710dc68c8a6dec41832ddd7ce39a254629",
       "crates/noos-sim-net/src/main.rs": "e703c60d5734bee2350f403234ac9476529f0b7ac9c4633cae97fe5680502547",
-      "tools/e2e/run_network.py": "cbb7a9d97fabfbf652fff123295d5a2ef0688ba6e371a9bdd5e9726fd95e76e7"
+      "tools/e2e/run_network.py": "9a7e8dc4d86341bb9ab592d1805be50286f0d4586a265b51e6a0c71207170022"
     },
     "working_tree": "exact source files are hash-bound; this remains G2-only evidence"
   },
@@ -178,8 +179,8 @@
     "trapped_escrow_max": 0
   },
   "timestamps": {
-    "ended_utc": "2026-07-11T10:33:04.819Z",
-    "started_utc": "2026-07-11T10:32:58.149Z"
+    "ended_utc": "2026-07-11T15:16:58.081Z",
+    "started_utc": "2026-07-11T15:16:53.074Z"
   },
   "toolchain": {
     "cargo": "cargo 1.96.1 (356927216 2026-06-26)",

@@ -1,0 +1,4 @@
+{
+  "claims": {},
+  "notes": "tools/gates/differential_admission.py: production NodeCore::submit_tx admission path (noos-node bin noos-transition, READY handshake) differentially tested against an independent Python oracle re-modelling the frozen admission law (size/decode/chain/version/expiry/byte-envelope/duplicate/payer/witness/D-SIG-TX signature/account caps) across 13 preregistered mutation classes, 10000 seeded cases, 0 divergences; txid identity triangulated python==node==go; AA/AB/BA/BB process matrix PASS. Faucet fixture made honestly derivable (seed BLAKE3-256('noos-devnet-1/faucet/0'), devnet-parameters.toml comment now true). Evidence: evidence/differential-admission-10000.json."
+}

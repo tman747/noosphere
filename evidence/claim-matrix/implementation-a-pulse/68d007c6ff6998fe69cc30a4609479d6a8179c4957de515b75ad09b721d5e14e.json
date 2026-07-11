@@ -1,0 +1,70 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "4872e6b98255cfecf5aea94bd7c526e3c8987c26673906cb624d918e9017905b",
+      "evidence/base-base-transfer-contract.json": "d120db9e228cec6a99b828dd919a0e1c7daaae8e7c6470c6513a3eb552c3e20d",
+      "evidence/base-crash-matrix.json": "62b45c91fb123ba3e9e016a776f218a222cfda097686d8fe131aa70f53c02c59"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-braid",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-braid"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-PULSE": "0c653bf37884b338f3758f8baf3f818a5fe2c2b48f1a0cccb12e66d8f3c3b344"
+  },
+  "claims": [
+    "A-PULSE"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-PULSE"
+  ],
+  "evidence_sha256": "68d007c6ff6998fe69cc30a4609479d6a8179c4957de515b75ad09b721d5e14e",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-pulse",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-braid/Cargo.toml": "af8febe91195fceee44aeb9aaeb65481d56261caea96cd01018da9d6b9556f4e",
+    "crates/noos-braid/src/lib.rs": "268ed2e34e5c616bff8dc6732f3267c1b29b1900554347d82a96e97f82984154"
+  }
+}

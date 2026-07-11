@@ -1,0 +1,658 @@
+//! NOOSPHERE command-line workflows over the real protocol crates.
+//!
+//! Every command wraps a frozen law rather than re-implementing it:
+//! - `keygen` — noos-wallet HKDF derivation (ODR-WALLET-001 vectors);
+//!   secrets are derived, used, and zeroized — NEVER printed.
+//! - `tx build` — canonical `TransactionV1` encoding via noos-lumen /
+//!   noos-codec; byte-identical to `protocol/vectors/lumen/lumen-tx-v1.json`.
+//! - `tx sign` — wallet identity-gated signing of the txid; emits the
+//!   segregated `TransactionWitnessesV1` container.
+//! - `tx submit` / `status` — the noos-node operator line protocol
+//!   (`crates/noos-node/src/rpc.rs`), identity checked against `/status`
+//!   BEFORE any transaction bytes leave the machine.
+//! - `query` — the frozen indexer public API v1.
+
+#![forbid(unsafe_code)]
+
+use noos_codec::{NoosDecode, NoosEncode};
+use noos_lumen::objects::{
+    txid as lumen_txid, witness_root, AccessEntry, BoundedBytes, BoundedList, FeeAuthorizationV1,
+    NoteV1, OptionalHash32, OptionalObject, ResourceVector, SignedIntentV1, TransactionV1,
+    TransactionWitnessesV1,
+};
+use noos_wallet::{derive_authority, IdentityGate, NodeIdentity, Purpose};
+use serde_json::{json, Value};
+use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::time::Duration;
+
+/// Signature suite id carried by every `lumen-tx-v1` intent fixture
+/// (64-byte ed25519 signatures).
+pub const SIGNATURE_SUITE_ED25519: u16 = 1;
+/// Wallet/gate API version (`noos-wallet::API_VERSION`).
+pub const API_VERSION: u16 = noos_wallet::API_VERSION;
+
+pub type Result<T, E = CliError> = std::result::Result<T, E>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CliError {
+    /// Bad invocation: unknown command or missing/invalid argument.
+    Usage(String),
+    /// Input payload violates a protocol law (hex, bounds, spec shape).
+    Malformed(String),
+    /// Canonical decode rejected the bytes; carries the stable class name.
+    Codec(&'static str),
+    /// noos-wallet refused (derivation bounds, identity gate, ...).
+    Wallet(String),
+    /// Transport failure talking to a node or indexer.
+    Transport(String),
+    /// The remote answered with a non-success status.
+    Refused { status: u16, body: String },
+    /// The node's declared identity differs from the one supplied.
+    WrongProtocolIdentity,
+}
+
+impl std::fmt::Display for CliError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Usage(v) => write!(f, "usage: {v}"),
+            Self::Malformed(v) => write!(f, "malformed: {v}"),
+            Self::Codec(v) => write!(f, "codec: {v}"),
+            Self::Wallet(v) => write!(f, "wallet: {v}"),
+            Self::Transport(v) => write!(f, "transport: {v}"),
+            Self::Refused { status, body } => write!(f, "refused ({status}): {body}"),
+            Self::WrongProtocolIdentity => f.write_str("wrong_protocol_identity"),
+        }
+    }
+}
+impl std::error::Error for CliError {}
+
+impl From<noos_wallet::WalletError> for CliError {
+    fn from(e: noos_wallet::WalletError) -> Self {
+        Self::Wallet(e.to_string())
+    }
+}
+impl From<noos_codec::CodecError> for CliError {
+    fn from(e: noos_codec::CodecError) -> Self {
+        Self::Codec(e.class_name())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hex helpers (lowercase canonical, strict)
+// ---------------------------------------------------------------------------
+
+#[must_use]
+pub fn to_hex(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len().saturating_mul(2));
+    for b in bytes {
+        out.push(char::from_digit(u32::from(b >> 4), 16).unwrap_or('0'));
+        out.push(char::from_digit(u32::from(b & 0x0f), 16).unwrap_or('0'));
+    }
+    out
+}
+
+pub fn from_hex(s: &str) -> Result<Vec<u8>> {
+    if !s.len().is_multiple_of(2) {
+        return Err(CliError::Malformed(format!("odd-length hex: {s:.16}")));
+    }
+    let digit = |c: u8| -> Result<u8> {
+        match c {
+            b'0'..=b'9' => Ok(c.saturating_sub(b'0')),
+            b'a'..=b'f' => Ok(c.saturating_sub(b'a').saturating_add(10)),
+            _ => Err(CliError::Malformed("non-canonical hex digit".into())),
+        }
+    };
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len().saturating_div(2));
+    let mut i = 0usize;
+    while i < bytes.len() {
+        let hi = digit(bytes[i])?;
+        let lo = digit(bytes[i.saturating_add(1)])?;
+        out.push(hi.saturating_mul(16).saturating_add(lo));
+        i = i.saturating_add(2);
+    }
+    Ok(out)
+}
+
+pub fn from_hex32(s: &str) -> Result<[u8; 32]> {
+    let v = from_hex(s)?;
+    <[u8; 32]>::try_from(v.as_slice())
+        .map_err(|_| CliError::Malformed("expected 32-byte hex".into()))
+}
+
+// ---------------------------------------------------------------------------
+// keygen
+// ---------------------------------------------------------------------------
+
+pub fn parse_purpose(s: &str) -> Result<Purpose> {
+    match s {
+        "sign" => Ok(Purpose::Sign),
+        "view" => Ok(Purpose::View),
+        "agent" => Ok(Purpose::Agent),
+        "recovery" => Ok(Purpose::Recovery),
+        other => match other.strip_prefix("umbra:") {
+            Some(suite) => Ok(Purpose::Umbra {
+                suite: suite
+                    .parse()
+                    .map_err(|_| CliError::Malformed("umbra suite must be u32".into()))?,
+            }),
+            None => Err(CliError::Usage(format!(
+                "unknown purpose {s}; expected sign|view|agent|recovery|umbra:<suite>"
+            ))),
+        },
+    }
+}
+
+/// Derives the purpose-separated authority for `(seed, purpose, account,
+/// index)` and reports only public material: the derivation path, the
+/// blake3 public id, and — for the spending purpose — the ed25519
+/// verifying key. The raw secret is zeroized on drop and never emitted.
+pub fn keygen(seed_hex: &str, purpose_str: &str, account: u32, index: u32) -> Result<Value> {
+    let seed = from_hex(seed_hex)?;
+    let purpose = parse_purpose(purpose_str)?;
+    let path: Vec<String> = noos_wallet::derivation_path(purpose, account, index)?
+        .into_iter()
+        .map(|c| format!("{c:#010x}"))
+        .collect();
+    let authority = derive_authority(&seed, purpose, account, index)?;
+    let public_id = to_hex(&authority.public_id());
+    let mut out = json!({
+        "purpose": purpose_str,
+        "account": account.to_string(),
+        "index": index.to_string(),
+        "path": path,
+        "public_id": public_id,
+    });
+    if matches!(purpose, Purpose::Sign) {
+        let spending = authority.into_spending_key()?;
+        out["verifying_key"] = json!(to_hex(&spending.verifying_key()));
+    }
+    Ok(out)
+}
+
+// ---------------------------------------------------------------------------
+// tx build
+// ---------------------------------------------------------------------------
+
+fn spec_str<'a>(v: &'a Value, key: &str) -> Result<&'a str> {
+    v[key]
+        .as_str()
+        .ok_or_else(|| CliError::Malformed(format!("spec field {key} must be a string")))
+}
+
+/// u64 spec fields accept a JSON number or a decimal string.
+fn spec_u64(v: &Value, key: &str) -> Result<u64> {
+    match &v[key] {
+        Value::Number(n) => n
+            .as_u64()
+            .ok_or_else(|| CliError::Malformed(format!("spec field {key} must be u64"))),
+        Value::String(s) => s
+            .parse()
+            .map_err(|_| CliError::Malformed(format!("spec field {key} must be u64"))),
+        Value::Null => Err(CliError::Malformed(format!("spec field {key} is required"))),
+        _ => Err(CliError::Malformed(format!("spec field {key} must be u64"))),
+    }
+}
+
+/// u128 spec fields are decimal strings (JSON numbers cannot carry u128).
+fn spec_u128(v: &Value, key: &str) -> Result<u128> {
+    spec_str(v, key)?
+        .parse()
+        .map_err(|_| CliError::Malformed(format!("spec field {key} must be a u128 string")))
+}
+
+fn spec_hash(v: &Value, key: &str) -> Result<[u8; 32]> {
+    from_hex32(spec_str(v, key)?)
+}
+
+fn spec_hash_list<const MAX: u32>(v: &Value, key: &str) -> Result<BoundedList<[u8; 32], MAX>> {
+    let items = match &v[key] {
+        Value::Null => Vec::new(),
+        Value::Array(a) => a
+            .iter()
+            .map(|e| {
+                e.as_str()
+                    .ok_or_else(|| CliError::Malformed(format!("{key} entries must be hex")))
+                    .and_then(from_hex32)
+            })
+            .collect::<Result<Vec<_>>>()?,
+        _ => return Err(CliError::Malformed(format!("{key} must be an array"))),
+    };
+    BoundedList::new(items).ok_or_else(|| CliError::Malformed(format!("{key} exceeds bound")))
+}
+
+fn spec_resources(v: &Value) -> Result<ResourceVector> {
+    if v.is_null() {
+        return Ok(ResourceVector::default());
+    }
+    Ok(ResourceVector {
+        bytes: spec_u64(v, "bytes")?,
+        grain_steps: spec_u64(v, "grain_steps")?,
+        proof_units: spec_u64(v, "proof_units")?,
+        state_reads: spec_u64(v, "state_reads")?,
+        state_writes: spec_u64(v, "state_writes")?,
+        blob_bytes: spec_u64(v, "blob_bytes")?,
+    })
+}
+
+fn spec_lock_reveals(v: &Value) -> Result<BoundedList<BoundedBytes<4096>, 256>> {
+    let items = match v {
+        Value::Null => Vec::new(),
+        Value::Array(a) => a
+            .iter()
+            .map(|e| {
+                let bytes = e
+                    .as_str()
+                    .ok_or_else(|| CliError::Malformed("lock_reveals entries must be hex".into()))
+                    .and_then(from_hex)?;
+                BoundedBytes::new(bytes)
+                    .ok_or_else(|| CliError::Malformed("lock reveal exceeds 4096 bytes".into()))
+            })
+            .collect::<Result<Vec<_>>>()?,
+        _ => return Err(CliError::Malformed("lock_reveals must be an array".into())),
+    };
+    BoundedList::new(items).ok_or_else(|| CliError::Malformed("lock_reveals exceeds bound".into()))
+}
+
+fn tx_from_spec(spec: &Value) -> Result<(TransactionV1, BoundedList<BoundedBytes<4096>, 256>)> {
+    let fee_authorization = match &spec["fee_authorization"] {
+        Value::Null => OptionalObject(None),
+        auth => OptionalObject(Some(FeeAuthorizationV1 {
+            amount: spec_u128(auth, "amount")?,
+            resource_ceiling: spec_resources(&auth["resource_ceiling"])?,
+            expiry_height: spec_u64(auth, "expiry_height")?,
+            tx_commitment: spec_hash(auth, "tx_commitment")?,
+            sponsor: spec_hash(auth, "sponsor")?,
+            signature_suite: u16::try_from(spec_u64(auth, "signature_suite")?)
+                .map_err(|_| CliError::Malformed("signature_suite must be u16".into()))?,
+            signature: BoundedBytes::new(from_hex(spec_str(auth, "signature")?)?)
+                .ok_or_else(|| CliError::Malformed("sponsor signature exceeds bound".into()))?,
+        })),
+    };
+    let object_access_list = match &spec["object_access_list"] {
+        Value::Null => Vec::new(),
+        Value::Array(a) => a
+            .iter()
+            .map(|e| {
+                let mode = match spec_str(e, "mode")? {
+                    "read" => AccessEntry::MODE_READ,
+                    "read_write" => AccessEntry::MODE_READ_WRITE,
+                    other => {
+                        return Err(CliError::Malformed(format!(
+                            "access mode {other} (expected read|read_write)"
+                        )))
+                    }
+                };
+                Ok(AccessEntry {
+                    object_id: spec_hash(e, "object_id")?,
+                    mode,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?,
+        _ => {
+            return Err(CliError::Malformed(
+                "object_access_list must be an array".into(),
+            ))
+        }
+    };
+    let actions = match &spec["actions"] {
+        Value::Null => Vec::new(),
+        Value::Array(a) => a
+            .iter()
+            .map(|e| {
+                let bytes = e
+                    .as_str()
+                    .ok_or_else(|| CliError::Malformed("actions entries must be hex".into()))
+                    .and_then(from_hex)?;
+                BoundedBytes::new(bytes)
+                    .ok_or_else(|| CliError::Malformed("action exceeds 65536 bytes".into()))
+            })
+            .collect::<Result<Vec<_>>>()?,
+        _ => return Err(CliError::Malformed("actions must be an array".into())),
+    };
+    let outputs = match &spec["outputs"] {
+        Value::Null => Vec::new(),
+        Value::Array(a) => a
+            .iter()
+            .map(|e| {
+                Ok(NoteV1 {
+                    asset_id: spec_hash(e, "asset_id")?,
+                    amount: spec_u128(e, "amount")?,
+                    lock_root: spec_hash(e, "lock_root")?,
+                    datum_root: spec_hash(e, "datum_root")?,
+                    birth_height: spec_u64(e, "birth_height")?,
+                    relative_timelock: u32::try_from(spec_u64(e, "relative_timelock")?)
+                        .map_err(|_| CliError::Malformed("relative_timelock must be u32".into()))?,
+                    memo_commitment: spec_hash(e, "memo_commitment")?,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?,
+        _ => return Err(CliError::Malformed("outputs must be an array".into())),
+    };
+    let lock_reveals = spec_lock_reveals(&spec["lock_reveals"])?;
+    let tx = TransactionV1 {
+        chain_id: spec_hash(spec, "chain_id")?,
+        format_version: match &spec["format_version"] {
+            Value::Null => 1,
+            Value::Number(n) => n
+                .as_u64()
+                .and_then(|x| u16::try_from(x).ok())
+                .ok_or_else(|| CliError::Malformed("format_version must be u16".into()))?,
+            Value::String(s) => s
+                .parse()
+                .map_err(|_| CliError::Malformed("format_version must be u16".into()))?,
+            _ => return Err(CliError::Malformed("format_version must be u16".into())),
+        },
+        expiry_height: spec_u64(spec, "expiry_height")?,
+        fee_payer: spec_hash(spec, "fee_payer")?,
+        fee_authorization,
+        resource_limits: spec_resources(&spec["resource_limits"])?,
+        note_inputs: spec_hash_list(spec, "note_inputs")?,
+        account_inputs: spec_hash_list(spec, "account_inputs")?,
+        object_access_list: BoundedList::new(object_access_list)
+            .ok_or_else(|| CliError::Malformed("object_access_list exceeds bound".into()))?,
+        actions: BoundedList::new(actions)
+            .ok_or_else(|| CliError::Malformed("actions exceeds bound".into()))?,
+        outputs: BoundedList::new(outputs)
+            .ok_or_else(|| CliError::Malformed("outputs exceeds bound".into()))?,
+        evidence_refs: spec_hash_list(spec, "evidence_refs")?,
+        // The witness root commits the witness PROGRAMS (lock reveals),
+        // never signatures — computed, not user-supplied.
+        witness_root: witness_root(&lock_reveals),
+    };
+    Ok((tx, lock_reveals))
+}
+
+/// Builds the canonical transaction bytes from a JSON spec.
+pub fn tx_build(spec_json: &str) -> Result<Value> {
+    let spec: Value = serde_json::from_str(spec_json)
+        .map_err(|e| CliError::Malformed(format!("spec is not JSON: {e}")))?;
+    let (tx, _) = tx_from_spec(&spec)?;
+    let bytes = tx.encode_canonical();
+    // Round-trip self-check: what we emit MUST decode canonically.
+    TransactionV1::decode_canonical(&bytes)?;
+    Ok(json!({
+        "tx": to_hex(&bytes),
+        "txid": to_hex(&lumen_txid(&tx)),
+        "witness_root": to_hex(&tx.witness_root),
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// tx sign
+// ---------------------------------------------------------------------------
+
+/// Signs canonical transaction bytes under the wallet identity gate and
+/// emits the segregated witness container. Fails closed when the supplied
+/// lock reveals do not reproduce the transaction's `witness_root`.
+#[allow(clippy::too_many_arguments)]
+pub fn tx_sign(
+    tx_hex: &str,
+    seed_hex: &str,
+    account: u32,
+    index: u32,
+    chain_id_hex: &str,
+    genesis_hash_hex: &str,
+    signer_scope: u8,
+    lock_reveal_hex: &[String],
+) -> Result<Value> {
+    let bytes = from_hex(tx_hex)?;
+    let tx = TransactionV1::decode_canonical(&bytes)?;
+    let reveals = spec_lock_reveals(&Value::Array(
+        lock_reveal_hex.iter().cloned().map(Value::String).collect(),
+    ))?;
+    if witness_root(&reveals) != tx.witness_root {
+        return Err(CliError::Malformed(
+            "lock reveals do not reproduce the transaction witness_root".into(),
+        ));
+    }
+    let identity = NodeIdentity {
+        chain_id: from_hex32(chain_id_hex)?,
+        genesis_hash: from_hex32(genesis_hash_hex)?,
+        api_version: API_VERSION,
+    };
+    let mut gate = IdentityGate::new(identity);
+    gate.verify(identity)?;
+    let seed = from_hex(seed_hex)?;
+    let spending = derive_authority(&seed, Purpose::Sign, account, index)?.into_spending_key()?;
+    let txid = lumen_txid(&tx);
+    let signature = spending.sign(&gate, &txid)?;
+    let witnesses = TransactionWitnessesV1 {
+        intents: BoundedList::new(vec![SignedIntentV1 {
+            tx_commitment: txid,
+            signer_scope,
+            capability_ref: OptionalHash32(None),
+            signature_suite: SIGNATURE_SUITE_ED25519,
+            signature: BoundedBytes::new(signature.to_vec())
+                .ok_or_else(|| CliError::Malformed("signature exceeds bound".into()))?,
+        }])
+        .ok_or_else(|| CliError::Malformed("intents exceed bound".into()))?,
+        lock_reveals: reveals,
+    };
+    Ok(json!({
+        "txid": to_hex(&txid),
+        "signature": to_hex(&signature),
+        "verifying_key": to_hex(&spending.verifying_key()),
+        "witnesses": to_hex(&witnesses.encode_canonical()),
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// Line-protocol / indexer HTTP client
+// ---------------------------------------------------------------------------
+
+fn http_request(
+    addr: &str,
+    method: &str,
+    path: &str,
+    token: Option<&str>,
+    body: Option<&str>,
+) -> Result<(u16, String)> {
+    let err = |e: std::io::Error| CliError::Transport(e.to_string());
+    let mut stream = TcpStream::connect(addr).map_err(err)?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .map_err(err)?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(5)))
+        .map_err(err)?;
+    let mut request = format!("{method} {path} HTTP/1.1\r\nhost: {addr}\r\n");
+    if let Some(token) = token {
+        request.push_str(&format!("authorization: Bearer {token}\r\n"));
+    }
+    if let Some(body) = body {
+        request.push_str(&format!(
+            "content-type: application/json\r\ncontent-length: {}\r\n",
+            body.len()
+        ));
+    }
+    request.push_str("connection: close\r\n\r\n");
+    if let Some(body) = body {
+        request.push_str(body);
+    }
+    stream.write_all(request.as_bytes()).map_err(err)?;
+    let mut raw = Vec::new();
+    stream.read_to_end(&mut raw).map_err(err)?;
+    let text = String::from_utf8_lossy(&raw);
+    let (head, payload) = text
+        .split_once("\r\n\r\n")
+        .ok_or_else(|| CliError::Transport("truncated HTTP response".into()))?;
+    let status = head
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .and_then(|c| c.parse::<u16>().ok())
+        .ok_or_else(|| CliError::Transport("malformed status line".into()))?;
+    Ok((status, payload.to_string()))
+}
+
+fn expect_json(status: u16, body: String) -> Result<Value> {
+    if status != 200 && status != 202 {
+        return Err(CliError::Refused { status, body });
+    }
+    serde_json::from_str(&body).map_err(|_| CliError::Transport("non-JSON response".into()))
+}
+
+/// `GET /status` on the node operator line protocol.
+pub fn node_status(node: &str, token: &str) -> Result<Value> {
+    let (status, body) = http_request(node, "GET", "/status", Some(token), None)?;
+    expect_json(status, body)
+}
+
+/// Verifies the node's declared identity, then submits `{"tx","witnesses"}`
+/// over the line protocol. Wrong identity fails closed: the transaction
+/// bytes never leave the machine.
+pub fn tx_submit(
+    node: &str,
+    token: &str,
+    chain_id_hex: &str,
+    genesis_hash_hex: &str,
+    tx_hex: &str,
+    witnesses_hex: &str,
+) -> Result<Value> {
+    from_hex(tx_hex)?;
+    from_hex(witnesses_hex)?;
+    let status = node_status(node, token)?;
+    if status["chain_id"].as_str() != Some(chain_id_hex)
+        || status["genesis_hash"].as_str() != Some(genesis_hash_hex)
+    {
+        return Err(CliError::WrongProtocolIdentity);
+    }
+    let body = json!({ "tx": tx_hex, "witnesses": witnesses_hex }).to_string();
+    let (code, payload) = http_request(node, "POST", "/submit_tx", Some(token), Some(&body))?;
+    expect_json(code, payload)
+}
+
+/// `GET /api/v1/blocks/{id}` on the indexer public API.
+pub fn query_block(indexer: &str, id: &str) -> Result<Value> {
+    let (status, body) = http_request(indexer, "GET", &format!("/api/v1/blocks/{id}"), None, None)?;
+    expect_json(status, body)
+}
+
+/// `GET /api/v1/transactions/{txid}` on the indexer public API.
+pub fn query_tx(indexer: &str, txid: &str) -> Result<Value> {
+    let (status, body) = http_request(
+        indexer,
+        "GET",
+        &format!("/api/v1/transactions/{txid}"),
+        None,
+        None,
+    )?;
+    expect_json(status, body)
+}
+
+/// `GET /api/status` on the indexer public API (three separate heads).
+pub fn indexer_status(indexer: &str) -> Result<Value> {
+    let (status, body) = http_request(indexer, "GET", "/api/status", None, None)?;
+    expect_json(status, body)
+}
+
+// ---------------------------------------------------------------------------
+// Argument parsing + dispatcher
+// ---------------------------------------------------------------------------
+
+fn flag(args: &[String], name: &str) -> Option<String> {
+    args.iter()
+        .position(|a| a == name)
+        .and_then(|i| args.get(i.saturating_add(1)))
+        .cloned()
+}
+
+fn required(args: &[String], name: &str) -> Result<String> {
+    flag(args, name).ok_or_else(|| CliError::Usage(format!("{name} is required")))
+}
+
+fn required_u32(args: &[String], name: &str) -> Result<u32> {
+    required(args, name)?
+        .parse()
+        .map_err(|_| CliError::Usage(format!("{name} must be a u32")))
+}
+
+fn multi(args: &[String], name: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut i = 0usize;
+    while i < args.len() {
+        if args[i] == name {
+            if let Some(v) = args.get(i.saturating_add(1)) {
+                out.push(v.clone());
+            }
+        }
+        i = i.saturating_add(1);
+    }
+    out
+}
+
+pub const USAGE: &str = "noos-cli <command>\n\
+  keygen    --seed <hex> --purpose sign|view|agent|recovery|umbra:<suite> --account <n> --index <n>\n\
+  tx build  --spec <json> | --spec-file <path>\n\
+  tx sign   --tx <hex> --seed <hex> --account <n> --index <n> --chain-id <hex32> --genesis-hash <hex32> [--scope <n>] [--lock-reveal <hex>]...\n\
+  tx submit --node <addr> --token <t> --chain-id <hex32> --genesis-hash <hex32> --tx <hex> --witnesses <hex>\n\
+  query     block <height|hash> --indexer <addr> | tx <txid> --indexer <addr>\n\
+  status    --node <addr> --token <t> | --indexer <addr>";
+
+/// Runs one CLI invocation; returns the exact stdout payload.
+pub fn run(args: &[String]) -> Result<String> {
+    let pretty = |v: Value| -> Result<String> {
+        serde_json::to_string_pretty(&v).map_err(|e| CliError::Malformed(e.to_string()))
+    };
+    match args {
+        [cmd, rest @ ..] if cmd == "keygen" => pretty(keygen(
+            &required(rest, "--seed")?,
+            &required(rest, "--purpose")?,
+            required_u32(rest, "--account")?,
+            required_u32(rest, "--index")?,
+        )?),
+        [tx, sub, rest @ ..] if tx == "tx" && sub == "build" => {
+            let spec = match flag(rest, "--spec") {
+                Some(inline) => inline,
+                None => {
+                    let path = required(rest, "--spec-file")?;
+                    std::fs::read_to_string(&path)
+                        .map_err(|e| CliError::Usage(format!("--spec-file {path}: {e}")))?
+                }
+            };
+            pretty(tx_build(&spec)?)
+        }
+        [tx, sub, rest @ ..] if tx == "tx" && sub == "sign" => {
+            let scope = match flag(rest, "--scope") {
+                Some(v) => v
+                    .parse()
+                    .map_err(|_| CliError::Usage("--scope must be a u8".into()))?,
+                None => 0,
+            };
+            pretty(tx_sign(
+                &required(rest, "--tx")?,
+                &required(rest, "--seed")?,
+                required_u32(rest, "--account")?,
+                required_u32(rest, "--index")?,
+                &required(rest, "--chain-id")?,
+                &required(rest, "--genesis-hash")?,
+                scope,
+                &multi(rest, "--lock-reveal"),
+            )?)
+        }
+        [tx, sub, rest @ ..] if tx == "tx" && sub == "submit" => pretty(tx_submit(
+            &required(rest, "--node")?,
+            &required(rest, "--token")?,
+            &required(rest, "--chain-id")?,
+            &required(rest, "--genesis-hash")?,
+            &required(rest, "--tx")?,
+            &required(rest, "--witnesses")?,
+        )?),
+        [q, kind, id, rest @ ..] if q == "query" && kind == "block" => {
+            pretty(query_block(&required(rest, "--indexer")?, id)?)
+        }
+        [q, kind, id, rest @ ..] if q == "query" && kind == "tx" => {
+            pretty(query_tx(&required(rest, "--indexer")?, id)?)
+        }
+        [cmd, rest @ ..] if cmd == "status" => match flag(rest, "--indexer") {
+            Some(indexer) => pretty(indexer_status(&indexer)?),
+            None => pretty(node_status(
+                &required(rest, "--node")?,
+                &required(rest, "--token")?,
+            )?),
+        },
+        _ => Err(CliError::Usage(USAGE.into())),
+    }
+}

@@ -1,0 +1,4961 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "cbd4c74b864519a602cf55c0b0b957ec38504cadb769341c9aa537da70df018e"
+        }
+      ],
+      "name": "release/artifacts/noos-transition-go.exe",
+      "type": "file",
+      "version": "0.1.0-dev"
+    },
+    {
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "441f91ff4b21f703e051d90ea34a503b1f98a3b65db86fc3bdd2bf35c399d93a"
+        }
+      ],
+      "name": "release/artifacts/noos-transition-rust.exe",
+      "type": "file",
+      "version": "0.1.0-dev"
+    },
+    {
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "f9c6a4a93087a882d1636d3908c3435a0805bdb167506b9c921f3639b29511ee"
+        }
+      ],
+      "name": "release/artifacts/noos-verify.exe",
+      "type": "file",
+      "version": "0.1.0-dev"
+    },
+    {
+      "name": "aead",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/aead@0.5.2",
+      "type": "library",
+      "version": "0.5.2"
+    },
+    {
+      "name": "ahash",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/ahash@0.7.8",
+      "type": "library",
+      "version": "0.7.8"
+    },
+    {
+      "name": "aho-corasick",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/aho-corasick@1.1.4",
+      "type": "library",
+      "version": "1.1.4"
+    },
+    {
+      "name": "anyhow",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/anyhow@1.0.103",
+      "type": "library",
+      "version": "1.0.103"
+    },
+    {
+      "name": "arrayref",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/arrayref@0.3.9",
+      "type": "library",
+      "version": "0.3.9"
+    },
+    {
+      "name": "arrayvec",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/arrayvec@0.7.8",
+      "type": "library",
+      "version": "0.7.8"
+    },
+    {
+      "name": "asn1-rs",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/asn1-rs@0.7.2",
+      "type": "library",
+      "version": "0.7.2"
+    },
+    {
+      "name": "asn1-rs-derive",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/asn1-rs-derive@0.6.0",
+      "type": "library",
+      "version": "0.6.0"
+    },
+    {
+      "name": "asn1-rs-impl",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/asn1-rs-impl@0.2.0",
+      "type": "library",
+      "version": "0.2.0"
+    },
+    {
+      "name": "async-io",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/async-io@2.6.0",
+      "type": "library",
+      "version": "2.6.0"
+    },
+    {
+      "name": "async-trait",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/async-trait@0.1.89",
+      "type": "library",
+      "version": "0.1.89"
+    },
+    {
+      "name": "atomic-waker",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/atomic-waker@1.1.2",
+      "type": "library",
+      "version": "1.1.2"
+    },
+    {
+      "name": "attohttpc",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/attohttpc@0.30.1",
+      "type": "library",
+      "version": "0.30.1"
+    },
+    {
+      "name": "autocfg",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/autocfg@1.5.1",
+      "type": "library",
+      "version": "1.5.1"
+    },
+    {
+      "name": "axum",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/axum@0.8.8",
+      "type": "library",
+      "version": "0.8.8"
+    },
+    {
+      "name": "axum-core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/axum-core@0.5.6",
+      "type": "library",
+      "version": "0.5.6"
+    },
+    {
+      "name": "base-x",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/base-x@0.2.11",
+      "type": "library",
+      "version": "0.2.11"
+    },
+    {
+      "name": "base256emoji",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/base256emoji@1.0.2",
+      "type": "library",
+      "version": "1.0.2"
+    },
+    {
+      "name": "base45",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/base45@3.2.0",
+      "type": "library",
+      "version": "3.2.0"
+    },
+    {
+      "name": "base64",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/base64@0.22.1",
+      "type": "library",
+      "version": "0.22.1"
+    },
+    {
+      "name": "base64ct",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/base64ct@1.8.3",
+      "type": "library",
+      "version": "1.8.3"
+    },
+    {
+      "name": "bindgen",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/bindgen@0.72.1",
+      "type": "library",
+      "version": "0.72.1"
+    },
+    {
+      "name": "bitflags",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/bitflags@1.3.2",
+      "type": "library",
+      "version": "1.3.2"
+    },
+    {
+      "name": "bitflags",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/bitflags@2.13.0",
+      "type": "library",
+      "version": "2.13.0"
+    },
+    {
+      "name": "bitvec",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/bitvec@1.1.1",
+      "type": "library",
+      "version": "1.1.1"
+    },
+    {
+      "name": "blake3",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/blake3@1.8.5",
+      "type": "library",
+      "version": "1.8.5"
+    },
+    {
+      "name": "block-buffer",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/block-buffer@0.10.4",
+      "type": "library",
+      "version": "0.10.4"
+    },
+    {
+      "name": "blst",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/blst@0.3.16",
+      "type": "library",
+      "version": "0.3.16"
+    },
+    {
+      "name": "blstrs",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/blstrs@0.7.1",
+      "type": "library",
+      "version": "0.7.1"
+    },
+    {
+      "name": "bs58",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/bs58@0.5.1",
+      "type": "library",
+      "version": "0.5.1"
+    },
+    {
+      "name": "bumpalo",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/bumpalo@3.20.3",
+      "type": "library",
+      "version": "3.20.3"
+    },
+    {
+      "name": "byte-slice-cast",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/byte-slice-cast@1.2.3",
+      "type": "library",
+      "version": "1.2.3"
+    },
+    {
+      "name": "byteorder",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/byteorder@1.5.0",
+      "type": "library",
+      "version": "1.5.0"
+    },
+    {
+      "name": "bytes",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/bytes@1.12.1",
+      "type": "library",
+      "version": "1.12.1"
+    },
+    {
+      "name": "bzip2-sys",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/bzip2-sys@0.1.13+1.0.8",
+      "type": "library",
+      "version": "0.1.13+1.0.8"
+    },
+    {
+      "name": "cc",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/cc@1.2.67",
+      "type": "library",
+      "version": "1.2.67"
+    },
+    {
+      "name": "cexpr",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/cexpr@0.6.0",
+      "type": "library",
+      "version": "0.6.0"
+    },
+    {
+      "name": "cfg-if",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/cfg-if@1.0.4",
+      "type": "library",
+      "version": "1.0.4"
+    },
+    {
+      "name": "cfg_aliases",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/cfg_aliases@0.2.1",
+      "type": "library",
+      "version": "0.2.1"
+    },
+    {
+      "name": "chacha20",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/chacha20@0.10.1",
+      "type": "library",
+      "version": "0.10.1"
+    },
+    {
+      "name": "chacha20",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/chacha20@0.9.1",
+      "type": "library",
+      "version": "0.9.1"
+    },
+    {
+      "name": "chacha20poly1305",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/chacha20poly1305@0.10.1",
+      "type": "library",
+      "version": "0.10.1"
+    },
+    {
+      "name": "cipher",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/cipher@0.4.4",
+      "type": "library",
+      "version": "0.4.4"
+    },
+    {
+      "name": "clang-sys",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/clang-sys@1.8.1",
+      "type": "library",
+      "version": "1.8.1"
+    },
+    {
+      "name": "concurrent-queue",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/concurrent-queue@2.5.0",
+      "type": "library",
+      "version": "2.5.0"
+    },
+    {
+      "name": "const-oid",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/const-oid@0.9.6",
+      "type": "library",
+      "version": "0.9.6"
+    },
+    {
+      "name": "const-str",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/const-str@0.4.3",
+      "type": "library",
+      "version": "0.4.3"
+    },
+    {
+      "name": "constant_time_eq",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/constant_time_eq@0.4.2",
+      "type": "library",
+      "version": "0.4.2"
+    },
+    {
+      "name": "core-foundation",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/core-foundation@0.9.4",
+      "type": "library",
+      "version": "0.9.4"
+    },
+    {
+      "name": "core-foundation-sys",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/core-foundation-sys@0.8.7",
+      "type": "library",
+      "version": "0.8.7"
+    },
+    {
+      "name": "cpufeatures",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/cpufeatures@0.2.17",
+      "type": "library",
+      "version": "0.2.17"
+    },
+    {
+      "name": "cpufeatures",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/cpufeatures@0.3.0",
+      "type": "library",
+      "version": "0.3.0"
+    },
+    {
+      "name": "critical-section",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/critical-section@1.2.0",
+      "type": "library",
+      "version": "1.2.0"
+    },
+    {
+      "name": "crossbeam-channel",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/crossbeam-channel@0.5.16",
+      "type": "library",
+      "version": "0.5.16"
+    },
+    {
+      "name": "crossbeam-epoch",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/crossbeam-epoch@0.9.20",
+      "type": "library",
+      "version": "0.9.20"
+    },
+    {
+      "name": "crossbeam-utils",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/crossbeam-utils@0.8.22",
+      "type": "library",
+      "version": "0.8.22"
+    },
+    {
+      "name": "crypto-common",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/crypto-common@0.1.7",
+      "type": "library",
+      "version": "0.1.7"
+    },
+    {
+      "name": "curve25519-dalek",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/curve25519-dalek@4.1.3",
+      "type": "library",
+      "version": "4.1.3"
+    },
+    {
+      "name": "curve25519-dalek-derive",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/curve25519-dalek-derive@0.1.1",
+      "type": "library",
+      "version": "0.1.1"
+    },
+    {
+      "name": "data-encoding",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/data-encoding@2.11.0",
+      "type": "library",
+      "version": "2.11.0"
+    },
+    {
+      "name": "data-encoding-macro",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/data-encoding-macro@0.1.20",
+      "type": "library",
+      "version": "0.1.20"
+    },
+    {
+      "name": "data-encoding-macro-internal",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/data-encoding-macro-internal@0.1.18",
+      "type": "library",
+      "version": "0.1.18"
+    },
+    {
+      "name": "der",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/der@0.7.10",
+      "type": "library",
+      "version": "0.7.10"
+    },
+    {
+      "name": "der-parser",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/der-parser@10.0.0",
+      "type": "library",
+      "version": "10.0.0"
+    },
+    {
+      "name": "deranged",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/deranged@0.5.8",
+      "type": "library",
+      "version": "0.5.8"
+    },
+    {
+      "name": "digest",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/digest@0.10.7",
+      "type": "library",
+      "version": "0.10.7"
+    },
+    {
+      "name": "displaydoc",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/displaydoc@0.2.6",
+      "type": "library",
+      "version": "0.2.6"
+    },
+    {
+      "name": "ed25519",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/ed25519@2.2.3",
+      "type": "library",
+      "version": "2.2.3"
+    },
+    {
+      "name": "ed25519-dalek",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/ed25519-dalek@2.2.0",
+      "type": "library",
+      "version": "2.2.0"
+    },
+    {
+      "name": "either",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/either@1.16.0",
+      "type": "library",
+      "version": "1.16.0"
+    },
+    {
+      "name": "enum-as-inner",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/enum-as-inner@0.6.1",
+      "type": "library",
+      "version": "0.6.1"
+    },
+    {
+      "name": "equivalent",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/equivalent@1.0.2",
+      "type": "library",
+      "version": "1.0.2"
+    },
+    {
+      "name": "errno",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/errno@0.3.14",
+      "type": "library",
+      "version": "0.3.14"
+    },
+    {
+      "name": "fastbloom",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/fastbloom@0.17.0",
+      "type": "library",
+      "version": "0.17.0"
+    },
+    {
+      "name": "fastrand",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/fastrand@2.4.1",
+      "type": "library",
+      "version": "2.4.1"
+    },
+    {
+      "name": "ff",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/ff@0.13.1",
+      "type": "library",
+      "version": "0.13.1"
+    },
+    {
+      "name": "fiat-crypto",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/fiat-crypto@0.2.9",
+      "type": "library",
+      "version": "0.2.9"
+    },
+    {
+      "name": "find-msvc-tools",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/find-msvc-tools@0.1.9",
+      "type": "library",
+      "version": "0.1.9"
+    },
+    {
+      "name": "fnv",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/fnv@1.0.7",
+      "type": "library",
+      "version": "1.0.7"
+    },
+    {
+      "name": "foldhash",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/foldhash@0.1.5",
+      "type": "library",
+      "version": "0.1.5"
+    },
+    {
+      "name": "foldhash",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/foldhash@0.2.0",
+      "type": "library",
+      "version": "0.2.0"
+    },
+    {
+      "name": "form_urlencoded",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/form_urlencoded@1.2.2",
+      "type": "library",
+      "version": "1.2.2"
+    },
+    {
+      "name": "funty",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/funty@2.0.0",
+      "type": "library",
+      "version": "2.0.0"
+    },
+    {
+      "name": "futures",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/futures@0.3.32",
+      "type": "library",
+      "version": "0.3.32"
+    },
+    {
+      "name": "futures-channel",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/futures-channel@0.3.32",
+      "type": "library",
+      "version": "0.3.32"
+    },
+    {
+      "name": "futures-core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/futures-core@0.3.32",
+      "type": "library",
+      "version": "0.3.32"
+    },
+    {
+      "name": "futures-executor",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/futures-executor@0.3.32",
+      "type": "library",
+      "version": "0.3.32"
+    },
+    {
+      "name": "futures-io",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/futures-io@0.3.32",
+      "type": "library",
+      "version": "0.3.32"
+    },
+    {
+      "name": "futures-lite",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/futures-lite@2.6.1",
+      "type": "library",
+      "version": "2.6.1"
+    },
+    {
+      "name": "futures-macro",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/futures-macro@0.3.32",
+      "type": "library",
+      "version": "0.3.32"
+    },
+    {
+      "name": "futures-rustls",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/futures-rustls@0.26.0",
+      "type": "library",
+      "version": "0.26.0"
+    },
+    {
+      "name": "futures-sink",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/futures-sink@0.3.32",
+      "type": "library",
+      "version": "0.3.32"
+    },
+    {
+      "name": "futures-task",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/futures-task@0.3.32",
+      "type": "library",
+      "version": "0.3.32"
+    },
+    {
+      "name": "futures-timer",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/futures-timer@3.0.4",
+      "type": "library",
+      "version": "3.0.4"
+    },
+    {
+      "name": "futures-util",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/futures-util@0.3.32",
+      "type": "library",
+      "version": "0.3.32"
+    },
+    {
+      "name": "generic-array",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/generic-array@0.14.7",
+      "type": "library",
+      "version": "0.14.7"
+    },
+    {
+      "name": "getrandom",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/getrandom@0.2.17",
+      "type": "library",
+      "version": "0.2.17"
+    },
+    {
+      "name": "getrandom",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/getrandom@0.3.4",
+      "type": "library",
+      "version": "0.3.4"
+    },
+    {
+      "name": "getrandom",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/getrandom@0.4.3",
+      "type": "library",
+      "version": "0.4.3"
+    },
+    {
+      "name": "glob",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/glob@0.3.3",
+      "type": "library",
+      "version": "0.3.3"
+    },
+    {
+      "name": "group",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/group@0.13.0",
+      "type": "library",
+      "version": "0.13.0"
+    },
+    {
+      "name": "h2",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/h2@0.4.15",
+      "type": "library",
+      "version": "0.4.15"
+    },
+    {
+      "name": "hashbrown",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/hashbrown@0.12.3",
+      "type": "library",
+      "version": "0.12.3"
+    },
+    {
+      "name": "hashbrown",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/hashbrown@0.15.5",
+      "type": "library",
+      "version": "0.15.5"
+    },
+    {
+      "name": "hashbrown",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/hashbrown@0.17.1",
+      "type": "library",
+      "version": "0.17.1"
+    },
+    {
+      "name": "hashlink",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/hashlink@0.10.0",
+      "type": "library",
+      "version": "0.10.0"
+    },
+    {
+      "name": "heck",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/heck@0.5.0",
+      "type": "library",
+      "version": "0.5.0"
+    },
+    {
+      "name": "hermit-abi",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/hermit-abi@0.5.2",
+      "type": "library",
+      "version": "0.5.2"
+    },
+    {
+      "name": "hex",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/hex@0.4.3",
+      "type": "library",
+      "version": "0.4.3"
+    },
+    {
+      "name": "hickory-proto",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/hickory-proto@0.25.2",
+      "type": "library",
+      "version": "0.25.2"
+    },
+    {
+      "name": "hickory-resolver",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/hickory-resolver@0.25.2",
+      "type": "library",
+      "version": "0.25.2"
+    },
+    {
+      "name": "hkdf",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/hkdf@0.12.4",
+      "type": "library",
+      "version": "0.12.4"
+    },
+    {
+      "name": "hmac",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/hmac@0.12.1",
+      "type": "library",
+      "version": "0.12.1"
+    },
+    {
+      "name": "http",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/http@1.4.2",
+      "type": "library",
+      "version": "1.4.2"
+    },
+    {
+      "name": "http-body",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/http-body@1.0.1",
+      "type": "library",
+      "version": "1.0.1"
+    },
+    {
+      "name": "http-body-util",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/http-body-util@0.1.3",
+      "type": "library",
+      "version": "0.1.3"
+    },
+    {
+      "name": "httparse",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/httparse@1.10.1",
+      "type": "library",
+      "version": "1.10.1"
+    },
+    {
+      "name": "httpdate",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/httpdate@1.0.3",
+      "type": "library",
+      "version": "1.0.3"
+    },
+    {
+      "name": "hyper",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/hyper@1.10.1",
+      "type": "library",
+      "version": "1.10.1"
+    },
+    {
+      "name": "hyper-util",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/hyper-util@0.1.20",
+      "type": "library",
+      "version": "0.1.20"
+    },
+    {
+      "name": "icu_collections",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/icu_collections@2.2.0",
+      "type": "library",
+      "version": "2.2.0"
+    },
+    {
+      "name": "icu_locale_core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/icu_locale_core@2.2.0",
+      "type": "library",
+      "version": "2.2.0"
+    },
+    {
+      "name": "icu_normalizer",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/icu_normalizer@2.2.0",
+      "type": "library",
+      "version": "2.2.0"
+    },
+    {
+      "name": "icu_normalizer_data",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/icu_normalizer_data@2.2.0",
+      "type": "library",
+      "version": "2.2.0"
+    },
+    {
+      "name": "icu_properties",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/icu_properties@2.2.0",
+      "type": "library",
+      "version": "2.2.0"
+    },
+    {
+      "name": "icu_properties_data",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/icu_properties_data@2.2.0",
+      "type": "library",
+      "version": "2.2.0"
+    },
+    {
+      "name": "icu_provider",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/icu_provider@2.2.0",
+      "type": "library",
+      "version": "2.2.0"
+    },
+    {
+      "name": "idna",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/idna@1.1.0",
+      "type": "library",
+      "version": "1.1.0"
+    },
+    {
+      "name": "idna_adapter",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/idna_adapter@1.2.2",
+      "type": "library",
+      "version": "1.2.2"
+    },
+    {
+      "name": "if-addrs",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/if-addrs@0.15.0",
+      "type": "library",
+      "version": "0.15.0"
+    },
+    {
+      "name": "if-watch",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/if-watch@3.2.2",
+      "type": "library",
+      "version": "3.2.2"
+    },
+    {
+      "name": "igd-next",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/igd-next@0.16.2",
+      "type": "library",
+      "version": "0.16.2"
+    },
+    {
+      "name": "indexmap",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/indexmap@2.14.0",
+      "type": "library",
+      "version": "2.14.0"
+    },
+    {
+      "name": "inout",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/inout@0.1.4",
+      "type": "library",
+      "version": "0.1.4"
+    },
+    {
+      "name": "instant",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/instant@0.1.13",
+      "type": "library",
+      "version": "0.1.13"
+    },
+    {
+      "name": "ipconfig",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/ipconfig@0.3.4",
+      "type": "library",
+      "version": "0.3.4"
+    },
+    {
+      "name": "ipnet",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/ipnet@2.12.0",
+      "type": "library",
+      "version": "2.12.0"
+    },
+    {
+      "name": "itertools",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/itertools@0.13.0",
+      "type": "library",
+      "version": "0.13.0"
+    },
+    {
+      "name": "itertools",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/itertools@0.14.0",
+      "type": "library",
+      "version": "0.14.0"
+    },
+    {
+      "name": "itoa",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/itoa@1.0.18",
+      "type": "library",
+      "version": "1.0.18"
+    },
+    {
+      "name": "jobserver",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/jobserver@0.1.35",
+      "type": "library",
+      "version": "0.1.35"
+    },
+    {
+      "name": "js-sys",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/js-sys@0.3.103",
+      "type": "library",
+      "version": "0.3.103"
+    },
+    {
+      "name": "lazy_static",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/lazy_static@1.5.0",
+      "type": "library",
+      "version": "1.5.0"
+    },
+    {
+      "name": "libc",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libc@0.2.186",
+      "type": "library",
+      "version": "0.2.186"
+    },
+    {
+      "name": "libloading",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libloading@0.8.9",
+      "type": "library",
+      "version": "0.8.9"
+    },
+    {
+      "name": "libm",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libm@0.2.16",
+      "type": "library",
+      "version": "0.2.16"
+    },
+    {
+      "name": "libp2p",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libp2p@0.56.0",
+      "type": "library",
+      "version": "0.56.0"
+    },
+    {
+      "name": "libp2p-allow-block-list",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libp2p-allow-block-list@0.6.0",
+      "type": "library",
+      "version": "0.6.0"
+    },
+    {
+      "name": "libp2p-connection-limits",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libp2p-connection-limits@0.6.0",
+      "type": "library",
+      "version": "0.6.0"
+    },
+    {
+      "name": "libp2p-core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libp2p-core@0.43.2",
+      "type": "library",
+      "version": "0.43.2"
+    },
+    {
+      "name": "libp2p-dns",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libp2p-dns@0.44.0",
+      "type": "library",
+      "version": "0.44.0"
+    },
+    {
+      "name": "libp2p-identity",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libp2p-identity@0.2.14",
+      "type": "library",
+      "version": "0.2.14"
+    },
+    {
+      "name": "libp2p-mdns",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libp2p-mdns@0.48.0",
+      "type": "library",
+      "version": "0.48.0"
+    },
+    {
+      "name": "libp2p-quic",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libp2p-quic@0.13.1",
+      "type": "library",
+      "version": "0.13.1"
+    },
+    {
+      "name": "libp2p-stream",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libp2p-stream@0.4.0-alpha",
+      "type": "library",
+      "version": "0.4.0-alpha"
+    },
+    {
+      "name": "libp2p-swarm",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libp2p-swarm@0.47.1",
+      "type": "library",
+      "version": "0.47.1"
+    },
+    {
+      "name": "libp2p-tcp",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libp2p-tcp@0.44.1",
+      "type": "library",
+      "version": "0.44.1"
+    },
+    {
+      "name": "libp2p-tls",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libp2p-tls@0.6.2",
+      "type": "library",
+      "version": "0.6.2"
+    },
+    {
+      "name": "libp2p-upnp",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libp2p-upnp@0.5.0",
+      "type": "library",
+      "version": "0.5.0"
+    },
+    {
+      "name": "librocksdb-sys",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/librocksdb-sys@0.17.3+10.4.2",
+      "type": "library",
+      "version": "0.17.3+10.4.2"
+    },
+    {
+      "name": "libz-sys",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/libz-sys@1.1.29",
+      "type": "library",
+      "version": "1.1.29"
+    },
+    {
+      "name": "linux-raw-sys",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/linux-raw-sys@0.12.1",
+      "type": "library",
+      "version": "0.12.1"
+    },
+    {
+      "name": "litemap",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/litemap@0.8.2",
+      "type": "library",
+      "version": "0.8.2"
+    },
+    {
+      "name": "lock_api",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/lock_api@0.4.14",
+      "type": "library",
+      "version": "0.4.14"
+    },
+    {
+      "name": "log",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/log@0.4.33",
+      "type": "library",
+      "version": "0.4.33"
+    },
+    {
+      "name": "lru",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/lru@0.7.8",
+      "type": "library",
+      "version": "0.7.8"
+    },
+    {
+      "name": "lru-slab",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/lru-slab@0.1.2",
+      "type": "library",
+      "version": "0.1.2"
+    },
+    {
+      "name": "lz4-sys",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/lz4-sys@1.11.1+lz4-1.10.0",
+      "type": "library",
+      "version": "1.11.1+lz4-1.10.0"
+    },
+    {
+      "name": "match-lookup",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/match-lookup@0.1.2",
+      "type": "library",
+      "version": "0.1.2"
+    },
+    {
+      "name": "matchit",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/matchit@0.8.4",
+      "type": "library",
+      "version": "0.8.4"
+    },
+    {
+      "name": "memchr",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/memchr@2.8.3",
+      "type": "library",
+      "version": "2.8.3"
+    },
+    {
+      "name": "mime",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/mime@0.3.17",
+      "type": "library",
+      "version": "0.3.17"
+    },
+    {
+      "name": "minimal-lexical",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/minimal-lexical@0.2.1",
+      "type": "library",
+      "version": "0.2.1"
+    },
+    {
+      "name": "mio",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/mio@1.2.1",
+      "type": "library",
+      "version": "1.2.1"
+    },
+    {
+      "name": "moka",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/moka@0.12.15",
+      "type": "library",
+      "version": "0.12.15"
+    },
+    {
+      "name": "multiaddr",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/multiaddr@0.18.2",
+      "type": "library",
+      "version": "0.18.2"
+    },
+    {
+      "name": "multibase",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/multibase@0.9.3",
+      "type": "library",
+      "version": "0.9.3"
+    },
+    {
+      "name": "multihash",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/multihash@0.19.5",
+      "type": "library",
+      "version": "0.19.5"
+    },
+    {
+      "name": "multistream-select",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/multistream-select@0.13.0",
+      "type": "library",
+      "version": "0.13.0"
+    },
+    {
+      "name": "netlink-packet-core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/netlink-packet-core@0.8.1",
+      "type": "library",
+      "version": "0.8.1"
+    },
+    {
+      "name": "netlink-packet-route",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/netlink-packet-route@0.28.0",
+      "type": "library",
+      "version": "0.28.0"
+    },
+    {
+      "name": "netlink-proto",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/netlink-proto@0.12.0",
+      "type": "library",
+      "version": "0.12.0"
+    },
+    {
+      "name": "netlink-sys",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/netlink-sys@0.8.8",
+      "type": "library",
+      "version": "0.8.8"
+    },
+    {
+      "name": "nix",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/nix@0.30.1",
+      "type": "library",
+      "version": "0.30.1"
+    },
+    {
+      "name": "nom",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/nom@7.1.3",
+      "type": "library",
+      "version": "7.1.3"
+    },
+    {
+      "name": "noos-agent-class",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-agent-class@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-analytics",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-analytics@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-braid",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-braid@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-chorus",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-chorus@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-cli",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-cli@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-codec",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-codec@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-commerce",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-commerce@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-contracts",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-contracts@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-crypto",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-crypto@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-da",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-da@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-fuzz",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-fuzz@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-grain",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-grain@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-ground",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-ground@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-hearth",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-hearth@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-indexer",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-indexer@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-jet",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-jet@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-loam",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-loam@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-lumen",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-lumen@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-nel",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-nel@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-node",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-node@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-p2p",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-p2p@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-private-besi",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-private-besi@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-reflex",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-reflex@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-sim-net",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-sim-net@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-species",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-species@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-store",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-store@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-swarm",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-swarm@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-training",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-training@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-umbra",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-umbra@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-wallet",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-wallet@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-weft-check",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-weft-check@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-weft-compile",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-weft-compile@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-weft-syntax",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-weft-syntax@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-weftc",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-weftc@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-witness",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-witness@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-work-loom",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-work-loom@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "noos-workerd",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:cargo/noos-workerd@0.1.0",
+      "type": "library",
+      "version": "0.1.0"
+    },
+    {
+      "name": "num-bigint",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/num-bigint@0.4.8",
+      "type": "library",
+      "version": "0.4.8"
+    },
+    {
+      "name": "num-conv",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/num-conv@0.2.2",
+      "type": "library",
+      "version": "0.2.2"
+    },
+    {
+      "name": "num-integer",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/num-integer@0.1.46",
+      "type": "library",
+      "version": "0.1.46"
+    },
+    {
+      "name": "num-traits",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/num-traits@0.2.19",
+      "type": "library",
+      "version": "0.2.19"
+    },
+    {
+      "name": "num_cpus",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/num_cpus@1.17.0",
+      "type": "library",
+      "version": "1.17.0"
+    },
+    {
+      "name": "oid-registry",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/oid-registry@0.8.1",
+      "type": "library",
+      "version": "0.8.1"
+    },
+    {
+      "name": "once_cell",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/once_cell@1.21.4",
+      "type": "library",
+      "version": "1.21.4"
+    },
+    {
+      "name": "opaque-debug",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/opaque-debug@0.3.1",
+      "type": "library",
+      "version": "0.3.1"
+    },
+    {
+      "name": "pairing",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/pairing@0.23.0",
+      "type": "library",
+      "version": "0.23.0"
+    },
+    {
+      "name": "parking",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/parking@2.2.1",
+      "type": "library",
+      "version": "2.2.1"
+    },
+    {
+      "name": "parking_lot",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/parking_lot@0.11.2",
+      "type": "library",
+      "version": "0.11.2"
+    },
+    {
+      "name": "parking_lot",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/parking_lot@0.12.5",
+      "type": "library",
+      "version": "0.12.5"
+    },
+    {
+      "name": "parking_lot_core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/parking_lot_core@0.8.6",
+      "type": "library",
+      "version": "0.8.6"
+    },
+    {
+      "name": "parking_lot_core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/parking_lot_core@0.9.12",
+      "type": "library",
+      "version": "0.9.12"
+    },
+    {
+      "name": "paste",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/paste@1.0.15",
+      "type": "library",
+      "version": "1.0.15"
+    },
+    {
+      "name": "pem",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/pem@3.0.6",
+      "type": "library",
+      "version": "3.0.6"
+    },
+    {
+      "name": "percent-encoding",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/percent-encoding@2.3.2",
+      "type": "library",
+      "version": "2.3.2"
+    },
+    {
+      "name": "pin-project",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/pin-project@1.1.13",
+      "type": "library",
+      "version": "1.1.13"
+    },
+    {
+      "name": "pin-project-internal",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/pin-project-internal@1.1.13",
+      "type": "library",
+      "version": "1.1.13"
+    },
+    {
+      "name": "pin-project-lite",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/pin-project-lite@0.2.17",
+      "type": "library",
+      "version": "0.2.17"
+    },
+    {
+      "name": "pkcs8",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/pkcs8@0.10.2",
+      "type": "library",
+      "version": "0.10.2"
+    },
+    {
+      "name": "pkg-config",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/pkg-config@0.3.33",
+      "type": "library",
+      "version": "0.3.33"
+    },
+    {
+      "name": "polling",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/polling@3.11.0",
+      "type": "library",
+      "version": "3.11.0"
+    },
+    {
+      "name": "poly1305",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/poly1305@0.8.0",
+      "type": "library",
+      "version": "0.8.0"
+    },
+    {
+      "name": "portable-atomic",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/portable-atomic@1.13.1",
+      "type": "library",
+      "version": "1.13.1"
+    },
+    {
+      "name": "potential_utf",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/potential_utf@0.1.5",
+      "type": "library",
+      "version": "0.1.5"
+    },
+    {
+      "name": "powerfmt",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/powerfmt@0.2.0",
+      "type": "library",
+      "version": "0.2.0"
+    },
+    {
+      "name": "ppv-lite86",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/ppv-lite86@0.2.21",
+      "type": "library",
+      "version": "0.2.21"
+    },
+    {
+      "name": "proc-macro2",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/proc-macro2@1.0.106",
+      "type": "library",
+      "version": "1.0.106"
+    },
+    {
+      "name": "prost",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/prost@0.14.4",
+      "type": "library",
+      "version": "0.14.4"
+    },
+    {
+      "name": "prost-derive",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/prost-derive@0.14.4",
+      "type": "library",
+      "version": "0.14.4"
+    },
+    {
+      "name": "quick-protobuf",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/quick-protobuf@0.8.1",
+      "type": "library",
+      "version": "0.8.1"
+    },
+    {
+      "name": "quinn",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/quinn@0.11.11",
+      "type": "library",
+      "version": "0.11.11"
+    },
+    {
+      "name": "quinn-proto",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/quinn-proto@0.11.16",
+      "type": "library",
+      "version": "0.11.16"
+    },
+    {
+      "name": "quinn-udp",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/quinn-udp@0.5.15",
+      "type": "library",
+      "version": "0.5.15"
+    },
+    {
+      "name": "quote",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/quote@1.0.46",
+      "type": "library",
+      "version": "1.0.46"
+    },
+    {
+      "name": "r-efi",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/r-efi@5.3.0",
+      "type": "library",
+      "version": "5.3.0"
+    },
+    {
+      "name": "r-efi",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/r-efi@6.0.0",
+      "type": "library",
+      "version": "6.0.0"
+    },
+    {
+      "name": "radium",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/radium@0.7.0",
+      "type": "library",
+      "version": "0.7.0"
+    },
+    {
+      "name": "rand",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rand@0.10.2",
+      "type": "library",
+      "version": "0.10.2"
+    },
+    {
+      "name": "rand",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rand@0.8.6",
+      "type": "library",
+      "version": "0.8.6"
+    },
+    {
+      "name": "rand",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rand@0.9.4",
+      "type": "library",
+      "version": "0.9.4"
+    },
+    {
+      "name": "rand_chacha",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rand_chacha@0.3.1",
+      "type": "library",
+      "version": "0.3.1"
+    },
+    {
+      "name": "rand_chacha",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rand_chacha@0.9.0",
+      "type": "library",
+      "version": "0.9.0"
+    },
+    {
+      "name": "rand_core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rand_core@0.10.1",
+      "type": "library",
+      "version": "0.10.1"
+    },
+    {
+      "name": "rand_core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rand_core@0.6.4",
+      "type": "library",
+      "version": "0.6.4"
+    },
+    {
+      "name": "rand_core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rand_core@0.9.5",
+      "type": "library",
+      "version": "0.9.5"
+    },
+    {
+      "name": "rand_pcg",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rand_pcg@0.10.2",
+      "type": "library",
+      "version": "0.10.2"
+    },
+    {
+      "name": "rand_xorshift",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rand_xorshift@0.3.0",
+      "type": "library",
+      "version": "0.3.0"
+    },
+    {
+      "name": "rcgen",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rcgen@0.13.2",
+      "type": "library",
+      "version": "0.13.2"
+    },
+    {
+      "name": "redox_syscall",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/redox_syscall@0.2.16",
+      "type": "library",
+      "version": "0.2.16"
+    },
+    {
+      "name": "redox_syscall",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/redox_syscall@0.5.18",
+      "type": "library",
+      "version": "0.5.18"
+    },
+    {
+      "name": "reed-solomon-erasure",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/reed-solomon-erasure@6.0.0",
+      "type": "library",
+      "version": "6.0.0"
+    },
+    {
+      "name": "regex",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/regex@1.13.0",
+      "type": "library",
+      "version": "1.13.0"
+    },
+    {
+      "name": "regex-automata",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/regex-automata@0.4.15",
+      "type": "library",
+      "version": "0.4.15"
+    },
+    {
+      "name": "regex-syntax",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/regex-syntax@0.8.11",
+      "type": "library",
+      "version": "0.8.11"
+    },
+    {
+      "name": "resolv-conf",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/resolv-conf@0.7.6",
+      "type": "library",
+      "version": "0.7.6"
+    },
+    {
+      "name": "ring",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/ring@0.17.14",
+      "type": "library",
+      "version": "0.17.14"
+    },
+    {
+      "name": "rocksdb",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rocksdb@0.24.0",
+      "type": "library",
+      "version": "0.24.0"
+    },
+    {
+      "name": "rtnetlink",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rtnetlink@0.20.0",
+      "type": "library",
+      "version": "0.20.0"
+    },
+    {
+      "name": "rustc-hash",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rustc-hash@2.1.3",
+      "type": "library",
+      "version": "2.1.3"
+    },
+    {
+      "name": "rustc_version",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rustc_version@0.4.1",
+      "type": "library",
+      "version": "0.4.1"
+    },
+    {
+      "name": "rusticata-macros",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rusticata-macros@4.1.0",
+      "type": "library",
+      "version": "4.1.0"
+    },
+    {
+      "name": "rustix",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rustix@1.1.4",
+      "type": "library",
+      "version": "1.1.4"
+    },
+    {
+      "name": "rustls",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rustls@0.23.41",
+      "type": "library",
+      "version": "0.23.41"
+    },
+    {
+      "name": "rustls-pki-types",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rustls-pki-types@1.15.0",
+      "type": "library",
+      "version": "1.15.0"
+    },
+    {
+      "name": "rustls-webpki",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rustls-webpki@0.103.13",
+      "type": "library",
+      "version": "0.103.13"
+    },
+    {
+      "name": "rustversion",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rustversion@1.0.23",
+      "type": "library",
+      "version": "1.0.23"
+    },
+    {
+      "name": "rw-stream-sink",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/rw-stream-sink@0.4.0",
+      "type": "library",
+      "version": "0.4.0"
+    },
+    {
+      "name": "ryu",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/ryu@1.0.23",
+      "type": "library",
+      "version": "1.0.23"
+    },
+    {
+      "name": "scopeguard",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/scopeguard@1.2.0",
+      "type": "library",
+      "version": "1.2.0"
+    },
+    {
+      "name": "semver",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/semver@1.0.28",
+      "type": "library",
+      "version": "1.0.28"
+    },
+    {
+      "name": "serde",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/serde@1.0.228",
+      "type": "library",
+      "version": "1.0.228"
+    },
+    {
+      "name": "serde_core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/serde_core@1.0.228",
+      "type": "library",
+      "version": "1.0.228"
+    },
+    {
+      "name": "serde_derive",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/serde_derive@1.0.228",
+      "type": "library",
+      "version": "1.0.228"
+    },
+    {
+      "name": "serde_json",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/serde_json@1.0.150",
+      "type": "library",
+      "version": "1.0.150"
+    },
+    {
+      "name": "serde_path_to_error",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/serde_path_to_error@0.1.20",
+      "type": "library",
+      "version": "0.1.20"
+    },
+    {
+      "name": "serde_urlencoded",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/serde_urlencoded@0.7.1",
+      "type": "library",
+      "version": "0.7.1"
+    },
+    {
+      "name": "sha2",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/sha2@0.10.9",
+      "type": "library",
+      "version": "0.10.9"
+    },
+    {
+      "name": "shlex",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/shlex@1.3.0",
+      "type": "library",
+      "version": "1.3.0"
+    },
+    {
+      "name": "shlex",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/shlex@2.0.1",
+      "type": "library",
+      "version": "2.0.1"
+    },
+    {
+      "name": "signature",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/signature@2.2.0",
+      "type": "library",
+      "version": "2.2.0"
+    },
+    {
+      "name": "siphasher",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/siphasher@1.0.3",
+      "type": "library",
+      "version": "1.0.3"
+    },
+    {
+      "name": "slab",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/slab@0.4.12",
+      "type": "library",
+      "version": "0.4.12"
+    },
+    {
+      "name": "smallvec",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/smallvec@1.15.2",
+      "type": "library",
+      "version": "1.15.2"
+    },
+    {
+      "name": "socket2",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/socket2@0.5.10",
+      "type": "library",
+      "version": "0.5.10"
+    },
+    {
+      "name": "socket2",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/socket2@0.6.4",
+      "type": "library",
+      "version": "0.6.4"
+    },
+    {
+      "name": "spin",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/spin@0.9.8",
+      "type": "library",
+      "version": "0.9.8"
+    },
+    {
+      "name": "spki",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/spki@0.7.3",
+      "type": "library",
+      "version": "0.7.3"
+    },
+    {
+      "name": "stable_deref_trait",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/stable_deref_trait@1.2.1",
+      "type": "library",
+      "version": "1.2.1"
+    },
+    {
+      "name": "static_assertions",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/static_assertions@1.1.0",
+      "type": "library",
+      "version": "1.1.0"
+    },
+    {
+      "name": "subtle",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/subtle@2.6.1",
+      "type": "library",
+      "version": "2.6.1"
+    },
+    {
+      "name": "syn",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/syn@2.0.118",
+      "type": "library",
+      "version": "2.0.118"
+    },
+    {
+      "name": "sync_wrapper",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/sync_wrapper@1.0.2",
+      "type": "library",
+      "version": "1.0.2"
+    },
+    {
+      "name": "synstructure",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/synstructure@0.13.2",
+      "type": "library",
+      "version": "0.13.2"
+    },
+    {
+      "name": "system-configuration",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/system-configuration@0.7.0",
+      "type": "library",
+      "version": "0.7.0"
+    },
+    {
+      "name": "system-configuration-sys",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/system-configuration-sys@0.6.0",
+      "type": "library",
+      "version": "0.6.0"
+    },
+    {
+      "name": "tagptr",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tagptr@0.2.0",
+      "type": "library",
+      "version": "0.2.0"
+    },
+    {
+      "name": "tap",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tap@1.0.1",
+      "type": "library",
+      "version": "1.0.1"
+    },
+    {
+      "name": "tempfile",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tempfile@3.24.0",
+      "type": "library",
+      "version": "3.24.0"
+    },
+    {
+      "name": "thiserror",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/thiserror@1.0.69",
+      "type": "library",
+      "version": "1.0.69"
+    },
+    {
+      "name": "thiserror",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/thiserror@2.0.18",
+      "type": "library",
+      "version": "2.0.18"
+    },
+    {
+      "name": "thiserror-impl",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/thiserror-impl@1.0.69",
+      "type": "library",
+      "version": "1.0.69"
+    },
+    {
+      "name": "thiserror-impl",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/thiserror-impl@2.0.18",
+      "type": "library",
+      "version": "2.0.18"
+    },
+    {
+      "name": "threadpool",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/threadpool@1.8.1",
+      "type": "library",
+      "version": "1.8.1"
+    },
+    {
+      "name": "time",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/time@0.3.53",
+      "type": "library",
+      "version": "0.3.53"
+    },
+    {
+      "name": "time-core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/time-core@0.1.9",
+      "type": "library",
+      "version": "0.1.9"
+    },
+    {
+      "name": "time-macros",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/time-macros@0.2.31",
+      "type": "library",
+      "version": "0.2.31"
+    },
+    {
+      "name": "tinystr",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tinystr@0.8.3",
+      "type": "library",
+      "version": "0.8.3"
+    },
+    {
+      "name": "tinyvec",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tinyvec@1.12.0",
+      "type": "library",
+      "version": "1.12.0"
+    },
+    {
+      "name": "tinyvec_macros",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tinyvec_macros@0.1.1",
+      "type": "library",
+      "version": "0.1.1"
+    },
+    {
+      "name": "tokio",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tokio@1.52.3",
+      "type": "library",
+      "version": "1.52.3"
+    },
+    {
+      "name": "tokio-macros",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tokio-macros@2.7.0",
+      "type": "library",
+      "version": "2.7.0"
+    },
+    {
+      "name": "tokio-util",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tokio-util@0.7.18",
+      "type": "library",
+      "version": "0.7.18"
+    },
+    {
+      "name": "tower",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tower@0.5.3",
+      "type": "library",
+      "version": "0.5.3"
+    },
+    {
+      "name": "tower-layer",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tower-layer@0.3.3",
+      "type": "library",
+      "version": "0.3.3"
+    },
+    {
+      "name": "tower-service",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tower-service@0.3.3",
+      "type": "library",
+      "version": "0.3.3"
+    },
+    {
+      "name": "tracing",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tracing@0.1.44",
+      "type": "library",
+      "version": "0.1.44"
+    },
+    {
+      "name": "tracing-attributes",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tracing-attributes@0.1.31",
+      "type": "library",
+      "version": "0.1.31"
+    },
+    {
+      "name": "tracing-core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/tracing-core@0.1.36",
+      "type": "library",
+      "version": "0.1.36"
+    },
+    {
+      "name": "try-lock",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/try-lock@0.2.5",
+      "type": "library",
+      "version": "0.2.5"
+    },
+    {
+      "name": "typenum",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/typenum@1.20.1",
+      "type": "library",
+      "version": "1.20.1"
+    },
+    {
+      "name": "unicode-ident",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/unicode-ident@1.0.24",
+      "type": "library",
+      "version": "1.0.24"
+    },
+    {
+      "name": "universal-hash",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/universal-hash@0.5.1",
+      "type": "library",
+      "version": "0.5.1"
+    },
+    {
+      "name": "unsigned-varint",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/unsigned-varint@0.7.2",
+      "type": "library",
+      "version": "0.7.2"
+    },
+    {
+      "name": "unsigned-varint",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/unsigned-varint@0.8.0",
+      "type": "library",
+      "version": "0.8.0"
+    },
+    {
+      "name": "untrusted",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/untrusted@0.9.0",
+      "type": "library",
+      "version": "0.9.0"
+    },
+    {
+      "name": "url",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/url@2.5.8",
+      "type": "library",
+      "version": "2.5.8"
+    },
+    {
+      "name": "utf8_iter",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/utf8_iter@1.0.4",
+      "type": "library",
+      "version": "1.0.4"
+    },
+    {
+      "name": "uuid",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/uuid@1.23.4",
+      "type": "library",
+      "version": "1.23.4"
+    },
+    {
+      "name": "vcpkg",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/vcpkg@0.2.15",
+      "type": "library",
+      "version": "0.2.15"
+    },
+    {
+      "name": "version_check",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/version_check@0.9.5",
+      "type": "library",
+      "version": "0.9.5"
+    },
+    {
+      "name": "want",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/want@0.3.1",
+      "type": "library",
+      "version": "0.3.1"
+    },
+    {
+      "name": "wasi",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/wasi@0.11.1+wasi-snapshot-preview1",
+      "type": "library",
+      "version": "0.11.1+wasi-snapshot-preview1"
+    },
+    {
+      "name": "wasip2",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/wasip2@1.0.4+wasi-0.2.12",
+      "type": "library",
+      "version": "1.0.4+wasi-0.2.12"
+    },
+    {
+      "name": "wasm-bindgen",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/wasm-bindgen@0.2.126",
+      "type": "library",
+      "version": "0.2.126"
+    },
+    {
+      "name": "wasm-bindgen-macro",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/wasm-bindgen-macro@0.2.126",
+      "type": "library",
+      "version": "0.2.126"
+    },
+    {
+      "name": "wasm-bindgen-macro-support",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/wasm-bindgen-macro-support@0.2.126",
+      "type": "library",
+      "version": "0.2.126"
+    },
+    {
+      "name": "wasm-bindgen-shared",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/wasm-bindgen-shared@0.2.126",
+      "type": "library",
+      "version": "0.2.126"
+    },
+    {
+      "name": "web-time",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/web-time@1.1.0",
+      "type": "library",
+      "version": "1.1.0"
+    },
+    {
+      "name": "widestring",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/widestring@1.2.1",
+      "type": "library",
+      "version": "1.2.1"
+    },
+    {
+      "name": "winapi",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/winapi@0.3.9",
+      "type": "library",
+      "version": "0.3.9"
+    },
+    {
+      "name": "winapi-i686-pc-windows-gnu",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/winapi-i686-pc-windows-gnu@0.4.0",
+      "type": "library",
+      "version": "0.4.0"
+    },
+    {
+      "name": "winapi-x86_64-pc-windows-gnu",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/winapi-x86_64-pc-windows-gnu@0.4.0",
+      "type": "library",
+      "version": "0.4.0"
+    },
+    {
+      "name": "windows",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows@0.62.2",
+      "type": "library",
+      "version": "0.62.2"
+    },
+    {
+      "name": "windows-collections",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-collections@0.3.2",
+      "type": "library",
+      "version": "0.3.2"
+    },
+    {
+      "name": "windows-core",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-core@0.62.2",
+      "type": "library",
+      "version": "0.62.2"
+    },
+    {
+      "name": "windows-future",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-future@0.3.2",
+      "type": "library",
+      "version": "0.3.2"
+    },
+    {
+      "name": "windows-implement",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-implement@0.60.2",
+      "type": "library",
+      "version": "0.60.2"
+    },
+    {
+      "name": "windows-interface",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-interface@0.59.3",
+      "type": "library",
+      "version": "0.59.3"
+    },
+    {
+      "name": "windows-link",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-link@0.2.1",
+      "type": "library",
+      "version": "0.2.1"
+    },
+    {
+      "name": "windows-numerics",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-numerics@0.3.1",
+      "type": "library",
+      "version": "0.3.1"
+    },
+    {
+      "name": "windows-registry",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-registry@0.6.1",
+      "type": "library",
+      "version": "0.6.1"
+    },
+    {
+      "name": "windows-result",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-result@0.4.1",
+      "type": "library",
+      "version": "0.4.1"
+    },
+    {
+      "name": "windows-strings",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-strings@0.5.1",
+      "type": "library",
+      "version": "0.5.1"
+    },
+    {
+      "name": "windows-sys",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-sys@0.52.0",
+      "type": "library",
+      "version": "0.52.0"
+    },
+    {
+      "name": "windows-sys",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-sys@0.61.2",
+      "type": "library",
+      "version": "0.61.2"
+    },
+    {
+      "name": "windows-targets",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-targets@0.52.6",
+      "type": "library",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows-threading",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows-threading@0.2.1",
+      "type": "library",
+      "version": "0.2.1"
+    },
+    {
+      "name": "windows_aarch64_gnullvm",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows_aarch64_gnullvm@0.52.6",
+      "type": "library",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_aarch64_msvc",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows_aarch64_msvc@0.52.6",
+      "type": "library",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_i686_gnu",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows_i686_gnu@0.52.6",
+      "type": "library",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_i686_gnullvm",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows_i686_gnullvm@0.52.6",
+      "type": "library",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_i686_msvc",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows_i686_msvc@0.52.6",
+      "type": "library",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_x86_64_gnu",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows_x86_64_gnu@0.52.6",
+      "type": "library",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_x86_64_gnullvm",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows_x86_64_gnullvm@0.52.6",
+      "type": "library",
+      "version": "0.52.6"
+    },
+    {
+      "name": "windows_x86_64_msvc",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/windows_x86_64_msvc@0.52.6",
+      "type": "library",
+      "version": "0.52.6"
+    },
+    {
+      "name": "wit-bindgen",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/wit-bindgen@0.57.1",
+      "type": "library",
+      "version": "0.57.1"
+    },
+    {
+      "name": "writeable",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/writeable@0.6.3",
+      "type": "library",
+      "version": "0.6.3"
+    },
+    {
+      "name": "wyz",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/wyz@0.5.1",
+      "type": "library",
+      "version": "0.5.1"
+    },
+    {
+      "name": "x25519-dalek",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/x25519-dalek@2.0.1",
+      "type": "library",
+      "version": "2.0.1"
+    },
+    {
+      "name": "x509-parser",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/x509-parser@0.17.0",
+      "type": "library",
+      "version": "0.17.0"
+    },
+    {
+      "name": "xml-rs",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/xml-rs@0.8.28",
+      "type": "library",
+      "version": "0.8.28"
+    },
+    {
+      "name": "xmltree",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/xmltree@0.10.3",
+      "type": "library",
+      "version": "0.10.3"
+    },
+    {
+      "name": "yasna",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/yasna@0.5.2",
+      "type": "library",
+      "version": "0.5.2"
+    },
+    {
+      "name": "yoke",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/yoke@0.8.3",
+      "type": "library",
+      "version": "0.8.3"
+    },
+    {
+      "name": "yoke-derive",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/yoke-derive@0.8.2",
+      "type": "library",
+      "version": "0.8.2"
+    },
+    {
+      "name": "zerocopy",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/zerocopy@0.8.54",
+      "type": "library",
+      "version": "0.8.54"
+    },
+    {
+      "name": "zerocopy-derive",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/zerocopy-derive@0.8.54",
+      "type": "library",
+      "version": "0.8.54"
+    },
+    {
+      "name": "zerofrom",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/zerofrom@0.1.8",
+      "type": "library",
+      "version": "0.1.8"
+    },
+    {
+      "name": "zerofrom-derive",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/zerofrom-derive@0.1.7",
+      "type": "library",
+      "version": "0.1.7"
+    },
+    {
+      "name": "zeroize",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/zeroize@1.9.0",
+      "type": "library",
+      "version": "1.9.0"
+    },
+    {
+      "name": "zeroize_derive",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/zeroize_derive@1.5.0",
+      "type": "library",
+      "version": "1.5.0"
+    },
+    {
+      "name": "zerotrie",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/zerotrie@0.2.4",
+      "type": "library",
+      "version": "0.2.4"
+    },
+    {
+      "name": "zerovec",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/zerovec@0.11.6",
+      "type": "library",
+      "version": "0.11.6"
+    },
+    {
+      "name": "zerovec-derive",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/zerovec-derive@0.11.3",
+      "type": "library",
+      "version": "0.11.3"
+    },
+    {
+      "name": "zmij",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/zmij@1.0.21",
+      "type": "library",
+      "version": "1.0.21"
+    },
+    {
+      "name": "zstd-sys",
+      "properties": [
+        {
+          "name": "noos:workspace",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:cargo/zstd-sys@2.0.16+zstd.1.5.7",
+      "type": "library",
+      "version": "2.0.16+zstd.1.5.7"
+    }
+  ],
+  "serialNumber": "urn:uuid:2211725a-ea1a-4bce-831e-1c95592c5080",
+  "specVersion": "1.5",
+  "version": 1
+}

@@ -1,0 +1,40 @@
+[package]
+name = "noos-wallet-app"
+version = "0.1.0"
+description = "MindChain Wallet desktop shell over the noos-wallet core"
+edition = "2021"
+rust-version = "1.77.2"
+license = "Apache-2.0"
+publish = false
+
+# Standalone project on purpose: keeps the desktop shell out of the crates/*
+# workspace glob so the consensus gate never couples to GUI dependencies.
+[workspace]
+
+[lib]
+name = "noos_wallet_app"
+
+[dependencies]
+noos-wallet = { path = "../../../crates/noos-wallet" }
+blake3 = "=1.8.5"
+ed25519-dalek = "=2.2.0"
+hex = "=0.4.3"
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+thiserror = "=2.0.18"
+tauri = { version = "2", optional = true }
+
+[build-dependencies]
+tauri-build = { version = "2", optional = true }
+
+[features]
+default = []
+gui = ["dep:tauri", "dep:tauri-build"]
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+arithmetic_side_effects = "warn"

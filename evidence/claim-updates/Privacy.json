@@ -1,0 +1,88 @@
+{
+  "claims": {
+    "P1-S-DUAL-ROOT": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-private-besi"],
+      "command": "python tools/gates/run_privacy_claim.py --claim P1-S-DUAL-ROOT",
+      "rollback_command": "python tools/gates/run_privacy_claim.py --claim P1-S-DUAL-ROOT --rollback-check",
+      "notes": "dual_root.rs: stable ArtifactID=BLAKE3(canonical injective tensor encoding) separated from challenge-keyed WorkCommit; falsifiers reject challenge replay, precomputed work roots under a fresh challenge, shape-ambiguous encodings, and profile/trace substitution. CPU/GPU cross-implementation and 10^9-case power run remain external."
+    },
+    "P2-S-FUSED-AUDIT": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-private-besi"],
+      "command": "python tools/gates/run_privacy_claim.py --claim P2-S-FUSED-AUDIT",
+      "rollback_command": "python tools/gates/run_privacy_claim.py --claim P2-S-FUSED-AUDIT --rollback-check",
+      "notes": "fused_audit.rs: seeded randomized-HD projection audit over private state transitions with chained transcript; falsifiers reject basis-aligned and over-threshold errors, stale seeds (single-use ledger), blockwise-H substitution for the HD profile, and the approximate acceptance never unlocks exact requantization (non-claim in types). Latency/energy cost-advantage evidence remains external."
+    },
+    "P3-S-ALGORITHM-TRANSITION": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-private-besi"],
+      "command": "python tools/gates/run_privacy_claim.py --claim P3-S-ALGORITHM-TRANSITION",
+      "rollback_command": "python tools/gates/run_privacy_claim.py --claim P3-S-ALGORITHM-TRANSITION --rollback-check",
+      "notes": "transition_market.rs: executable cost evidence with mandatory artifact roots, activation only after two independent reproductions within 10%, strictly prospective profiles; falsifiers reject withheld artifacts, single/dependent reproduction, out-of-tolerance measurements, suppression past cheaper reproduced evidence, retroactive credit reinterpretation, and non-cheaper activation; losing artifacts stay archived."
+    },
+    "P4-S-PAID-DELIVERY": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-private-besi"],
+      "command": "python tools/gates/run_privacy_claim.py --claim P4-S-PAID-DELIVERY",
+      "rollback_command": "python tools/gates/run_privacy_claim.py --claim P4-S-PAID-DELIVERY --rollback-check",
+      "notes": "delivery.rs: S-DEMAND bundle predicate binds payment to AAD-bound decryptable delivery matching the output commitment; undecryptable delivery is an explicit typed fault (consistent with noos-commerce UndecryptableDelivery) and never pays; falsifiers cover wash billing, undisclosed rebates, undelivered/substituted output, context rebinding, and settlement replay. Does not prove model quality (non-claim)."
+    },
+    "M-3PC-MALICIOUS": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-private-besi"],
+      "command": "python tools/gates/run_privacy_claim.py --claim M-3PC-MALICIOUS",
+      "rollback_command": "python tools/gates/run_privacy_claim.py --claim M-3PC-MALICIOUS --rollback-check",
+      "notes": "mpc3.rs: deterministic replicated-secret-sharing 3PC over Z2^64 computed in Z2^128 (SPDZ2k-style k=64/s=64) with triple-sacrifice malicious check under a post-commit odd Fiat-Shamir challenge; falsifiers show each cheating party caught with the exact abort class (SacrificeFailed incl. the matched-top-bit Z2^64 killer attack, ShareEquivocation, InputInconsistency) and aborts carry no share material. MP-SPDZ pinned backend, container/ceremony, and the full frozen transformer relation remain external prerequisites; suite stays disabled."
+    },
+    "M-HFHE-SUITE": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-private-besi"],
+      "command": "python tools/gates/run_privacy_claim.py --claim M-HFHE-SUITE",
+      "rollback_command": "python tools/gates/run_privacy_claim.py --claim M-HFHE-SUITE --rollback-check",
+      "notes": "refresh.rs: toy integer-lattice ciphertext with tracked noise and fail-closed decrypt exercises the suite surface, but the claim needs a standard-assumption reduction, exact frozen parameters, an IND-style model, a concrete attack estimate, and two verifiers - none locally provable; row stays PARTIAL and umbra_suite_enabled[hfhe]=false."
+    },
+    "M-PROOF-CARRYING-REFRESH": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-private-besi"],
+      "command": "python tools/gates/run_privacy_claim.py --claim M-PROOF-CARRYING-REFRESH",
+      "rollback_command": "python tools/gates/run_privacy_claim.py --claim M-PROOF-CARRYING-REFRESH --rollback-check",
+      "notes": "refresh.rs: proof-carrying refresh skeleton - every refresh emits a proof binding suite, both key epochs, rights root, both ciphertext commitments, and a plaintext-continuity digest; missing/forged/substituted proofs reject and retired epoch keys cannot open refreshed state. The continuity tag is a symmetric audit-key stand-in for the required complete zero-knowledge prover and second verifier, so the row stays PARTIAL."
+    },
+    "M-PRIVACY-DEPTH": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-private-besi"],
+      "command": "python tools/gates/run_privacy_claim.py --claim M-PRIVACY-DEPTH",
+      "rollback_command": "python tools/gates/run_privacy_claim.py --claim M-PRIVACY-DEPTH --rollback-check",
+      "notes": "depth.rs: published depth/noise budget predicts measured noise of real refresh-skeleton ciphertext ops within factor two (exact on the corpus), monotone risk bands whose Fail band coincides with the fail-closed decrypt, monotone evaluation/refresh pricing; falsifiers reject under-declared budgets (metric gaming) and hidden composition steps. External attack-cost calibration (E-HFHE-01) remains external."
+    },
+    "A-UMBRA-BASE": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-umbra"],
+      "command": "python tools/gates/run_privacy_claim.py --claim A-UMBRA-BASE",
+      "rollback_command": "python tools/gates/run_privacy_claim.py --claim A-UMBRA-BASE --rollback-check",
+      "notes": "lib.rs + stealth.rs: commitments/nullifiers with atomic double-claim rejection and two-verifier agreement (existing), plus X25519 stealth envelopes with one-byte view-tag scanner-DoS prefilter; falsifiers show no universal viewing path, tamper/substitution rejection, and per-ephemeral unlinkability. Suite-leakage budget measurement remains external."
+    },
+    "A-UMBRA-HIDDEN": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-umbra"],
+      "command": "python tools/gates/run_privacy_claim.py --claim A-UMBRA-HIDDEN",
+      "rollback_command": "python tools/gates/run_privacy_claim.py --claim A-UMBRA-HIDDEN --rollback-check",
+      "notes": "hidden.rs: epoch-scoped PRF access tags conceal read/write sets while proving nonconflict; overlap always collides so false nonconflict is impossible for sealed footprints, wire-forged tags fail the keyed binding, conflicts return a typed serialize requirement, tags unlink across epochs. Sealing-completeness ZK relation and AUC/MI leakage measurement (E-UMBRA-01) remain external."
+    },
+    "M-FIBER": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-umbra"],
+      "command": "python tools/gates/run_privacy_claim.py --claim M-FIBER",
+      "rollback_command": "python tools/gates/run_privacy_claim.py --claim M-FIBER --rollback-check",
+      "notes": "fiber_dag.rs: transition certificates bind ciphertext root, causal root, key epoch, rights root, privacy budget, and exactly one certified successor; falsifiers reject dual heads, unbound-successor forgeries, lineage substitution, and causal omission; commutation claims are valid only to the same certified successor, else MustSerialize; closure matches the reference graph."
+    },
+    "M-BRANCH": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-umbra"],
+      "command": "python tools/gates/run_privacy_claim.py --claim M-BRANCH",
+      "rollback_command": "python tools/gates/run_privacy_claim.py --claim M-BRANCH --rollback-check",
+      "notes": "branch.rs: N_F=PRF_sk(domain,chainID,C_parent,u_F) with exactly-once right consumption binding one family root and at-most-once separately authorized branch activation; falsifiers reject u_F reuse, root substitution, cross-chain replay (chain-bound PRF), second activation, and branch-substituted authorization. Proves neither privacy, quality, nor that activation occurs (non-claims)."
+    }
+  }
+}

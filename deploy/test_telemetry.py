@@ -5,7 +5,7 @@ from telemetry import emit, load_contract, parse_sample
 class TelemetryFixtures(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        contract=load_contract(Path("../protocol/telemetry/telemetry-v1.yaml")); cls.metric=next(m for m in contract["metrics"] if m["name"]=="noos_p2p_peers")
+        contract=load_contract(Path(__file__).resolve().parents[1]/"protocol/telemetry/telemetry-v1.yaml"); cls.metric=next(m for m in contract["metrics"] if m["name"]=="noos_p2p_peers")
     def test_emitter_parser_numeric(self):
         line=emit("noos_p2p_peers",4,{"direction":"inbound"},100_000)
         self.assertEqual(parse_sample(line,self.metric,now_seconds=101).value,4)

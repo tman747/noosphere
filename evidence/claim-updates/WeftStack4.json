@@ -1,0 +1,60 @@
+{
+  "claims": {
+    "E-WEFT-01": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-weft-syntax", "noos-weft-compile", "noos-weftc"],
+      "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-01",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-01 --rollback-check",
+      "notes": "Elaboration faithfulness mechanized end to end: independently authored Rust (noos-weftc) and Go (go/weftref) elaborators produce byte-identical source_root/grain_formula_hex/formula_id over the release corpus plus generated units, and reject the invalid corpus with identical diagnostic classes (tools/gates/differential_weft.py --cases 4096 PASS, isolated builds, digest dfe5092e...8883). In-crate half: compiled formulas executed through noos_grain::eval match an independent AST-semantics reference evaluator on values/traps/charge across corpus + 4096 generated cases, elaboration is deterministic and layout/comment-invariant, malformed classes stable (noos-weft-compile tests/e_weft_01.rs). External gap: the frozen ch04 statistical power (10^7 generated units on the frozen release corpus, both production Grain interpreters) needs the unresolved production experiment owner; kill language (one divergence quarantines the compiler) is exercised at lab scale only."
+    },
+    "E-WEFT-02": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-weft-syntax", "noos-weft-compile"],
+      "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-02",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-02 --rollback-check",
+      "notes": "Cost-certificate soundness mechanized: every unit carries an exact-shape static charge bound (derived_constant) and each test case runs under a meter set to exactly that bound — zero overruns across the adversarial input corpus including u64 maxima (tests/e_weft_02.rs zero_meter_overruns_across_adversarial_corpus). Tightness gate: >=95% of the working corpus within 10x slack (floor 0.10, median >= 0.25). Declared polynomials are never trusted (E-COST-001 on underrun). Recurrence/totality checker: E-TOT-001/E-TOT-002 reject unproven recursion; mutual cycles get derived_constant=0 with declared-bound governance and the Grain step-metering backstop proven trap-exact (MeterExhausted at spent==limit). Inference budget frozen at the 4096 literal-add unroll (E-LOWER-003 above it). External gap: the 10^7 adversarial-evaluation campaign and preregistered compile-budget study."
+    },
+    "E-WEFT-03": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-weft-compile"],
+      "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-03",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-03 --rollback-check",
+      "notes": "Extended this session to the full 32^3 Freivalds span relation: freivalds_span_check verifies C*w == A*(B*w) exactly over i128 in O(n^2), and admit_span_certificate_freivalds is a second admission path that binds the claimed transcript (requant consistency, commitment, output hashes, projections) without re-running the GEMM. All seven tamper/transplant/splice gates reject on BOTH admission paths at 32^3 (C32 tamper, C8 tamper, input tamper, payout transplant, projection splice, challenge splice, soundness downgrade — tests/e_weft_03.rs gates 1-7). The load-bearing falsifier: a fully self-consistent forged transcript over a wrong product passes every binding check and dies exactly on CertificateError::Relation. Roots byte-identical across independent derivations; verifier scaling exponent log2(ops64/ops32) = 2.0 in the preregistered [1.9,2.1]; deterministic op census frozen (6144 MACs at 32^3). Profile typing (@W8A8v1 accepted into the meaning contract; E-PROFILE-002/003/004 rejections; requant parameter law) covered. External gap, keeps this PARTIAL: the RISC Zero derived-guest vs hand-built kt-ladder run-27 comparison (cycle envelope <= 1.15 x 61,175 at 32^3, 64^3 scaling on real guests) needs the external zkVM toolchain and the unresolved experiment owner."
+    },
+    "E-WEFT-04": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-weft-syntax", "noos-weft-compile"],
+      "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-04",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-04 --rollback-check",
+      "notes": "FOUND AND FIXED a genuine kill-condition hole this session: both the Rust and Go checkers admitted a well-typed double use through let ('let a = consume(x); consume(x)') because the Let rule merged used-sets without a disjointness check. Fixed identically in noos-weft-syntax infer() and go/weftref (E-LIN-002), and the falsifier is now pinned in the differential gate's invalid corpus. Full rejection corpus stable across runs (E-LIN-001 drop/stranded-let, E-LIN-002 tuple/let/arg double use, E-LIN-003 branch skew, E-LIN-004 consume of non-lin); spend/escrow/saga patterns expressible; 2000-case seeded structural fuzz accepts iff exactly-once on every path; trap atomicity proven (under-metered spend traps with spent==limit and yields no value). External gap: the 10^7 accepted-fuzzed-elaboration campaign with live nullifier reveals."
+    },
+    "E-WEFT-05": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-weft-syntax", "noos-weft-compile"],
+      "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-05",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-05 --rollback-check",
+      "notes": "Type-level commit-then-beacon gate proven: the grind corpus is 100% ill-typed (direct uncommitted preimage, let/tuple/branch wrapper laundering all E-EFFECT-002; undeclared beacon effect E-EFFECT-001; re-committing beacon output under its own index unrepresentable, E-TYPE-002), while the required verifier pattern (Committed<u64,h> -> Rand256<h> under {beacon}) compiles and reports its effect row in the meaning contract (tests/e_weft_05.rs). PARTIAL because the claim's evidence instrument — taint analysis over 10^6 accepted elaborations covering jets, traps, serialization, and dream re-entry — is a separate analyzer that does not exist locally; only the type gate it would audit is implemented."
+    },
+    "E-WEFT-06": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-weft-compile", "noos-weft-check"],
+      "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-06",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-06 --rollback-check",
+      "notes": "Local discovery mechanics proven: a bounded differential challenger finds the planted boundary-input jet divergence at trial 255 of a 4096 window (median far below window), re-verifies the witness before any slash, records zero false flags against a semantically equivalent jet over the full sweep, and certificates bind exact formula ids so honest certificates cannot be transplanted onto divergent implementations (tests/e_weft_06.rs). The v0 JetCertificateV0 lifecycle object (Proposed/Challengeable/Admitted/Quarantined/Revoked, bond field, corpus root) is implemented and checked in noos-weft-check. PARTIAL because the claim is an economic game: bonded challenges, at least two independent profitable challengers, bond griefing/wash-trade resistance, and appeal flow need a live market and E-JET-01, which cannot run locally."
+    },
+    "E-WEFT-07": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-weft-syntax", "noos-weft-compile"],
+      "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-07",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-07 --rollback-check",
+      "notes": "Typed rights rows are decidable and exact on the frozen mini-corpus: row inference terminates, unions across parameters/returns/nested carriers deterministically into the meaning contract, revoking an annotation shrinks the closure with no resurrection (zero under/over-approximation on the lab corpus), and declassification without the Disclose right is stably ill-typed (E-RIGHT-002) while the Disclose pattern stays expressible (tests/e_weft_07.rs). PARTIAL and honestly [DREAM]-labeled: the claim requires a frozen production transform corpus, pathological-lattice/revocation-storm studies, typed-vs-ledgered repair closure comparison, and the preregistered annotation-burden ceiling — all external."
+    },
+    "E-WEFT-08": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-weft-check"],
+      "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-08",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-08 --rollback-check",
+      "notes": "The v0 half is fully mechanized: every release-corpus unit elaborated by the full compiler is expressible as an admitted CostCertificateV0 (100% local coverage census), and the checker has no false accepts — a bound one step below the actual trial charge rejects with CertChargeExceedsBound (the universal kill), formula/id binding is enforced (CertFormulaHashMismatch), and mock-verifier probes reject with distinct stable codes (noos-weft-check tests/e_weft_08.rs plus the crate's own vector suite). Local census supports the null hypothesis (v0 covers the current stream), which under the frozen kill language keeps the full language in research — it never kills Grain/v0. PARTIAL because the deciding instrument is two consecutive quarters of production admission telemetry, audit-cost accounting, and incident-class attribution, which only the live network can produce."
+    }
+  }
+}

@@ -1,0 +1,1 @@
+fn keep<m: Size, k: Size>(x: Tensor<i8, [m, k], @W8A8v1>) -> Tensor<i8, [m, k], @W8A8v1> ! {} cost 32 dec 0 { x }

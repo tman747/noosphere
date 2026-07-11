@@ -1,0 +1,1 @@
+fn select(c: Bool, x: u64, y: u64) -> u64 ! {} cost 64 dec 0 { if c { x } else { y } }

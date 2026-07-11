@@ -15,6 +15,15 @@ use sha2::Sha256;
 use std::collections::BTreeSet;
 use x25519_dalek::{PublicKey, StaticSecret};
 
+pub mod delivery;
+pub mod depth;
+pub mod dual_root;
+pub mod fused_audit;
+pub mod mpc3;
+pub mod refresh;
+pub mod transformer;
+pub mod transition_market;
+
 pub const PRIVACY_PROFILE: &str = "P3_DEEP_SEALED";
 pub const EXECUTION_MODE: &str = "BESI_SPLIT_PROTOTYPE";
 pub const ASSURANCE: &str = "ASSURED_SPLIT";

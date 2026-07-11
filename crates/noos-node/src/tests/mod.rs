@@ -8,9 +8,12 @@
 
 mod util;
 
+mod contract_exec;
+mod devnet_finality;
 mod e2e;
 mod import_matrix;
 mod mempool_tests;
+mod network_e2e;
 mod retention;
 mod rpc_supervisor;
 mod safety;

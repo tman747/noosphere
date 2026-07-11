@@ -1,0 +1,23 @@
+[package]
+name = "noos-workerd"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Deterministic worker daemon: hearth job routing and custody admission, NEL verifier self-audit, domain-separated signed receipts, line-oriented telemetry bound to the frozen telemetry-v1 families."
+
+[[bin]]
+name = "noos-workerd"
+path = "src/main.rs"
+
+[dependencies]
+noos-crypto = { path = "../noos-crypto" }
+noos-hearth = { path = "../noos-hearth" }
+noos-nel = { path = "../noos-nel" }
+
+[dev-dependencies]
+serde_json = "=1.0.150"
+
+[lints]
+workspace = true

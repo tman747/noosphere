@@ -1,0 +1,69 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-loam"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-loam"
+        ]
+      },
+      "name": "admitted transform repair contracts and NON_REPAIRABLE rejection",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-LIFECYCLE": "6556fe66b753e8dd2e0580a972eceada893e587f5d72b7eafc3461110bf81d40",
+    "S-LOAM": "b6caa8172d0f808926634043a30c12508a8c2674c576b611a80d970742459c6e",
+    "S-LOAM-BASE": "08c360db00ea811842c6db0af70c951f331f3fe23ce556394847ff8a518f6dec"
+  },
+  "claims": [
+    "S-LIFECYCLE",
+    "S-LOAM",
+    "S-LOAM-BASE"
+  ],
+  "command": [
+    "tools/gates/run_loam_repair.py",
+    "--all-admitted-transforms"
+  ],
+  "evidence_sha256": "d78d7b6851bcd860a3610fa482e0aa1efb0a3d09c55d9950e1a0fd24ffc53a3e",
+  "expected_result": "PASSED",
+  "gate": "loam-repair",
+  "limitations": [],
+  "registry_schema_version": "1.2.0",
+  "result": "PASSED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-loam/Cargo.toml": "104e63c72cdfbe8e39c988576b7a8013d55393e419e3d9a66681b4aea0b27b25",
+    "crates/noos-loam/src/lib.rs": "23fe2f97004c257ecea47fccc7f3c865a4cd0b00d7324b46cdde87af2ac82d65"
+  }
+}

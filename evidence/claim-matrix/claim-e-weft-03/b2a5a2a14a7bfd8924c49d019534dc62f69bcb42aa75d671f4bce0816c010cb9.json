@@ -1,0 +1,60 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "enabled": false,
+      "lifecycle": "ACTIVE",
+      "name": "registered disposition",
+      "passed": true,
+      "registry_result": "PARTIAL"
+    }
+  ],
+  "claim_fingerprints": {
+    "E-WEFT-03": "cc2a3202a0cbb1cac8057e560ed5d550f398706009b31dede2686a285b76f5ac"
+  },
+  "claims": [
+    "E-WEFT-03"
+  ],
+  "command": [
+    "tools/gates/reproduce_claim.py",
+    "--claim",
+    "E-WEFT-03",
+    "--expected-result",
+    "DISABLED"
+  ],
+  "evidence_sha256": "b2a5a2a14a7bfd8924c49d019534dc62f69bcb42aa75d671f4bce0816c010cb9",
+  "expected_result": "DISABLED",
+  "gate": "claim-e-weft-03",
+  "limitations": [
+    "Disposition reproduction does not promote the mechanism."
+  ],
+  "registry_schema_version": "1.1.0",
+  "result": "DISABLED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "protocol/claims/registry.schema.json": "e99f4310b1fe2fbe9ff555f89f437ad8495360a800360cfd5a0e179d656ab24e",
+    "protocol/spec/constants-v1.toml": "d1575f8f50a58648762f91555c3267deddefab0556fae63e5921c57e8a486258"
+  }
+}

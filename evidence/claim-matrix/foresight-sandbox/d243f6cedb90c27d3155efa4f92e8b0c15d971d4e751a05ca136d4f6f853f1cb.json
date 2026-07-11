@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "controls": [
+        "dream_lane_enabled"
+      ],
+      "name": "activation controls remain off",
+      "passed": true
+    },
+    {
+      "detail": "sealed branch is private, payout-free, non-authoritative, and cannot reopen killed dream market",
+      "name": "authority and payout boundary",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-DREAM-02": "5baeb74be3d15e6e71b9c1d3147a571213833faf39ad86725c3ab4ff5f270a12",
+    "S-DREAM": "4eb6681db01d28383824f9bac63413a1b14bf04cd36b616b25ca3b98c7cbe0e1",
+    "S-DREAM-LANE": "a16c3c253dd072c3e9eb607536b470872e211ffd4a44905d84b6dabf8fae689f"
+  },
+  "claims": [
+    "E-DREAM-02",
+    "S-DREAM",
+    "S-DREAM-LANE"
+  ],
+  "command": [
+    "tools/gates/run_foresight_sandbox.py",
+    "--causally-insulated",
+    "--payout",
+    "0"
+  ],
+  "evidence_sha256": "d243f6cedb90c27d3155efa4f92e8b0c15d971d4e751a05ca136d4f6f853f1cb",
+  "expected_result": "DISABLED",
+  "gate": "foresight-sandbox",
+  "limitations": [
+    "No public duration or causal-insulation trial pass is claimed."
+  ],
+  "registry_schema_version": "1.1.0",
+  "result": "DISABLED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "protocol/claims/registry.schema.json": "e99f4310b1fe2fbe9ff555f89f437ad8495360a800360cfd5a0e179d656ab24e",
+    "protocol/spec/constants-v1.toml": "d1575f8f50a58648762f91555c3267deddefab0556fae63e5921c57e8a486258"
+  }
+}

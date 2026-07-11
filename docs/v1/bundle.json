@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "bundle_version": "v1",
+  "protocol_version": "v1",
+  "api_version": "v1",
+  "release_version": "0.0.0-preproduction",
+  "chain_id": "OWNER_BLOCKED",
+  "genesis_hash": "OWNER_BLOCKED",
+  "parameter_manifest_hash": "OWNER_BLOCKED",
+  "status": "PREPRODUCTION_OWNER_BLOCKED",
+  "binding_rule": "A production publication MUST replace every OWNER_BLOCKED chain value with the exact signed release-manifest value and rerun tools/gates/check_docs.py.",
+  "pages": [
+    "index.md",
+    "protocol-and-registries.md",
+    "security-and-economics.md",
+    "governance-and-lifecycle.md",
+    "node-and-key-operations.md",
+    "developer-guides.md",
+    "assurance-disclosures.md",
+    "interfaces-and-explorer.md",
+    "build-and-operations.md",
+    "migration-and-evidence.md"
+  ]
+}

@@ -1,0 +1,2 @@
+fn inc(x: u64) -> u64 ! {} cost 32 dec 0 { x + 1 }
+fn twice(x: u64) -> u64 ! {} cost 128 dec 0 { inc(inc(x)) }

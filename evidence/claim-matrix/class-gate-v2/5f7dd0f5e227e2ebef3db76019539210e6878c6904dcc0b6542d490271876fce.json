@@ -1,0 +1,104 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "4872e6b98255cfecf5aea94bd7c526e3c8987c26673906cb624d918e9017905b",
+      "evidence/base-base-transfer-contract.json": "d120db9e228cec6a99b828dd919a0e1c7daaae8e7c6470c6513a3eb552c3e20d",
+      "evidence/base-crash-matrix.json": "62b45c91fb123ba3e9e016a776f218a222cfda097686d8fe131aa70f53c02c59"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "controls": [
+        "class_gate_irreversible_budget"
+      ],
+      "name": "activation controls remain off",
+      "passed": true
+    },
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-agent-class",
+          "-p",
+          "noos-contracts"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-agent-class",
+          "noos-contracts"
+        ]
+      },
+      "name": "v2 laundering, foreign-receipt, budget crossing, reorg and revocation tests",
+      "passed": true
+    },
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-agent-class",
+          "-p",
+          "noos-contracts"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-agent-class",
+          "noos-contracts"
+        ]
+      },
+      "name": "action router: gate-only effects, monotone budget, mid-flight revocation, bypass fails closed",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-CLASS-GATE.v2": "59300a5a98a5e70934432620a91c92e40515b4cdd60454160c77584781ec1db5",
+    "I-AGENT": "30dc555c8e6f400cf61e3a489b9f74a4744ddcc810f767e0966feb14e9f75df5"
+  },
+  "claims": [
+    "A-CLASS-GATE.v2",
+    "I-AGENT"
+  ],
+  "command": [
+    "tools/gates/run_class_gate.py",
+    "--version",
+    "2",
+    "--irreversible-budget",
+    "0",
+    "--reorg-revocation-matrix"
+  ],
+  "evidence_sha256": "5f7dd0f5e227e2ebef3db76019539210e6878c6904dcc0b6542d490271876fce",
+  "expected_result": "PASSED",
+  "gate": "class-gate-v2",
+  "limitations": [],
+  "registry_schema_version": "1.2.0",
+  "result": "PASSED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-agent-class/Cargo.toml": "2ddcb38e7a47ae5603301d92cc97707aaaaca359f91cf9f81b87c1b5498b8579",
+    "crates/noos-agent-class/src/lib.rs": "d84f94d91c49b6f9cf833782a6842543927ac942262aa9324e1d8a743637f695",
+    "crates/noos-contracts/Cargo.toml": "01f0291a29c707a91ba613280b853922bb90ed3ea44a2b0564b11b8d182f9ed4",
+    "crates/noos-contracts/src/router.rs": "020a7aa0fd05a086836535bca6cfbada551b20dd27bbe2ca03b441065b01c9a8",
+    "protocol/spec/constants-v1.toml": "d1575f8f50a58648762f91555c3267deddefab0556fae63e5921c57e8a486258"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-contracts",
+          "-p",
+          "noos-lumen"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-contracts",
+          "noos-lumen"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-GOVERNANCE": "2380c97f4d9d63f706500a5d70e1fcbed6e868a797c1417fb7afce47da0db404"
+  },
+  "claims": [
+    "A-GOVERNANCE"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-GOVERNANCE"
+  ],
+  "evidence_sha256": "e61b37edc27582cd674279e429c26bdf9b8c87bdad825836b333cded3720fb13",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-governance",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-contracts/Cargo.toml": "2fcd7cf8381db2549c627770f3b6295e723672b7ba057d44aae5e4700bd3140a",
+    "crates/noos-contracts/src/lib.rs": "d7031d5ed252fc01e39983b74039469d3a227a37b7d377a1ce21b416d7f08b1b",
+    "crates/noos-lumen/Cargo.toml": "7d061b1df025ddf95b12fadab77173bfa031a2476400d6bda981ff3771e9053d",
+    "crates/noos-lumen/src/lib.rs": "f375af4869113ab821c51e082010d3a39996c8b64563fc35b639f12e6f0cae66"
+  }
+}

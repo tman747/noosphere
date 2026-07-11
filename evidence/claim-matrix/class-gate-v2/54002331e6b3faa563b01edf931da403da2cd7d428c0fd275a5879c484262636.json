@@ -1,0 +1,81 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "10fb6b92fb548e6760237769e5e0374e1d81a5e001bea808918a2c507b0e6611",
+      "evidence/base-base-transfer-contract.json": "4732560ee4f80d982af6442590e2d34b444593cc115114682bb12ef324cdc217",
+      "evidence/base-crash-matrix.json": "80890b604ba4a0dd47a0e28967031287476f405d22e300fcd59a76fd65a9e1bc"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "controls": [
+        "class_gate_irreversible_budget"
+      ],
+      "name": "activation controls remain off",
+      "passed": true
+    },
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-agent-class"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-agent-class"
+        ]
+      },
+      "name": "v2 laundering, foreign-receipt, budget crossing, reorg and revocation tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-CLASS-GATE.v1": "bb67ef8eb3bc6b54274137b2f0826d6ab0975a46a61a43d7093a754563224c36",
+    "A-CLASS-GATE.v2": "142e187306367a2939e2e8b0b91d0d4869fac7f8111be323a56972dc1439e4b4",
+    "I-AGENT": "f1e7b5908a9b49663a62d36e5a2e6bd108f8f414c56dd4a910584d76fe3206a4"
+  },
+  "claims": [
+    "A-CLASS-GATE.v1",
+    "A-CLASS-GATE.v2",
+    "I-AGENT"
+  ],
+  "command": [
+    "tools/gates/run_class_gate.py",
+    "--version",
+    "2",
+    "--irreversible-budget",
+    "0",
+    "--reorg-revocation-matrix"
+  ],
+  "evidence_sha256": "54002331e6b3faa563b01edf931da403da2cd7d428c0fd275a5879c484262636",
+  "expected_result": "PASSED",
+  "gate": "class-gate-v2",
+  "limitations": [],
+  "registry_schema_version": "1.1.0",
+  "result": "PASSED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-agent-class/Cargo.toml": "2ddcb38e7a47ae5603301d92cc97707aaaaca359f91cf9f81b87c1b5498b8579",
+    "crates/noos-agent-class/src/lib.rs": "c4639302b5f035985b39082d60a4e76425b0f9a4c100ba65f49877afae9832df",
+    "protocol/spec/constants-v1.toml": "d1575f8f50a58648762f91555c3267deddefab0556fae63e5921c57e8a486258"
+  }
+}

@@ -485,6 +485,94 @@ fn opcode_12_never_interprets() {
 }
 
 #[test]
+fn opcode_12_atom_arg_is_still_unknown_opcode_in_production() {
+    // Production rejects 12 BEFORE any shape validation: even a malformed
+    // (atom) argument yields UNKNOWN_OPCODE, never TYPE_MISMATCH.
+    let mut meter = Meter::new(1000, 1000);
+    let r = eval(1, a(0), c2(a(12), a(0)), &mut meter);
+    assert_eq!(r, Err(GrainTrap::UnknownOpcode));
+    assert_eq!(meter.spent(), 0);
+}
+
+/// Hook that always declines: `[12 id f]` must erase to `f` exactly.
+struct Decline;
+impl crate::JetHook for Decline {
+    fn dispatch(
+        &self,
+        _id: &Noun,
+        _s: &Noun,
+        _f: &Noun,
+        _meter: &mut Meter,
+    ) -> Option<Result<Noun, GrainTrap>> {
+        None
+    }
+}
+
+/// Hook that fires only for id 7 / formula `[1 42]`, mirroring the exact
+/// interpreter triple of that formula (charge COST_QUOTE, return the arg).
+struct QuoteJet;
+impl crate::JetHook for QuoteJet {
+    fn dispatch(
+        &self,
+        id: &Noun,
+        _s: &Noun,
+        f: &Noun,
+        meter: &mut Meter,
+    ) -> Option<Result<Noun, GrainTrap>> {
+        if id != &a(7) || f != &c2(a(1), a(42)) {
+            return None;
+        }
+        Some(match meter.charge(crate::COST_QUOTE) {
+            Ok(()) => Ok(a(42)),
+            Err(t) => Err(t),
+        })
+    }
+}
+
+#[test]
+fn jet_hook_erasure_law_declining_hook_interprets_f_exactly() {
+    // [12 id f] under a declining hook == plain eval of f: identical value,
+    // charge, and arena, across a value case and a trap case.
+    let f = c2(a(4), c2(a(0), a(1))); // inc subject
+    let hinted = c2(a(12), c2(a(99), f.clone()));
+    for subject in [a(5), c2(a(1), a(2))] {
+        let mut m1 = Meter::new(1000, 1000);
+        let plain = eval(1, subject.clone(), f.clone(), &mut m1);
+        let mut m2 = Meter::new(1000, 1000);
+        let jetted = crate::eval_with_jets(1, subject, hinted.clone(), &mut m2, &Decline);
+        assert_eq!(plain, jetted);
+        assert_eq!(m1.spent(), m2.spent());
+        assert_eq!(m1.arena_used(), m2.arena_used());
+    }
+}
+
+#[test]
+fn jet_hook_firing_reproduces_the_exact_triple() {
+    let f = c2(a(1), a(42));
+    let hinted = c2(a(12), c2(a(7), f.clone()));
+    let mut m1 = Meter::new(1000, 1000);
+    let plain = eval(1, a(0), f, &mut m1);
+    let mut m2 = Meter::new(1000, 1000);
+    let jetted = crate::eval_with_jets(1, a(0), hinted, &mut m2, &QuoteJet);
+    assert_eq!(plain, jetted);
+    assert_eq!(jetted, Ok(a(42)));
+    assert_eq!(m1.spent(), m2.spent());
+    assert_eq!(m1.arena_used(), m2.arena_used());
+}
+
+#[test]
+fn jet_hook_mode_still_rejects_opcode_13_and_atom_arg_shape() {
+    // Ops beyond 12 stay UNKNOWN_OPCODE even with a hook; a malformed
+    // [12 . atom] argument is TYPE_MISMATCH in hook mode (spec op-11 law).
+    let mut m = Meter::new(1000, 1000);
+    let r = crate::eval_with_jets(1, a(0), c2(a(13), c2(a(1), a(0))), &mut m, &Decline);
+    assert_eq!(r, Err(GrainTrap::UnknownOpcode));
+    let mut m = Meter::new(1000, 1000);
+    let r = crate::eval_with_jets(1, a(0), c2(a(12), a(0)), &mut m, &Decline);
+    assert_eq!(r, Err(GrainTrap::TypeMismatch));
+}
+
+#[test]
 fn deep_noun_teardown_does_not_recurse() {
     // A right-nested list far deeper than any safe recursion depth.
     let mut n = a(0);

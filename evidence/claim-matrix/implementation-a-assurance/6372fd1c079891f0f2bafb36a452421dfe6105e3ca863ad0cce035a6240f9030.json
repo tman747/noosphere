@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-witness"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-witness"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-ASSURANCE": "f818dcde58814674238ecd8ec95c600ba6d08de6f39809a9f649ca19b5daa904"
+  },
+  "claims": [
+    "A-ASSURANCE"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-ASSURANCE"
+  ],
+  "evidence_sha256": "6372fd1c079891f0f2bafb36a452421dfe6105e3ca863ad0cce035a6240f9030",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-assurance",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-witness/Cargo.toml": "33b29402a6721318400be656256a86864f45dd35e5966067a3a4f37568140474",
+    "crates/noos-witness/src/lib.rs": "5329996ed160e79c90fddca09bbf44a683b8af44f41a06b34e0a339de46bff93"
+  }
+}

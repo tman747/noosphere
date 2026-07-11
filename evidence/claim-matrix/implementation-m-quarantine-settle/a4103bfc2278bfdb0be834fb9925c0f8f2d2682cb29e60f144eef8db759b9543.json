@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-training"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-training"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-QUARANTINE-SETTLE": "3f3a995bf8ba0b8a421267ccf3c1a3a52681f205961de790f747688024be5d70"
+  },
+  "claims": [
+    "M-QUARANTINE-SETTLE"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "M-QUARANTINE-SETTLE"
+  ],
+  "evidence_sha256": "a4103bfc2278bfdb0be834fb9925c0f8f2d2682cb29e60f144eef8db759b9543",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-m-quarantine-settle",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-training/Cargo.toml": "edfcafaf40f74e6478ab052fc08d6714d48cda11538d9f48f64dcacca22800ce",
+    "crates/noos-training/src/lib.rs": "69c469abb21225ef4c64e5dd26fb2b6648466c3aa38288eb2709427f3dfb14b3"
+  }
+}

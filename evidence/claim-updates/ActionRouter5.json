@@ -1,0 +1,11 @@
+{
+  "claims": {
+    "I-AGENT": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-agent-class", "noos-contracts"],
+      "command": "python tools/gates/run_class_gate.py --version 2 --irreversible-budget 0 --reorg-revocation-matrix",
+      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "notes": "Application action router landed: noos-contracts router.rs routes typed ActionEnvelopes (untrusted Proposal + ClassGateRequest + contract call) to ContractHost effects ONLY through both gates - pure class gate first (finality/attestation axes, provenance meet, monotone budget; a denial spends nothing), then the agent Firewall (scope, replay, monotone grant budget, revocation), yielding a single-use privately-constructed RouteTicket; dispatch re-checks grant revocation (new fail-closed Firewall::is_revoked, unknown grant reads revoked) and class revocation epoch so mid-flight revocation rejects with zero host effects. Falsifiers green (router::tests, 6): monotone grant+class budget consumption with denied-route-spends-nothing exhaustion, grant revocation mid-flight, class epoch race mid-flight, foreign-finality receipt rejected before any spend, forged and replayed tickets fail closed as Bypass with host state untouched, and hostile model text cannot mint an effect (unknown grant, out-of-schema action, retargeted callee all denied; the one effect path carries the text digest as provenance only). Gate class-gate-v2 re-emitted PASSED covering both crates (evidence/claim-matrix/class-gate-v2/b983ca3a19c3fd91....json). Row stays PARTIAL: I-AGENT is the four-component composition claim and the composed four-attack drill (clone-farm reputation, cross-job resource reuse, key-rotation identity theft, mandate replay simultaneously over M-LINEAGE-QUORUM + M-QUARANTINE-SETTLE fixtures) has not run; named production experiment owner remains OWNER_BLOCKED."
+    }
+  }
+}

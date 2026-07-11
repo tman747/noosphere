@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:noos:promotion-blockers:v1",
+  "title": "NOOSPHERE immutable staged-promotion blocker ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "ledger_policy", "protocol_binding", "cutover", "gates", "owner_decisions", "external_blockers"],
+  "properties": {
+    "$schema": {"const": "promotion-blockers-schema-v1.json"},
+    "schema_version": {"const": 1},
+    "ledger_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["append_only", "no_waivers", "no_fabricated_evidence", "promotion_order"],
+      "properties": {
+        "append_only": {"const": true}, "no_waivers": {"const": true}, "no_fabricated_evidence": {"const": true},
+        "promotion_order": {"const": ["G0", "G1", "G2", "G3", "GENESIS", "G4", "G5"]}
+      }
+    },
+    "protocol_binding": {"$ref": "#/$defs/binding"},
+    "cutover": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dns_cutover", "execution_authority", "prepared_manifest", "rollback_target"],
+      "properties": {
+        "dns_cutover": {"const": "PROHIBITED"},
+        "execution_authority": {"const": "SIGNED_G5_ONLY"},
+        "prepared_manifest": {"type": "string", "minLength": 1},
+        "rollback_target": {"enum": ["OWNER_BLOCKED_STATIC_MAINTENANCE", "SIGNED_STATIC_MAINTENANCE", "SIGNED_LAST_KNOWN_GOOD_NOOSPHERE"]}
+      }
+    },
+    "gates": {"type": "array", "minItems": 7, "maxItems": 7, "items": {"$ref": "#/$defs/gate"}},
+    "owner_decisions": {"type": "array", "items": {"$ref": "#/$defs/blocker"}},
+    "external_blockers": {"type": "array", "items": {"$ref": "#/$defs/blocker"}}
+  },
+  "$defs": {
+    "binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["protocol_version", "api_version", "release_version", "revision", "chain_id", "genesis_hash"],
+      "properties": {
+        "protocol_version": {"const": "v1"}, "api_version": {"const": "v1"},
+        "release_version": {"type": "string", "minLength": 1},
+        "revision": {"type": "string", "minLength": 1},
+        "chain_id": {"type": "string", "minLength": 1}, "genesis_hash": {"type": "string", "minLength": 1}
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requirement_id", "description", "status", "bundle_refs", "exact_revision", "threshold", "observed", "verdict"],
+      "properties": {
+        "requirement_id": {"type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]+$"},
+        "description": {"type": "string", "minLength": 1},
+        "status": {"enum": ["UNSATISFIED", "SATISFIED", "OWNER_BLOCKED", "EXTERNAL_BLOCKED", "KILLED", "NOT_APPLICABLE"]},
+        "bundle_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "exact_revision": {"type": "string", "minLength": 1},
+        "threshold": {"type": "string", "minLength": 1},
+        "observed": {"type": "string", "minLength": 1},
+        "verdict": {"enum": ["PASS", "FAIL", "BLOCKED", "NOT_RUN", "KILLED"]}
+      }
+    },
+    "gate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gate", "state", "immutable_record", "requirements", "unresolved", "signatures"],
+      "properties": {
+        "gate": {"enum": ["G0", "G1", "G2", "G3", "GENESIS", "G4", "G5"]},
+        "state": {"enum": ["BLOCKED", "PASSED", "KILLED"]},
+        "immutable_record": {"const": true},
+        "requirements": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence"}},
+        "unresolved": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "signatures": {"type": "array", "items": {"type": "object", "required": ["role", "key_id", "signature", "signed_artifact_hash"], "additionalProperties": false, "properties": {"role": {"type": "string"}, "key_id": {"type": "string"}, "signature": {"type": "string"}, "signed_artifact_hash": {"type": "string"}}}}
+      }
+    },
+    "blocker": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "description", "owner", "status", "required_for", "resolution_artifact"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1}, "description": {"type": "string", "minLength": 1},
+        "owner": {"type": "string", "minLength": 1}, "status": {"enum": ["OWNER_BLOCKED", "EXTERNAL_BLOCKED"]},
+        "required_for": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "resolution_artifact": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

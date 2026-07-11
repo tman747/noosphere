@@ -1,0 +1,22 @@
+{
+  "schema": "noos.canonical-differential.v1",
+  "command": "python tools/gates/differential_transitions.py --generated 100000 --restart-every 25000",
+  "generated_cases": 100000,
+  "parameterized_max": 10000000,
+  "seed": 1313820499,
+  "divergences": 0,
+  "family_identities": {
+    "production_rust": "e364571d8a82a0d617988db93a9fee77c8aa5c1d1ae8f6387db5089d1cc06f99",
+    "independent_go": "2989ec809d2ecdd546e18676ab5feb8cf15d51e5acb28efb44bd7faa975516b6"
+  },
+  "process_matrix": {
+    "AA": "PASS",
+    "AB": "PASS",
+    "BA": "PASS",
+    "BB": "PASS"
+  },
+  "restart_interval": 25000,
+  "canonical_objects": ["TransactionV1", "TransactionWitnessesV1", "ReceiptV1"],
+  "compared_outputs": ["error_class", "six_lumen_roots", "execution_receipt_root", "fork_tuple", "justified", "finalized", "supply", "charge", "trap", "txid", "wtxid"],
+  "verdict": "PASS"
+}

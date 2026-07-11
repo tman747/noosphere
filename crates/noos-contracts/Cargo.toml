@@ -9,6 +9,7 @@ repository.workspace = true
 
 [dependencies]
 blake3 = "=1.8.5"
+noos-agent-class = { path = "../noos-agent-class" }
 noos-grain = { path = "../noos-grain" }
 serde = { version = "=1.0.228", features = ["derive"] }
 thiserror = "=2.0.18"

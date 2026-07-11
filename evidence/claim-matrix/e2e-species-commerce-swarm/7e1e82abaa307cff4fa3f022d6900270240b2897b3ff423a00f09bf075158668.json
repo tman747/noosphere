@@ -1,0 +1,81 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "10fb6b92fb548e6760237769e5e0374e1d81a5e001bea808918a2c507b0e6611",
+      "evidence/base-base-transfer-contract.json": "4732560ee4f80d982af6442590e2d34b444593cc115114682bb12ef324cdc217",
+      "evidence/base-crash-matrix.json": "80890b604ba4a0dd47a0e28967031287476f405d22e300fcd59a76fd65a9e1bc"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-species",
+          "-p",
+          "noos-commerce",
+          "-p",
+          "noos-swarm"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-species",
+          "noos-commerce",
+          "noos-swarm"
+        ]
+      },
+      "name": "local scenario fault/rollback contracts",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "H-PAY": "539fbb8b690d5b04e31c5de6856d9b504b6bd195c0698bd39107b9d322b4a86c",
+    "S-COMMERCE": "c3abbf1d0d23298ca102d375ca976be4b60f42b46919df76cf2b072e578aa26e",
+    "S-SPECIES": "363081961f139b801bf42d2389d85cd60980026a415a2781ba8429017d975c3e"
+  },
+  "claims": [
+    "H-PAY",
+    "S-COMMERCE",
+    "S-SPECIES"
+  ],
+  "command": [
+    "tools/e2e/run_network.py",
+    "--scenario",
+    "species-commerce-swarm",
+    "--inject-concentration-and-withholding"
+  ],
+  "evidence_sha256": "7e1e82abaa307cff4fa3f022d6900270240b2897b3ff423a00f09bf075158668",
+  "expected_result": "PASSED",
+  "gate": "e2e-species-commerce-swarm",
+  "limitations": [],
+  "registry_schema_version": "1.1.0",
+  "result": "PASSED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-commerce/Cargo.toml": "32d97cfaa3a87a46973d349affcb12768befdab82f91ca986cf149c0b2c51297",
+    "crates/noos-commerce/src/lib.rs": "20e6d53d111bbb47fd9922626913e94f4f13aab94389caf58bf9d767f2561be6",
+    "crates/noos-species/Cargo.toml": "0aa308ddb798097808b3e81c2d89bfc81319edf452fc2526785e6fb42f0296ca",
+    "crates/noos-species/src/lib.rs": "505e078947a851f2134dc094285095d6518688d552ec668a5ccb659fcee29dc3",
+    "crates/noos-swarm/Cargo.toml": "8897e41f67566eeabd589cb57570cfdcec8a0ccf0f476b348856ec777b54ca1b",
+    "crates/noos-swarm/src/lib.rs": "c8d28529a2d769c2c89d1e295dd33ba40cc30f5cd8e51cdcf5b0a897a40e7ce1"
+  }
+}

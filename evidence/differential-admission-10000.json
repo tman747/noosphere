@@ -1,0 +1,43 @@
+{
+  "admission_path": "NodeCore::submit_tx (production mempool: size/decode/chain/version/expiry/fee/duplicate/payer/witness/signature/caps)",
+  "binaries_sha256": {
+    "go": "3a10c0b4088e25eeed0414fe101db02412a3f6d9e1d277f8190557e5763c04a2",
+    "node": "ebbed382f661c85546fb4d2af804a36ca9a936e5b793d004d41fee9b7db5c664"
+  },
+  "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+  "class_counts": {
+    "BAD_DISCRIMINANT": 789,
+    "BAD_SIGNATURE": 749,
+    "BYTES_ENVELOPE": 821,
+    "DUPLICATE": 797,
+    "EXPIRED": 794,
+    "PAYER_NOT_SIGNER": 736,
+    "TRAILING": 776,
+    "TRUNCATED": 783,
+    "UNKNOWN_PAYER": 739,
+    "VALID": 749,
+    "WITNESS_MISMATCH": 816,
+    "WRONG_CHAIN": 689,
+    "WRONG_VERSION": 762
+  },
+  "command": "python tools/gates/differential_admission.py --generated 10000 --seed 0x4e4f4f53",
+  "divergences": 0,
+  "faucet_fixture": "seed BLAKE3-256('noos-devnet-1/faucet/0'), devnet-parameters.toml [faucet]",
+  "generated_cases": 10000,
+  "identity_cross_check": "python txid == node ADMITTED txid == go client txid (D-TX-ID)",
+  "process_matrix": {
+    "AA": "PASS",
+    "AB": "PASS",
+    "BA": "PASS",
+    "BB": "PASS"
+  },
+  "schema": "noos.production-admission-differential.v1",
+  "seed": 1313820499,
+  "sources_sha256": {
+    "crates/noos-node/src/bin/noos-transition.rs": "b42c643fd72f51e17bc543281c6d501ec142f067ba45bb4334436370440a54f9",
+    "crates/noos-node/src/mempool.rs": "c3b0bbda701dc5ade1437fbe8b6d685f0eb37d26af5109643bc6b0d9581fd986",
+    "tools/gates/differential_admission.py": "83f327e57a43ce20eb08b3d6f5e418c9f1f3c1f78aeb5b20c0c9cac5075a15fa"
+  },
+  "verdict": "PASS",
+  "wall_seconds": 15.164
+}

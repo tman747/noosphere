@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "4872e6b98255cfecf5aea94bd7c526e3c8987c26673906cb624d918e9017905b",
+      "evidence/base-base-transfer-contract.json": "d120db9e228cec6a99b828dd919a0e1c7daaae8e7c6470c6513a3eb552c3e20d",
+      "evidence/base-crash-matrix.json": "62b45c91fb123ba3e9e016a776f218a222cfda097686d8fe131aa70f53c02c59"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-wallet"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-wallet"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-WALLET": "f775bd4159580048819a3b57fd561a33837379000a3195582e69421be474126c"
+  },
+  "claims": [
+    "A-WALLET"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-WALLET"
+  ],
+  "evidence_sha256": "b36d1b1260e3f024f5281f6de11bd9a57d5c1ce06cfc7d8146368094e37b8097",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-wallet",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-wallet/Cargo.toml": "cd311ae0807a9d6138e44803796063ad6e953a16368f533fc4c94e441307ed3e",
+    "crates/noos-wallet/src/lib.rs": "76a0ce2daf8e01666078c4312b980ec067043f0f83d5a498507271d1b690f7f2"
+  }
+}

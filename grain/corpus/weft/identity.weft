@@ -1,0 +1,1 @@
+fn identity(x: u64) -> u64 ! {} cost 16 dec 0 { x }

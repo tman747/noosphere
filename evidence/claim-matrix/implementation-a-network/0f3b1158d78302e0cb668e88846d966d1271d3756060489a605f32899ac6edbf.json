@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-p2p"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-p2p"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-NETWORK": "4b1d24b49d31b78ab7593637dc8c91b88148516e2bea39771ae39c37155da108"
+  },
+  "claims": [
+    "A-NETWORK"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-NETWORK"
+  ],
+  "evidence_sha256": "0f3b1158d78302e0cb668e88846d966d1271d3756060489a605f32899ac6edbf",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-network",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-p2p/Cargo.toml": "cb95a27840edaac5af579cc5865a079944f85af19857bbde4313dc943c3920b0",
+    "crates/noos-p2p/src/lib.rs": "5659b47df24e93e3cf7ac06b2cff38cf9c06a75950af88c8edc75484553cb31f"
+  }
+}

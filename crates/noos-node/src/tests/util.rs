@@ -5,11 +5,11 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use noos_braid::{Bytes48, CheckpointRef, FinalityCertificateV1};
+use noos_braid::{CheckpointRef, FinalityCertificateV1};
 use noos_codec::NoosEncode;
 use noos_crypto::{BlsSecretKey, DomainId, Keypair};
 use noos_lumen::objects::{
-    txid, witness_root, ActionV1, BoundedBytes, BoundedList, NoteV1, OptionalHash32,
+    txid, witness_root, AccessEntry, ActionV1, BoundedBytes, BoundedList, NoteV1, OptionalHash32,
     OptionalObject, ResourceVector, SignedIntentV1, TransactionV1, TransactionWitnessesV1,
 };
 use noos_witness::bond::WitnessBondV1;
@@ -71,38 +71,27 @@ pub fn operator_account(i: u8) -> Hash32 {
     operator_key(i).public_key().into_bytes()
 }
 
-/// Witness fixture: `n` bonds above the devnet minimum, real BLS keys.
+/// Witness fixture: `n` bonds above the devnet minimum, real BLS keys
+/// (the shared `devnet_fixture` module — same set `noosd --validator` runs).
 pub fn witness_bonds(n: usize) -> Vec<WitnessBondV1> {
-    (0..n)
-        .map(|i| {
-            let secret = witness_secret(i);
-            let ed = Keypair::from_seed([0x81_u8.wrapping_add(i as u8); 32]);
-            WitnessBondV1 {
-                validator_id: [(i as u8) + 1; 32],
-                consensus_bls_key: Bytes48(secret.public_key().into_bytes()),
-                withdrawal_key: ed.public_key().into_bytes(),
-                network_endpoints_commitment: [0x11; 32],
-                failure_domains: BoundedBytes::new(vec![b'd', i as u8]).unwrap(),
-                bonded_noos: 5_000_000_000_000,
-                activation_epoch: 0,
-                exit_epoch: 0,
-                proofpower_account: [0x22; 32],
-            }
-        })
-        .collect()
+    crate::devnet_fixture::fixture_witness_bonds(n).expect("fixture bonds")
 }
 
 pub fn witness_secret(i: usize) -> BlsSecretKey {
-    BlsSecretKey::from_seed([(i as u8) + 1; 32]).expect("bls seed")
+    crate::devnet_fixture::fixture_witness_secret(i).expect("bls seed")
 }
 
 /// Node config with a 4-member simulated witness set.
 pub fn node_config() -> NodeConfig {
-    NodeConfig {
+    let mut cfg = NodeConfig {
         witness_bonds: witness_bonds(4),
         min_bond: devnet_params().min_bond_micro,
         ..NodeConfig::default()
-    }
+    };
+    // In-process consensus/RPC tests do not need live sockets. The focused
+    // network tests explicitly re-enable this fixture field.
+    cfg.network.enabled = false;
+    cfg
 }
 
 /// Boots a fresh full node over a (new or existing) store in `dir`.
@@ -186,6 +175,18 @@ pub fn signed_transfer(
     build_signed_tx(chain_id, expiry_height, from_key, actions, vec![])
 }
 
+/// Default declared resource envelope for fixture transactions.
+pub fn default_limits() -> ResourceVector {
+    ResourceVector {
+        bytes: 65_536,
+        grain_steps: 10_000,
+        proof_units: 8,
+        state_reads: 64,
+        state_writes: 64,
+        blob_bytes: 0,
+    }
+}
+
 /// Assembles + signs a transaction whose only signer is `key` (also the
 /// fee payer). One intent, no note inputs.
 pub fn build_signed_tx(
@@ -194,6 +195,28 @@ pub fn build_signed_tx(
     key: &Keypair,
     actions: Vec<ActionV1>,
     outputs: Vec<NoteV1>,
+) -> (Vec<u8>, Vec<u8>, Hash32) {
+    build_signed_tx_full(
+        chain_id,
+        expiry_height,
+        key,
+        actions,
+        outputs,
+        vec![],
+        default_limits(),
+    )
+}
+
+/// Full-control builder: explicit declared object access list and resource
+/// limits (contract-call tests exercise both envelopes).
+pub fn build_signed_tx_full(
+    chain_id: Hash32,
+    expiry_height: u64,
+    key: &Keypair,
+    actions: Vec<ActionV1>,
+    outputs: Vec<NoteV1>,
+    object_access: Vec<AccessEntry>,
+    resource_limits: ResourceVector,
 ) -> (Vec<u8>, Vec<u8>, Hash32) {
     let signer = key.public_key().into_bytes();
     let action_bytes: Vec<BoundedBytes<65536>> = actions
@@ -207,17 +230,10 @@ pub fn build_signed_tx(
         expiry_height,
         fee_payer: signer,
         fee_authorization: OptionalObject(None),
-        resource_limits: ResourceVector {
-            bytes: 65_536,
-            grain_steps: 10_000,
-            proof_units: 8,
-            state_reads: 64,
-            state_writes: 64,
-            blob_bytes: 0,
-        },
+        resource_limits,
         note_inputs: BoundedList::new(vec![]).unwrap(),
         account_inputs: BoundedList::new(vec![signer]).unwrap(),
-        object_access_list: BoundedList::new(vec![]).unwrap(),
+        object_access_list: BoundedList::new(object_access).unwrap(),
         actions: BoundedList::new(action_bytes).unwrap(),
         outputs: BoundedList::new(outputs).unwrap(),
         evidence_refs: BoundedList::new(vec![]).unwrap(),

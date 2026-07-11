@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-weft-check"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-weft-check"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-WEFT-02a": "ab60a4bb914e97e3f5ecc656db0f7d689f5e7bf63ab170bda167a73dfc65fafa"
+  },
+  "claims": [
+    "E-WEFT-02a"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "E-WEFT-02a"
+  ],
+  "evidence_sha256": "d9e0bb912f81ecbe4b3c613d22d678ee5e72cf4bb64c4c59ec105fd800d403d6",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-e-weft-02a",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-weft-check/Cargo.toml": "23d9a52378272efa9e89c1f0951ed29eff3fcb21cb609589c89c9845f5dc9604",
+    "crates/noos-weft-check/src/lib.rs": "010b9f27ecabfc6995f58b98e81f4f4d96e9be244458bd73391a0e37f9e679dd"
+  }
+}

@@ -1,0 +1,197 @@
+{
+  "A-AGENT-ABI": [
+    "noos-contracts",
+    "noos-node"
+  ],
+  "A-ASSURANCE": [
+    "noos-witness"
+  ],
+  "A-BRAID": [
+    "noos-braid"
+  ],
+  "A-CLASS-GATE.v2": [
+    "noos-agent-class"
+  ],
+  "A-DA": [
+    "noos-da"
+  ],
+  "A-FEES": [
+    "noos-lumen"
+  ],
+  "A-GOVERNANCE": [
+    "noos-contracts",
+    "noos-lumen"
+  ],
+  "A-GRAIN": [
+    "noos-grain",
+    "noos-contracts",
+    "noos-node"
+  ],
+  "A-GROUND": [
+    "noos-ground"
+  ],
+  "A-JET-CERT": [
+    "noos-jet"
+  ],
+  "A-JET-FALLBACK": [
+    "noos-braid"
+  ],
+  "A-LUMEN": [
+    "noos-lumen"
+  ],
+  "A-NETWORK": [
+    "noos-p2p"
+  ],
+  "A-PULSE": [
+    "noos-braid"
+  ],
+  "A-REFLEX-F9": [
+    "noos-reflex"
+  ],
+  "A-RING": [
+    "noos-crypto"
+  ],
+  "A-TOPOLOGY": [
+    "noos-p2p"
+  ],
+  "A-TX": [
+    "noos-codec",
+    "noos-lumen"
+  ],
+  "A-UMBRA-BASE": [
+    "noos-umbra"
+  ],
+  "A-UMBRA-HIDDEN": [
+    "noos-umbra"
+  ],
+  "A-WALLET": [
+    "noos-wallet"
+  ],
+  "E-GRAD-01": [
+    "noos-training",
+    "noos-analytics"
+  ],
+  "E-NEL-01b": [
+    "noos-nel"
+  ],
+  "E-ORACLE-01": [
+    "noos-training",
+    "noos-analytics"
+  ],
+  "E-REFLEX-02": [
+    "noos-reflex"
+  ],
+  "E-WEFT-01": [
+    "noos-weft-syntax",
+    "noos-weft-compile",
+    "noos-weftc"
+  ],
+  "E-WEFT-01a": [
+    "noos-weft-check"
+  ],
+  "E-WEFT-02": [
+    "noos-weft-syntax",
+    "noos-weft-compile"
+  ],
+  "E-WEFT-02a": [
+    "noos-weft-check"
+  ],
+  "E-WEFT-03": [
+    "noos-weft-compile"
+  ],
+  "E-WEFT-04": [
+    "noos-weft-syntax",
+    "noos-weft-compile"
+  ],
+  "E-WEFT-05": [
+    "noos-weft-syntax",
+    "noos-weft-compile"
+  ],
+  "E-WEFT-06": [
+    "noos-weft-compile",
+    "noos-weft-check"
+  ],
+  "E-WEFT-07": [
+    "noos-weft-syntax",
+    "noos-weft-compile"
+  ],
+  "E-WEFT-08": [
+    "noos-weft-check"
+  ],
+  "M-3PC-MALICIOUS": [
+    "noos-private-besi"
+  ],
+  "M-BRANCH": [
+    "noos-umbra"
+  ],
+  "M-FIBER": [
+    "noos-umbra"
+  ],
+  "M-JET": [
+    "noos-jet",
+    "noos-grain"
+  ],
+  "M-LINEAGE-QUORUM": [
+    "noos-training"
+  ],
+  "M-PRIVACY-DEPTH": [
+    "noos-private-besi"
+  ],
+  "M-PROOFPOWER": [
+    "noos-jet",
+    "noos-witness",
+    "noos-work-loom"
+  ],
+  "M-QUARANTINE-SETTLE": [
+    "noos-training"
+  ],
+  "M-RECURSIVE-VERIFIER": [
+    "noos-jet"
+  ],
+  "N-ACT-DA": [
+    "noos-nel",
+    "noos-hearth",
+    "noos-work-loom"
+  ],
+  "N-BISECT": [
+    "noos-nel",
+    "noos-hearth",
+    "noos-work-loom"
+  ],
+  "N-CHUNK-FREIVALDS": [
+    "noos-nel"
+  ],
+  "N-KV-REPLAY": [
+    "noos-nel"
+  ],
+  "N-SAMPLER": [
+    "noos-nel"
+  ],
+  "N-TOKEN-STATE": [
+    "noos-nel"
+  ],
+  "P1-S-DUAL-ROOT": [
+    "noos-private-besi"
+  ],
+  "P2-S-FUSED-AUDIT": [
+    "noos-private-besi"
+  ],
+  "P3-S-ALGORITHM-TRANSITION": [
+    "noos-private-besi"
+  ],
+  "P4-S-PAID-DELIVERY": [
+    "noos-private-besi"
+  ],
+  "P5-S-KERNEL-JET": [
+    "noos-jet"
+  ],
+  "S-LIFECYCLE": [
+    "noos-loam"
+  ],
+  "S-LOAM": [
+    "noos-loam"
+  ],
+  "S-LOAM-BASE": [
+    "noos-loam"
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-analytics",
+          "-p",
+          "noos-training"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-analytics",
+          "noos-training"
+        ]
+      },
+      "name": "local shadow identity/transcript regression",
+      "passed": true
+    },
+    {
+      "name": "real one-witness five-path 0.5B measurement and independent disable drill",
+      "passed": false,
+      "reason": "no registered real 0.5B witness corpus with measured five-path marginal cost, 15/15 mutations, and two-epoch live lane-disable evidence",
+      "status": "EXTERNAL_BLOCKED"
+    }
+  ],
+  "claim_fingerprints": {
+    "E-IDENT-01": "c317ccc8a9691660ce462eceb965dce8b57fcab737eaeaff0a434f6e8b2632a8",
+    "E-IDENT-02": "227d942e8f412ff450fd33c64157a1b411801988cd00724d96ed6c287d5fb4d9",
+    "E-IDENT-03": "42c98fd0f2835234b00b053d62ccd035c1bc33c5b67182deb89be8dcbc8a198a",
+    "I-PENTAGON": "c56a0dd00a4c2bf35786f182a348ee069db80ca10d9a77f47589c54c88fd48dc"
+  },
+  "claims": [
+    "E-IDENT-01",
+    "E-IDENT-02",
+    "E-IDENT-03",
+    "I-PENTAGON"
+  ],
+  "command": [
+    "tools/gates/run_identity_pentagon.py",
+    "--claims",
+    "E-IDENT-01,E-IDENT-02,E-IDENT-03",
+    "--model",
+    "0.5B",
+    "--chunk",
+    "32",
+    "--orderings",
+    "100000",
+    "--shadow-only"
+  ],
+  "evidence_sha256": "ea7ee4570c3f42b2ca7d7513e3f6273e894208479ec5afa200690603a2c224ed",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "identity-pentagon",
+  "limitations": [
+    "I-PENTAGON remains shadow-only."
+  ],
+  "registry_schema_version": "1.1.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-analytics/src/lib.rs": "a901ca2c2489cc050d4bb3e1ba411b88c3d888a19d2a3b0f7c54b0cf967bba16",
+    "crates/noos-training/src/lib.rs": "69c469abb21225ef4c64e5dd26fb2b6648466c3aa38288eb2709427f3dfb14b3"
+  }
+}

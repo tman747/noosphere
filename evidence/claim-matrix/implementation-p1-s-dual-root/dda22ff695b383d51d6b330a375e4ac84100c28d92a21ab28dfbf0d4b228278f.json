@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "cbec5f6b6db0d7de6564c04548d81fd7df468e5e1e5caebe1bbc72341a0ff2f2",
+      "evidence/base-base-transfer-contract.json": "224b1463430761a96608ae40fde2c6f287c94e761876e12e9d4fcc4321dec413",
+      "evidence/base-crash-matrix.json": "0425fec51e098f88256feea6cb48975781f446c3b1863e9d1c75b7eebd4e81a3"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-private-besi"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-private-besi"
+        ]
+      },
+      "name": "claim-specific crate tests with falsifiers",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "P1-S-DUAL-ROOT": "f9e992de3fd7ffc39f066fb2166804b7cf8822aa2d80435d1f7662218a18cc19"
+  },
+  "claims": [
+    "P1-S-DUAL-ROOT"
+  ],
+  "command": [
+    "tools/gates/run_privacy_claim.py",
+    "--claim",
+    "P1-S-DUAL-ROOT"
+  ],
+  "evidence_sha256": "dda22ff695b383d51d6b330a375e4ac84100c28d92a21ab28dfbf0d4b228278f",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-p1-s-dual-root",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-private-besi/Cargo.toml": "1a7fa58553b0285dfe833b02626c3479f85f6a464f0bd115531109b6267e9ac3",
+    "crates/noos-private-besi/src/dual_root.rs": "dd813430340140b5c2beb710c8b679bc44508601ef08bfb87224114bd813b90b"
+  }
+}

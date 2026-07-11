@@ -1,11 +1,8 @@
 //! Sync modes behind the thin [`NetworkEdge`] trait (ch01 §10.5;
 //! plan §7.5; node-v1.md §6).
-//!
-//! `noos-p2p` is running in a sibling ticket; a later binding pass adapts
-//! its `P2pHandle`/`ProtocolStore` onto these traits (certificates travel
-//! inside `/noos/sync/range/1` payload bytes — agreed with the transport
-//! owner). Until then [`NetworkEdge`] keeps the node testable against
-//! in-process edges.
+//! Production nodes bind this seam to [`crate::network::P2pNetworkEdge`].
+//! Tests retain an explicit no-network fixture so the sync state machine can
+//! be exercised without opening sockets.
 //!
 //! * **Header-first full sync** — pull `(header, ticket)` ranges, verify
 //!   tickets/work/retarget/ancestry through the ordinary stage-1/2 law,
@@ -74,11 +71,12 @@ pub trait NetworkEdge: Send {
     fn announce_vote(&mut self, vote: &FinalityVoteV1);
 }
 
-/// A no-network edge (isolated node; `noosd` default until the noos-p2p
-/// binding pass).
+/// Explicit no-network test fixture.
+#[cfg(test)]
 #[derive(Debug, Default)]
 pub struct NullEdge;
 
+#[cfg(test)]
 impl NetworkEdge for NullEdge {
     fn request_headers(
         &mut self,

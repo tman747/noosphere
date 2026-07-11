@@ -1,0 +1,69 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "4872e6b98255cfecf5aea94bd7c526e3c8987c26673906cb624d918e9017905b",
+      "evidence/base-base-transfer-contract.json": "d120db9e228cec6a99b828dd919a0e1c7daaae8e7c6470c6513a3eb552c3e20d",
+      "evidence/base-crash-matrix.json": "62b45c91fb123ba3e9e016a776f218a222cfda097686d8fe131aa70f53c02c59"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-private-besi"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-private-besi"
+        ]
+      },
+      "name": "claim-specific crate tests with falsifiers",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-PRIVACY-DEPTH": "8c5155a70685a007ce4583a6e42cecc6cfc2ec49dada72b7de1ad1c4c8425af8"
+  },
+  "claims": [
+    "M-PRIVACY-DEPTH"
+  ],
+  "command": [
+    "tools/gates/run_privacy_claim.py",
+    "--claim",
+    "M-PRIVACY-DEPTH"
+  ],
+  "evidence_sha256": "ab813c6935a4ff17a9b74f3a4b46f51947ba1518decad055cae2fa093ad6105a",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-m-privacy-depth",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-private-besi/Cargo.toml": "1a7fa58553b0285dfe833b02626c3479f85f6a464f0bd115531109b6267e9ac3",
+    "crates/noos-private-besi/src/depth.rs": "22ae95b063144b83def2a5264845187421866af00147c8dfc4fe47af3fc2cfb4",
+    "crates/noos-private-besi/src/refresh.rs": "b3ad8e340d0a830ae273fda6c5916e3b64c9c8d16ebb1ac6e1585a70244999a0"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "claims": {
+    "N-PROFILE": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-nel"],
+      "command": "python tools/gates/run_nel_claim.py --claim N-PROFILE",
+      "rollback_command": "python tools/gates/run_nel_claim.py --claim N-PROFILE --rollback-check",
+      "notes": "crates/noos-nel/src/inference.rs + luts.rs: deterministic W8A8 integer decoder forward at mini shape (hidden 32, 2 layers, GQA 4q/2kv, head_dim 8, MLP 64) with every ch05 \u00a73.2 op family pinned: INT8x INT8->INT32 GEMM with the G8 accumulator non-overflow lemma enforced at the shape boundary (unregistrable shapes reject), exact floor-quotient round-half-up dyadic requant, integer RMSNorm with pinned isqrt (seed 2^ceil(bits/2), 8 Newton + 2 correction steps, gated equal to floor sqrt), Q6 log2-domain integer softmax over the committed 64-entry exp2 LUT with masked-to-zero rows, one exact division per row and the load-bearing int16 P cap, committed Q1.15 rotate-half RoPE tables, committed 256-byte SiLU LUT, saturating residual add, greedy lowest-token-id ties. LUT bytes and every scale constant are frozen under lut_root/mini_profile_id; the whole run is frozen bit-for-bit in protocol/vectors/nel/forward-w8a8-v1.json. Falsifiers: frozen-vector mismatch, single-weight-bit flip diverges S_end and changes model identity, reduction-order (schedule) invariance gate, overflow-lemma rejection. PARTIAL because the claim requires the registered 0.5B model, the tokenizer byte-spec, and the >=10^9-instance cross-vendor NVIDIA/AMD/CPU conformance campaign (E-NEL-01/G5) \u2014 external; GPU/live-model rows stay PARTIAL."
+    },
+    "N-TOKEN-STATE": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-nel"],
+      "command": "python tools/gates/run_nel_claim.py --claim N-TOKEN-STATE",
+      "rollback_command": "python tools/gates/run_nel_claim.py --claim N-TOKEN-STATE --rollback-check",
+      "notes": "S_t chain over the executing lane: run_lane commits per-step TokenStateCommitment binding (job_id, model_root, numeric_profile, t, token_history_root, kv_commitment, rng_cursor, trace_root); S_0 derives from the job alone and each S_{t+1} is checkable from S_t plus one step's committed surface without any validator re-executing the transformer (verification is hash equality over commitments). Falsifiers: every one of the 8 bound fields mutates the commitment (state_commitment_binds_every_field), cross-job replay yields disjoint chains for identical execution, token-history root is positional and append-only, and the first divergence between two parties' chains is binary-searchable (first_state_divergence_is_binary_searchable). Wire objects (TokenClaim 292 B, ChunkClaim 1634 B = 51.06 B/token) were already frozen against protocol/vectors/nel boundary/malformed vectors."
+    },
+    "N-CHUNK-FREIVALDS": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-nel"],
+      "command": "python tools/gates/run_nel_claim.py --claim N-CHUNK-FREIVALDS",
+      "rollback_command": "python tools/gates/run_nel_claim.py --claim N-CHUNK-FREIVALDS --rollback-check",
+      "notes": "verify_chunk_op stacks T per-token rows of a layer matmul against the shared weight operand and runs one rectangular Freivalds pass with post-commit challenge vectors derived from the transcript root; C32 accumulators are committed inside each GEMM op payload (the harness transcript discipline). Measured 1/T cost law: the counting verifier's executed multiplications equal reps*(K*N + T*K + T*N) exactly for T in {1,2,4,8,16,32} \u2014 per-token cost is exactly A/T + B with A = reps*K*N (the T-independent W*r term) and B = reps*(K+N), strictly falling in T, with recompute-relative speedup monotone in T (chunk_freivalds_accepts_honest_chunks_and_the_cost_law_is_exactly_one_over_t). Falsifiers: single-element C32 tampers reject 6/6 across every weight-side op family (qkv/gate/up/out/down/lm_head) at REPS=2 and REPS=4; dual-verifier agreement between the frozen public freivalds_verify_u64 (API unchanged \u2014 Workerd's dependency is stable) and the independent counting twin on accepting and rejecting transcripts. The claim's own non-claim stands: no real proof system was run; real prover cost at 0.5B (E-NEL-06) stays external."
+    },
+    "N-BISECT": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-nel", "noos-hearth", "noos-work-loom"],
+      "command": "python tools/gates/run_nel_claim.py --claim N-BISECT",
+      "rollback_command": "python tools/gates/run_nel_claim.py --claim N-BISECT --rollback-check",
+      "notes": "run_bisection descends the committed grid token -> layer -> op (S_t chain, per-layer ops-roots, per-op commitments) with logarithmic interactive rounds, then referees the isolated leaf exactly: Freivalds over committed C32 for GEMM leaves with input-glue equality against the agreed prefix, exact integer recompute for nonlinear leaves; forced-move deadlines, availability-paused clocks and stage transitions were already in Dispute::apply_move. Cheating-prover falsifiers: a single corrupted accumulator or payload at any of the 14 op families at any grid point is isolated at exactly its (position, layer, op) and loses (falsifier_cheating_prover_cannot_win_from_any_single_op_corruption, ...tampered_gemm..., ...tampered_nonlinear...), including output-preserving claim fraud where greedy re-converges but the committed trace lies (settlement test); a frivolous challenger against an honest executor loses in 0 rounds. Cross-crate settlement: the lost bisection maps to WorkLoom resolve_dispute(WorkerFault) \u2014 worker bond slashed per distribute_executor_slash (challenger 50%, watch pool 20%, burn 30%), requester escrow refunded in full, conservation asserted, and quarantine_profile blocks the faulty implementation profile from new commits while independent profiles keep working (crates/noos-nel/tests/settlement.rs). Live colluding-committee drills on a public network (E-NEL-04) stay external."
+    },
+    "N-ACT-DA": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-nel", "noos-hearth", "noos-work-loom"],
+      "command": "python tools/gates/run_nel_claim.py --claim N-ACT-DA",
+      "rollback_command": "python tools/gates/run_nel_claim.py --claim N-ACT-DA --rollback-check",
+      "notes": "Per-step trace roots Merkle-commit every layer activation block (domain-separated activation leaves bound to job/position/layer) plus every op commitment; the chain carries one 32-byte root per step while witness bytes (HIDDEN per layer) are revealed only on dispute with Merkle inclusion proofs (merkle_open/merkle_verify, pad-to-power-of-two, pinned node domain). Falsifiers: tampered reveals are Merkle-inconsistent, transplanted proofs (wrong index) reject, commit-vs-reveal byte asymmetry gated. Root-proves-identity-not-availability is enforced end to end in the settlement test: activation witnesses erasure-sharded into noos-hearth CustodySet (admit_custody-gated holders); with reconstructible custody the WorkLoom availability certificate finalizes and the challenge clock starts; with 3 of 4 data shards corrupted reconstructible()=false, no certificate exists, challenge_start stays None and open_dispute rejects InvalidState (availability precedes challenge time). 99.9% retrieval inside deadlines on a public testnet (E-NEL-05) stays external."
+    },
+    "N-KV-REPLAY": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-nel"],
+      "command": "python tools/gates/run_nel_claim.py --claim N-KV-REPLAY",
+      "rollback_command": "python tools/gates/run_nel_claim.py --claim N-KV-REPLAY --rollback-check",
+      "notes": "Logical KV is a pure function of the committed token history: canonical replay from the token prefix reproduces the executor cache bit-for-bit and its commitment matches the kv_commitment bound in S_t at every position (kv_checkpoint_equals_canonical_replay_at_every_position); zero consensus KV bytes \u2014 the chain stores only the 32-byte binding. Commitments bind the digest \u00a78 key tuple (model_root, numeric_profile, job_id, position). Falsifiers: a single poisoned checkpoint byte mismatches the committed logical KV before signing; cross-job, cross-model and cross-profile cache reuse each change the commitment (cross-tenant reuse is detectable). Production-context reconstruction SLA over 30 days stays external."
+    },
+    "N-SAMPLER": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-nel"],
+      "command": "python tools/gates/run_nel_claim.py --claim N-SAMPLER",
+      "rollback_command": "python tools/gates/run_nel_claim.py --claim N-SAMPLER --rollback-check",
+      "notes": "Integer stochastic sampler per ch05 \u00a77.3: Q1.15 masses from the integer softmax, pinned total order (mass desc, token id asc), top-k then inclusive-boundary top-p, one draw per derivation H(NOOS/NEL/DRAW/V1 || beacon || job_id || token_index || round || draw_index) with a pinned 256-bit Horner reduction mod S, cursor advancing exactly one per draw. Greedy Phase B is randomness-free (rng_cursor pinned 0 in every committed state) and top_k=1 degenerates to greedy for any beacon. Falsifiers: every tuple component moves the variate; no executor input exists in the derivation and the one residual dial (cursor) is bound inside S_t so a cursor grind is a state-commitment lie; tie/top-k/top-p boundary rules pinned; exhaustive small vectors match an independently written second implementation across 6 shapes x 8 cursors. Threshold-beacon liveness/stall accounting and grind drills (E-NEL-07) stay external; stochastic decoding remains inactive (greedy-only first activation)."
+    }
+  },
+  "notes": "NEL completion pass (NelRunner2): frozen mini W8A8 integer profile + token-state chain + chunk-Freivalds dispute calculus + bisection referee + activation-DA + KV replay + integer sampler in crates/noos-nel (src/inference.rs, src/luts.rs; 48 lib tests + 3 cross-crate settlement tests, clippy -D warnings clean); frozen vector protocol/vectors/nel/forward-w8a8-v1.json; dedicated gate tools/gates/run_nel_claim.py (privacy-runner precedent) with immutable evidence under evidence/claim-matrix/implementation-n-*. freivalds_verify_u64's public API is unchanged. N-TEE-FIBER intentionally untouched: external/PARTIAL per assignment; E-NEL GPU/live-model experiment rows stay PARTIAL."
+}

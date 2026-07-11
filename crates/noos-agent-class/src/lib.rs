@@ -209,6 +209,13 @@ impl Firewall {
     pub fn revoke(&mut self, grant: Hash32, nonce: u64) {
         self.revoked.insert((grant, nonce));
     }
+    /// Fail-closed revocation query: an unknown grant reads as revoked.
+    #[must_use]
+    pub fn is_revoked(&self, grant: Hash32) -> bool {
+        self.grants
+            .get(&grant)
+            .is_none_or(|g| self.revoked.contains(&(g.grant_id, g.revocation_nonce)))
+    }
     #[must_use]
     pub fn spent(&self, grant: Hash32) -> u128 {
         self.spent.get(&grant).copied().unwrap_or(0)

@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-contracts"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-contracts"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-AGENT-ABI": "ad4f0ced9404dda4053694bb59c09b38ab5b9d5834f46080a056aafe3cef2da5"
+  },
+  "claims": [
+    "A-AGENT-ABI"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-AGENT-ABI"
+  ],
+  "evidence_sha256": "c7ff947b4e243dcf5fd1a99e1fb61eb14da19e7ac6ad1a6f6aa52cd037ca8fda",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-agent-abi",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-contracts/Cargo.toml": "2fcd7cf8381db2549c627770f3b6295e723672b7ba057d44aae5e4700bd3140a",
+    "crates/noos-contracts/src/lib.rs": "d7031d5ed252fc01e39983b74039469d3a227a37b7d377a1ce21b416d7f08b1b"
+  }
+}

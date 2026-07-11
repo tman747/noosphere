@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-braid"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-braid"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-JET-FALLBACK": "5515b2d3ef0a902c57579f8ff4437f508f7070282bfc75dd8e799c33e6442aeb"
+  },
+  "claims": [
+    "A-JET-FALLBACK"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-JET-FALLBACK"
+  ],
+  "evidence_sha256": "0d83e9b81593653c6b029be9325eeaa7018b7873649702ee12fa7ce2942eeef5",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-jet-fallback",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-braid/Cargo.toml": "af8febe91195fceee44aeb9aaeb65481d56261caea96cd01018da9d6b9556f4e",
+    "crates/noos-braid/src/lib.rs": "268ed2e34e5c616bff8dc6732f3267c1b29b1900554347d82a96e97f82984154"
+  }
+}

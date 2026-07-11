@@ -237,7 +237,7 @@ dependencies = [
  "bitflags 2.13.0",
  "cexpr",
  "clang-sys",
- "itertools",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "regex",
@@ -366,9 +366,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.66"
+version = "1.2.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5d6cac793997bd970000024b2934968efe83b382de4fdcf4fcb46b6ee4ad996"
+checksum = "e17dd265a7d0f31ef544e1b20e03add05d3b45b491b633b10d67145d2acc1a38"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -1413,6 +1413,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2009,6 +2018,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "noos-cli"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "blake3",
+ "ed25519-dalek",
+ "hex",
+ "noos-codec",
+ "noos-indexer",
+ "noos-lumen",
+ "noos-wallet",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "noos-codec"
 version = "0.1.0"
 
@@ -2025,6 +2051,7 @@ name = "noos-contracts"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "noos-agent-class",
  "noos-grain",
  "serde",
  "thiserror 2.0.18",
@@ -2056,6 +2083,15 @@ dependencies = [
  "noos-crypto",
  "noos-lumen",
  "reed-solomon-erasure",
+]
+
+[[package]]
+name = "noos-fuzz"
+version = "0.1.0"
+dependencies = [
+ "noos-codec",
+ "noos-grain",
+ "noos-lumen",
 ]
 
 [[package]]
@@ -2094,6 +2130,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "noos-jet"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "noos-grain",
+]
+
+[[package]]
 name = "noos-loam"
 version = "0.1.0"
 dependencies = [
@@ -2106,6 +2150,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "noos-codec",
+ "noos-crypto",
 ]
 
 [[package]]
@@ -2114,6 +2159,8 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "ed25519-dalek",
+ "noos-hearth",
+ "noos-work-loom",
  "serde_json",
 ]
 
@@ -2121,14 +2168,19 @@ dependencies = [
 name = "noos-node"
 version = "0.1.0"
 dependencies = [
+ "getrandom 0.2.17",
  "noos-braid",
  "noos-codec",
+ "noos-contracts",
  "noos-crypto",
  "noos-da",
+ "noos-grain",
  "noos-ground",
  "noos-lumen",
+ "noos-p2p",
  "noos-store",
  "noos-witness",
+ "tokio",
 ]
 
 [[package]]
@@ -2226,6 +2278,7 @@ dependencies = [
  "chacha20poly1305",
  "hkdf",
  "sha2",
+ "x25519-dalek",
 ]
 
 [[package]]
@@ -2251,6 +2304,31 @@ dependencies = [
  "blake3",
  "noos-codec",
  "noos-grain",
+ "noos-weft-compile",
+ "noos-weft-syntax",
+ "serde_json",
+]
+
+[[package]]
+name = "noos-weft-compile"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "noos-grain",
+ "noos-weft-syntax",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "noos-weft-syntax"
+version = "0.1.0"
+
+[[package]]
+name = "noos-weftc"
+version = "0.1.0"
+dependencies = [
+ "noos-weft-compile",
  "serde_json",
 ]
 
@@ -2270,6 +2348,16 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "noos-lumen",
+]
+
+[[package]]
+name = "noos-workerd"
+version = "0.1.0"
+dependencies = [
+ "noos-crypto",
+ "noos-hearth",
+ "noos-nel",
+ "serde_json",
 ]
 
 [[package]]
@@ -2549,7 +2637,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b570b25f7617e43d59005d0990ccb79e950a423952cea19671b7a876da390adf"
 dependencies = [
  "anyhow",
- "itertools",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn",

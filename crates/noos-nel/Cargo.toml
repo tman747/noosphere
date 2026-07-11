@@ -12,6 +12,8 @@ ed25519-dalek = "2.2.0"
 
 [dev-dependencies]
 serde_json = "=1.0.150"
+noos-work-loom = { path = "../noos-work-loom" }
+noos-hearth = { path = "../noos-hearth" }
 
 [lints]
 workspace = true

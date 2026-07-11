@@ -1,0 +1,82 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "4872e6b98255cfecf5aea94bd7c526e3c8987c26673906cb624d918e9017905b",
+      "evidence/base-base-transfer-contract.json": "d120db9e228cec6a99b828dd919a0e1c7daaae8e7c6470c6513a3eb552c3e20d",
+      "evidence/base-crash-matrix.json": "62b45c91fb123ba3e9e016a776f218a222cfda097686d8fe131aa70f53c02c59"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-nel",
+          "-p",
+          "noos-hearth",
+          "-p",
+          "noos-work-loom",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-nel",
+          "noos-hearth",
+          "noos-work-loom"
+        ]
+      },
+      "name": "claim-specific crate tests with falsifiers",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "N-BISECT": "01ce1550bc23a9f0f86b68581f98f7b375548e5a93aed033013d244dfebb99f3"
+  },
+  "claims": [
+    "N-BISECT"
+  ],
+  "command": [
+    "tools/gates/run_nel_claim.py",
+    "--claim",
+    "N-BISECT"
+  ],
+  "evidence_sha256": "43c02ca59f1496aa73df7723897c0a080248612fefa71514f770a4cb232c5f6b",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-n-bisect",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-hearth/Cargo.toml": "a623eacb1395837a76ce4a36ca87442dcf367e66842fb1fd88a5b3f09c707faa",
+    "crates/noos-nel/Cargo.toml": "17d2ecfb2e392c496e7dfaa14c28d1b89a4b97a16095b984434f3b81cfc99189",
+    "crates/noos-nel/src/inference.rs": "89f6c6b879f0f562fd071ea75941daee94ef7142f35a87533deaefb127bcee8f",
+    "crates/noos-nel/src/lib.rs": "5baddc85c27150926dac44af8b9beaaeeaa020911bee964778bcb1162eaaf816",
+    "crates/noos-nel/src/luts.rs": "80d6ecea395a61c2d5fe103cd20aad2b8b7608d1442b0dcebb4ec017629c7acb",
+    "crates/noos-nel/tests/settlement.rs": "78dcc813f6651577e72c76b7d1a52a26a46735563c3afbebfde442058095cef5",
+    "crates/noos-work-loom/Cargo.toml": "f476280c0cd27c42f409a6a91fae5eefdeb484d4b336aeeef95353609981431a",
+    "protocol/vectors/nel/forward-w8a8-v1.json": "afa7a0ac2466f878cafbb41edc510a04ad595e0ceaac39aabed5c34dd8eeab9a"
+  }
+}

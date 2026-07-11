@@ -1,0 +1,39 @@
+{
+  "claims": {
+    "M-JET": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-jet", "noos-grain"],
+      "command": "python tools/gates/run_implementation_claim.py --claim M-JET",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim M-JET --rollback-check",
+      "notes": "Exact observational jet equivalence stated and enforced over the full consensus-visible surface of pure Grain v1 — value-or-trap, stable trap code, metered charge (including mid-schedule METER_EXHAUSTED pinning), and arena accounting — carried by versioned JetCertV1 (crates/noos-jet: cert.rs semantics_hash = BLAKE3 over canonical formula bytes, jet_id binds semantics+versioned impl tag, digest binds every field). Two jets shipped per the pass shape: bounded-field increment [4 [0 1]] and a tree-walk jet [5 [0 2] [0 3]], each mirroring the frozen charge schedule instruction-by-instruction (jets.rs). Grain opcode-12 hook added WITHOUT touching production semantics: eval_with_jets/[12 id f] mirrors the opcode-11 erasure law, production eval still traps UNKNOWN_OPCODE with charge 0 (noos-grain tests opcode_12_never_interprets and opcode_12_atom_arg_is_still_unknown_opcode_in_production both green). Fallback equality proven on seeded corpora: 1024-case certification corpus per jet PLUS an independent 1200-case corpus per jet with a counting hook proving the jet fired on every case (jet_output_equals_interpreted_grain_on_seeded_corpus), triple-exact vs pure interpretation. Golden fixtures frozen and gate-clean under protocol/vectors/jet/ (jet-cert-v1.json, jet-dispatch-v1.json; check_vectors.py --strict OK), byte-compared against fresh emission in tests. External residue: the ch04 tree-HASH jet variant is represented by a tree-walk (equality) jet since pure Grain v1 has no hash opcode; the independent second checker family (Go) and the 10^8-scale E-JET-01 campaign remain external."
+    },
+    "A-JET-CERT": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-jet"],
+      "command": "python tools/gates/run_implementation_claim.py --claim A-JET-CERT",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-JET-CERT --rollback-check",
+      "notes": "Certificates are machine-checked by full re-derivation, never trusted as stated: JetRegistry::admit recomputes the semantics hash from the certified formula bytes, re-derives the jet id, recomputes the binding digest, and REPLAYS the entire differential corpus against the offered native implementation before an entry can exist (registry.rs). Falsifiers all green: tampered field without digest fix -> DigestMismatch; forged equivalence root WITH recomputed digest -> EquivalenceRootMismatch via corpus replay; formula swap -> SemanticsHashMismatch; impl-tag tamper -> JetIdMismatch; a valid cert cannot smuggle a divergent native (EquivalenceDivergence); dispatch never fires an uncertified id nor a certified id on different semantics (declines to pure Grain, the ch04 rollback). EXPLICITLY EXTERNAL: proof-assistant-grade universal equivalence certificates (unsound-kernel adversary), translation validation of emitted binaries, a second INDEPENDENTLY IMPLEMENTED checker (local dual-path certify/admit shares code), and the preregistered 10^8 differential campaign. This row stays THEORY-backed until those exist; nothing here declares an uncertified nontrivial binary equivalent."
+    },
+    "P5-S-KERNEL-JET": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-jet"],
+      "command": "python tools/gates/run_implementation_claim.py --claim P5-S-KERNEL-JET",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim P5-S-KERNEL-JET --rollback-check",
+      "notes": "The kernel-jet bonding DISCIPLINE exists locally: an optimized implementation is admitted only by bonding against the canonical slow relation (Grain interpretation) across a randomized post-commit corpus with boundary values, and one surviving wrong result is impossible to admit (divergence falsifiers green; rollback = quarantine, slow path authoritative — dispatch declines to the interpreter). The frozen RV32 lowering (rv32.rs) additionally pins a versioned toolchain profile analog: deterministic byte-exact codegen, exact image-id hashing, domain-exit-never-wrong-answer law tested on golden vectors plus a 500-case random corpus. EXPLICITLY EXTERNAL: actual CuTe/CUDA kernels, device/compiler-version matrices, and race/layout adversaries — this workstation has no CUDA device (AMD GPU) and no GPU toolchain; the claim's production surface is untouched. Named experiment owner remains OWNER_BLOCKED."
+    },
+    "M-RECURSIVE-VERIFIER": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-jet"],
+      "command": "python tools/gates/run_implementation_claim.py --claim M-RECURSIVE-VERIFIER",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim M-RECURSIVE-VERIFIER --rollback-check",
+      "notes": "Proof dispatch is real and exact: ProofRequest binds an exact RV32 image id (BLAKE3 over ABI version, leaf count, and text bytes), an input commitment, and a journal commitment; ReceiptVerifier is the backend-independent interface (proof.rs). The local backing is LocalExecutionChecker — deterministic re-execution of the pinned image with strict receipt decoding — which has ZERO FALSE ACCEPTS BY CONSTRUCTION and rejects every tested mutation class: forged journal, forged input, cross-image receipt, unknown image, truncated/oversized/misversioned receipts (all falsifier tests green). NO SUCCINCT PROOF IS CLAIMED OR FAKED: the RISC Zero / recursive Plonky2-STARK toolchain cannot be fetched in this offline environment (crates.io returns 403; risc0 is absent from the workspace lockfile and additionally requires external rustup target + prover downloads), so re-execution is the honest stand-in. EXPLICITLY EXTERNAL: the succinct recursive verifier itself, the second independently implemented verifier, the 10^8 structured/mutated-proof E-VERIFY-01 campaign, and the first-party ~60KB proof-size figure (never reproduced here)."
+    },
+    "M-PROOFPOWER": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-jet", "noos-witness", "noos-work-loom"],
+      "command": "python tools/gates/run_implementation_claim.py --claim M-PROOFPOWER",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim M-PROOFPOWER --rollback-check",
+      "notes": "Local contribution is the verification gate proofpower depends on: a receipt that fails ReceiptVerifier::verify is rejected with a typed error and can never earn credit (noos-jet proof.rs; zero false accepts on the tested mutation classes). Pre-existing plumbing by other workstreams: noos-witness carries the effective-weight path behind witness_proofpower_bonus_enabled=false with the compile-time PROOFPOWER_GENESIS_CAP == 0 (eff ≡ raw at genesis) and the cap-repair reduction arm; noos-work-loom carries counterfactual-vs-production proofpower accounting with production pinned to zero. EXPLICITLY EXTERNAL: the entire economics surface — maturity/decay accounting, external-funding and non-self-dealing predicates, wash/capture experiments E-WASH-01/E-CAPTURE-01 at preregistered power, the one-third cluster bound under a declared adversary budget, and any nonzero cap activation (G4, at most 1%). Genesis scope keeps the bonus disabled; nothing local changes that."
+    }
+  }
+}

@@ -56,10 +56,13 @@ use noos_lumen::objects::{BoundedList, ReceiptV1, TransactionWitnessesV1};
 use noos_lumen::state::{BlockContext, DeltaEntry, LumenLedger, LumenRoots, StateDelta, TreeId};
 use noos_store::{Blob, WriteSet};
 use noos_witness::bond::WitnessBondV1;
-use noos_witness::finality::{Ancestry, FinalityTracker, IngestOutcome, SnapshotRegistry};
+use noos_witness::finality::{
+    build_certificate, Ancestry, FinalityTracker, IngestOutcome, SnapshotRegistry,
+};
 use noos_witness::membership::{build_snapshot, SnapshotOutcome};
+use noos_witness::vote::{validate_vote, CheckpointView, FinalityVoteV1};
 
-use crate::auth::{DeferredEngine, NodeAuthVerifier};
+use crate::auth::{GrainContractEngine, NodeAuthVerifier};
 use crate::genesis::{
     BuiltGenesis, GenesisSpec, DEVNET_PROPOSER_SEED, PROPOSER_POOL_ACCOUNT, TREASURY_ACCOUNT,
     WITNESS_POOL_ACCOUNT,
@@ -97,6 +100,12 @@ pub struct NodeConfig {
     pub observer: bool,
     pub view_retention_blocks: u64,
     pub mempool: MempoolConfig,
+    /// Immutable Grain formula registry keyed by the object `code_hash`.
+    /// Every execution path (admission simulation, proposal, import, replay,
+    /// and sync) uses this same registry.
+    pub contract_codes: BTreeMap<Hash32, Vec<u8>>,
+    /// Production libp2p transport settings.
+    pub network: crate::network::NetworkSettings,
     /// Weak-subjectivity checkpoint. SOCIAL INPUT (ch01 §10.5): obtained
     /// from social sources, labeled, and NEVER able to override local
     /// finality — see [`NodeCore::apply_social_checkpoint`].
@@ -105,6 +114,12 @@ pub struct NodeConfig {
     pub witness_bonds: Vec<WitnessBondV1>,
     /// Minimum bond for snapshot eligibility (devnet fixture value).
     pub min_bond: u128,
+    /// Devnet fixture finality (TEST NETWORKS ONLY): when set, the node
+    /// signs the 3-of-4 fixture witness quorum itself at each epoch
+    /// boundary (`devnet_fixture` seed law) instead of waiting for live
+    /// witnesses. `noosd` enables this only for `--validator` runs against
+    /// parameters with `is_test_network = true`.
+    pub devnet_fixture_finality: bool,
 }
 
 impl Default for NodeConfig {
@@ -114,9 +129,12 @@ impl Default for NodeConfig {
             observer: false,
             view_retention_blocks: 0,
             mempool: MempoolConfig::default(),
+            contract_codes: BTreeMap::new(),
+            network: crate::network::NetworkSettings::default(),
             social_checkpoint: None,
             witness_bonds: Vec::new(),
             min_bond: 1,
+            devnet_fixture_finality: false,
         }
     }
 }
@@ -173,10 +191,26 @@ impl Ancestry for DagAncestry<'_> {
         if target_stored.header.height != target.epoch.saturating_mul(EPOCH_LENGTH) {
             return false;
         }
+
         let source_height = source.epoch.saturating_mul(EPOCH_LENGTH);
         self.dag
             .ancestor_at_height(&target.checkpoint_hash, source_height)
             .is_some_and(|a| a.hash == source.checkpoint_hash)
+    }
+}
+
+struct VoteCheckpointView<'a> {
+    dag: &'a HeaderDag,
+    justified: CheckpointRef,
+}
+
+impl CheckpointView for VoteCheckpointView<'_> {
+    fn is_justified(&self, checkpoint: &CheckpointRef) -> bool {
+        *checkpoint == self.justified
+    }
+
+    fn descends(&self, source: &CheckpointRef, target: &CheckpointRef) -> bool {
+        DagAncestry { dag: self.dag }.descends(source, target)
     }
 }
 
@@ -189,6 +223,7 @@ pub struct NodeCore<P: StorePort> {
     genesis_time_ms: u64,
     dag: HeaderDag,
     ledger: LumenLedger,
+    engine: GrainContractEngine,
     /// Rollback anchor: `(block hash, height, state at that block)`,
     /// refreshed when finality advances. The ONE bounded whole-state
     /// materialization in the node (one clone per finality advance), the
@@ -200,6 +235,7 @@ pub struct NodeCore<P: StorePort> {
     registry: SnapshotRegistry,
     availability: AvailabilityLedger,
     parked: BTreeMap<Hash32, ParkedBlock>,
+    pending_votes: Vec<FinalityVoteV1>,
     pending_certs: Vec<FinalityCertificateV1>,
     pub mempool: Mempool,
     pub view: ChainView,
@@ -240,6 +276,11 @@ impl<P: StorePort> NodeCore<P> {
         let proposer_secret =
             BlsSecretKey::from_seed(DEVNET_PROPOSER_SEED).map_err(|_| NodeError::Crypto)?;
 
+        let engine = GrainContractEngine::new(
+            built.chain_id,
+            built.genesis_hash,
+            cfg.contract_codes.clone(),
+        );
         let mut core = NodeCore {
             view: ChainView::new(cfg.view_retention_blocks),
             mempool: Mempool::new(cfg.mempool.clone()),
@@ -251,12 +292,14 @@ impl<P: StorePort> NodeCore<P> {
             dag,
             anchor: (genesis_block_hash, 0, built.ledger.clone()),
             ledger: built.ledger,
+            engine,
             exec_head: genesis_block_hash,
             exec_height: 0,
             tracker,
             registry: SnapshotRegistry::new(),
             availability,
             parked: BTreeMap::new(),
+            pending_votes: Vec::new(),
             pending_certs: Vec::new(),
             port,
             now_ms: spec.genesis_time_ms,
@@ -359,6 +402,122 @@ impl<P: StorePort> NodeCore<P> {
             self.pending_certs.push(cert);
         }
         Ok(())
+    }
+
+    /// Devnet fixture finality driver (TEST NETWORKS ONLY; see
+    /// [`NodeConfig::devnet_fixture_finality`]). Advances the FFG ladder by
+    /// at most one rung: when the executed head has crossed the boundary of
+    /// epoch `justified + 1`, signs the fixture 3-of-4 quorum over
+    /// `justified -> next` and queues the certificate (which also rides the
+    /// next produced block). Returns `true` when a certificate was queued.
+    ///
+    /// # Errors
+    /// Snapshot construction, vote signing, or certificate ingestion
+    /// failures; disabled or not-yet-eligible states are `Ok(false)`.
+    pub fn devnet_finality_tick(&mut self) -> Result<bool, NodeError> {
+        if !self.cfg.devnet_fixture_finality {
+            return Ok(false);
+        }
+        let source = self.tracker.justified_head();
+        let next_epoch = source.epoch.saturating_add(1);
+        let boundary_height = next_epoch.saturating_mul(EPOCH_LENGTH);
+        if self.exec_height < boundary_height {
+            return Ok(false);
+        }
+        let target = CheckpointRef {
+            epoch: next_epoch,
+            checkpoint_hash: self
+                .dag
+                .ancestor_at_height(&self.exec_head, boundary_height)
+                .ok_or(NodeError::BodyMismatch {
+                    what: "epoch boundary block missing from dag",
+                })?
+                .hash,
+        };
+        self.ensure_snapshot(next_epoch)?;
+        let snapshot = self
+            .registry
+            .get(next_epoch)
+            .cloned()
+            .ok_or(NodeError::Witness(
+                noos_witness::WitnessError::UnknownSnapshot,
+            ))?;
+        let quorum = (snapshot.members().len().saturating_mul(2) / 3).saturating_add(1);
+        let votes = snapshot.members()[..quorum]
+            .iter()
+            .map(|member| {
+                // Fixture seed law: the BLS seed IS the validator id bytes.
+                let secret =
+                    BlsSecretKey::from_seed(member.validator_id).map_err(|_| NodeError::Crypto)?;
+                FinalityVoteV1::sign(
+                    self.chain_id,
+                    next_epoch,
+                    source,
+                    target,
+                    member.validator_id,
+                    snapshot.root(),
+                    &secret,
+                )
+                .map_err(NodeError::Witness)
+            })
+            .collect::<Result<Vec<_>, NodeError>>()?;
+        let cert =
+            build_certificate(&votes, &self.chain_id, &snapshot).map_err(NodeError::Witness)?;
+        self.queue_certificate(cert)?;
+        Ok(true)
+    }
+
+    /// Validates and aggregates an inbound checkpoint vote. A quorum is
+    /// converted through the witness crate's sole certificate constructor
+    /// and enters the same certificate path as block-carried certificates.
+    pub fn ingest_network_vote(&mut self, vote: FinalityVoteV1) -> Result<(), NodeError> {
+        let snapshot = self
+            .registry
+            .get(vote.epoch)
+            .cloned()
+            .ok_or(NodeError::Witness(
+                noos_witness::WitnessError::UnknownSnapshot,
+            ))?;
+        let view = VoteCheckpointView {
+            dag: &self.dag,
+            justified: self.tracker.justified_head(),
+        };
+        validate_vote(&vote, &self.chain_id, &snapshot, &view)?;
+        if self.pending_votes.iter().any(|known| {
+            known.epoch == vote.epoch
+                && known.source == vote.source
+                && known.target == vote.target
+                && known.validator_id == vote.validator_id
+        }) {
+            return Ok(());
+        }
+        if self.pending_votes.len() >= 1024 {
+            self.pending_votes.remove(0);
+        }
+        self.pending_votes.push(vote.clone());
+        let quorum: Vec<_> = self
+            .pending_votes
+            .iter()
+            .filter(|known| {
+                known.epoch == vote.epoch
+                    && known.source == vote.source
+                    && known.target == vote.target
+                    && known.membership_root == vote.membership_root
+            })
+            .cloned()
+            .collect();
+        match build_certificate(&quorum, &self.chain_id, &snapshot) {
+            Ok(cert) => {
+                self.pending_votes.retain(|known| {
+                    known.epoch != vote.epoch
+                        || known.source != vote.source
+                        || known.target != vote.target
+                });
+                self.queue_certificate(cert)
+            }
+            Err(noos_witness::WitnessError::QuorumNotMet) => Ok(()),
+            Err(error) => Err(NodeError::Witness(error)),
+        }
     }
 
     // -- SOCIAL INPUT checkpoints (ch01 §10.5) --------------------------------
@@ -802,7 +961,7 @@ impl<P: StorePort> NodeCore<P> {
             chain_id: self.chain_id,
             height: header.height,
         };
-        let engine = DeferredEngine;
+        let engine = self.engine.clone();
         let auth = NodeAuthVerifier;
         let mut receipts: Vec<ReceiptV1> = Vec::with_capacity(body.transactions.len());
         for (tx, wits) in body
@@ -1125,6 +1284,7 @@ impl<P: StorePort> NodeCore<P> {
         let mut anchor_exec = AnchorExec {
             ledger: &mut anchor_ledger,
             chain_id: self.chain_id,
+            engine: &self.engine,
         };
         for hash in path {
             let (header, ticket) = self.load_header(&hash)?;
@@ -1375,7 +1535,7 @@ impl<P: StorePort> NodeCore<P> {
             chain_id: self.chain_id,
             height,
         };
-        let engine = DeferredEngine;
+        let engine = self.engine.clone();
         let auth = NodeAuthVerifier;
         let mut receipts: Vec<ReceiptV1> = Vec::new();
         let mut included: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
@@ -1615,6 +1775,7 @@ pub fn merge_deltas(deltas: Vec<StateDelta>) -> StateDelta {
 struct AnchorExec<'a> {
     ledger: &'a mut LumenLedger,
     chain_id: Hash32,
+    engine: &'a GrainContractEngine,
 }
 
 impl AnchorExec<'_> {
@@ -1632,7 +1793,7 @@ impl AnchorExec<'_> {
             chain_id: self.chain_id,
             height: header.height,
         };
-        let engine = DeferredEngine;
+        let engine = self.engine.clone();
         let auth = NodeAuthVerifier;
         let mut receipts = Vec::with_capacity(body.transactions.len());
         for (tx, wits) in body

@@ -40,6 +40,24 @@ enum K {
     },
 }
 
+/// Lab-only jet hook surface. [`eval_with_jets`] recognizes `[12 id f]` and
+/// offers the evaluation to the hook. A firing hook MUST reproduce the exact
+/// observational triple of evaluating `f` on the subject — value-or-trap,
+/// trap code, and metering — charging `meter` through the same frozen
+/// schedule. Declining (`None`) falls back to interpreting `f`, so erasing
+/// `[12 id f]` to `f` is always semantics-preserving, exactly like opcode
+/// 11. Production [`eval`] passes no hook: opcode 12 stays `UNKNOWN_OPCODE`.
+pub trait JetHook {
+    /// `id` is pure data (never evaluated); return `None` to decline.
+    fn dispatch(
+        &self,
+        id: &Noun,
+        subject: &Noun,
+        formula: &Noun,
+        meter: &mut Meter,
+    ) -> Option<Result<Noun, GrainTrap>>;
+}
+
 /// Pure deterministic evaluation (spec §1). The conformance triple is
 /// `(value-or-trap, trap_code, meter.spent())`.
 pub fn eval(
@@ -47,6 +65,28 @@ pub fn eval(
     subject: Noun,
     formula: Noun,
     meter: &mut Meter,
+) -> Result<Noun, GrainTrap> {
+    eval_inner(version, subject, formula, meter, None)
+}
+
+/// [`eval`] with a lab-only jet hook: identical semantics except that
+/// `[12 id f]` consults `hook` (see [`JetHook`]).
+pub fn eval_with_jets(
+    version: u32,
+    subject: Noun,
+    formula: Noun,
+    meter: &mut Meter,
+    hook: &dyn JetHook,
+) -> Result<Noun, GrainTrap> {
+    eval_inner(version, subject, formula, meter, Some(hook))
+}
+
+fn eval_inner(
+    version: u32,
+    subject: Noun,
+    formula: Noun,
+    meter: &mut Meter,
+    hook: Option<&dyn JetHook>,
 ) -> Result<Noun, GrainTrap> {
     if version != GRAIN_VERSION {
         return Err(GrainTrap::UnknownVersion);
@@ -56,7 +96,7 @@ pub fn eval(
 
     while let Some(task) = tasks.pop() {
         match task {
-            Task::Eval(s, f) => dispatch(s, f, &mut tasks, &mut vals, meter)?,
+            Task::Eval(s, f) => dispatch(s, f, &mut tasks, &mut vals, meter, hook)?,
             Task::Kont(k) => kont(k, &mut tasks, &mut vals, meter)?,
         }
     }
@@ -73,6 +113,7 @@ fn dispatch(
     tasks: &mut Vec<Task>,
     vals: &mut Vec<Noun>,
     meter: &mut Meter,
+    hook: Option<&dyn JetHook>,
 ) -> Result<(), GrainTrap> {
     let (head, arg) = match f.as_cell() {
         Some((h, t)) => (h.clone(), t.clone()),
@@ -90,7 +131,7 @@ fn dispatch(
 
     let op = match head.as_atom() {
         Some([]) => 0u8,
-        Some(&[b]) if b <= 11 => b,
+        Some(&[b]) if b <= 12 => b,
         _ => return Err(GrainTrap::UnknownOpcode),
     };
 
@@ -182,7 +223,23 @@ fn dispatch(
             let (_hint, f2) = split(&arg)?;
             tasks.push(Task::Eval(s, f2));
         }
-        _ => return Err(GrainTrap::UnknownOpcode), // unreachable: op <= 11
+        12 => {
+            // Lab-only jet hint: invalid in production (no hook), checked
+            // BEFORE any shape validation so production behavior for every
+            // `[12 ...]` formula is exactly `UNKNOWN_OPCODE`. With a hook,
+            // `[12 id f]` mirrors opcode 11 (charge 0, `id` never
+            // evaluated): the hook may produce the exact observational
+            // triple of `f`, else `f` is interpreted.
+            let Some(h) = hook else {
+                return Err(GrainTrap::UnknownOpcode);
+            };
+            let (id, f2) = split(&arg)?;
+            match h.dispatch(&id, &s, &f2, meter) {
+                Some(r) => vals.push(r?),
+                None => tasks.push(Task::Eval(s, f2)),
+            }
+        }
+        _ => return Err(GrainTrap::UnknownOpcode), // unreachable: op <= 12
     }
     Ok(())
 }

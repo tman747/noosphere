@@ -1,0 +1,9 @@
+# noos-workerd example configuration (dev/test only).
+#
+# The daemon never draws entropy itself: the receipt signing seed comes
+# only from this file. Production operators generate seed_hex from an OS
+# CSPRNG and NEVER commit it; the fixed bytes below are a development
+# fixture, not a credential.
+[worker]
+seed_hex = "1111111111111111111111111111111111111111111111111111111111111111"
+chain_id_hex = "2222222222222222222222222222222222222222222222222222222222222222"

@@ -51,6 +51,8 @@ DIMENSIONS = {
     "lifecycle": {"DEFINED", "ACTIVE", "DISABLED", "RETIRED", "WITHDRAWN"},
     "result": {"UNTESTED", "PARTIAL", "PASSED", "KILLED"},
 }
+LOCAL_IMPLEMENTATION_STATES = {"IMPLEMENTED", "PARTIAL", "MISSING"}
+LOCAL_EVIDENCE_STATES = {"VERIFIED", "PARTIAL", "MISSING"}
 
 REQUIRED_NONEMPTY = (
     "claim_id",
@@ -296,6 +298,21 @@ def invariant_errors(doc) -> list:
                 )
         if not isinstance(claim.get("enabled"), bool):
             errors.append(f"{label}: dimension 'enabled' must be a boolean")
+        local = claim.get("local_implementation_state")
+        if local not in LOCAL_IMPLEMENTATION_STATES:
+            errors.append(f"{label}: invalid local_implementation_state {local!r}")
+        local_evidence = claim.get("local_evidence_state")
+        if local_evidence not in LOCAL_EVIDENCE_STATES:
+            errors.append(f"{label}: invalid local_evidence_state {local_evidence!r}")
+        for blockers in ("owner_blockers", "external_blockers"):
+            values = claim.get(blockers)
+            if not isinstance(values, list) or any(not isinstance(value, str) or not value.strip() for value in values):
+                errors.append(f"{label}: '{blockers}' must be a list of non-empty strings")
+        if local != "IMPLEMENTED" and claim.get("expected_result") != "LOCAL_MISSING":
+            errors.append(f"{label}: local incomplete claims must expect LOCAL_MISSING")
+        command = claim.get("command")
+        if isinstance(command, str) and "reproduce_claim.py" in command:
+            errors.append(f"{label}: generic disposition replay cannot be a claim command")
 
         if claim.get("evidence_label") == "THEORY" and not _nonempty(
             claim.get("kill_threshold")

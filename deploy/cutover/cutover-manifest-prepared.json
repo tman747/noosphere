@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "manifest_state": "PREPARED_NOT_EXECUTED",
+  "execution": {
+    "authorized": false,
+    "executed": false,
+    "required_authority": "SIGNED_G5_PROMOTION_OVER_EXACT_MANIFEST_HASH",
+    "dns_cutover": "PROHIBITED",
+    "tunnel_changes": "PROHIBITED",
+    "asset_replacement": "PROHIBITED",
+    "signatures": []
+  },
+  "protocol_binding": {
+    "protocol_version": "v1",
+    "api_version": "v1",
+    "release_version": "0.0.0-preproduction",
+    "chain_id": "OWNER_BLOCKED",
+    "genesis_hash": "OWNER_BLOCKED",
+    "release_manifest_hash": "OWNER_BLOCKED"
+  },
+  "domains": [
+    {"domain":"mindchain.network","access":"OWNER_BLOCKED","current_inventory":"OWNER_BLOCKED","candidate_origin":"OWNER_BLOCKED","low_ttl_value_seconds":"OWNER_BLOCKED","tls_csp_cache_verification":"OWNER_BLOCKED"},
+    {"domain":"mindscan.network","access":"OWNER_BLOCKED","current_inventory":"OWNER_BLOCKED","candidate_origin":"OWNER_BLOCKED","low_ttl_value_seconds":"OWNER_BLOCKED","tls_csp_cache_verification":"OWNER_BLOCKED"}
+  ],
+  "historical_archive": {
+    "old_chain_label": "HISTORICAL OLD CHAIN — READ ONLY — NOT NOOSPHERE",
+    "site_export": {"status":"OWNER_BLOCKED","reason":"No verified dated export or domain access is available.","inventory_path":"OWNER_BLOCKED","archive_hash":"OWNER_BLOCKED","public_read_only_origin":"OWNER_BLOCKED"},
+    "indexed_state_export": {"status":"OWNER_BLOCKED","reason":"No verified dated indexed-state export is available.","inventory_path":"OWNER_BLOCKED","archive_hash":"OWNER_BLOCKED","schema_and_chain_identity":"OWNER_BLOCKED"},
+    "required_inventory_fields": ["source chain_id/genesis", "coverage and gaps", "export UTC interval", "file path", "byte length", "sha256", "content type", "schema/software revision", "read-only destination"],
+    "runtime_compatibility_fallback": false
+  },
+  "candidate_origins": {
+    "rpc": {"origin":"OWNER_BLOCKED","status":"NOT_PROVISIONED","must_match_chain":true},
+    "api": {"origin":"OWNER_BLOCKED","status":"NOT_PROVISIONED","must_match_chain":true},
+    "indexer": {"origin":"OWNER_BLOCKED","status":"NOT_PROVISIONED","must_match_chain":true},
+    "site": {"origin":"OWNER_BLOCKED","status":"NOT_PROVISIONED","must_match_chain":true},
+    "explorer": {"origin":"OWNER_BLOCKED","status":"NOT_PROVISIONED","must_match_chain":true},
+    "synthetic_health_checks": {"status":"NOT_CONFIGURED","checks":["exact /api/status identity", "fresh unsafe/justified/finalized coordinates", "wallet wrong-chain rejection", "TLS/CSP/cache", "indexer replica identity/freshness", "zero old-origin runtime requests"]}
+  },
+  "rollback": {
+    "armed": false,
+    "target_kind": "STATIC_MAINTENANCE_ARCHIVE",
+    "target_origin": "OWNER_BLOCKED",
+    "target_signature": "OWNER_BLOCKED",
+    "requirements": ["submission disabled", "RPC disabled", "historical archive link retained", "no historical RPC/indexer/wallet/state fallback"],
+    "old_rpc_fallback": false,
+    "old_indexer_fallback": false,
+    "old_wallet_fallback": false,
+    "old_state_fallback": false,
+    "last_known_good_noosphere_origin_set": "NOT_YET_APPLICABLE_BEFORE_FIRST_LAUNCH"
+  },
+  "rehearsal": {
+    "forward": "OWNER_BLOCKED_NOT_RUN",
+    "rollback": "OWNER_BLOCKED_NOT_RUN",
+    "zero_old_runtime_requests": "OWNER_BLOCKED_NOT_PROVEN",
+    "evidence_bundle_refs": []
+  },
+  "unresolved_blockers": [
+    "Signed G5 promotion",
+    "Exact production chain/release identity",
+    "Domain owner access and current DNS/tunnel inventory",
+    "Dated verified historical site export",
+    "Dated verified historical indexed-state export",
+    "Fresh NOOSPHERE origins and synthetic probes",
+    "Signed submission-disabled static maintenance/archive rollback target",
+    "Forward and rollback rehearsal evidence",
+    "Proof of zero candidate runtime requests to historical origins"
+  ]
+}

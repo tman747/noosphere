@@ -1,0 +1,73 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "4872e6b98255cfecf5aea94bd7c526e3c8987c26673906cb624d918e9017905b",
+      "evidence/base-base-transfer-contract.json": "d120db9e228cec6a99b828dd919a0e1c7daaae8e7c6470c6513a3eb552c3e20d",
+      "evidence/base-crash-matrix.json": "62b45c91fb123ba3e9e016a776f218a222cfda097686d8fe131aa70f53c02c59"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-jet",
+          "-p",
+          "noos-grain"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-jet",
+          "noos-grain"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-JET": "d922b7e1b94b9d374f6308f8ddace011593b6248383ff8bedfe7b676ff5fcac7"
+  },
+  "claims": [
+    "M-JET"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "M-JET"
+  ],
+  "evidence_sha256": "2319c1d56ffb2115d05ac99adba5192dd68b0b71d14e4e740f03336abee762d7",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-m-jet",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-grain/Cargo.toml": "cb53cbb9f790cf60512c616f2cec30524cdaec3edddf99fb6c432e9840099a05",
+    "crates/noos-grain/src/lib.rs": "f5895e22606ee3f56db12a087d7401efbfe1a1dd08295b9033fe21976db2389e",
+    "crates/noos-jet/Cargo.toml": "0e17c9b36416dc643bb66cb41ac75fdfb648eb075ce97fc3b01282a31aca4c33",
+    "crates/noos-jet/src/lib.rs": "127c86982a3d25be9df581010d47dd176e86b52f54ce23bbc8febbef4f3e5abc"
+  }
+}

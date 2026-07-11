@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "4872e6b98255cfecf5aea94bd7c526e3c8987c26673906cb624d918e9017905b",
+      "evidence/base-base-transfer-contract.json": "d120db9e228cec6a99b828dd919a0e1c7daaae8e7c6470c6513a3eb552c3e20d",
+      "evidence/base-crash-matrix.json": "62b45c91fb123ba3e9e016a776f218a222cfda097686d8fe131aa70f53c02c59"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-umbra"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-umbra"
+        ]
+      },
+      "name": "claim-specific crate tests with falsifiers",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-BRANCH": "338e78d78983752655c37c61c8f97a1a7a323678b8669dee1f22677e4abf982f"
+  },
+  "claims": [
+    "M-BRANCH"
+  ],
+  "command": [
+    "tools/gates/run_privacy_claim.py",
+    "--claim",
+    "M-BRANCH"
+  ],
+  "evidence_sha256": "bfb6bc2381f700b4c0bf08b2f02f0ff095f070f6f917313be640001ffc950d0c",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-m-branch",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-umbra/Cargo.toml": "9e19b16697059689f650d5e13e2d248f39b2501c5a91f68b33c74a6feeb3085c",
+    "crates/noos-umbra/src/branch.rs": "09539d9610c3ca15fa9e0735836677166258133046d28786d92ba1e3679f832c"
+  }
+}

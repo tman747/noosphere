@@ -17,7 +17,10 @@
 //!   the arena is a cumulative allocation budget in 8-byte words.
 //! - Opcode 11 hints are semantically erasable: erasing `[11 h f]` to `f`
 //!   preserves the result noun, the trap, and the charge exactly.
-//! - Opcode 12 is invalid in production (`UNKNOWN_OPCODE`).
+//! - Opcode 12 is invalid in production `eval` (`UNKNOWN_OPCODE`). The
+//!   lab-only jet surface is `eval_with_jets`: `[12 id f]` consults a
+//!   [`JetHook`] which must reproduce the exact observational triple of
+//!   `f`, or decline so `f` is interpreted (erasure-preserving, like 11).
 //!
 //! Decision (spec §15): Grain noun bytes are self-contained; this crate has
 //! no dependencies (including `noos-codec`).
@@ -32,7 +35,7 @@ mod noun;
 pub mod vectors;
 
 pub use bytes::{decode_formula, decode_subject, encode_noun};
-pub use eval::eval;
+pub use eval::{eval, eval_with_jets, JetHook};
 pub use noun::Noun;
 
 #[cfg(test)]
@@ -105,7 +108,8 @@ pub enum GrainTrap {
     MandatoryJetUnavailable = 4,
     /// Atom length or cell depth beyond the frozen structural bounds.
     NounOversized = 5,
-    /// Formula head atom not in `0..=11` (includes the lab-only 12).
+    /// Formula head atom not in `0..=11` (in production `eval` this also
+    /// covers the lab-only 12, which only `eval_with_jets` recognizes).
     UnknownOpcode = 6,
     /// `eval` called with a version other than 1.
     UnknownVersion = 7,
@@ -215,8 +219,10 @@ impl Meter {
 
     /// Charge `c` steps. On exhaustion, `steps` is pinned to the limit so the
     /// reported charge of a `METER_EXHAUSTED` trap is exactly `step_limit`.
+    /// Public so a [`JetHook`] can mirror the frozen charge schedule exactly;
+    /// never call it outside the interpreter or a certified jet.
     #[inline]
-    pub(crate) fn charge(&mut self, c: u64) -> Result<(), GrainTrap> {
+    pub fn charge(&mut self, c: u64) -> Result<(), GrainTrap> {
         match self.steps.checked_add(c) {
             Some(n) if n <= self.step_limit => {
                 self.steps = n;
@@ -230,8 +236,9 @@ impl Meter {
     }
 
     /// Add `w` words to the cumulative arena. Words are never returned.
+    /// Public for [`JetHook`] mirrors, like [`Meter::charge`].
     #[inline]
-    pub(crate) fn arena_add(&mut self, w: u64) -> Result<(), GrainTrap> {
+    pub fn arena_add(&mut self, w: u64) -> Result<(), GrainTrap> {
         match self.arena.checked_add(w) {
             Some(n) if n <= self.arena_limit => {
                 self.arena = n;

@@ -6,3 +6,5 @@ __pycache__/
 /evidence/**/raw-logs/
 *.tmp
 .env
+/wallet/app/ui/dist/
+/wallet/app/src-tauri/gen/

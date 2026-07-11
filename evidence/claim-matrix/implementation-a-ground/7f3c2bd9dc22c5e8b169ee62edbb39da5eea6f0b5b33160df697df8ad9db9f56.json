@@ -1,0 +1,68 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "4872e6b98255cfecf5aea94bd7c526e3c8987c26673906cb624d918e9017905b",
+      "evidence/base-base-transfer-contract.json": "d120db9e228cec6a99b828dd919a0e1c7daaae8e7c6470c6513a3eb552c3e20d",
+      "evidence/base-crash-matrix.json": "62b45c91fb123ba3e9e016a776f218a222cfda097686d8fe131aa70f53c02c59"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-ground"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-ground"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-GROUND": "687918e5ed4de79deb82c746e3be931b40ea993931326e7b3050466bf5be31b1"
+  },
+  "claims": [
+    "A-GROUND"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-GROUND"
+  ],
+  "evidence_sha256": "7f3c2bd9dc22c5e8b169ee62edbb39da5eea6f0b5b33160df697df8ad9db9f56",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-ground",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-ground/Cargo.toml": "b0ff16aeefada2a1e616bd5f79be7146a873234d60d9abe8601f007681731b99",
+    "crates/noos-ground/src/lib.rs": "caf4885c23c598f22500828fedf39f5f3a3807da3a7fea6b53700383168e44aa"
+  }
+}

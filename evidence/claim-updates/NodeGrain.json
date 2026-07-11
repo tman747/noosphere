@@ -1,0 +1,18 @@
+{
+  "claims": {
+    "A-GRAIN": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-grain", "noos-contracts", "noos-node"],
+      "command": "python tools/gates/run_implementation_claim.py --claim A-GRAIN",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-GRAIN --rollback-check",
+      "notes": "Grain engine now bound end-to-end into the production node execution path: CallObject transactions execute through GrainContractEngine in block production AND import with deterministic metering (grain_steps pinned to the frozen cost table, byte-identical roots/object/receipt on independent re-import: noos-node tests::contract_exec::contract_call_reexecutes_identically_on_import), storage-word accounting into fee dimension R, and Grain traps surfacing as typed receipt classes (2000+code). Meter exhaustion falsifiers: exact METER_EXHAUSTED trap with spent==limit (noos-contracts meter_exhaustion_traps_exactly_and_charges_spent_equal_to_limit; noos-node auth grain_engine_meter_exhaustion_has_exact_stable_trap) and frozen deterministic failure charge min(failure_fee, reservation) through the node (contract_exec::meter_exhaustion_surfaces_exact_trap_and_frozen_failure_charge)."
+    },
+    "A-AGENT-ABI": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-contracts", "noos-node"],
+      "command": "python tools/gates/run_implementation_claim.py --claim A-AGENT-ABI",
+      "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-AGENT-ABI --rollback-check",
+      "notes": "Declared read/write-set law enforced fail-closed through the production node path: a CallObject without a declared entry, or with a READ-only entry, settles as typed UndeclaredAccess (status 1005) and leaves the object and objects_root byte-identical (falsifier: noos-node tests::contract_exec::undeclared_object_write_fails_closed); a multi-action transaction whose second call is undeclared drops the first call's in-overlay migration wholesale, preserving per-transaction object-migration atomicity (contract_exec::failed_action_drops_all_contract_effects_atomically). Host-level undeclared read/write and declared-migration atomicity remain covered in noos-contracts."
+    }
+  }
+}

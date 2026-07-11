@@ -92,6 +92,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--max-ai-load", action="store_true")
     p.add_argument("--kill-every-fsync-boundary", action="store_true")
     p.add_argument("--max-faults", type=positive_int, help="scoped smoke bound; public crash gate omits this")
+    p.add_argument("--pairs", help="required comma-separated client matrix pairs (AA,AB,BA,BB)")
     p.add_argument("--out", type=Path)
     return p
 
@@ -115,6 +116,14 @@ def validate(args: argparse.Namespace, p: argparse.ArgumentParser) -> list[int]:
         p.error("wan-fault-matrix requires the frozen --seed-file")
     if args.scenario == "crash-matrix" and not args.kill_every_fsync_boundary:
         p.error("crash-matrix requires --kill-every-fsync-boundary")
+    if args.scenario == "client-matrix":
+        if args.pairs is None:
+            p.error("client-matrix requires --pairs AA,AB,BA,BB")
+        pairs = args.pairs.split(",")
+        if pairs != ["AA", "AB", "BA", "BB"]:
+            p.error("client-matrix pairs must be exactly AA,AB,BA,BB")
+    elif args.pairs is not None:
+        p.error("--pairs is valid only for client-matrix")
     if args.seed_file is None:
         return [args.seed]
     seed_path = args.seed_file if args.seed_file.is_absolute() else ROOT / args.seed_file
@@ -171,7 +180,25 @@ def canonical_hash(value: object) -> str:
     return sha256_bytes(json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8"))
 
 
+EXPERIMENTAL_SCENARIOS = {
+    "umbra-disable-exit", "umbra-p1-attestation-revocation",
+    "umbra-p2-complete-relation", "besi-full-24layer", "malicious-3pc",
+    "species-commerce-swarm", "reflex-live-devnet",
+}
+
+
+def requested_scenario(argv: list[str]) -> str | None:
+    try:
+        return argv[argv.index("--scenario") + 1]
+    except (ValueError, IndexError):
+        return None
+
+
 def main() -> int:
+    scenario = requested_scenario(sys.argv[1:])
+    if scenario in EXPERIMENTAL_SCENARIOS:
+        from experimental_network import main as experimental_main
+        return experimental_main(sys.argv[1:])
     p = parser()
     args = p.parse_args()
     seeds = validate(args, p)
@@ -217,9 +244,13 @@ def main() -> int:
         "kill_every_fsync_boundary": args.kill_every_fsync_boundary,
         "max_faults": args.max_faults,
         "crypto": "real",
+        "requested_client_pairs": args.pairs.split(",") if args.pairs else None,
         "seed_file": seed_file_meta,
     }
     all_pairs = sorted({pair for run in runs for pair in run.get("client_pairs", [])})
+    if args.scenario == "client-matrix" and all_pairs != ["go->go", "go->rust", "rust->go", "rust->rust"]:
+        print(f"run_network.py: client matrix incomplete: {all_pairs}", file=sys.stderr)
+        return 1
     payload: dict[str, object] = {
         "schema_version": "noos.base-g2-evidence.v1",
         "gate": "G2_INDEPENDENT_DEVNET_DETERMINISTIC_SIMULATION",

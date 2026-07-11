@@ -1,0 +1,30 @@
+[package]
+name = "noos-cli"
+version = "0.1.0"
+description = "NOOSPHERE operator/user CLI: purpose-separated keygen (noos-wallet derivation law), canonical Lumen transaction build/sign, node line-protocol submit/status, and indexer API queries"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "noos-cli"
+path = "src/main.rs"
+
+[dependencies]
+noos-codec = { path = "../noos-codec" }
+noos-lumen = { path = "../noos-lumen" }
+noos-wallet = { path = "../noos-wallet" }
+serde_json = "=1.0.150"
+
+[dev-dependencies]
+axum = "=0.8.8"
+blake3 = "=1.8.5"
+ed25519-dalek = "=2.2.0"
+hex = "=0.4.3"
+noos-indexer = { path = "../noos-indexer" }
+tempfile = "=3.24.0"
+tokio = { version = "=1.52.3", features = ["macros", "net", "rt-multi-thread"] }
+
+[lints]
+workspace = true

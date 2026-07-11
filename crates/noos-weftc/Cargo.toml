@@ -1,0 +1,19 @@
+[package]
+name = "noos-weftc"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Weft compiler command-line package"
+
+[[bin]]
+name = "weftc"
+path = "src/main.rs"
+
+[dependencies]
+noos-weft-compile = { path = "../noos-weft-compile" }
+serde_json = "=1.0.150"
+
+[lints]
+workspace = true

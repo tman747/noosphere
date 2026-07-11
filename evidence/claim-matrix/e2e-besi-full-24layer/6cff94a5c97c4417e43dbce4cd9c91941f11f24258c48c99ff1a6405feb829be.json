@@ -1,0 +1,79 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "e68d716857542848b00cd086f98b0ba3978a446b4a401fc5bb73c92fbb4e4d1e",
+      "evidence/base-base-transfer-contract.json": "775b94d3f6a327cb5f93615c91edeaf602ffee47e4c01576c6724d40c7e94177",
+      "evidence/base-crash-matrix.json": "3a8243a5c28731b2d6cfb228ebb6e6498e6de8af97cc0cb2a4a9e4b578836d8d"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-private-besi"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-private-besi"
+        ]
+      },
+      "name": "local scenario fault/rollback contracts",
+      "passed": true
+    },
+    {
+      "name": "external live-duration/hardware/independence threshold",
+      "passed": false,
+      "reason": "local executable checks do not satisfy real hardware, independent operator, public duration, or live-devnet evidence",
+      "status": "EXTERNAL_BLOCKED"
+    }
+  ],
+  "claim_fingerprints": {
+    "E-NEL-PRIVATE-01": "2dd99641abb4f182f650320b1926ff23fe62c3fdc2f7a7183f54ea2db2e54264"
+  },
+  "claims": [
+    "E-NEL-PRIVATE-01"
+  ],
+  "command": [
+    "tools/e2e/run_network.py",
+    "--scenario",
+    "besi-full-24layer",
+    "--mandatory-freivalds",
+    "--bucket",
+    "128",
+    "--executors",
+    "2"
+  ],
+  "evidence_sha256": "6cff94a5c97c4417e43dbce4cd9c91941f11f24258c48c99ff1a6405feb829be",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "e2e-besi-full-24layer",
+  "limitations": [
+    "No hardware or public-duration pass is claimed."
+  ],
+  "registry_schema_version": "1.1.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-private-besi/Cargo.toml": "1a7fa58553b0285dfe833b02626c3479f85f6a464f0bd115531109b6267e9ac3",
+    "crates/noos-private-besi/src/lib.rs": "393e4b96a99e67ea73e2cf7790d261d36c68a9a7a8162982367eddad82043a7e"
+  }
+}
