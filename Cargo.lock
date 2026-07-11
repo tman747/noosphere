@@ -2216,6 +2216,13 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "ed25519-dalek",
+ "noos-agent-class",
+ "noos-braid",
+ "noos-ground",
+ "noos-nel",
+ "noos-training",
+ "noos-umbra",
+ "noos-work-loom",
  "thiserror 2.0.18",
 ]
 

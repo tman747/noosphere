@@ -1,0 +1,54 @@
+{
+  "claims": {
+    "M-CLOCK": {
+      "local_implementation_state": "IMPLEMENTED",
+      "packages": ["noos-reflex", "noos-braid"],
+      "command": "python tools/gates/run_identity_reflex_claim.py --claim M-CLOCK",
+      "rollback_command": "python tools/gates/run_identity_reflex_claim.py --claim M-CLOCK --rollback-check",
+      "notes": "TwoHandedClock composes Braid's exact U256 ForkScore tuple with atomic Loom receipt admission: eligibility_epoch <= block epoch, activation boundary, fork-local ancestor nullifier freshness, per-block and cumulative L/(G+L) <= 0.10, monotone finalized/justified checkpoints and epochs, saturating normalized work, and c_L=0 rollback retaining Ground production. Falsifiers cover future receipts, activation-before-boundary, cap overflow, descendant replay on both child forks, checkpoint/epoch rollback, lower-finalized or lower-justified work stuffing, inverse-hash ordering, and Ground-only continuation. The dedicated gate differentially executes Rust noos-braid and independent Go braidref over the same generated 100,000-pair corpus with byte-identical winners. This completes the local threshold only; it is not independent-vendor or production promotion evidence."
+    },
+    "I-PENTAGON": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-reflex", "noos-training", "noos-nel", "noos-umbra", "noos-work-loom"],
+      "command": "python tools/gates/run_identity_reflex_claim.py --claim I-PENTAGON",
+      "rollback_command": "python tools/gates/run_identity_reflex_claim.py --claim I-PENTAGON --rollback-check",
+      "notes": "A real deterministic INT8 span executes once into exact C32 and pinned-requant C8; five read-only product consumers bind that same root: escrow delivery, noos-work-loom counterfactual shadow accounting with production credit hard zero, verified dispute C32, three-leaf adjoint, and an M-BRANCH family registered from the N-TOKEN-STATE terminal commitment. Every single product is independently disableable and all receipts have zero consensus weight. PARTIAL because the exact threshold requires the production-shaped 0.5B T=32 witness and chapter-09 cycles/bytes/wall-clock marginal-cost vector; local 32^3 precursor evidence cannot substitute for those measurements."
+    },
+    "E-IDENT-01": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-reflex", "noos-training", "noos-nel", "noos-umbra", "noos-work-loom"],
+      "command": "python tools/gates/run_identity_reflex_claim.py --claim E-IDENT-01",
+      "rollback_command": "python tools/gates/run_identity_reflex_claim.py --claim E-IDENT-01 --rollback-check",
+      "notes": "Local precursor exercises five products from one actual 32^3 witness with one underlying execution, C8 escrow binding, receipt-only Loom weight zero, exact C32 dispute verification, C32-bound training adjoint, N-TOKEN-STATE branch registration, witness/adjoint mutation rejection, unauthorized activation rejection, each-product disablement, and zero double-credit across 100,000 deterministic adversarial orderings. PARTIAL because no production-shaped 0.5B cycle-harness run or measured chapter-09 section-2 marginal-cost vector exists."
+    },
+    "E-IDENT-02": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-reflex", "noos-training", "noos-nel"],
+      "command": "python tools/gates/run_identity_reflex_claim.py --claim E-IDENT-02",
+      "rollback_command": "python tools/gates/run_identity_reflex_claim.py --claim E-IDENT-02 --rollback-check",
+      "notes": "The existing NEL exact gemm_i8/requant discipline executes Y=XW, G_X=G_Y*W^T, and G_W=X^T*G_Y at 32^3 and rectangular 32x16x24 shapes. Per-leaf span IDs reuse noos-training E-IDENT-02 domains and every training leaf binds G_Y. The local exact operation census is 3.0x with bit-exact phase sum; 15/15 operand/C32/requant/span mutations and all six directed training-leaf transplants reject, including low-bit and 2-adic accumulator perturbations. PARTIAL because the claim requires measured RV32IM cycle-model ratios and phase cycles; an operation census is not that experiment."
+    },
+    "E-IDENT-03": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-reflex", "noos-training"],
+      "command": "python tools/gates/run_identity_reflex_claim.py --claim E-IDENT-03",
+      "rollback_command": "python tools/gates/run_identity_reflex_claim.py --claim E-IDENT-03 --rollback-check",
+      "notes": "A deterministic closure evaluator requires exactly two ordered four-epoch cycles disabling dream, training credit, Loom credit, and Chorus one at a time; it requires the other four product costs, unchanged base finality/liveness, and zero forks. Falsifiers exercise the inclusive 1.25x pass edge, >1.25x target failure, >2x coupled-label collapse, malformed schedules, and base-chain universal kill. PARTIAL because the required shadow-mode testnet, real epoch toggles, and surviving-product measurements have not run."
+    },
+    "A-REFLEX": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-reflex", "noos-agent-class"],
+      "command": "python tools/gates/run_identity_reflex_claim.py --claim A-REFLEX",
+      "rollback_command": "python tools/gates/run_identity_reflex_claim.py --claim A-REFLEX --rollback-check",
+      "notes": "The local application lifecycle now covers registered slot keys and Ground bonds; signed <=250ms compact ticks with tx root, receipt root, cumulative gas and no state root; mandatory handoff pause and <=2-tick gap; canonical count/per-index accumulator and receipt-root mapping; total inclusion/omission/same-key contradiction verdict; causal A-CLASS-GATE.v2 enforcement; foreign-finality rejection; persistent monotone composition budgets; contradiction replay protection; unambiguous same-key liability; integer-exact multi-victim bond compensation; and canonical-only rollback. Proposal/finality weights and base_chain_delta remain structurally zero/None, and local/F9 evidence cannot enable production. PARTIAL because the required live-devnet cadence, p95 handoff, partitioned-delivery trials, and real bond payout drill remain unrun."
+    },
+    "E-REFLEX-01": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-reflex"],
+      "command": "python tools/gates/run_identity_reflex_claim.py --claim E-REFLEX-01",
+      "rollback_command": "python tools/gates/run_identity_reflex_claim.py --claim E-REFLEX-01 --rollback-check",
+      "notes": "The frozen row is WITHDRAWN IN FULL, superseded by E-REFLEX-02, and has evidence weight zero. The implementation preserves explicit WITHDRAWN/zero-weight constants and proves withdrawn-v1 or shape evidence cannot enable Reflex. No former G1-G6 result is reused; this row intentionally remains PARTIAL/withdrawn rather than presenting the rebuilt A-REFLEX lifecycle as E-REFLEX-01 evidence."
+    }
+  },
+  "notes": "IdentityReflexClaims: exact local M-CLOCK implementation plus honest executable precursors for the production/cycle/testnet/live-devnet identity and Reflex rows; withdrawn E-REFLEX-01 remains void."
+}
