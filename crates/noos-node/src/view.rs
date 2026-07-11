@@ -221,11 +221,7 @@ impl ChainView {
         let prune_before = tip_height.saturating_sub(self.retention_blocks);
         self.pruned_before_height = self.pruned_before_height.max(prune_before);
 
-        let evict_heights: Vec<u64> = self
-            .blocks
-            .range(..prune_before)
-            .map(|(h, _)| *h)
-            .collect();
+        let evict_heights: Vec<u64> = self.blocks.range(..prune_before).map(|(h, _)| *h).collect();
         for h in evict_heights {
             if let Some(summary) = self.blocks.remove(&h) {
                 self.by_hash.remove(&summary.hash);

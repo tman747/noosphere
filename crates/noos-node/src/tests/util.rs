@@ -48,8 +48,12 @@ pub fn devnet_params() -> DevnetParams {
     params
 }
 
+/// Devnet spec with operator fixture accounts 1..=4 pre-provisioned
+/// (lumen v1 deposit targets must exist; genesis is the only creator).
 pub fn spec() -> GenesisSpec {
-    GenesisSpec::devnet(devnet_params(), GENESIS_TIME_MS)
+    let mut s = GenesisSpec::devnet(devnet_params(), GENESIS_TIME_MS);
+    s.extra_accounts = (1..=4).map(|i| (operator_account(i), 0)).collect();
+    s
 }
 
 /// Spendable faucet fixture keypair (test networks only).
@@ -237,8 +241,14 @@ pub fn build_signed_tx(
 
 /// Advances the node clock one slot and produces the next block.
 pub fn produce_next(core: &mut NodeCore<InProcStore>) -> Hash32 {
+    produce_full(core).hash
+}
+
+/// Like [`produce_next`] but returns the full gossip-ready block
+/// (header, ticket, body, DA claim, shards) for import-side tests.
+pub fn produce_full(core: &mut NodeCore<InProcStore>) -> crate::consensus::ProducedBlock {
     let (height, _) = core.head();
     let now = GENESIS_TIME_MS + (height + 1) * 6000;
     core.set_now(now);
-    core.produce_block().expect("produce block").hash
+    core.produce_block().expect("produce block")
 }

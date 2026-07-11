@@ -28,7 +28,9 @@ fn e2e_happy_path_finality_and_restart_recovery() {
     let faucet = faucet_key();
     let alice = operator_account(1);
     let faucet_account = faucet.public_key().into_bytes();
-    let faucet_start = core.ledger().balance(&faucet_account, &noos_lumen::state::NOOS_ASSET);
+    let faucet_start = core
+        .ledger()
+        .balance(&faucet_account, &noos_lumen::state::NOOS_ASSET);
 
     // Transfers riding the first blocks.
     let (tx1, wit1, txid1) = signed_transfer(chain_id, 40, &faucet, alice, 1_000_000);
@@ -47,18 +49,27 @@ fn e2e_happy_path_finality_and_restart_recovery() {
     assert!(core.mempool.is_empty());
     assert_eq!(
         core.view.tx_status(&txid1),
-        ViewLookup::Found(TxStatus::Settled { height: 1, status: 0 })
+        ViewLookup::Found(TxStatus::Settled {
+            height: 1,
+            status: 0
+        })
     );
     assert_eq!(
         core.view.tx_status(&txid2),
-        ViewLookup::Found(TxStatus::Settled { height: 1, status: 0 })
+        ViewLookup::Found(TxStatus::Settled {
+            height: 1,
+            status: 0
+        })
     );
     assert_eq!(
-        core.ledger().balance(&alice, &noos_lumen::state::NOOS_ASSET),
+        core.ledger()
+            .balance(&alice, &noos_lumen::state::NOOS_ASSET),
         3_500_000
     );
     // Fees left the faucet beyond the transferred amounts.
-    let faucet_now = core.ledger().balance(&faucet_account, &noos_lumen::state::NOOS_ASSET);
+    let faucet_now = core
+        .ledger()
+        .balance(&faucet_account, &noos_lumen::state::NOOS_ASSET);
     assert!(faucet_now < faucet_start - 3_500_000);
 
     // Justify epoch 1 with the simulated witness set.
@@ -114,24 +125,35 @@ fn e2e_happy_path_finality_and_restart_recovery() {
     let head_before = core.head();
     let finalized_before = core.finalized();
     let justified_before = core.justified();
-    let alice_before = core.ledger().balance(&alice, &noos_lumen::state::NOOS_ASSET);
+    let alice_before = core
+        .ledger()
+        .balance(&alice, &noos_lumen::state::NOOS_ASSET);
     let minted_before = core.ledger().total_minted();
     drop(core);
 
     // Restart: replay from the durable store only.
     let mut restarted = boot_node(&dir, node_config());
     assert_eq!(restarted.head(), head_before, "head recovered");
-    assert_eq!(restarted.ledger().roots(), roots_before, "exact roots recovered");
+    assert_eq!(
+        restarted.ledger().roots(),
+        roots_before,
+        "exact roots recovered"
+    );
     assert_eq!(restarted.finalized(), finalized_before);
     assert_eq!(restarted.justified(), justified_before);
     assert_eq!(
-        restarted.ledger().balance(&alice, &noos_lumen::state::NOOS_ASSET),
+        restarted
+            .ledger()
+            .balance(&alice, &noos_lumen::state::NOOS_ASSET),
         alice_before
     );
     assert_eq!(restarted.ledger().total_minted(), minted_before);
     assert_eq!(
         restarted.view.tx_status(&txid1),
-        ViewLookup::Found(TxStatus::Settled { height: 1, status: 0 })
+        ViewLookup::Found(TxStatus::Settled {
+            height: 1,
+            status: 0
+        })
     );
 
     // The recovered node RESUMES: one more block extends the chain.

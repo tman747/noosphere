@@ -67,6 +67,9 @@ pub const KEY_FINALIZED: &[u8] = b"m/final";
 /// Index-CF key of the justified checkpoint.
 pub const KEY_JUSTIFIED: &[u8] = b"m/just";
 
+/// Owned `(key, value)` entries returned by an index scan.
+pub type ScanEntries = Vec<(Vec<u8>, Vec<u8>)>;
+
 /// Storage surface the consensus core requires. Every mutation is
 /// `&mut self`: the single-writer law extends through storage.
 pub trait StorePort: Send {
@@ -80,7 +83,7 @@ pub trait StorePort: Send {
     fn get_index(&self, key: &[u8]) -> Result<Option<Vec<u8>>, NodeError>;
     fn get_receipt(&self, key: &[u8]) -> Result<Option<Vec<u8>>, NodeError>;
     fn get_blob(&self, hash: &Hash32) -> Result<Option<Vec<u8>>, NodeError>;
-    fn scan_indices(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, NodeError>;
+    fn scan_indices(&self, prefix: &[u8]) -> Result<ScanEntries, NodeError>;
     fn roots(&self) -> Result<Option<LumenRoots>, NodeError>;
     fn create_snapshot(&mut self) -> Result<u64, NodeError>;
     fn applied_seq(&self) -> u64;
@@ -94,7 +97,11 @@ pub struct InProcStore {
 impl InProcStore {
     /// Opens (or initializes) the store bound to the chain identity
     /// `chain_id ++ genesis_hash` (wrong identity is a typed fatal).
-    pub fn open(root: PathBuf, chain_id: &Hash32, genesis_hash: &Hash32) -> Result<Self, NodeError> {
+    pub fn open(
+        root: PathBuf,
+        chain_id: &Hash32,
+        genesis_hash: &Hash32,
+    ) -> Result<Self, NodeError> {
         let mut identity = Vec::with_capacity(64);
         identity.extend_from_slice(chain_id);
         identity.extend_from_slice(genesis_hash);
@@ -144,7 +151,7 @@ impl StorePort for InProcStore {
     fn get_blob(&self, hash: &Hash32) -> Result<Option<Vec<u8>>, NodeError> {
         Ok(self.store.get_blob(hash)?)
     }
-    fn scan_indices(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, NodeError> {
+    fn scan_indices(&self, prefix: &[u8]) -> Result<ScanEntries, NodeError> {
         Ok(self.store.scan(Cf::Indices, prefix)?)
     }
     fn roots(&self) -> Result<Option<LumenRoots>, NodeError> {

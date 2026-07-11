@@ -53,13 +53,11 @@ use noos_ground::{
 };
 use noos_lumen::fees;
 use noos_lumen::objects::{BoundedList, ReceiptV1, TransactionWitnessesV1};
-use noos_lumen::state::{
-    BlockContext, DeltaEntry, LumenLedger, LumenRoots, StateDelta, TreeId,
-};
+use noos_lumen::state::{BlockContext, DeltaEntry, LumenLedger, LumenRoots, StateDelta, TreeId};
 use noos_store::{Blob, WriteSet};
+use noos_witness::bond::WitnessBondV1;
 use noos_witness::finality::{Ancestry, FinalityTracker, IngestOutcome, SnapshotRegistry};
 use noos_witness::membership::{build_snapshot, SnapshotOutcome};
-use noos_witness::bond::WitnessBondV1;
 
 use crate::auth::{DeferredEngine, NodeAuthVerifier};
 use crate::genesis::{
@@ -274,7 +272,8 @@ impl<P: StorePort> NodeCore<P> {
             let mut ws = WriteSet::default();
             let mut header_bytes = built.header.encode_canonical();
             header_bytes.extend_from_slice(&built.ticket.encode());
-            ws.headers.push((key_header(&genesis_block_hash), Some(header_bytes)));
+            ws.headers
+                .push((key_header(&genesis_block_hash), Some(header_bytes)));
             ws.indices
                 .push((key_height(0), Some(genesis_block_hash.to_vec())));
             ws.indices
@@ -374,21 +373,16 @@ impl<P: StorePort> NodeCore<P> {
                 local.checkpoint_hash
             } else {
                 // The finalized chain at that epoch's checkpoint height.
-                match self
-                    .dag
-                    .ancestor_at_height(
-                        &local.checkpoint_hash,
-                        social.epoch.saturating_mul(EPOCH_LENGTH),
-                    ) {
+                match self.dag.ancestor_at_height(
+                    &local.checkpoint_hash,
+                    social.epoch.saturating_mul(EPOCH_LENGTH),
+                ) {
                     Some(s) => s.hash,
                     None => local.checkpoint_hash,
                 }
             };
             if local_at != social.checkpoint_hash {
-                return Err(NodeError::SocialCheckpointConflictsLocalFinality {
-                    local,
-                    social,
-                });
+                return Err(NodeError::SocialCheckpointConflictsLocalFinality { local, social });
             }
         }
         // Consistent (or ahead of local finality): retained as a sync hint
@@ -421,9 +415,9 @@ impl<P: StorePort> NodeCore<P> {
                     .map_err(|_| NodeError::Witness(noos_witness::WitnessError::UnknownSnapshot))?;
                 Ok(())
             }
-            SnapshotOutcome::Halt => Err(NodeError::Witness(
-                noos_witness::WitnessError::QuorumNotMet,
-            )),
+            SnapshotOutcome::Halt => {
+                Err(NodeError::Witness(noos_witness::WitnessError::QuorumNotMet))
+            }
         }
     }
 
@@ -444,20 +438,25 @@ impl<P: StorePort> NodeCore<P> {
         ticket: &GroundTicketV1,
     ) -> Result<InsertOutcome, NodeError> {
         // Stage 1: structural law + proposer signature.
-        header.validate_structure(&self.chain_id, false).map_err(|e| {
-            NodeError::Dag(noos_braid::DagError::Header(e))
-        })?;
+        header
+            .validate_structure(&self.chain_id, false)
+            .map_err(|e| NodeError::Dag(noos_braid::DagError::Header(e)))?;
         let commitment = header
             .proposal_commitment()
             .map_err(|_| NodeError::Crypto)?;
         let key = BlsPublicKey::from_bytes(header.proposer_key.0);
         let sig = BlsSignature::from_bytes(header.proposer_signature.0);
-        bls_verify(DomainId::BlsProposer, &key, commitment.as_bytes(), &sig)
-            .map_err(|_| NodeError::BodyMismatch { what: "proposer signature" })?;
+        bls_verify(DomainId::BlsProposer, &key, commitment.as_bytes(), &sig).map_err(|_| {
+            NodeError::BodyMismatch {
+                what: "proposer signature",
+            }
+        })?;
 
         // Ticket root binding (header field 24 <-> the gossiped ticket).
         if body_ticket_root(ticket)? != header.ground_ticket_root {
-            return Err(NodeError::BodyMismatch { what: "ground_ticket_root" });
+            return Err(NodeError::BodyMismatch {
+                what: "ground_ticket_root",
+            });
         }
 
         // Parent unknown → bounded orphan pool (ticket law needs context).
@@ -628,8 +627,12 @@ impl<P: StorePort> NodeCore<P> {
             return Ok(None);
         };
         parked.shards.extend_from_slice(more);
-        match self.reconstruct_body(&parked.header, &parked.ticket, &parked.claim, &parked.shards)
-        {
+        match self.reconstruct_body(
+            &parked.header,
+            &parked.ticket,
+            &parked.claim,
+            &parked.shards,
+        ) {
             Ok(body) => {
                 self.metrics
                     .set(&self.metrics.blocks_parked, self.parked.len() as u64);
@@ -671,7 +674,9 @@ impl<P: StorePort> NodeCore<P> {
             return Err(NodeError::RootMismatch { field: "tx_root" });
         }
         if body_witness_root(&body.segregated_witnesses)? != header.witness_root {
-            return Err(NodeError::RootMismatch { field: "witness_root" });
+            return Err(NodeError::RootMismatch {
+                field: "witness_root",
+            });
         }
         if body_cert_root(&body.finality_certificates)? != header.finality_certificate_root {
             return Err(NodeError::RootMismatch {
@@ -679,13 +684,17 @@ impl<P: StorePort> NodeCore<P> {
             });
         }
         if header.evidence_root != ZERO_ROOT {
-            return Err(NodeError::RootMismatch { field: "evidence_root" });
+            return Err(NodeError::RootMismatch {
+                field: "evidence_root",
+            });
         }
         if !body.system_transitions.is_empty() {
             return Err(NodeError::SystemTransitionsUnfrozen);
         }
         if body.transactions.len() != body.segregated_witnesses.len() {
-            return Err(NodeError::BodyMismatch { what: "witness alignment" });
+            return Err(NodeError::BodyMismatch {
+                what: "witness alignment",
+            });
         }
         check_blob_descriptors(body.consensus_blob_descriptors.as_slice())?;
         self.availability.record_reconstructed(&reconstructed);
@@ -772,7 +781,9 @@ impl<P: StorePort> NodeCore<P> {
         ];
         for i in 0..fees::DIMENSIONS {
             if u128::from(claimed[i]) != prices[i] {
-                return Err(NodeError::RootMismatch { field: "base_prices" });
+                return Err(NodeError::RootMismatch {
+                    field: "base_prices",
+                });
             }
         }
         deltas.push(
@@ -835,7 +846,11 @@ impl<P: StorePort> NodeCore<P> {
         let roots = self.ledger.roots();
         let checks: [(&'static str, Hash32, Hash32); 7] = [
             ("notes_root", header.notes_root, roots.notes_root),
-            ("nullifiers_root", header.nullifiers_root, roots.nullifiers_root),
+            (
+                "nullifiers_root",
+                header.nullifiers_root,
+                roots.nullifiers_root,
+            ),
             ("accounts_root", header.accounts_root, roots.accounts_root),
             ("objects_root", header.objects_root, roots.objects_root),
             ("params_root", header.params_root, roots.params_root),
@@ -876,9 +891,11 @@ impl<P: StorePort> NodeCore<P> {
         body: &BlockBodyV1,
         exec: &ExecResult,
     ) -> Result<(), NodeError> {
-        let mut ws = WriteSet::default();
-        ws.delta = exec.merged_delta.clone();
-        ws.roots = Some(exec.roots);
+        let mut ws = WriteSet {
+            delta: exec.merged_delta.clone(),
+            roots: Some(exec.roots),
+            ..WriteSet::default()
+        };
         let mut header_bytes = header.encode_canonical();
         header_bytes.extend_from_slice(&ticket.encode());
         ws.headers.push((key_header(&hash), Some(header_bytes)));
@@ -984,7 +1001,8 @@ impl<P: StorePort> NodeCore<P> {
             }
             cursor = stored.header.parent_hash;
         }
-        ws.indices.push((KEY_HEAD.to_vec(), Some(new_head.to_vec())));
+        ws.indices
+            .push((KEY_HEAD.to_vec(), Some(new_head.to_vec())));
         let seq = self.port.commit(&ws)?;
         self.metrics.set(&self.metrics.store_seq, seq);
         Ok(())
@@ -1135,7 +1153,9 @@ impl<P: StorePort> NodeCore<P> {
         let bytes = self
             .port
             .get_blob(&header.body_da_root)?
-            .ok_or(NodeError::BodyMismatch { what: "body blob missing" })?;
+            .ok_or(NodeError::BodyMismatch {
+                what: "body blob missing",
+            })?;
         let mut body = BlockBodyV1::decode_canonical(&bytes)?;
         body.ground_ticket = GroundTicketWire(*ticket);
         Ok(body)
@@ -1162,7 +1182,9 @@ impl<P: StorePort> NodeCore<P> {
         let entries = self.port.scan_indices(b"n/")?;
         for (key, value) in entries {
             if key.len() != 10 {
-                return Err(NodeError::BodyMismatch { what: "height index key" });
+                return Err(NodeError::BodyMismatch {
+                    what: "height index key",
+                });
             }
             let mut he = [0_u8; 8];
             he.copy_from_slice(&key[2..10]);
@@ -1170,10 +1192,13 @@ impl<P: StorePort> NodeCore<P> {
             if height == 0 {
                 continue; // genesis installed by boot
             }
-            let hash: Hash32 = value
-                .as_slice()
-                .try_into()
-                .map_err(|_| NodeError::BodyMismatch { what: "height index value" })?;
+            let hash: Hash32 =
+                value
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| NodeError::BodyMismatch {
+                        what: "height index value",
+                    })?;
             let (header, ticket) = self.load_header(&hash)?;
             let body = self.load_body(&header, &ticket)?;
 
@@ -1283,7 +1308,9 @@ impl<P: StorePort> NodeCore<P> {
         let height = parent_header
             .height
             .checked_add(1)
-            .ok_or(NodeError::BodyMismatch { what: "height overflow" })?;
+            .ok_or(NodeError::BodyMismatch {
+                what: "height overflow",
+            })?;
 
         // Timestamp/slot: > parent MTP, slot in [parent_slot, parent+20].
         let parent_timestamps = self
@@ -1295,9 +1322,13 @@ impl<P: StorePort> NodeCore<P> {
             .genesis_time_ms
             .saturating_add(parent_header.slot.saturating_mul(noos_ground::SLOT_MS));
         ts = ts.max(parent_slot_start);
-        let max_slot = parent_header.slot.saturating_add(noos_ground::MAX_SLOT_SKIP);
-        let mut slot = slot_from_timestamp(ts, self.genesis_time_ms)
-            .ok_or(NodeError::BodyMismatch { what: "timestamp before genesis" })?;
+        let max_slot = parent_header
+            .slot
+            .saturating_add(noos_ground::MAX_SLOT_SKIP);
+        let mut slot =
+            slot_from_timestamp(ts, self.genesis_time_ms).ok_or(NodeError::BodyMismatch {
+                what: "timestamp before genesis",
+            })?;
         if slot > max_slot {
             slot = max_slot;
             ts = self
@@ -1327,11 +1358,13 @@ impl<P: StorePort> NodeCore<P> {
 
         // Deterministic template, executed on the live ledger; entries the
         // state rejects are dropped from the pool (invalid at this state).
-        let capacity = self
-            .ledger
-            .fee_params()
-            .map(|p| p.capacity())
-            .ok_or(NodeError::RootMismatch { field: "fee_params" })?;
+        let capacity =
+            self.ledger
+                .fee_params()
+                .map(|p| p.capacity())
+                .ok_or(NodeError::RootMismatch {
+                    field: "fee_params",
+                })?;
         let template: Vec<(Hash32, Vec<u8>, Vec<u8>)> = self
             .mempool
             .template(&capacity)
@@ -1382,15 +1415,18 @@ impl<P: StorePort> NodeCore<P> {
         let mut txs = Vec::with_capacity(included.len());
         let mut wits = Vec::with_capacity(included.len());
         for (tx_bytes, wit_bytes) in &included {
-            txs.push(noos_lumen::objects::TransactionV1::decode_canonical(tx_bytes)?);
+            txs.push(noos_lumen::objects::TransactionV1::decode_canonical(
+                tx_bytes,
+            )?);
             wits.push(TransactionWitnessesV1::decode_canonical(wit_bytes)?);
         }
         let certs: Vec<FinalityCertificateV1> = std::mem::take(&mut self.pending_certs);
         let mut body = BlockBodyV1 {
             transactions: BoundedList::new(txs)
                 .ok_or(NodeError::BodyMismatch { what: "tx count" })?,
-            segregated_witnesses: BoundedList::new(wits)
-                .ok_or(NodeError::BodyMismatch { what: "witness count" })?,
+            segregated_witnesses: BoundedList::new(wits).ok_or(NodeError::BodyMismatch {
+                what: "witness count",
+            })?,
             system_transitions: BoundedList::new(vec![]).unwrap_or_default(),
             finality_certificates: BoundedList::new(certs)
                 .ok_or(NodeError::BodyMismatch { what: "cert count" })?,
@@ -1513,7 +1549,11 @@ impl<P: StorePort> NodeCore<P> {
         let Some(stored) = self.dag.get(&cp.checkpoint_hash) else {
             return false;
         };
-        let floor = self.tracker.finalized_head().epoch.saturating_mul(EPOCH_LENGTH);
+        let floor = self
+            .tracker
+            .finalized_head()
+            .epoch
+            .saturating_mul(EPOCH_LENGTH);
         let mut cursor = stored.hash;
         loop {
             let Some(s) = self.dag.get(&cursor) else {
@@ -1535,13 +1575,16 @@ impl<P: StorePort> NodeCore<P> {
 
 /// Decodes a stored `header ++ ticket` record.
 pub fn decode_header_record(bytes: &[u8]) -> Result<(BlockHeaderV1, GroundTicketV1), NodeError> {
-    if bytes.len() < noos_ground::TICKET_ENCODED_BYTES {
-        return Err(NodeError::BodyMismatch { what: "header record" });
-    }
-    let split = bytes.len() - noos_ground::TICKET_ENCODED_BYTES;
+    let split = bytes
+        .len()
+        .checked_sub(noos_ground::TICKET_ENCODED_BYTES)
+        .ok_or(NodeError::BodyMismatch {
+            what: "header record",
+        })?;
     let header = BlockHeaderV1::decode_canonical(&bytes[..split])?;
-    let ticket = GroundTicketV1::decode(&bytes[split..])
-        .ok_or(NodeError::BodyMismatch { what: "ticket record" })?;
+    let ticket = GroundTicketV1::decode(&bytes[split..]).ok_or(NodeError::BodyMismatch {
+        what: "ticket record",
+    })?;
     Ok((header, ticket))
 }
 
@@ -1615,7 +1658,9 @@ impl AnchorExec<'_> {
             .map_err(NodeError::LumenReject)?;
         let roots = self.ledger.roots();
         if roots.accounts_root != header.accounts_root {
-            return Err(NodeError::RootMismatch { field: "anchor accounts_root" });
+            return Err(NodeError::RootMismatch {
+                field: "anchor accounts_root",
+            });
         }
         Ok(())
     }

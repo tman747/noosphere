@@ -200,7 +200,11 @@ fn handle_connection(
     }
     if !bearer_ok {
         metrics.inc(&metrics.rpc_unauthorized_total);
-        return json_error("401 Unauthorized", "unauthorized", "missing or bad bearer token");
+        return json_error(
+            "401 Unauthorized",
+            "unauthorized",
+            "missing or bad bearer token",
+        );
     }
 
     match (method.as_str(), path.as_str()) {
@@ -219,7 +223,7 @@ fn handle_connection(
 fn find_header_end(buf: &[u8]) -> Option<usize> {
     buf.windows(4)
         .position(|w| w == b"\r\n\r\n")
-        .map(|p| p + 4)
+        .map(|p| p.saturating_add(4))
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
@@ -250,7 +254,11 @@ fn status_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
     let Some(s): Option<StatusSnapshot> =
         round_trip(consensus_tx, |reply| ConsensusMsg::Status { reply })
     else {
-        return json_error("503 Service Unavailable", "consensus_unavailable", "no status");
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no status",
+        );
     };
     // The three heads are SEPARATE fields by law; no merged "latest".
     let body = format!(
@@ -276,11 +284,7 @@ fn status_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
     http("200 OK", "application/json", &body)
 }
 
-fn submit_route(
-    cfg: &RpcConfig,
-    consensus_tx: &SyncSender<ConsensusMsg>,
-    body: &[u8],
-) -> String {
+fn submit_route(cfg: &RpcConfig, consensus_tx: &SyncSender<ConsensusMsg>, body: &[u8]) -> String {
     if cfg.observer {
         return feature_disabled(
             "node.tx_submission.observer",
@@ -290,9 +294,15 @@ fn submit_route(
     let Ok(text) = std::str::from_utf8(body) else {
         return json_error("400 Bad Request", "malformed", "body is not utf-8");
     };
-    let (Some(tx_hex), Some(wit_hex)) = (json_str_field(text, "tx"), json_str_field(text, "witnesses"))
-    else {
-        return json_error("400 Bad Request", "malformed", "expected {\"tx\",\"witnesses\"}");
+    let (Some(tx_hex), Some(wit_hex)) = (
+        json_str_field(text, "tx"),
+        json_str_field(text, "witnesses"),
+    ) else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "expected {\"tx\",\"witnesses\"}",
+        );
     };
     let (Some(tx_bytes), Some(wit_bytes)) = (unhex(&tx_hex), unhex(&wit_hex)) else {
         return json_error("400 Bad Request", "malformed", "bad hex payload");
@@ -310,7 +320,11 @@ fn submit_route(
             &format!(r#"{{"accepted":true,"txid":"{}"}}"#, hex(&txid)),
         ),
         Some(Err(e)) => json_error("409 Conflict", e.code(), "admission refused"),
-        None => json_error("503 Service Unavailable", "consensus_unavailable", "no reply"),
+        None => json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no reply",
+        ),
     }
 }
 
@@ -328,7 +342,11 @@ fn block_route(consensus_tx: &SyncSender<ConsensusMsg>, id_raw: &str) -> String 
     };
     let Some(lookup) = round_trip(consensus_tx, |reply| ConsensusMsg::GetBlock { id, reply })
     else {
-        return json_error("503 Service Unavailable", "consensus_unavailable", "no reply");
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no reply",
+        );
     };
     match lookup {
         ViewLookup::Found(b) => {
@@ -353,10 +371,15 @@ fn receipt_route(consensus_tx: &SyncSender<ConsensusMsg>, txid_raw: &str) -> Str
     let Some(txid) = unhex32(txid_raw) else {
         return json_error("400 Bad Request", "malformed", "bad txid");
     };
-    let Some(lookup) =
-        round_trip(consensus_tx, |reply| ConsensusMsg::GetReceipt { txid, reply })
-    else {
-        return json_error("503 Service Unavailable", "consensus_unavailable", "no reply");
+    let Some(lookup) = round_trip(consensus_tx, |reply| ConsensusMsg::GetReceipt {
+        txid,
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no reply",
+        );
     };
     match lookup {
         ViewLookup::Found((status, receipt)) => {
@@ -392,7 +415,7 @@ fn receipt_route(consensus_tx: &SyncSender<ConsensusMsg>, txid_raw: &str) -> Str
 
 #[must_use]
 pub fn hex(bytes: &[u8]) -> String {
-    let mut s = String::with_capacity(bytes.len() * 2);
+    let mut s = String::with_capacity(bytes.len().saturating_mul(2));
     for b in bytes {
         s.push(char::from_digit(u32::from(b >> 4), 16).unwrap_or('0'));
         s.push(char::from_digit(u32::from(b & 0xF), 16).unwrap_or('0'));
@@ -402,7 +425,7 @@ pub fn hex(bytes: &[u8]) -> String {
 
 #[must_use]
 pub fn unhex(s: &str) -> Option<Vec<u8>> {
-    if s.len() % 2 != 0 {
+    if !s.len().is_multiple_of(2) {
         return None;
     }
     let bytes = s.as_bytes();
@@ -426,10 +449,10 @@ pub fn unhex32(s: &str) -> Option<Hash32> {
 /// fancier belongs to the later public API phase.
 fn json_str_field(text: &str, key: &str) -> Option<String> {
     let needle = format!("\"{key}\"");
-    let start = text.find(&needle)? + needle.len();
-    let rest = &text[start..];
+    let start = text.find(&needle)?.saturating_add(needle.len());
+    let rest = text.get(start..)?;
     let colon = rest.find(':')?;
-    let rest = rest[colon + 1..].trim_start();
+    let rest = rest.get(colon.saturating_add(1)..)?.trim_start();
     let rest = rest.strip_prefix('"')?;
     let end = rest.find('"')?;
     Some(rest[..end].to_string())

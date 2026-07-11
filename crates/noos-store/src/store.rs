@@ -99,6 +99,9 @@ pub struct PruneReport {
 // Store
 // ---------------------------------------------------------------------------
 
+/// Owned `(key, value)` entry returned by [`Store::scan`].
+pub type ScanEntry = (Vec<u8>, Vec<u8>);
+
 /// Durable store handle. Single-writer: `&mut self` on every mutation.
 pub struct Store {
     cfg: StoreConfig,
@@ -557,7 +560,7 @@ impl Store {
     /// (headers / indices / receipts). Additive node-runtime API: the
     /// node's restart replay enumerates its height index and certificate
     /// log through this; nothing here mutates state.
-    pub fn scan(&self, cf: Cf, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, StoreError> {
+    pub fn scan(&self, cf: Cf, prefix: &[u8]) -> Result<Vec<ScanEntry>, StoreError> {
         self.engine.prefix_scan(cf, prefix)
     }
 

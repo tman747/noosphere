@@ -52,15 +52,21 @@ pub const EMERGENCY_AUTHORITY_ACCOUNT: Hash32 = [0xE0; 32];
 pub const DEVNET_PROPOSER_SEED: [u8; 32] = [0x47; 32];
 
 /// The eight genesis controls, in manifest bit order (plan §6.8).
+///
+/// These are the params-tree key names under `noos.control.<name>`;
+/// `noos-lumen::state::param_key` freezes full names at <= 32 bytes and
+/// `CONTROL_PREFIX` is 13 bytes, so every name here MUST be <= 19 bytes
+/// (enforced by `control_key_names_fit_frozen_param_law`). The long plan
+/// aliases are recorded next to each entry.
 pub const CONTROL_NAMES: [&str; 8] = [
-    "work_loom_credit_enabled",
-    "work_loom_weight_cap_nonzero",
-    "witness_proofpower_bonus_enabled",
-    "neural_lane_enabled",
-    "reflex_lane_enabled",
-    "umbra_suite_enabled",
-    "dream_lane_enabled",
-    "class_gate_irreversible_budget_nonzero",
+    "work_loom_credit",    // work_loom_credit_enabled
+    "work_loom_weightcap", // work_loom_weight_cap != 0
+    "witness_proofpower",  // witness_proofpower_bonus_enabled
+    "neural_lane",         // neural_lane_enabled
+    "reflex_lane",         // reflex_lane_enabled
+    "umbra_suite",         // umbra_suite_enabled (all suites)
+    "dream_lane",          // dream_lane_enabled
+    "class_gate_budget",   // class_gate_irreversible_budget != 0
 ];
 
 // ---------------------------------------------------------------------------
@@ -117,26 +123,34 @@ fn parse_toml(text: &str) -> Result<std::collections::BTreeMap<String, String>, 
             continue;
         }
         if let Some(name) = line.strip_prefix('[') {
-            let name = name
-                .strip_suffix(']')
-                .ok_or_else(|| NodeError::Config(format!("line {}: bad section", lineno + 1)))?;
+            let name = name.strip_suffix(']').ok_or_else(|| {
+                NodeError::Config(format!("line {}: bad section", lineno.saturating_add(1)))
+            })?;
             section = name.trim().to_string();
             continue;
         }
-        let (key, value) = line
-            .split_once('=')
-            .ok_or_else(|| NodeError::Config(format!("line {}: expected key = value", lineno + 1)))?;
+        let (key, value) = line.split_once('=').ok_or_else(|| {
+            NodeError::Config(format!(
+                "line {}: expected key = value",
+                lineno.saturating_add(1)
+            ))
+        })?;
         let key = key.trim();
         let mut value = value.trim().to_string();
         if value.starts_with('"') {
             value = value
                 .strip_prefix('"')
                 .and_then(|v| v.strip_suffix('"'))
-                .ok_or_else(|| NodeError::Config(format!("line {}: bad string", lineno + 1)))?
+                .ok_or_else(|| {
+                    NodeError::Config(format!("line {}: bad string", lineno.saturating_add(1)))
+                })?
                 .to_string();
         }
         if value.is_empty() || value.contains('#') {
-            return Err(NodeError::Config(format!("line {}: bad value", lineno + 1)));
+            return Err(NodeError::Config(format!(
+                "line {}: bad value",
+                lineno.saturating_add(1)
+            )));
         }
         let full = if section.is_empty() {
             key.to_string()
@@ -397,6 +411,14 @@ pub struct GenesisSpec {
     pub genesis_time_ms: u64,
     /// Initial Ground target, little-endian (devnet: `T_MAX` = trivial).
     pub initial_ground_target: U256,
+    /// Extra fixture accounts installed at genesis: `(account_id, balance)`
+    /// where the account id IS the Ed25519 public key bytes and the
+    /// auth_descriptor is the same bytes (the node's suite-1 verifier law).
+    /// Lumen v1 has no account-creation action (lumen-v1.md §6: deposit
+    /// targets must already exist), so engineering networks pre-provision
+    /// their operator accounts here. REFUSED unless `is_test_network = true`
+    /// (plan §2.5); mainnet allocations are OWNER_BLOCKED by design.
+    pub extra_accounts: Vec<(Hash32, u128)>,
 }
 
 /// A fully derived genesis: identity, ledger, and the genesis block.
@@ -418,6 +440,7 @@ impl GenesisSpec {
             params,
             genesis_time_ms,
             initial_ground_target: U256::MAX,
+            extra_accounts: Vec::new(),
         }
     }
 
@@ -531,14 +554,28 @@ impl GenesisSpec {
     pub fn build_ledger(&self) -> LumenLedger {
         let mut ledger = LumenLedger::new();
         let faucet = Self::fixture_account(self.params.faucet_pubkey, &self.params.faucet_pubkey);
-        let accounts = [
-            (faucet, vec![(NOOS_ASSET, self.params.faucet_allocation_micro)]),
+        let mut accounts = vec![
+            (
+                faucet,
+                vec![(NOOS_ASSET, self.params.faucet_allocation_micro)],
+            ),
             (Self::fixture_account(PROPOSER_POOL_ACCOUNT, &[]), vec![]),
             (Self::fixture_account(WITNESS_POOL_ACCOUNT, &[]), vec![]),
             (Self::fixture_account(TREASURY_ACCOUNT, &[]), vec![]),
             (Self::fixture_account(GOV_AUTHORITY_ACCOUNT, &[]), vec![]),
-            (Self::fixture_account(EMERGENCY_AUTHORITY_ACCOUNT, &[]), vec![]),
+            (
+                Self::fixture_account(EMERGENCY_AUTHORITY_ACCOUNT, &[]),
+                vec![],
+            ),
         ];
+        for (id, balance) in &self.extra_accounts {
+            let balances = if *balance > 0 {
+                vec![(NOOS_ASSET, *balance)]
+            } else {
+                vec![]
+            };
+            accounts.push((Self::fixture_account(*id, id), balances));
+        }
         let controls: Vec<(&str, bool)> = CONTROL_NAMES.iter().map(|n| (*n, false)).collect();
         ledger.install_genesis(&GenesisConfig {
             fee_params: FeeParamsV1::testnet_fixture(),
@@ -559,6 +596,13 @@ impl GenesisSpec {
     /// [`NodeError::Config`] on fixture-law violations; [`NodeError::Crypto`]
     /// only on registry misuse (build defect).
     pub fn build(&self) -> Result<BuiltGenesis, NodeError> {
+        if !self.extra_accounts.is_empty() && !self.params.is_test_network {
+            return Err(NodeError::Config(
+                "extra fixture accounts are a test-network-only mechanism \
+                 (is_test_network = false)"
+                    .into(),
+            ));
+        }
         let chain_id = self.chain_id()?;
         let genesis_hash = self.genesis_hash()?;
         let ledger = self.build_ledger();
@@ -633,7 +677,9 @@ impl GenesisSpec {
         // Mine the genesis ticket against the header's own proposal
         // commitment (parent = zero hash, parent target = the initial
         // target). Trivial at T_MAX.
-        let commitment = header.proposal_commitment().map_err(|_| NodeError::Crypto)?;
+        let commitment = header
+            .proposal_commitment()
+            .map_err(|_| NodeError::Crypto)?;
         let ticket = mine_ticket(
             &chain_id,
             &ZERO_ROOT,
@@ -671,9 +717,12 @@ impl GenesisSpec {
     }
 }
 
-/// Deterministic ticket search: ascending nonce under a fixed extra nonce.
-/// Devnet targets are trivial, so this terminates immediately; a real
-/// Ground worker replaces this loop.
+/// Deterministic ticket search: ascending nonce under an extra nonce
+/// derived from the per-block challenge (which binds parent, slot, and
+/// proposal commitment), so the `(proposer, nonce, extra_nonce)` tuple is
+/// unique per block and never trips the ch01 §4.2 rule-8 duplicate scan
+/// even at the trivial devnet target. Devnet targets are trivial, so the
+/// search terminates immediately; a real Ground worker replaces this loop.
 pub fn mine_ticket(
     chain_id: &Hash32,
     parent_hash: &Hash32,
@@ -694,10 +743,11 @@ pub fn mine_ticket(
         proposer_pubkey,
     })
     .map_err(|_| NodeError::Crypto)?;
-    let extra_nonce = [0_u8; 32];
+    let extra_nonce = *challenge.as_bytes();
     let mut nonce: u64 = 0;
     loop {
-        let digest = ground_digest(&challenge, nonce, &extra_nonce).map_err(|_| NodeError::Crypto)?;
+        let digest =
+            ground_digest(&challenge, nonce, &extra_nonce).map_err(|_| NodeError::Crypto)?;
         if &U256::from_le_bytes(digest.as_bytes()) < target {
             return Ok(GroundTicketV1 {
                 profile_id: GROUND_PROFILE_ID_V1,
@@ -706,8 +756,8 @@ pub fn mine_ticket(
                 digest,
             });
         }
-        nonce = nonce
-            .checked_add(1)
-            .ok_or(NodeError::BodyMismatch { what: "nonce space exhausted" })?;
+        nonce = nonce.checked_add(1).ok_or(NodeError::BodyMismatch {
+            what: "nonce space exhausted",
+        })?;
     }
 }

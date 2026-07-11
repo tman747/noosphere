@@ -146,7 +146,7 @@ pub struct PoolEntry {
 impl PoolEntry {
     #[must_use]
     pub fn encoded_len(&self) -> usize {
-        self.tx_bytes.len() + self.wit_bytes.len()
+        self.tx_bytes.len().saturating_add(self.wit_bytes.len())
     }
     fn density_key(&self) -> (u128, u64, Hash32) {
         (self.density, self.seq, self.txid)
@@ -332,12 +332,7 @@ impl Mempool {
         if self.per_source.get(&source).copied().unwrap_or(0) >= self.cfg.per_source_pending {
             return Err(AdmitError::SourceLimit);
         }
-        if self
-            .per_account
-            .get(&payer)
-            .map_or(0, VecDeque::len)
-            >= self.cfg.per_account_pending
-        {
+        if self.per_account.get(&payer).map_or(0, VecDeque::len) >= self.cfg.per_account_pending {
             return Err(AdmitError::AccountLimit);
         }
 
@@ -378,7 +373,8 @@ impl Mempool {
         self.total_bytes = self.total_bytes.saturating_add(entry.encoded_len());
         self.by_density.insert(entry.density_key());
         self.per_account.entry(payer).or_default().push_back(id);
-        *self.per_source.entry(source).or_default() += 1;
+        let source_count = self.per_source.entry(source).or_default();
+        *source_count = source_count.saturating_add(1);
         self.entries.insert(id, entry);
         Ok(id)
     }
@@ -447,8 +443,7 @@ impl Mempool {
         while progressed && selected.len() < self.cfg.template_max_txs {
             progressed = false;
             'cand: for entry in &ranked {
-                if selected_set.contains(&entry.txid)
-                    || selected.len() >= self.cfg.template_max_txs
+                if selected_set.contains(&entry.txid) || selected.len() >= self.cfg.template_max_txs
                 {
                     continue;
                 }

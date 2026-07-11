@@ -60,7 +60,10 @@ enum StoreMsg {
     GetIndex(Vec<u8>, Reply<Result<Option<Vec<u8>>, String>>),
     GetReceipt(Vec<u8>, Reply<Result<Option<Vec<u8>>, String>>),
     GetBlob(Hash32, Reply<Result<Option<Vec<u8>>, String>>),
-    ScanIndices(Vec<u8>, Reply<Result<Vec<(Vec<u8>, Vec<u8>)>, String>>),
+    ScanIndices(
+        Vec<u8>,
+        Reply<Result<crate::store_port::ScanEntries, String>>,
+    ),
     Roots(Reply<Result<Option<LumenRoots>, String>>),
     CreateSnapshot(Reply<Result<u64, String>>),
     AppliedSeq(Reply<u64>),
@@ -79,10 +82,7 @@ fn store_err(msg: String) -> NodeError {
 }
 
 impl StoreClient {
-    fn round_trip<T>(
-        &self,
-        build: impl FnOnce(Reply<T>) -> StoreMsg,
-    ) -> Result<T, NodeError> {
+    fn round_trip<T>(&self, build: impl FnOnce(Reply<T>) -> StoreMsg) -> Result<T, NodeError> {
         let (reply_tx, reply_rx) = sync_channel(1);
         self.tx
             .send(build(reply_tx))
@@ -125,7 +125,7 @@ impl StorePort for StoreClient {
         self.round_trip(|r| StoreMsg::GetBlob(*hash, r))?
             .map_err(store_err)
     }
-    fn scan_indices(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, NodeError> {
+    fn scan_indices(&self, prefix: &[u8]) -> Result<crate::store_port::ScanEntries, NodeError> {
         self.round_trip(|r| StoreMsg::ScanIndices(prefix.to_vec(), r))?
             .map_err(store_err)
     }
@@ -133,7 +133,8 @@ impl StorePort for StoreClient {
         self.round_trip(StoreMsg::Roots)?.map_err(store_err)
     }
     fn create_snapshot(&mut self) -> Result<u64, NodeError> {
-        self.round_trip(StoreMsg::CreateSnapshot)?.map_err(store_err)
+        self.round_trip(StoreMsg::CreateSnapshot)?
+            .map_err(store_err)
     }
     fn applied_seq(&self) -> u64 {
         self.round_trip(StoreMsg::AppliedSeq).unwrap_or(0)
@@ -357,10 +358,7 @@ pub struct NodeHandle {
 }
 
 impl NodeHandle {
-    fn round_trip<T>(
-        &self,
-        build: impl FnOnce(Reply<T>) -> ConsensusMsg,
-    ) -> Result<T, NodeError> {
+    fn round_trip<T>(&self, build: impl FnOnce(Reply<T>) -> ConsensusMsg) -> Result<T, NodeError> {
         let (reply_tx, reply_rx) = sync_channel(1);
         self.consensus_tx
             .send(build(reply_tx))
@@ -390,9 +388,7 @@ impl NodeHandle {
         match self.consensus_tx.try_send(ConsensusMsg::InjectCrash) {
             Ok(()) => Ok(()),
             Err(TrySendError::Full(_)) => Err(NodeError::ChannelClosed("consensus inbox full")),
-            Err(TrySendError::Disconnected(_)) => {
-                Err(NodeError::ChannelClosed("consensus inbox"))
-            }
+            Err(TrySendError::Disconnected(_)) => Err(NodeError::ChannelClosed("consensus inbox")),
         }
     }
 

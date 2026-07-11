@@ -154,7 +154,13 @@ pub fn light_sync_round<P: StorePort>(
 ) -> Result<u64, NodeError> {
     debug_assert_eq!(core.cfg.mode, NodeMode::Light);
     let mut progressed = 0_u64;
-    let (head_height, _) = core.head();
+    // Light mode never executes, so the executed head is pinned at
+    // genesis; the header cursor is the best-known DAG tip instead.
+    let head_height = core
+        .dag()
+        .select_head()
+        .and_then(|tip| core.dag().get(&tip).map(|s| s.header.height))
+        .unwrap_or_else(|| core.head().0);
     if let Ok(headers) = edge.request_headers(head_height.saturating_add(1), batch) {
         for (header, ticket) in headers {
             match core.import_header_light(&header, &ticket) {
@@ -285,8 +291,7 @@ impl SnapshotSource for DirSnapshotSource {
     }
 
     fn fetch(&self, name: &str) -> Result<Vec<u8>, EdgeError> {
-        let mut bytes =
-            std::fs::read(self.root.join(name)).map_err(|_| EdgeError::Unavailable)?;
+        let mut bytes = std::fs::read(self.root.join(name)).map_err(|_| EdgeError::Unavailable)?;
         if self.corrupt.contains(name) {
             if let Some(b) = bytes.first_mut() {
                 *b ^= 0xFF;

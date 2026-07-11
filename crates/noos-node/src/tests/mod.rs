@@ -12,5 +12,6 @@ mod e2e;
 mod import_matrix;
 mod mempool_tests;
 mod retention;
+mod rpc_supervisor;
 mod safety;
 mod sync_tests;

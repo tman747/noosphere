@@ -60,7 +60,7 @@ impl VerdictPool {
         let mut handles = Vec::with_capacity(workers.max(1));
         for i in 0..workers.max(1) {
             let rx = Arc::clone(&shared);
-            let handle = std::thread::Builder::new()
+            let spawned = std::thread::Builder::new()
                 .name(format!("noos-verdict-{i}"))
                 .spawn(move || loop {
                     let job = {
@@ -91,9 +91,13 @@ impl VerdictPool {
                         verdict,
                         cost,
                     });
-                })
-                .expect("spawn verdict worker");
-            handles.push(handle);
+                });
+            match spawned {
+                Ok(handle) => handles.push(handle),
+                // OS refused a thread: a smaller pool still fails closed
+                // (a queue with zero workers answers WorkerCrashed).
+                Err(_) => break,
+            }
         }
         VerdictPool {
             job_tx,

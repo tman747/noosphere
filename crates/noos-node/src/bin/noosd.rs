@@ -120,7 +120,10 @@ fn main() -> ExitCode {
                     return ExitCode::from(2);
                 }
             },
-            "--social-checkpoint" => match take("--social-checkpoint").as_deref().and_then(parse_social) {
+            "--social-checkpoint" => match take("--social-checkpoint")
+                .as_deref()
+                .and_then(parse_social)
+            {
                 Some(cp) => social = Some(cp),
                 None => {
                     eprintln!("error: --social-checkpoint expects <epoch:hash-hex>");
@@ -143,7 +146,11 @@ fn main() -> ExitCode {
     };
     let spec = GenesisSpec::devnet(params, genesis_time_ms);
     let cfg = NodeConfig {
-        mode: if light { NodeMode::Light } else { NodeMode::Full },
+        mode: if light {
+            NodeMode::Light
+        } else {
+            NodeMode::Full
+        },
         observer,
         view_retention_blocks: retention,
         social_checkpoint: social,
@@ -180,7 +187,11 @@ fn main() -> ExitCode {
                 token,
                 observer,
             };
-            match rpc::start(rpc_cfg, handle.consensus_tx.clone(), Arc::clone(&handle.metrics)) {
+            match rpc::start(
+                rpc_cfg,
+                handle.consensus_tx.clone(),
+                Arc::clone(&handle.metrics),
+            ) {
                 Ok(h) => {
                     println!("operator RPC ready at http://{}", h.addr);
                     Some(h)

@@ -49,10 +49,14 @@ pub fn body_witness_root(
 /// `execution_receipt_root` over THIS block's ordered execution receipts
 /// (plan §6.3: distinct from the post-state settled-receipt index).
 pub fn body_receipt_root(receipts: &[ReceiptV1]) -> Result<Hash32, NodeError> {
-    let mut w = noos_codec::Writer::with_capacity(64 + receipts.len() * 96);
-    w.put_u32(u32::try_from(receipts.len()).map_err(|_| NodeError::BodyMismatch {
-        what: "receipt count exceeds u32",
-    })?);
+    let mut w = noos_codec::Writer::with_capacity(
+        64_usize.saturating_add(receipts.len().saturating_mul(96)),
+    );
+    w.put_u32(
+        u32::try_from(receipts.len()).map_err(|_| NodeError::BodyMismatch {
+            what: "receipt count exceeds u32",
+        })?,
+    );
     for r in receipts {
         w.put_raw(&r.encode_canonical());
     }
@@ -113,9 +117,9 @@ pub fn sum_usage(receipts: &[ReceiptV1]) -> Result<Usage, NodeError> {
     for r in receipts {
         let u = fees::usage_from_resources(&r.resources_used);
         for i in 0..fees::DIMENSIONS {
-            total[i] = total[i]
-                .checked_add(u[i])
-                .ok_or(NodeError::BodyMismatch { what: "gas total overflow" })?;
+            total[i] = total[i].checked_add(u[i]).ok_or(NodeError::BodyMismatch {
+                what: "gas total overflow",
+            })?;
         }
     }
     Ok(total)
