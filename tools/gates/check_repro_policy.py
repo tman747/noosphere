@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Validate reproducibility policy, release manifest schema/template, and instances.
 
-Uses only Python stdlib. On Python 3.11+ it uses tomllib; older supported
-interpreters use the strict minimal TOML subset parser below. Passing the
-contract gate does not make an unsigned policy release-ready:
---require-signed enforces that boundary.
+Structural validation uses only Python stdlib. On Python 3.11+ it uses
+tomllib; older supported interpreters use the strict minimal TOML subset
+parser below. Passing the contract gate does not make an unsigned policy
+release-ready: --require-signed additionally requires the real keyring,
+revision, and cryptographically verified detached Ed25519 role signatures.
 """
 from __future__ import annotations
 import argparse, copy, hashlib, json, re, sys
@@ -72,7 +73,7 @@ def validate_policy(p):
  if set(p.get("builder_independence_fields",[]))!={"operator","host","toolchain_installation"}:e.append("builder independence fields drifted")
  if set(p.get("required_platforms",[]))!=PLATFORMS:e.append("required platform set incomplete")
  sig=p.get("signature_policy",{})
- if sig.get("required_before_build") is not True or set(sig.get("required_roles",[]))!={"release-owner","independent-build-reviewer"} or sig.get("unsigned_or_pending_state_blocks_release") is not True:e.append("signature policy incomplete")
+ if sig.get("required_before_build") is not True or set(sig.get("required_roles",[]))!={"release-owner","independent-build-reviewer"} or sig.get("unsigned_or_pending_state_blocks_release") is not True or sig.get("detached_signature_algorithm")!="ed25519":e.append("signature policy incomplete")
  signed=p.get("comparison",{}).get("signed_installer",{})
  if signed.get("law")!="signed_installer_payload":e.append("signed installer law invalid")
  if set(signed.get("allowed_platform_envelope_fields",[]))!={"platform_signature","timestamp_envelope"}:e.append("signed installer variance is not closed")
@@ -150,7 +151,7 @@ def vector_accept(case,policy,manifest):
  return False
 
 def main(argv=None):
- ap=argparse.ArgumentParser();ap.add_argument("--root");ap.add_argument("--instance");ap.add_argument("--require-signed",action="store_true");args=ap.parse_args(argv)
+ ap=argparse.ArgumentParser();ap.add_argument("--root");ap.add_argument("--instance");ap.add_argument("--require-signed",action="store_true");ap.add_argument("--signatures");ap.add_argument("--keyring");ap.add_argument("--exact-revision");args=ap.parse_args(argv)
  root=Path(args.root).resolve() if args.root else Path(__file__).resolve().parents[2]
  errors=[]
  try:
@@ -185,7 +186,23 @@ def main(argv=None):
  for c in vectors.get("cases",[]):
   actual=vector_accept(c,policy,manifest);expected=c.get("valid") is True
   if actual!=expected:errors.append(f"vector {c.get('id')}: got {actual}, expected {expected}")
- if args.require_signed and policy.get("state")!="SIGNED":errors.append("policy is not SIGNED; release build blocked")
+ if args.require_signed:
+  if policy.get("state")!="SIGNED":errors.append("policy is not SIGNED; release build blocked")
+  if not all((args.signatures,args.keyring,args.exact_revision)):
+   errors.append("signed policy verification requires --signatures, --keyring, and --exact-revision")
+  elif policy.get("state")=="SIGNED":
+   try:
+    genesis_tools=root/"tools/genesis"
+    if str(genesis_tools) not in sys.path:sys.path.insert(0,str(genesis_tools))
+    from production_authorization import load_keyring,read_json,verify_detached_signatures,require_current_revision,DOMAIN_REPRO_POLICY,FREEZE_ROLES
+    signature_path=Path(args.signatures);keyring_path=Path(args.keyring)
+    if not signature_path.is_absolute():signature_path=root/signature_path
+    if not keyring_path.is_absolute():keyring_path=root/keyring_path
+    keys,keyring_doc=load_keyring(keyring_path)
+    if keyring_doc.get("exact_revision")!=args.exact_revision:raise ValueError("keyring exact revision mismatch")
+    require_current_revision(args.exact_revision)
+    verify_detached_signatures((root/"protocol/release/repro-policy-v1.toml").read_bytes(),read_json(signature_path),DOMAIN_REPRO_POLICY,args.exact_revision,FREEZE_ROLES,keys)
+   except Exception as exc:errors.append(f"signed policy cryptographic verification failed: {exc}")
  if args.instance:
   try:instance=load_json(Path(args.instance));errors+=validate_manifest(instance,True)
   except ValueError as exc:errors.append(str(exc))

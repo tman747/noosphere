@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "kind": "noosphere-multiparty-cutover-authorization-v1",
+  "exact_revision": "OWNER_BLOCKED",
+  "chain_id": "OWNER_BLOCKED",
+  "genesis_hash": "OWNER_BLOCKED",
+  "promotion_ledger_sha256": "OWNER_BLOCKED",
+  "release_manifest_sha256": "OWNER_BLOCKED",
+  "final_freeze_sha256": "OWNER_BLOCKED",
+  "prepared_cutover_sha256": "OWNER_BLOCKED",
+  "is_test_fixture": false,
+  "authorization_scope": "Exact prepared cutover bytes only; no authority exists until all gates already passed and every required role signature verifies."
+}

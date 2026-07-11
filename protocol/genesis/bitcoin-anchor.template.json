@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "kind": "noosphere-bitcoin-anchor-chain-v1",
+  "exact_revision": "OWNER_BLOCKED",
+  "is_test_fixture": false,
+  "trusted_checkpoint": {
+    "height": "OWNER_BLOCKED",
+    "header_hex": "OWNER_BLOCKED",
+    "block_hash_display_hex": "OWNER_BLOCKED"
+  },
+  "headers": [
+    {"height": "OWNER_BLOCKED", "header_hex": "OWNER_BLOCKED"}
+  ],
+  "anchor_height": "OWNER_BLOCKED",
+  "anchor_hash_display_hex": "OWNER_BLOCKED",
+  "minimum_chainwork_hex": "OWNER_BLOCKED",
+  "anchor_observed_at_utc": "OWNER_BLOCKED"
+}

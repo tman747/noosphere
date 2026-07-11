@@ -574,6 +574,11 @@ def self_test(skip_node: bool = False) -> int:
 
 
 def main() -> int:
+    # Production authorization is a separate, fail-closed workflow. It never
+    # treats this module's devnet fixture ledger as production evidence.
+    if len(sys.argv) > 1 and sys.argv[1] == "production":
+        from production_authorization import main as production_main
+        return production_main(sys.argv[2:])
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--self-test", action="store_true", help="run every local falsifier")
     parser.add_argument("--skip-node", action="store_true", help="skip the noosd rebuild reproduction")

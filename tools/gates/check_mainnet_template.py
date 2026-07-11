@@ -35,6 +35,8 @@ REQUIRED_OWNER_FIELDS=[
  ("commitments","claim_registry_root"),("commitments","conformance_vector_root"),
  ("commitments","software_manifest_root"),
  ("dkg","participants"),("dkg","threshold"),
+ ("authorization","exact_revision"),("authorization","role_keyring_path"),
+ ("authorization","signed_repro_policy_record_path"),
  ("signatures","record_path"),
 ]
 ZERO_CONTROLS={"work_loom_credit_enabled":False,"work_loom_weight_cap":0,

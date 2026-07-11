@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "kind": "noosphere-dealerless-dkg-v1",
+  "ceremony_id": "OWNER_BLOCKED",
+  "exact_revision": "OWNER_BLOCKED",
+  "freeze_manifest_sha256": "OWNER_BLOCKED",
+  "quiet_week_publication_sha256": "OWNER_BLOCKED",
+  "authorized_at_utc": "OWNER_BLOCKED",
+  "chain_id": "OWNER_BLOCKED",
+  "threshold": "OWNER_BLOCKED",
+  "participants": [
+    {"participant_id": "OWNER_BLOCKED", "index": 1, "signing_role": "dkg-participant:OWNER_BLOCKED"}
+  ],
+  "is_test_fixture": false,
+  "assurance_limit": "Participant identities and threshold are owner inputs; tooling verifies records but does not establish that a participant is an independent human."
+}

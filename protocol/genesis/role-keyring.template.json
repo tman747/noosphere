@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "kind": "noosphere-role-keyring-v1",
+  "exact_revision": "OWNER_BLOCKED",
+  "is_test_fixture": false,
+  "role_label_notice": "A cryptographic role label does not establish human identity or independence.",
+  "keys": [
+    {"role": "release-owner", "key_id": "OWNER_BLOCKED", "public_key_ed25519_hex": "OWNER_BLOCKED"},
+    {"role": "independent-build-reviewer", "key_id": "OWNER_BLOCKED", "public_key_ed25519_hex": "OWNER_BLOCKED"},
+    {"role": "independent-genesis-rebuilder", "key_id": "OWNER_BLOCKED", "public_key_ed25519_hex": "OWNER_BLOCKED"},
+    {"role": "operations-owner", "key_id": "OWNER_BLOCKED", "public_key_ed25519_hex": "OWNER_BLOCKED"},
+    {"role": "security-reviewer", "key_id": "OWNER_BLOCKED", "public_key_ed25519_hex": "OWNER_BLOCKED"},
+    {"role": "dkg-participant:OWNER_BLOCKED", "key_id": "OWNER_BLOCKED", "public_key_ed25519_hex": "OWNER_BLOCKED"}
+  ]
+}

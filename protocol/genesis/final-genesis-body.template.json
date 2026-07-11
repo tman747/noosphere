@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "parameter_manifest_hash": "OWNER_BLOCKED",
+  "genesis_time_ms": "OWNER_BLOCKED",
+  "dkg_suite_id": "OWNER_BLOCKED",
+  "dkg_group_pubkey_hex": "OWNER_BLOCKED",
+  "dkg_participant_set_root": "OWNER_BLOCKED",
+  "genesis_witness_set_root": "OWNER_BLOCKED",
+  "genesis_state_roots": {
+    "notes_root": "OWNER_BLOCKED",
+    "nullifiers_root": "OWNER_BLOCKED",
+    "accounts_root": "OWNER_BLOCKED",
+    "objects_root": "OWNER_BLOCKED",
+    "receipts_root": "OWNER_BLOCKED",
+    "params_root": "OWNER_BLOCKED"
+  },
+  "is_test_fixture": false
+}
