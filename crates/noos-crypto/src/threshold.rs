@@ -134,7 +134,10 @@ pub fn bls_threshold_combine(
 }
 
 #[allow(clippy::arithmetic_side_effects)] // modular field arithmetic
-fn lagrange_at_zero(pos: usize, entries: &[(u16, &BlsSignature)]) -> Result<blstrs::Scalar, BlsError> {
+fn lagrange_at_zero(
+    pos: usize,
+    entries: &[(u16, &BlsSignature)],
+) -> Result<blstrs::Scalar, BlsError> {
     let xi = blstrs::Scalar::from(u64::from(entries[pos].0));
     let mut numerator = blstrs::Scalar::from(1_u64);
     let mut denominator = blstrs::Scalar::from(1_u64);
@@ -229,9 +232,7 @@ mod tests {
     #[test]
     fn combine_rejects_non_adjacent_duplicates_and_short_sets() {
         let sk = BlsSecretKey::from_seed([6; 32]).unwrap();
-        let sig = sk
-            .sign_domain(crate::DomainId::BlsDkg, b"partial")
-            .unwrap();
+        let sig = sk.sign_domain(crate::DomainId::BlsDkg, b"partial").unwrap();
         // Duplicate hidden at non-adjacent positions.
         let entries = [(1_u16, &sig), (2_u16, &sig), (1_u16, &sig)];
         assert_eq!(

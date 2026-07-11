@@ -89,7 +89,9 @@ impl Writer {
     }
 
     pub fn with_capacity(cap: usize) -> Self {
-        Writer { buf: Vec::with_capacity(cap) }
+        Writer {
+            buf: Vec::with_capacity(cap),
+        }
     }
 
     pub fn into_bytes(self) -> Vec<u8> {
@@ -140,7 +142,10 @@ impl Writer {
     /// per-type bound; encoding an oversized value is a caller bug and panics
     /// in debug (encoders construct only valid objects).
     pub fn put_bytes(&mut self, v: &[u8], max: u32) {
-        debug_assert!(v.len() <= max as usize, "encoder produced oversized collection");
+        debug_assert!(
+            v.len() <= max as usize,
+            "encoder produced oversized collection"
+        );
         self.put_u32(v.len() as u32);
         self.buf.extend_from_slice(v);
     }

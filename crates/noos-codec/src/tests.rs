@@ -1,5 +1,9 @@
 // Test-only module: hard assertions are the desired failure mode.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::arithmetic_side_effects)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::arithmetic_side_effects
+)]
 
 use crate::{CodecError, NoosDecode, NoosEncode, Reader, Writer};
 
@@ -14,7 +18,11 @@ define_object! {
 }
 
 fn demo() -> DemoV1 {
-    DemoV1 { alpha: 0xDEAD_BEEF_0102_0304, beta: [7u8; 32], gamma: 513 }
+    DemoV1 {
+        alpha: 0xDEAD_BEEF_0102_0304,
+        beta: [7u8; 32],
+        gamma: 513,
+    }
 }
 
 // -- roundtrips --------------------------------------------------------------
@@ -36,7 +44,10 @@ fn roundtrip_primitives() {
     assert_eq!(r.get_u16().unwrap(), 0xCDEF);
     assert_eq!(r.get_u32().unwrap(), 0x0123_4567);
     assert_eq!(r.get_u64().unwrap(), 0x89AB_CDEF_0123_4567);
-    assert_eq!(r.get_u128().unwrap(), 0x0011_2233_4455_6677_8899_AABB_CCDD_EEFF);
+    assert_eq!(
+        r.get_u128().unwrap(),
+        0x0011_2233_4455_6677_8899_AABB_CCDD_EEFF
+    );
     assert_eq!(r.get_array32().unwrap(), [9u8; 32]);
     r.finish().unwrap();
 }
@@ -87,7 +98,10 @@ fn truncated_every_prefix_rejects() {
 fn trailing_bytes_reject() {
     let mut bytes = demo().encode_canonical();
     bytes.push(0);
-    assert_eq!(DemoV1::decode_canonical(&bytes).unwrap_err(), CodecError::TrailingBytes);
+    assert_eq!(
+        DemoV1::decode_canonical(&bytes).unwrap_err(),
+        CodecError::TrailingBytes
+    );
 }
 
 #[test]
@@ -115,7 +129,10 @@ fn atom_zero_is_empty_and_valid() {
 fn unknown_version_rejects() {
     let mut bytes = demo().encode_canonical();
     bytes[0] = 2; // version LE low byte
-    assert_eq!(DemoV1::decode_canonical(&bytes).unwrap_err(), CodecError::UnknownVersion);
+    assert_eq!(
+        DemoV1::decode_canonical(&bytes).unwrap_err(),
+        CodecError::UnknownVersion
+    );
 }
 
 #[test]
@@ -123,14 +140,20 @@ fn unknown_mandatory_field_rejects() {
     let mut bytes = demo().encode_canonical();
     // First tag is at offset 2 (after version u16); change 1 -> 9.
     bytes[2] = 9;
-    assert_eq!(DemoV1::decode_canonical(&bytes).unwrap_err(), CodecError::UnknownMandatoryField);
+    assert_eq!(
+        DemoV1::decode_canonical(&bytes).unwrap_err(),
+        CodecError::UnknownMandatoryField
+    );
 }
 
 #[test]
 fn optional_tag_in_mandatory_position_rejects() {
     let mut bytes = demo().encode_canonical();
     bytes[3] = 0x80; // tag high byte -> 0x8001
-    assert_eq!(DemoV1::decode_canonical(&bytes).unwrap_err(), CodecError::UnknownMandatoryField);
+    assert_eq!(
+        DemoV1::decode_canonical(&bytes).unwrap_err(),
+        CodecError::UnknownMandatoryField
+    );
 }
 
 #[test]
@@ -139,7 +162,10 @@ fn unknown_discriminant_rejects() {
     w.put_u16(3);
     let bytes = w.into_bytes();
     let mut r = Reader::new(&bytes);
-    assert_eq!(r.get_discriminant(3).unwrap_err(), CodecError::UnknownDiscriminant);
+    assert_eq!(
+        r.get_discriminant(3).unwrap_err(),
+        CodecError::UnknownDiscriminant
+    );
     let mut w = Writer::new();
     w.put_u16(2);
     let bytes = w.into_bytes();
@@ -168,7 +194,10 @@ fn length_boundary_zero_max_maxplus1() {
     w.put_u32(5);
     w.put_raw(&[1, 2, 3, 4, 5]);
     let b = w.into_bytes();
-    assert_eq!(Reader::new(&b).get_bytes(4).unwrap_err(), CodecError::LengthExceedsBound);
+    assert_eq!(
+        Reader::new(&b).get_bytes(4).unwrap_err(),
+        CodecError::LengthExceedsBound
+    );
 }
 
 #[test]
@@ -177,13 +206,19 @@ fn huge_length_prefix_fails_before_allocation() {
     // remaining-bytes bound without ever allocating.
     let bytes = [0xFF, 0xFF, 0xFF, 0xFF];
     let mut r = Reader::new(&bytes);
-    assert_eq!(r.get_bytes(u32::MAX).unwrap_err(), CodecError::LengthExceedsBound);
+    assert_eq!(
+        r.get_bytes(u32::MAX).unwrap_err(),
+        CodecError::LengthExceedsBound
+    );
 
     // Same for lists.
     let mut input = vec![0xFF, 0xFF, 0xFF, 0xFF];
     input.extend_from_slice(&[0u8; 8]);
     let mut r = Reader::new(&input);
-    assert_eq!(r.get_list::<u64>(u32::MAX).unwrap_err(), CodecError::LengthExceedsBound);
+    assert_eq!(
+        r.get_list::<u64>(u32::MAX).unwrap_err(),
+        CodecError::LengthExceedsBound
+    );
 }
 
 #[test]
@@ -192,7 +227,10 @@ fn list_count_exceeding_type_max_rejects() {
     w.put_list(&[1u8, 2, 3], 8);
     let bytes = w.into_bytes();
     let mut r = Reader::new(&bytes);
-    assert_eq!(r.get_list::<u8>(2).unwrap_err(), CodecError::LengthExceedsBound);
+    assert_eq!(
+        r.get_list::<u8>(2).unwrap_err(),
+        CodecError::LengthExceedsBound
+    );
 }
 
 #[test]

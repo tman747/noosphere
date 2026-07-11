@@ -137,8 +137,7 @@ mod tests {
         (0..t)
             .map(|i| {
                 #[allow(clippy::unwrap_used)]
-                let sk =
-                    BlsSecretKey::from_seed([seed_base.wrapping_add(i as u8); 32]).unwrap();
+                let sk = BlsSecretKey::from_seed([seed_base.wrapping_add(i as u8); 32]).unwrap();
                 sk.public_key()
             })
             .collect()

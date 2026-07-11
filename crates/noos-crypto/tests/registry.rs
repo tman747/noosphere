@@ -83,9 +83,7 @@ fn contexts_are_distinct_and_prefix_free() {
             }
             assert_ne!(a.context(), b.context(), "{a:?} vs {b:?}");
             assert!(
-                !b.context()
-                    .as_bytes()
-                    .starts_with(a.context().as_bytes()),
+                !b.context().as_bytes().starts_with(a.context().as_bytes()),
                 "{a:?} context is a byte-prefix of {b:?}"
             );
         }

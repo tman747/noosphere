@@ -1,0 +1,20 @@
+[package]
+name = "noos-store"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "NOOSPHERE durable storage: RocksDB column families, checksummed protocol WAL, append-only blob segments, atomic verified snapshot generations (plan section 7.3)"
+
+[dependencies]
+noos-codec = { path = "../noos-codec" }
+noos-lumen = { path = "../noos-lumen" }
+blake3 = "1.8"
+# Pinned exactly (plan section 7.3): rocksdb 0.24.0 -> librocksdb-sys
+# 0.17.3+10.4.2 -> bundled RocksDB library 10.4.2. Changing this pin is a
+# protocol-operations decision, not a dependency bump.
+rocksdb = "=0.24.0"
+
+[lints]
+workspace = true

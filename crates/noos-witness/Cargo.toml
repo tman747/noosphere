@@ -1,0 +1,17 @@
+[package]
+name = "noos-witness"
+version = "0.1.0"
+description = "NOOSPHERE Witness Ring (witness-v1.md): WitnessBond registration with dual possession proofs, epoch membership snapshots (top-256 with epoch-salted tie-break, sampled reserve, exact cap-repair loop, SMT membership root), FinalityVote/FinalityCertificateV1 justification and finality with exact floor(2W/3)+1 dual thresholds, slashing evidence for the three offense classes, the delay-VRF commit/reveal beacon with persist-before-message durability barrier, and inactivity-leak liveness degradation. No networking, storage internals, node supervision, or proofpower economics (structural zero)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+noos-braid = { path = "../noos-braid" }
+noos-codec = { path = "../noos-codec" }
+noos-crypto = { path = "../noos-crypto" }
+noos-lumen = { path = "../noos-lumen" }
+
+[lints]
+workspace = true

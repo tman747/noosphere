@@ -97,13 +97,11 @@ impl Keypair {
 
     /// Signs `context_string || parts...` under a registered
     /// `ED25519_PREFIX` domain.
-    pub fn sign_domain(
-        &self,
-        domain: DomainId,
-        parts: &[&[u8]],
-    ) -> Result<Signature, CryptoError> {
+    pub fn sign_domain(&self, domain: DomainId, parts: &[&[u8]]) -> Result<Signature, CryptoError> {
         domain.require_kind(DomainKind::Ed25519Prefix)?;
-        Ok(Signature(self.0.sign(&domain_message(domain, parts)).to_bytes()))
+        Ok(Signature(
+            self.0.sign(&domain_message(domain, parts)).to_bytes(),
+        ))
     }
 
     /// Raw (un-prefixed) signing, for standard-vector conformance only.
@@ -123,7 +121,9 @@ impl fmt::Debug for Keypair {
 
 fn domain_message(domain: DomainId, parts: &[&[u8]]) -> Vec<u8> {
     let context = domain.context().as_bytes();
-    let total = parts.iter().fold(context.len(), |acc, p| acc.saturating_add(p.len()));
+    let total = parts
+        .iter()
+        .fold(context.len(), |acc, p| acc.saturating_add(p.len()));
     let mut msg = Vec::with_capacity(total);
     msg.extend_from_slice(context);
     for part in parts {

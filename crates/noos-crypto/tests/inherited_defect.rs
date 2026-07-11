@@ -94,5 +94,8 @@ fn no_bare_must_use_decorates_result_returning_functions() {
             );
         }
     }
-    assert!(checked > 0, "expected at least one #[must_use] site to audit");
+    assert!(
+        checked > 0,
+        "expected at least one #[must_use] site to audit"
+    );
 }

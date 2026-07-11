@@ -4,21 +4,32 @@
 //! in noos-crypto. This test scans every compiled source file (src/ and
 //! build.rs) for the banned identifiers.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::arithmetic_side_effects)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::arithmetic_side_effects
+)]
 
 use std::fs;
 use std::path::PathBuf;
 
 /// Banned identifier fragments. Any occurrence in compiled sources fails.
-const BANNED: &[&str] = &["beacon_dealer", "sim_rng", "sim-rng", "dealer", "DevnetGenesis"];
+const BANNED: &[&str] = &[
+    "beacon_dealer",
+    "sim_rng",
+    "sim-rng",
+    "dealer",
+    "DevnetGenesis",
+];
 
 fn manifest_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
 fn scan_file(path: &PathBuf, findings: &mut Vec<String>) {
-    let text = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+    let text =
+        fs::read_to_string(path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
     let lower = text.to_lowercase();
     for banned in BANNED {
         if lower.contains(&banned.to_lowercase()) {
@@ -44,7 +55,10 @@ fn compiled_sources_expose_no_excluded_symbols() {
     }
     scan_file(&root.join("build.rs"), &mut findings);
 
-    assert!(scanned >= 8, "expected to scan the full module set, saw {scanned}");
+    assert!(
+        scanned >= 8,
+        "expected to scan the full module set, saw {scanned}"
+    );
     assert!(
         findings.is_empty(),
         "excluded ceremony/fixture symbols found:\n{}",

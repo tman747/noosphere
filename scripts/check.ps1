@@ -66,6 +66,23 @@ function Skip-Step {
 
 Write-Host ("noosphere_core_gate: root={0}" -f $Root)
 
+# librocksdb-sys (noos-store's pinned RocksDB backend) runs bindgen at
+# build time and needs libclang. Auto-detect when LIBCLANG_PATH is unset.
+if (-not $env:LIBCLANG_PATH) {
+    $libclang = Get-Command 'libclang.dll' -ErrorAction SilentlyContinue
+    if (-not $libclang) {
+        $clang = Get-Command 'clang' -ErrorAction SilentlyContinue
+        if ($clang) {
+            $candidate = Join-Path (Split-Path -Parent $clang.Source) 'libclang.dll'
+            if (Test-Path $candidate) { $libclang = @{ Source = $candidate } }
+        }
+    }
+    if ($libclang) {
+        $env:LIBCLANG_PATH = Split-Path -Parent $libclang.Source
+        Write-Host ("LIBCLANG_PATH auto-detected: {0}" -f $env:LIBCLANG_PATH)
+    }
+}
+
 # --- Rust workspace steps -------------------------------------------------
 $cratesDir = Join-Path $Root 'crates'
 $crateManifests = @()

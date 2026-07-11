@@ -275,10 +275,7 @@ pub fn bls_pop_prove(secret: &BlsSecretKey) -> Result<BlsSignature, BlsError> {
 }
 
 /// Verifies a proof of possession under the `D-BLS-POP` domain.
-pub fn bls_pop_verify(
-    public_key: &BlsPublicKey,
-    proof: &BlsSignature,
-) -> Result<(), BlsError> {
+pub fn bls_pop_verify(public_key: &BlsPublicKey, proof: &BlsSignature) -> Result<(), BlsError> {
     bls_verify(DomainId::BlsPop, public_key, public_key.as_bytes(), proof)
 }
 

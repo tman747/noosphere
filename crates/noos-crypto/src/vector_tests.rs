@@ -16,9 +16,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use crate::bls::{
-    aggregate_verify_with_dst, fast_aggregate_verify_with_dst, verify_with_dst,
-};
+use crate::bls::{aggregate_verify_with_dst, fast_aggregate_verify_with_dst, verify_with_dst};
 use crate::ed25519::verify_raw;
 use crate::hkdf::hkdf_sha256_raw;
 use crate::*;
@@ -50,8 +48,12 @@ fn cases(doc: &Value) -> &Vec<Value> {
 }
 
 fn hexf(case: &Value, field: &str) -> Vec<u8> {
-    hex::decode(case[field].as_str().unwrap_or_else(|| panic!("missing {field}: {case}")))
-        .unwrap_or_else(|e| panic!("bad hex in {field}: {e}"))
+    hex::decode(
+        case[field]
+            .as_str()
+            .unwrap_or_else(|| panic!("missing {field}: {case}")),
+    )
+    .unwrap_or_else(|e| panic!("bad hex in {field}: {e}"))
 }
 
 fn arr<const N: usize>(bytes: &[u8]) -> [u8; N] {
@@ -199,7 +201,7 @@ fn bls12381_ietf_vectors() {
                     .iter()
                     .map(|s| {
                         BlsSignature::from_bytes(arr(
-                            &hex::decode(s.as_str().expect("sig hex")).expect("hex"),
+                            &hex::decode(s.as_str().expect("sig hex")).expect("hex")
                         ))
                     })
                     .collect();
@@ -219,7 +221,7 @@ fn bls12381_ietf_vectors() {
                     .iter()
                     .map(|p| {
                         BlsPublicKey::from_bytes(arr(
-                            &hex::decode(p.as_str().expect("pk hex")).expect("hex"),
+                            &hex::decode(p.as_str().expect("pk hex")).expect("hex")
                         ))
                     })
                     .collect();
@@ -247,7 +249,7 @@ fn bls12381_ietf_vectors() {
                     .iter()
                     .map(|p| {
                         BlsPublicKey::from_bytes(arr(
-                            &hex::decode(p.as_str().expect("pk hex")).expect("hex"),
+                            &hex::decode(p.as_str().expect("pk hex")).expect("hex")
                         ))
                     })
                     .collect();
@@ -258,14 +260,14 @@ fn bls12381_ietf_vectors() {
             }
             "deserialize_pubkey" => {
                 let bytes = hexf(case, "bytes");
-                let ok = bytes.len() == 48
-                    && BlsPublicKey::from_bytes(arr(&bytes)).validate().is_ok();
+                let ok =
+                    bytes.len() == 48 && BlsPublicKey::from_bytes(arr(&bytes)).validate().is_ok();
                 assert_eq!(ok, positive, "{name}");
             }
             "deserialize_signature" => {
                 let bytes = hexf(case, "bytes");
-                let ok = bytes.len() == 96
-                    && BlsSignature::from_bytes(arr(&bytes)).validate().is_ok();
+                let ok =
+                    bytes.len() == 96 && BlsSignature::from_bytes(arr(&bytes)).validate().is_ok();
                 assert_eq!(ok, positive, "{name}");
             }
             other => panic!("unknown op {other}"),
@@ -303,24 +305,27 @@ fn feldman_threshold_vectors() {
                 .iter()
                 .map(|c| {
                     BlsPublicKey::from_bytes(arr(
-                        &hex::decode(c.as_str().expect("hex")).expect("hex"),
+                        &hex::decode(c.as_str().expect("hex")).expect("hex")
                     ))
                 })
                 .collect()
         })
         .collect();
-    let group_pk =
-        BlsPublicKey::from_bytes(arr(&hex::decode(doc["group_public_key"].as_str().unwrap())
-            .expect("hex")));
-    assert_eq!(feldman_group_public_key(&commitments_all).unwrap(), group_pk);
+    let group_pk = BlsPublicKey::from_bytes(arr(&hex::decode(
+        doc["group_public_key"].as_str().unwrap(),
+    )
+    .expect("hex")));
+    assert_eq!(
+        feldman_group_public_key(&commitments_all).unwrap(),
+        group_pk
+    );
 
     for case in cases(&doc) {
         let name = case["name"].as_str().expect("name");
         let positive = is_positive(case);
         if name.starts_with("share-") {
             let index = u16::try_from(case["share_index"].as_u64().expect("index")).unwrap();
-            let expected =
-                BlsPublicKey::from_bytes(arr(&hexf(case, "share_public_key")));
+            let expected = BlsPublicKey::from_bytes(arr(&hexf(case, "share_public_key")));
             match derive_share_public_key(&commitments_all, index) {
                 Ok(got) => {
                     assert_eq!(got == expected, positive, "{name}");
@@ -331,8 +336,7 @@ fn feldman_threshold_vectors() {
                 }
             }
         } else if name.starts_with("partial-sig-") {
-            let share_pk =
-                BlsPublicKey::from_bytes(arr(&hexf(case, "share_public_key")));
+            let share_pk = BlsPublicKey::from_bytes(arr(&hexf(case, "share_public_key")));
             let sig = BlsSignature::from_bytes(arr(&hexf(case, "signature")));
             let msg = hexf(case, "bytes");
             let result = bls_verify(domain(case), &share_pk, &msg, &sig);
@@ -350,7 +354,7 @@ fn feldman_threshold_vectors() {
                 .iter()
                 .map(|s| {
                     BlsSignature::from_bytes(arr(
-                        &hex::decode(s.as_str().expect("hex")).expect("hex"),
+                        &hex::decode(s.as_str().expect("hex")).expect("hex")
                     ))
                 })
                 .collect();
@@ -359,8 +363,7 @@ fn feldman_threshold_vectors() {
             match bls_threshold_combine(&entries, threshold) {
                 Ok(combined) => {
                     assert!(positive, "{name}: combine accepted");
-                    let expected =
-                        BlsSignature::from_bytes(arr(&hexf(case, "combined_signature")));
+                    let expected = BlsSignature::from_bytes(arr(&hexf(case, "combined_signature")));
                     assert_eq!(combined, expected, "{name}");
                     let msg = hexf(case, "bytes");
                     bls_verify(domain(case), &group_pk, &msg, &combined)
@@ -424,7 +427,10 @@ fn cross_domain_rejection_vectors() {
     let doc = load("cross-domain.json");
     for case in cases(&doc) {
         let name = case["name"].as_str().expect("name");
-        assert!(!is_positive(case), "{name}: cross-domain cases are negative");
+        assert!(
+            !is_positive(case),
+            "{name}: cross-domain cases are negative"
+        );
         let msg = hexf(case, "bytes");
 
         if case.get("old_hash32").is_some() {
@@ -504,4 +510,3 @@ fn cross_domain_rejection_vectors() {
         }
     }
 }
-

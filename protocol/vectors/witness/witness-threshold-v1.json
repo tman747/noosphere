@@ -1,0 +1,156 @@
+{
+  "schema": "noos-witness/threshold-v1",
+  "cases": [
+    {
+      "name": "threshold-w-0",
+      "kind": "positive",
+      "bytes": "0000000000000000000000000000000001000000000000000000000000000000",
+      "naive_ceil": "0",
+      "naive_differs": "true",
+      "note": "3 | W: exact Q = floor(2W/3)+1 EXCEEDS the naive ceil(2W/3) by one"
+    },
+    {
+      "name": "threshold-w-1",
+      "kind": "positive",
+      "bytes": "0100000000000000000000000000000001000000000000000000000000000000",
+      "naive_ceil": "1",
+      "naive_differs": "false",
+      "note": "3 does not divide W: exact Q equals the naive ceiling"
+    },
+    {
+      "name": "threshold-w-2",
+      "kind": "positive",
+      "bytes": "0200000000000000000000000000000002000000000000000000000000000000",
+      "naive_ceil": "2",
+      "naive_differs": "false",
+      "note": "3 does not divide W: exact Q equals the naive ceiling"
+    },
+    {
+      "name": "threshold-w-3",
+      "kind": "positive",
+      "bytes": "0300000000000000000000000000000003000000000000000000000000000000",
+      "naive_ceil": "2",
+      "naive_differs": "true",
+      "note": "3 | W: exact Q = floor(2W/3)+1 EXCEEDS the naive ceil(2W/3) by one"
+    },
+    {
+      "name": "threshold-w-4",
+      "kind": "positive",
+      "bytes": "0400000000000000000000000000000003000000000000000000000000000000",
+      "naive_ceil": "3",
+      "naive_differs": "false",
+      "note": "3 does not divide W: exact Q equals the naive ceiling"
+    },
+    {
+      "name": "threshold-w-5",
+      "kind": "positive",
+      "bytes": "0500000000000000000000000000000004000000000000000000000000000000",
+      "naive_ceil": "4",
+      "naive_differs": "false",
+      "note": "3 does not divide W: exact Q equals the naive ceiling"
+    },
+    {
+      "name": "threshold-w-6",
+      "kind": "positive",
+      "bytes": "0600000000000000000000000000000005000000000000000000000000000000",
+      "naive_ceil": "4",
+      "naive_differs": "true",
+      "note": "3 | W: exact Q = floor(2W/3)+1 EXCEEDS the naive ceil(2W/3) by one"
+    },
+    {
+      "name": "threshold-w-7",
+      "kind": "positive",
+      "bytes": "0700000000000000000000000000000005000000000000000000000000000000",
+      "naive_ceil": "5",
+      "naive_differs": "false",
+      "note": "3 does not divide W: exact Q equals the naive ceiling"
+    },
+    {
+      "name": "threshold-w-8",
+      "kind": "positive",
+      "bytes": "0800000000000000000000000000000006000000000000000000000000000000",
+      "naive_ceil": "6",
+      "naive_differs": "false",
+      "note": "3 does not divide W: exact Q equals the naive ceiling"
+    },
+    {
+      "name": "threshold-w-66",
+      "kind": "positive",
+      "bytes": "420000000000000000000000000000002d000000000000000000000000000000",
+      "naive_ceil": "44",
+      "naive_differs": "true",
+      "note": "3 | W: exact Q = floor(2W/3)+1 EXCEEDS the naive ceil(2W/3) by one"
+    },
+    {
+      "name": "threshold-w-67",
+      "kind": "positive",
+      "bytes": "430000000000000000000000000000002d000000000000000000000000000000",
+      "naive_ceil": "45",
+      "naive_differs": "false",
+      "note": "3 does not divide W: exact Q equals the naive ceiling"
+    },
+    {
+      "name": "threshold-w-68",
+      "kind": "positive",
+      "bytes": "440000000000000000000000000000002e000000000000000000000000000000",
+      "naive_ceil": "46",
+      "naive_differs": "false",
+      "note": "3 does not divide W: exact Q equals the naive ceiling"
+    },
+    {
+      "name": "threshold-w-99",
+      "kind": "positive",
+      "bytes": "6300000000000000000000000000000043000000000000000000000000000000",
+      "naive_ceil": "66",
+      "naive_differs": "true",
+      "note": "3 | W: exact Q = floor(2W/3)+1 EXCEEDS the naive ceil(2W/3) by one"
+    },
+    {
+      "name": "threshold-w-100",
+      "kind": "positive",
+      "bytes": "6400000000000000000000000000000043000000000000000000000000000000",
+      "naive_ceil": "67",
+      "naive_differs": "false",
+      "note": "3 does not divide W: exact Q equals the naive ceiling"
+    },
+    {
+      "name": "threshold-w-101",
+      "kind": "positive",
+      "bytes": "6500000000000000000000000000000044000000000000000000000000000000",
+      "naive_ceil": "68",
+      "naive_differs": "false",
+      "note": "3 does not divide W: exact Q equals the naive ceiling"
+    },
+    {
+      "name": "threshold-w-3000000000000000000",
+      "kind": "positive",
+      "bytes": "00002cf61a24a22900000000000000000100c84e676dc11b0000000000000000",
+      "naive_ceil": "2000000000000000000",
+      "naive_differs": "true",
+      "note": "large 3k boundary: naive rounding still differs by one"
+    },
+    {
+      "name": "threshold-w-3000000000000000001",
+      "kind": "positive",
+      "bytes": "01002cf61a24a22900000000000000000100c84e676dc11b0000000000000000",
+      "naive_ceil": "2000000000000000001",
+      "naive_differs": "false",
+      "note": "large 3k+1 boundary"
+    },
+    {
+      "name": "threshold-w-3000000000000000002",
+      "kind": "positive",
+      "bytes": "02002cf61a24a22900000000000000000200c84e676dc11b0000000000000000",
+      "naive_ceil": "2000000000000000002",
+      "naive_differs": "false",
+      "note": "large 3k+2 boundary"
+    },
+    {
+      "name": "threshold-w-u128-max",
+      "kind": "positive",
+      "bytes": "ffffffffffffffffffffffffffffffffabaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "naive_differs": "true",
+      "note": "3 | u128::MAX; Q computed overflow-free as 2*(W/3) + 1"
+    }
+  ]
+}

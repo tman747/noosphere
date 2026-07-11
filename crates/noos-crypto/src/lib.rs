@@ -42,8 +42,8 @@ mod threshold;
 mod vector_tests;
 
 pub use bls::{
-    bls_aggregate, bls_aggregate_verify, bls_fast_aggregate_verify, bls_pop_prove,
-    bls_pop_verify, bls_verify, BlsPublicKey, BlsSecretKey, BlsSignature,
+    bls_aggregate, bls_aggregate_verify, bls_fast_aggregate_verify, bls_pop_prove, bls_pop_verify,
+    bls_verify, BlsPublicKey, BlsSecretKey, BlsSignature,
 };
 pub use dkg::{
     dkg_x25519_public_key, dkg_x25519_shared_secret, validate_dkg_transcript, DkgContribution,

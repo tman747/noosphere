@@ -70,7 +70,10 @@ fn handle(out: &mut impl Write, line: &str) -> Result<(), String> {
     match fields[0] {
         "E" => {
             if fields.len() != 6 {
-                return Err(format!("E wants 5 args, got {}", fields.len().saturating_sub(1)));
+                return Err(format!(
+                    "E wants 5 args, got {}",
+                    fields.len().saturating_sub(1)
+                ));
             }
             let version: u32 = fields[1].parse().map_err(|_| "bad version")?;
             let meter_limit: u64 = fields[2].parse().map_err(|_| "bad meter_limit")?;
@@ -115,7 +118,10 @@ fn handle(out: &mut impl Write, line: &str) -> Result<(), String> {
         }
         "D" => {
             if fields.len() != 3 {
-                return Err(format!("D wants 2 args, got {}", fields.len().saturating_sub(1)));
+                return Err(format!(
+                    "D wants 2 args, got {}",
+                    fields.len().saturating_sub(1)
+                ));
             }
             let b = parse_hex(fields[2])?;
             let decoded = match fields[1] {

@@ -55,6 +55,8 @@ exit_delay_epochs = "UNRESOLVED_SOURCE"        # same search as activation_delay
 evidence_horizon_epochs = "UNRESOLVED_SOURCE"  # searched ch01 for: evidence horizon, slashable through — ch01 section 4.6/4.8 keep stake "slashable through the evidence horizon" with no number. ODR-WITNESS-005
 mainnet_min_bond = "OWNER_BLOCKED"      # source: plan section 6.5 ("Mainnet minimum bond remains a signed genesis parameter"); ch01 section 4.6 makes it a versioned constant with no value. ODR-ECON-001
 proofpower_theoretical_cap = 0.20       # source: ch01 section 4.7 ("total proofpower-derived weight is capped at twenty percent of Ring weight") — theoretical design cap only; genesis value is zero, see [genesis_controls]; plan section 14.6 additionally bounds any first nonzero cap at <= 1% of Ring weight
+beacon_commit_cutoff_slot_offset = 192  # PROPOSED-G0 (witness-v1.md section 4.1: "cutoff constant: PROPOSED-G0, to be frozen with vectors"): commits for epoch e accept while slot_in_epoch < 192 (3/4 of the 256-slot epoch), leaving 64 slots for the commit set to finalize before reveals; frozen with protocol/vectors/witness/witness-beacon-v1.json; implemented as noos-witness BEACON_COMMIT_CUTOFF_SLOT_OFFSET
+bitmap_bit_order = "bit i of member i (canonical ascending-validator_id order) = byte[i/8] >> (i%8) & 1 (LSB-first); bitmap length exactly ceil(n/8) bytes"  # PROPOSED-G0 (noos-witness freeze): participation and beacon contribution bitmaps share this law; ch01 section 4.8 fixes the 128-byte maximum (N_hard=1024 bits) without a bit order
 
 [header]
 # Implemented header wire law (crates/noos-braid); full tag table in
