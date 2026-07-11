@@ -1,0 +1,121 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-nel",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-nel"
+        ]
+      },
+      "name": "noos-nel tests including deterministic falsifiers",
+      "passed": true
+    },
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "run",
+          "--locked",
+          "-q",
+          "-p",
+          "noos-nel",
+          "--bin",
+          "nel-claim-harness",
+          "--",
+          "E-NEL-07"
+        ],
+        "metrics": {
+          "alternate_beacons_accepted": 0,
+          "claim": "E-NEL-07",
+          "greedy_cursor_is_zero": true,
+          "independent_second_client": false,
+          "post_reveal_commitments_accepted": 0,
+          "public_30_day_stall_measurement": false,
+          "replay_draws_accepted": 0,
+          "schedules": 1000000,
+          "withholding_refunds": 58824
+        }
+      },
+      "name": "claim-specific machine-readable local harness",
+      "passed": true
+    },
+    {
+      "detail": {
+        "local_command": "python tools/gates/run_nel_lab_claim.py --claim E-NEL-07",
+        "required_external": [
+          "independently authored second sampler client",
+          "live threshold-beacon fault-bound exercise",
+          "30-day stochastic stall observation under preregistered load"
+        ]
+      },
+      "name": "external prerequisite schema",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-NEL-07": "20a7346a4de4744b69819365dafda8be5064e2b5ebd1eb3b80d4729217de93e6"
+  },
+  "claims": [
+    "E-NEL-07"
+  ],
+  "command": [
+    "tools/gates/run_nel_lab_claim.py",
+    "--claim",
+    "E-NEL-07"
+  ],
+  "evidence_sha256": "482e0ca174d004fb070a6a644867d0e2b4d25e925e39b3514a7ac0b1776c9cac",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-e-nel-07",
+  "limitations": [
+    "Local deterministic evidence only; it is not independent, cross-vendor, public-duration, or production evidence.",
+    "independently authored second sampler client",
+    "live threshold-beacon fault-bound exercise",
+    "30-day stochastic stall observation under preregistered load"
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-nel/Cargo.toml": "17d2ecfb2e392c496e7dfaa14c28d1b89a4b97a16095b984434f3b81cfc99189",
+    "crates/noos-nel/fixtures/claim-prerequisites-v1.json": "2cc557d30d64431df6fcaa777b659b016719e61fc86abf166d261015137a6f94",
+    "crates/noos-nel/src/bin/nel-claim-harness.rs": "0e10847361b80724712f1486a19b7bb63049aecfccda5697eb9cd93b9e3f4b90",
+    "crates/noos-nel/src/inference.rs": "304f6746a5b2bd9ba23e73a06553caac95b5c211c39377a50343ed4454b982c8",
+    "crates/noos-nel/src/lab.rs": "9025a80a33ea303029633799605cd98675909b8a1a96cd57eb0d9a07731d505b",
+    "crates/noos-nel/src/lib.rs": "30c1d4afbb6d1da58f6739b2deeab4d6d8b89a519803fa372ae1a97f2c2ca0a7",
+    "crates/noos-nel/src/luts.rs": "80d6ecea395a61c2d5fe103cd20aad2b8b7608d1442b0dcebb4ec017629c7acb",
+    "protocol/vectors/nel/forward-w8a8-v1.json": "afa7a0ac2466f878cafbb41edc510a04ad595e0ceaac39aabed5c34dd8eeab9a",
+    "tools/gates/run_nel_lab_claim.py": "4a55e01677a668f7c9549a7b57951966d675cff7fe08c7447e4dc12a14197544"
+  }
+}

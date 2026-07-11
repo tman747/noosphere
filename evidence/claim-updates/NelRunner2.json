@@ -1,12 +1,5 @@
 {
   "claims": {
-    "N-PROFILE": {
-      "local_implementation_state": "PARTIAL",
-      "packages": ["noos-nel"],
-      "command": "python tools/gates/run_nel_claim.py --claim N-PROFILE",
-      "rollback_command": "python tools/gates/run_nel_claim.py --claim N-PROFILE --rollback-check",
-      "notes": "crates/noos-nel/src/inference.rs + luts.rs: deterministic W8A8 integer decoder forward at mini shape (hidden 32, 2 layers, GQA 4q/2kv, head_dim 8, MLP 64) with every ch05 \u00a73.2 op family pinned: INT8x INT8->INT32 GEMM with the G8 accumulator non-overflow lemma enforced at the shape boundary (unregistrable shapes reject), exact floor-quotient round-half-up dyadic requant, integer RMSNorm with pinned isqrt (seed 2^ceil(bits/2), 8 Newton + 2 correction steps, gated equal to floor sqrt), Q6 log2-domain integer softmax over the committed 64-entry exp2 LUT with masked-to-zero rows, one exact division per row and the load-bearing int16 P cap, committed Q1.15 rotate-half RoPE tables, committed 256-byte SiLU LUT, saturating residual add, greedy lowest-token-id ties. LUT bytes and every scale constant are frozen under lut_root/mini_profile_id; the whole run is frozen bit-for-bit in protocol/vectors/nel/forward-w8a8-v1.json. Falsifiers: frozen-vector mismatch, single-weight-bit flip diverges S_end and changes model identity, reduction-order (schedule) invariance gate, overflow-lemma rejection. PARTIAL because the claim requires the registered 0.5B model, the tokenizer byte-spec, and the >=10^9-instance cross-vendor NVIDIA/AMD/CPU conformance campaign (E-NEL-01/G5) \u2014 external; GPU/live-model rows stay PARTIAL."
-    },
     "N-TOKEN-STATE": {
       "local_implementation_state": "IMPLEMENTED",
       "packages": ["noos-nel"],

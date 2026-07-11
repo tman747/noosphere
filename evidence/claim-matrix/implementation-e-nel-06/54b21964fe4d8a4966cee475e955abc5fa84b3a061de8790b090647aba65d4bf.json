@@ -1,0 +1,121 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-nel",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-nel"
+        ]
+      },
+      "name": "noos-nel tests including deterministic falsifiers",
+      "passed": true
+    },
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "run",
+          "--locked",
+          "-q",
+          "-p",
+          "noos-nel",
+          "--bin",
+          "nel-claim-harness",
+          "--",
+          "E-NEL-06"
+        ],
+        "metrics": {
+          "benchmark_interface_complete": true,
+          "claim": "E-NEL-06",
+          "extrapolation_rejected": true,
+          "independent_verifiers": false,
+          "real_specialized_proof_run": false
+        }
+      },
+      "name": "claim-specific machine-readable local harness",
+      "passed": true
+    },
+    {
+      "detail": {
+        "local_command": "python tools/gates/run_nel_lab_claim.py --claim E-NEL-06",
+        "required_external": [
+          "real 0.5B 16-32 token specialized-proof run",
+          "named hardware and pinned circuit and compiler commits",
+          "measured witness memory, wall time, energy, cost, proof bytes, aggregation, verifier time, and failures",
+          "two independently implemented verifiers",
+          "public reproduction"
+        ]
+      },
+      "name": "external prerequisite schema",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-NEL-06": "f0bc942203f72a01f48a6e2591811b6975b984bd94531f18c98b068d302b6f26"
+  },
+  "claims": [
+    "E-NEL-06"
+  ],
+  "command": [
+    "tools/gates/run_nel_lab_claim.py",
+    "--claim",
+    "E-NEL-06"
+  ],
+  "evidence_sha256": "54b21964fe4d8a4966cee475e955abc5fa84b3a061de8790b090647aba65d4bf",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-e-nel-06",
+  "limitations": [
+    "Local deterministic evidence only; it is not independent, cross-vendor, public-duration, or production evidence.",
+    "real 0.5B 16-32 token specialized-proof run",
+    "named hardware and pinned circuit and compiler commits",
+    "measured witness memory, wall time, energy, cost, proof bytes, aggregation, verifier time, and failures",
+    "two independently implemented verifiers",
+    "public reproduction"
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-nel/Cargo.toml": "17d2ecfb2e392c496e7dfaa14c28d1b89a4b97a16095b984434f3b81cfc99189",
+    "crates/noos-nel/fixtures/claim-prerequisites-v1.json": "2cc557d30d64431df6fcaa777b659b016719e61fc86abf166d261015137a6f94",
+    "crates/noos-nel/src/bin/nel-claim-harness.rs": "0e10847361b80724712f1486a19b7bb63049aecfccda5697eb9cd93b9e3f4b90",
+    "crates/noos-nel/src/inference.rs": "304f6746a5b2bd9ba23e73a06553caac95b5c211c39377a50343ed4454b982c8",
+    "crates/noos-nel/src/lab.rs": "9025a80a33ea303029633799605cd98675909b8a1a96cd57eb0d9a07731d505b",
+    "crates/noos-nel/src/lib.rs": "30c1d4afbb6d1da58f6739b2deeab4d6d8b89a519803fa372ae1a97f2c2ca0a7",
+    "crates/noos-nel/src/luts.rs": "80d6ecea395a61c2d5fe103cd20aad2b8b7608d1442b0dcebb4ec017629c7acb",
+    "protocol/vectors/nel/forward-w8a8-v1.json": "afa7a0ac2466f878cafbb41edc510a04ad595e0ceaac39aabed5c34dd8eeab9a",
+    "tools/gates/run_nel_lab_claim.py": "4a55e01677a668f7c9549a7b57951966d675cff7fe08c7447e4dc12a14197544"
+  }
+}

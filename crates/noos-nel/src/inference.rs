@@ -601,6 +601,28 @@ impl MiniModel {
         merkle_root(&leaves)
     }
 
+    /// Canonical byte stream for local full-weight availability exercises.
+    /// Tensor order is identical to [`Self::weight_root`]; this is a mini
+    /// profile precursor, not the external 0.5B weight artifact required by
+    /// E-NEL-05.
+    #[must_use]
+    pub fn canonical_weight_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend(bytes_of_i8(&self.embed));
+        for layer in &self.layers {
+            out.extend(bytes_of_i8(&layer.gamma1));
+            out.extend(bytes_of_i8(&layer.wqkv));
+            out.extend(bytes_of_i8(&layer.wout));
+            out.extend(bytes_of_i8(&layer.gamma2));
+            out.extend(bytes_of_i8(&layer.wgate));
+            out.extend(bytes_of_i8(&layer.wup));
+            out.extend(bytes_of_i8(&layer.wdown));
+        }
+        out.extend(bytes_of_i8(&self.final_gamma));
+        out.extend(bytes_of_i8(&self.lm_head));
+        out
+    }
+
     /// Resolve a weight-side Freivalds `B` operand.
     pub fn weight_i64(&self, id: WeightId) -> Result<Vec<i64>, NelError> {
         let slice = match id {

@@ -1,0 +1,90 @@
+{
+  "schema": "NOOS/NEL/CLAIM-PREREQUISITES/V1",
+  "claims": {
+    "N-PROFILE": {
+      "local_command": "python tools/gates/run_nel_lab_claim.py --claim N-PROFILE",
+      "required_external": [
+        "registered Qwen2.5-0.5B source checkpoint and tokenizer byte specification",
+        "at least 1000000000 clean operator instances",
+        "two independently authored CPU references",
+        "certified AMD and NVIDIA integer kernels",
+        "preregistered real-model quality tolerance"
+      ]
+    },
+    "E-NEL-01": {
+      "local_command": "python tools/gates/run_nel_lab_claim.py --claim E-NEL-01",
+      "required_external": [
+        "pinned compiler toolchains, GPU drivers, and GPU firmware",
+        "two independently authored CPU references",
+        "certified AMD and NVIDIA integer kernels",
+        "at least 1000000000 clean cross-vendor operator instances"
+      ]
+    },
+    "E-NEL-01a": {
+      "local_command": "python tools/gates/run_nel_lab_claim.py --claim E-NEL-01a",
+      "required_external_artifacts": [
+        "C:/tmp/nel-real-inference/runs/silu_clip.json",
+        "C:/tmp/nel-real-inference/runs/second_impl.json",
+        "C:/tmp/nel-real-inference/runs/divergence_probe.json"
+      ],
+      "required_external": [
+        "independent provenance review of the column-stream implementation and recorded artifacts"
+      ]
+    },
+    "E-NEL-02": {
+      "local_command": "python tools/gates/run_nel_lab_claim.py --claim E-NEL-02",
+      "required_external": [
+        "registered 0.5B source checkpoint",
+        "canonical quantization and calibration artifacts",
+        "hidden task and safety suites",
+        "power and numeric loss tolerance registered before suite opening",
+        "per-task source and W8A8 results"
+      ]
+    },
+    "E-NEL-03": {
+      "local_command": "python tools/gates/run_nel_lab_claim.py --claim E-NEL-03",
+      "required_external": [
+        "preregistered production arrival, context, generation, region, concurrency, and fault mix",
+        "three independent live control clusters",
+        "public measured p50, p95, and p99 observations"
+      ]
+    },
+    "E-NEL-04": {
+      "local_command": "python tools/gates/run_nel_lab_claim.py --claim E-NEL-04",
+      "required_external": [
+        "public testnet",
+        "three-of-three colluding live executor committee",
+        "commodity challenger selected after commitment",
+        "registered censorship schedule",
+        "two economically independent funded challengers"
+      ]
+    },
+    "E-NEL-05": {
+      "local_command": "python tools/gates/run_nel_lab_claim.py --claim E-NEL-05",
+      "required_external": [
+        "real 0.5B model weights in 4-16 MiB erasure-coded shards",
+        "operator-diverse public custody through the entire challenge window",
+        "99.9 percent witness retrieval observations for 30 days",
+        "preregistered production replay SLA measured over 30 days"
+      ]
+    },
+    "E-NEL-06": {
+      "local_command": "python tools/gates/run_nel_lab_claim.py --claim E-NEL-06",
+      "required_external": [
+        "real 0.5B 16-32 token specialized-proof run",
+        "named hardware and pinned circuit and compiler commits",
+        "measured witness memory, wall time, energy, cost, proof bytes, aggregation, verifier time, and failures",
+        "two independently implemented verifiers",
+        "public reproduction"
+      ]
+    },
+    "E-NEL-07": {
+      "local_command": "python tools/gates/run_nel_lab_claim.py --claim E-NEL-07",
+      "required_external": [
+        "independently authored second sampler client",
+        "live threshold-beacon fault-bound exercise",
+        "30-day stochastic stall observation under preregistered load"
+      ]
+    }
+  }
+}

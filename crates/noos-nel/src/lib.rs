@@ -8,6 +8,7 @@ use ed25519_dalek::{Signature as DalekSignature, Verifier, VerifyingKey};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod inference;
+pub mod lab;
 pub mod luts;
 
 pub type Hash32 = [u8; 32];
