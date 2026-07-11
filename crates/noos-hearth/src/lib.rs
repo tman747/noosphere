@@ -3,6 +3,24 @@
 use noos_species::{Hash32, SpeciesRevision, UpdatePacket};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod audit;
+mod federation;
+mod lifecycle;
+mod payment;
+mod relay;
+mod repair;
+mod rollback;
+mod seeding;
+
+pub use audit::*;
+pub use federation::*;
+pub use lifecycle::*;
+pub use payment::*;
+pub use relay::*;
+pub use repair::*;
+pub use rollback::*;
+pub use seeding::*;
+
 pub const WAN_PER_TOKEN_PIPELINE_ENABLED: bool = false;
 pub const GENERAL_DREAM_MARKET_ENABLED: bool = false;
 pub const FORESIGHT_LIFECYCLE: &str = "EXPERIMENTAL";
@@ -39,7 +57,7 @@ pub enum HearthState {
     Degraded,
     Retired,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DeviceRole {
     Stage,
     Referee,

@@ -1,0 +1,96 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "contract": "whole-job locality placement, zero token cross-traffic, 0.8x scaling evaluator, WAN inversion rule",
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-hearth",
+          "-p",
+          "noos-workerd",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-hearth",
+          "noos-workerd"
+        ]
+      },
+      "name": "deterministic local precursor and falsifier tests",
+      "passed": true
+    },
+    {
+      "name": "exact registry pass threshold",
+      "passed": false,
+      "reason": "requires measured 1000-hearth goodput and a public real-WAN autopsy",
+      "status": "EXTERNAL_BLOCKED"
+    }
+  ],
+  "claim_fingerprints": {
+    "H-FEDERATE": "163dda8055dd0c96d2a9bcb9335c2961534f6754831ae4fad03389fb3243dbac"
+  },
+  "claims": [
+    "H-FEDERATE"
+  ],
+  "command": [
+    "tools/gates/run_hearth_claim.py",
+    "--claim",
+    "H-FEDERATE"
+  ],
+  "evidence_sha256": "86974a9fc947f224f55f49113a0fab21f552fa1b4232c8f1599b533c914cc558",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "hearth-local-h-federate",
+  "limitations": [
+    "requires measured 1000-hearth goodput and a public real-WAN autopsy",
+    "Deterministic fixtures and modeled threshold evaluators are local precursor evidence, not hardware, operator, WAN, public-duration, or independent evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-hearth/Cargo.toml": "a623eacb1395837a76ce4a36ca87442dcf367e66842fb1fd88a5b3f09c707faa",
+    "crates/noos-hearth/src/audit.rs": "7f2fd1b26501d9bb3905df905e03adc9331d60387a2afdb81c9eb17d02e8ed67",
+    "crates/noos-hearth/src/federation.rs": "b43350526f5aa038b5e877fadc3caacb34856f9e7b5708b113922ec5e056111f",
+    "crates/noos-hearth/src/lib.rs": "64333983225ad5fa7c33c4c6994e389f91e5eb0bf3bd196950d93a5b76c19244",
+    "crates/noos-hearth/src/lifecycle.rs": "00f12ac95839d7c433c7fef10e31310a67f2953d939fd141852b02a5274e68d1",
+    "crates/noos-hearth/src/payment.rs": "19bc2cf8969252e26b27e2bfab1ff75d13a64b5686422441ac424a3c0df48e9d",
+    "crates/noos-hearth/src/relay.rs": "f21c35ce445eb36dc0b40fff4b20299ac2a0fb114be01e05c963c7cec996d342",
+    "crates/noos-hearth/src/repair.rs": "5c8bd2ae9453420f7673a2257bb240df088c0539fc64dadb0b2de82fa4f2a86d",
+    "crates/noos-hearth/src/rollback.rs": "a5527b68caced869ac9b04dc7ec2c427a7850a7f5e15a84e1cf9cd329be8213d",
+    "crates/noos-hearth/src/seeding.rs": "7a493dd4107e943536a0abf6ca59389d369acb4dbe6820eedee43ba12f411b3e",
+    "crates/noos-workerd/Cargo.toml": "9114dff1cbe026b19a42f5bb9e46c245f137036f6aed78f9848edfb275b60062",
+    "crates/noos-workerd/src/config.rs": "18c5d43624f7609b633a9f2cd145f191e1024626be54e171e4ecd3e874e371c9",
+    "crates/noos-workerd/src/hex.rs": "0372d76423cc35ab62869341429d8a12ce25ed89c425714d68f6ffb7cc5fd82b",
+    "crates/noos-workerd/src/main.rs": "5700c9c51fd766ee50beb9331b17df2f1da454c767d2165c28521b6020aea66a",
+    "crates/noos-workerd/src/runtime.rs": "6284e193413fccd12ac1e492f8495ccab027c1f6c1878950a0240b78f808a794",
+    "crates/noos-workerd/src/telemetry.rs": "5391dba8a0bc7b35e7d912eef5726f06a14c44417b19a95f0bd971169d0d68c7",
+    "tools/gates/run_hearth_claim.py": "69ee1973f8bd901018e1f8c116ea9eaf1ab1d4e0542444c7d60fcbe975ae54dc"
+  }
+}

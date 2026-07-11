@@ -1,0 +1,117 @@
+{
+  "claims": {
+    "H-HEARTH": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth", "noos-workerd"],
+      "command": "python tools/gates/run_hearth_claim.py --claim H-HEARTH",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim H-HEARTH --rollback-check",
+      "notes": "Local precursor: five-state FORMING/ATTESTING/ACTIVE/DEGRADED/RETIRED lifecycle with bond, generation, re-attestation, challenge-window, custody-handoff gates; exhaustive optimal contiguous whole-layer partitioner under memory/bandwidth constraints; generation/layer/byte-bound integer boundary commitments; conformance evaluator separates any mismatch, powerless FP16 control, >2x performance, and <70% partition quality. PARTIAL: no real NVIDIA/AMD/CPU corpus and no >=10^9 measured operator campaign."
+    },
+    "H-FEDERATE": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth", "noos-workerd"],
+      "command": "python tools/gates/run_hearth_claim.py --claim H-FEDERATE",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim H-FEDERATE --rollback-check",
+      "notes": "Local precursor: whole-job replica placement by locality/price and distinct failure domain, structurally zero cross-replica bytes per token, exact 0.8x-linear evaluator, integer WAN latency decomposition, +/-30% modeled-band check, and >=10 tok/s refutation mapped to retire-and-replace rather than kill. PARTIAL: 1000-hearth measured scale and the public real-WAN negative artifact are external."
+    },
+    "H-SEED": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth", "noos-workerd"],
+      "command": "python tools/gates/run_hearth_claim.py --claim H-SEED",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim H-SEED --rollback-check",
+      "notes": "Local precursor: real systematic GF(256) Reed-Solomon 8-of-12 coding, reconstruction from every any-eight pattern, Species-style artifact root and per-shard content binding, corrupt/transplanted shard rejection, and resumable mid-fetch source departure without discarding accepted shards. PARTIAL: the 100-hearth real 8.03 GB residential-link timing threshold is not local evidence."
+    },
+    "H-AUDIT": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth", "noos-workerd", "noos-nel", "noos-work-loom"],
+      "command": "python tools/gates/run_hearth_claim.py --claim H-AUDIT",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim H-AUDIT --rollback-check",
+      "notes": "Local precursor: post-commit unpredictable assignment bound to claim/auditor/shard/beacon, explicit TOPLOC -> sampled Freivalds -> full-dispute ladder with no stake move before terminal exact verdict, witness/client budgets, strict bond > gain/c calculation, four exact-fault classes, and the exact 40-phone x two-layer x 1.71 GB protocol shape. NEL and Work Loom tests exercise exact Freivalds, availability-before-clock, slashing, and conservation. PARTIAL: sustained real-time results on two independent phones and live witness delivery are external."
+    },
+    "H-REPAIR": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth", "noos-nel"],
+      "command": "python tools/gates/run_hearth_claim.py --claim H-REPAIR",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim H-REPAIR --rollback-check",
+      "notes": "Local precursor: conservative fixed-point replica solver reproduces all frozen p=0.3/0.6/0.9 x k=1/2/4 factors (20/74/850, 8/16/50, 3/5/7); evidence-weighted decaying availability classes; 8-of-12 reconstruction probability; ordered commitment check -> replica promotion -> exact replay -> reseed recovery. PARTIAL: 300 households, three regions, 90 elapsed days, correlated traces, and real repair economics remain external."
+    },
+    "H-TRAIN": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-training", "noos-hearth", "noos-nel", "noos-work-loom"],
+      "command": "python tools/gates/run_hearth_claim.py --claim H-TRAIN",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim H-TRAIN --rollback-check",
+      "notes": "Local precursor: exact TrainStepClaim receipt shape, graph-bound local opening, independently domain-separated Freivalds checks for forward Y=XW, input gradient dX=dY*W^T, and weight gradient dW=X^T*dY, detection surfaces for sign flip, stale policy, coherent fake Jacobian, and unopened-node corruption, plus exact 32-hearth/1.5B/H=500/batch-8192 sync-compute model and trusted-federation/no-credit rollback. PARTIAL: real convergence, 32 physical 24 GB hearths, residential WAN, witness traffic, and live stake/slashing are external."
+    },
+    "H-RELAY": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth", "noos-workerd"],
+      "command": "python tools/gates/run_hearth_claim.py --claim H-RELAY",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim H-RELAY --rollback-check",
+      "notes": "Local precursor: direct traversal selection, mandatory funded relay fallback, unreachable/unfunded typed failures, measured RTTClass honesty, lowest-measured-RTT routing, and exact 60% direct/100% reachability/20% relay-cost/locality evaluators with <50% economic kill kept non-semantic. PARTIAL: deployed-population NAT and billed relay measurements are external."
+    },
+    "H-PAY": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth", "noos-work-loom"],
+      "command": "python tools/gates/run_hearth_claim.py --claim H-PAY",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim H-PAY --rollback-check",
+      "notes": "Local precursor: bonded admission with mixed-vendor/architecture conformance, one-use challenge/transcript replay protection, independent multi-probe RTT consistency, availability/failure-domain evidence, attack-class findings, exact one-third-vs-bond cohort rule, conserved executor/Chorus/evaluator/availability-relay payment plans, and proofpower eligibility requiring independent paid delivered matured non-circular demand with no same-window double credit. PARTIAL: funded red team and twelve months of external non-circular demand are unavailable."
+    },
+    "E-HEARTH-01": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth", "noos-nel"],
+      "command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-01",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-01 --rollback-check",
+      "notes": "Executable local precursor covers integer commitment equality surfaces, schedule/placement aggregation, mandatory divergent FP16 negative control, 2x profile performance, and 70% auto-plan quality. PARTIAL by design: no cross-vendor real hardware campaign and no >=10^9 measured instances."
+    },
+    "E-HEARTH-02": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth", "noos-nel", "noos-workerd"],
+      "command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-02",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-02 --rollback-check",
+      "notes": "Executable local precursor pins the 40-phone/two-layer/1.71 GB assignment shape, post-commit witness budget, and accumulator/C8/saturation/transplant escalation while Workerd exercises the actual NEL Freivalds verifier. PARTIAL: real 3090/4090 serving and two independent thermally sustained phone platforms are not emulated."
+    },
+    "E-HEARTH-03": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth", "noos-nel"],
+      "command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-03",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-03 --rollback-check",
+      "notes": "Executable local precursor reproduces synthetic p=0.3/0.6/0.9 replication controls, 8-of-12 custody probability, exact committed replay, and the full departure sequence through reseed. PARTIAL: the required 300 consenting households, three regions, and 90 elapsed days are external."
+    },
+    "E-HEARTH-04": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth"],
+      "command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-04",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-04 --rollback-check",
+      "notes": "Executable local precursor reconstructs canonical bytes under every four-shard-loss pattern, rejects corrupt and cross-artifact shards, and resumes after seeder departure without restart. PARTIAL: 100 real fresh hearths on 10-50 Mbps links fetching the real 8.03 GB artifact are external."
+    },
+    "E-HEARTH-05": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth", "noos-workerd"],
+      "command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-05",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-05 --rollback-check",
+      "notes": "Executable local precursor calculates integer compute/serialization/RTT/queue decomposition, checks +/-30% bands, keeps WAN interactive routing prohibited, and treats >=10 tok/s at >=2 hops and >=50 ms as refutation/retire-and-replace. PARTIAL: real WAN cells and first-class public negative-result publication are external."
+    },
+    "E-HEARTH-06": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-training", "noos-hearth", "noos-nel", "noos-work-loom"],
+      "command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-06",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-06 --rollback-check",
+      "notes": "Executable local precursor pins the 32-hearth/1.5B/H=500/batch-8192 pilot model, <=1.296 sync/compute threshold, witness budget, three-GEMM receipts, all four planted attack surfaces, zero false-slash honest fixture, conservation, and trusted-federation rollback. PARTIAL: convergence, physical hearths, residential WAN, public testnet, and live stake are external."
+    },
+    "E-HEARTH-07": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth", "noos-work-loom"],
+      "command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-07",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-07 --rollback-check",
+      "notes": "Executable local precursor covers VM flag, GPU/mixed-vendor inconsistency, replayed transcript, co-location/failure-domain, and cloud-box/RTT attacks, with independent conformance and latency findings and exact >=1/3 below-bond kill logic. PARTIAL: no funded independent red team or real attack-cost curve."
+    },
+    "E-HEARTH-08": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-hearth", "noos-workerd"],
+      "command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-08",
+      "rollback_command": "python tools/gates/run_hearth_claim.py --claim E-HEARTH-08 --rollback-check",
+      "notes": "Executable local precursor evaluates exact direct/relay reachability, funded relay cost share, RTTClass honesty, and locality-vs-random placement thresholds; traversal failure remains economic and cannot affect correctness. PARTIAL: deployed volunteer-population DCUtR and billed relay measurements are external."
+    }
+  },
+  "notes": "Hearth lifecycle completion and honest local precursor pass. All 16 assigned rows remain PARTIAL because each exact registry pass threshold includes real mixed-vendor hardware, independent phone platforms, public WAN publication, 100/300/1000-hearth scale, 90-day or twelve-month elapsed evidence, live stake, funded external red team, or deployed NAT population. Deterministic code exercises protocol shape and falsifiers only; it is never labeled external evidence."
+}

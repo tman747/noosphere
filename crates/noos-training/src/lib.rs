@@ -4,6 +4,7 @@
 // Modular arithmetic and validated matrix index arithmetic are the experiment's
 // subject; dimensions are bounded before any allocation or indexing.
 #![allow(clippy::arithmetic_side_effects)]
+use noos_nel::{freivalds_verify_u64 as nel_freivalds, FreivaldsProfile};
 use noos_species::{
     Hash32, LearningDecision, LearningRecord, RevisionLifecycle, SpeciesRevision, UpdatePacket,
 };
@@ -272,6 +273,341 @@ pub fn audit_gradient(
     })
 }
 
+/// The H-TRAIN outer-loop and receipt shape. It remains experimental until
+/// the real 32-hearth, 1.5B, live-stake pilot passes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrainStepClaim {
+    pub reaction_id: Hash32,
+    pub member_root: Hash32,
+    pub outer_step: u64,
+    pub inner_lo: u64,
+    pub inner_hi: u64,
+    pub policy_lag: u16,
+    pub data_shard_root: Hash32,
+    pub fwd_root: Hash32,
+    pub bwd_root: Hash32,
+    pub grad_root: Hash32,
+    pub opt_state_root: Hash32,
+    pub pseudograd_root: Hash32,
+    pub registered_graph_root: Hash32,
+    pub local_opening_root: Hash32,
+    pub toploc_root: Hash32,
+}
+
+impl TrainStepClaim {
+    pub fn validate(&self, maximum_policy_lag: u16) -> Result<(), TrainingError> {
+        if self.inner_lo >= self.inner_hi
+            || self.policy_lag > maximum_policy_lag
+            || [
+                self.reaction_id,
+                self.member_root,
+                self.data_shard_root,
+                self.fwd_root,
+                self.bwd_root,
+                self.grad_root,
+                self.opt_state_root,
+                self.pseudograd_root,
+                self.registered_graph_root,
+                self.local_opening_root,
+                self.toploc_root,
+            ]
+            .contains(&[0; 32])
+        {
+            return Err(TrainingError::InvalidTrainStep);
+        }
+        if self.local_opening_root != expected_training_opening(self) {
+            return Err(TrainingError::UnboundJacobianOpening);
+        }
+        Ok(())
+    }
+}
+
+#[must_use]
+pub fn expected_training_opening(claim: &TrainStepClaim) -> Hash32 {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"NOOS/HEARTH/TRAINING-OPENING/V1");
+    hasher.update(&claim.registered_graph_root);
+    hasher.update(&claim.fwd_root);
+    hasher.update(&claim.bwd_root);
+    hasher.update(&claim.grad_root);
+    hasher.update(&claim.opt_state_root);
+    hasher.update(&claim.outer_step.to_le_bytes());
+    hasher.update(&claim.inner_lo.to_le_bytes());
+    hasher.update(&claim.inner_hi.to_le_bytes());
+    *hasher.finalize().as_bytes()
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ThreeGemmWitness {
+    pub x: Vec<u64>,
+    pub w: Vec<u64>,
+    pub dy: Vec<u64>,
+    pub y: Vec<u64>,
+    pub dx: Vec<u64>,
+    pub dw: Vec<u64>,
+}
+
+impl ThreeGemmWitness {
+    pub fn honest(
+        profile: &IntegerProfile,
+        x: Vec<u64>,
+        w: Vec<u64>,
+        dy: Vec<u64>,
+    ) -> Result<Self, TrainingError> {
+        let y = matmul_loop(profile, &x, &w)?;
+        let w_t = transpose(&w, profile.inner as usize, profile.cols as usize)?;
+        let x_t = transpose(&x, profile.rows as usize, profile.inner as usize)?;
+        let dx_profile = derived_profile(profile, profile.rows, profile.cols, profile.inner, b"DX");
+        let dw_profile = derived_profile(profile, profile.inner, profile.rows, profile.cols, b"DW");
+        let dx = matmul_loop(&dx_profile, &dy, &w_t)?;
+        let dw = matmul_loop(&dw_profile, &x_t, &dy)?;
+        Ok(Self {
+            x,
+            w,
+            dy,
+            y,
+            dx,
+            dw,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TrainingAttack {
+    SignFlippedGradient,
+    StalePolicy,
+    CoherentFakeJacobian,
+    UnopenedNodeCorruption,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TrainingAuditReport {
+    pub forward_passed: bool,
+    pub input_gradient_passed: bool,
+    pub weight_gradient_passed: bool,
+    pub opening_bound: bool,
+    pub policy_lag_valid: bool,
+    pub detected_attacks: BTreeSet<TrainingAttack>,
+    pub false_slash: bool,
+}
+
+impl TrainingAuditReport {
+    #[must_use]
+    pub fn exact_fidelity_passed(&self) -> bool {
+        self.forward_passed
+            && self.input_gradient_passed
+            && self.weight_gradient_passed
+            && self.opening_bound
+            && self.policy_lag_valid
+    }
+}
+
+pub fn audit_training_step(
+    profile: &IntegerProfile,
+    claim: &TrainStepClaim,
+    witness: &ThreeGemmWitness,
+    challenge_seed: Hash32,
+    maximum_policy_lag: u16,
+) -> Result<TrainingAuditReport, TrainingError> {
+    profile.validate()?;
+    let forward_passed = freivalds(profile, &witness.x, &witness.w, &witness.y, challenge_seed)?
+        && same_chunk_leaf(
+            &witness.x,
+            &witness.w,
+            &witness.y,
+            profile.rows,
+            profile.inner,
+            profile.cols,
+            challenge_seed,
+        )?;
+    let w_t = transpose(&witness.w, profile.inner as usize, profile.cols as usize)?;
+    let x_t = transpose(&witness.x, profile.rows as usize, profile.inner as usize)?;
+    let dx_profile = derived_profile(profile, profile.rows, profile.cols, profile.inner, b"DX");
+    let dw_profile = derived_profile(profile, profile.inner, profile.rows, profile.cols, b"DW");
+    let dx_seed = transcript_seed(challenge_seed, b"DX");
+    let dw_seed = transcript_seed(challenge_seed, b"DW");
+    let input_gradient_passed = freivalds(&dx_profile, &witness.dy, &w_t, &witness.dx, dx_seed)?
+        && same_chunk_leaf(
+            &witness.dy,
+            &w_t,
+            &witness.dx,
+            dx_profile.rows,
+            dx_profile.inner,
+            dx_profile.cols,
+            dx_seed,
+        )?;
+    let weight_gradient_passed = freivalds(&dw_profile, &x_t, &witness.dy, &witness.dw, dw_seed)?
+        && same_chunk_leaf(
+            &x_t,
+            &witness.dy,
+            &witness.dw,
+            dw_profile.rows,
+            dw_profile.inner,
+            dw_profile.cols,
+            dw_seed,
+        )?;
+    let opening_bound = claim.local_opening_root == expected_training_opening(claim);
+    let policy_lag_valid = claim.policy_lag <= maximum_policy_lag;
+    let mut detected_attacks = BTreeSet::new();
+    if !weight_gradient_passed {
+        detected_attacks.insert(TrainingAttack::SignFlippedGradient);
+    }
+    if !policy_lag_valid {
+        detected_attacks.insert(TrainingAttack::StalePolicy);
+    }
+    if !input_gradient_passed {
+        detected_attacks.insert(TrainingAttack::CoherentFakeJacobian);
+    }
+    if !opening_bound {
+        detected_attacks.insert(TrainingAttack::UnopenedNodeCorruption);
+    }
+    Ok(TrainingAuditReport {
+        forward_passed,
+        input_gradient_passed,
+        weight_gradient_passed,
+        opening_bound,
+        policy_lag_valid,
+        detected_attacks,
+        false_slash: false,
+    })
+}
+
+fn same_chunk_leaf(
+    a: &[u64],
+    b: &[u64],
+    c: &[u64],
+    rows: u32,
+    inner: u32,
+    cols: u32,
+    seed: Hash32,
+) -> Result<bool, TrainingError> {
+    let cols_usize = usize::try_from(cols).map_err(|_| TrainingError::Shape)?;
+    let vectors = (0..FreivaldsProfile::StandardReps2.reps())
+        .map(|repetition| {
+            (0..cols_usize)
+                .map(|column| {
+                    let mut hasher = blake3::Hasher::new();
+                    hasher.update(b"NOOS/HEARTH/TRAINING-NEL-LEAF/V1");
+                    hasher.update(&seed);
+                    hasher.update(&(repetition as u64).to_le_bytes());
+                    hasher.update(&(column as u64).to_le_bytes());
+                    u32::from_le_bytes(
+                        hasher.finalize().as_bytes()[..4]
+                            .try_into()
+                            .unwrap_or([0; 4]),
+                    )
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    nel_freivalds(
+        a,
+        b,
+        c,
+        usize::try_from(rows).map_err(|_| TrainingError::Shape)?,
+        usize::try_from(inner).map_err(|_| TrainingError::Shape)?,
+        cols_usize,
+        &vectors,
+        FreivaldsProfile::StandardReps2,
+    )
+    .map_err(|_| TrainingError::InvalidTrainStep)
+}
+
+fn derived_profile(
+    profile: &IntegerProfile,
+    rows: u32,
+    inner: u32,
+    cols: u32,
+    label: &[u8],
+) -> IntegerProfile {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"NOOS/HEARTH/TRAINING-GEMM-PROFILE/V1");
+    hasher.update(&profile.profile_id);
+    hasher.update(label);
+    IntegerProfile {
+        profile_id: *hasher.finalize().as_bytes(),
+        modulus: profile.modulus,
+        rows,
+        inner,
+        cols,
+        challenge_domain: profile.challenge_domain,
+        independent_implementations: profile.independent_implementations,
+    }
+}
+
+fn transcript_seed(seed: Hash32, label: &[u8]) -> Hash32 {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"NOOS/HEARTH/TRAINING-GEMM-CHALLENGE/V1");
+    hasher.update(&seed);
+    hasher.update(label);
+    *hasher.finalize().as_bytes()
+}
+
+fn transpose(values: &[u64], rows: usize, cols: usize) -> Result<Vec<u64>, TrainingError> {
+    if values.len() != rows.saturating_mul(cols) {
+        return Err(TrainingError::Shape);
+    }
+    let mut transposed = vec![0; values.len()];
+    for row in 0..rows {
+        for col in 0..cols {
+            transposed[col * rows + row] = values[row * cols + col];
+        }
+    }
+    Ok(transposed)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TrainingPilotModel {
+    pub hearths: u16,
+    pub model_parameters: u64,
+    pub outer_loop_h: u16,
+    pub local_batch_tokens: u32,
+    pub sync_milliseconds: u64,
+    pub compute_milliseconds: u64,
+    pub witness_bytes: u64,
+    pub witness_budget_bytes: u64,
+}
+
+impl TrainingPilotModel {
+    pub fn validate_reference_shape(self) -> Result<(), TrainingError> {
+        if self.hearths < 32
+            || self.model_parameters != 1_500_000_000
+            || self.outer_loop_h != 500
+            || self.local_batch_tokens != 8_192
+            || self.compute_milliseconds == 0
+        {
+            return Err(TrainingError::InvalidPilotShape);
+        }
+        Ok(())
+    }
+
+    pub fn sync_compute_ratio_bps(self) -> Result<u64, TrainingError> {
+        self.validate_reference_shape()?;
+        Ok(self.sync_milliseconds.saturating_mul(10_000) / self.compute_milliseconds)
+    }
+
+    pub fn local_thresholds_met(self) -> Result<bool, TrainingError> {
+        // 1.2 * modeled 1.08 = 1.296, represented exactly in basis points.
+        Ok(self.sync_compute_ratio_bps()? <= 12_960
+            && self.witness_bytes <= self.witness_budget_bytes)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TrainingFallback {
+    SlashableCandidate,
+    TrustedFederationNoCredit,
+}
+
+#[must_use]
+pub fn rollback_training(any_false_slash: bool, witness_affordable: bool) -> TrainingFallback {
+    if any_false_slash || !witness_affordable {
+        TrainingFallback::TrustedFederationNoCredit
+    } else {
+        TrainingFallback::SlashableCandidate
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PentagonPath {
@@ -423,6 +759,12 @@ pub enum TrainingError {
     Shape,
     #[error("independent implementations diverged")]
     ImplementationDivergence,
+    #[error("invalid training-step claim")]
+    InvalidTrainStep,
+    #[error("training Jacobian opening is not bound to the registered graph")]
+    UnboundJacobianOpening,
+    #[error("invalid H-TRAIN pilot shape")]
+    InvalidPilotShape,
     #[error("E-IDENT-01 failed")]
     Ident01,
     #[error("identity experiment cost exceeded")]
@@ -510,6 +852,121 @@ mod tests {
         let x = audit_gradient(&p, &a, &b, &[0; 4], h(1), Some(88)).unwrap();
         assert!(x.fidelity_passed && !x.forged_gradient_coverage && !x.slashable);
         assert_eq!(x.quality_score, Some(88));
+    }
+    fn train_claim() -> TrainStepClaim {
+        let mut claim = TrainStepClaim {
+            reaction_id: h(20),
+            member_root: h(21),
+            outer_step: 7,
+            inner_lo: 500,
+            inner_hi: 1_000,
+            policy_lag: 1,
+            data_shard_root: h(22),
+            fwd_root: h(23),
+            bwd_root: h(24),
+            grad_root: h(25),
+            opt_state_root: h(26),
+            pseudograd_root: h(27),
+            registered_graph_root: h(28),
+            local_opening_root: h(29),
+            toploc_root: h(30),
+        };
+        claim.local_opening_root = expected_training_opening(&claim);
+        claim
+    }
+    #[test]
+    fn three_training_gemms_accept_honest_and_detect_each_local_attack_surface() {
+        let mut p = profile();
+        // This bounded fixture never reaches the modulus, so the field-model
+        // verifier and the production wrapping-integer NEL leaf are identical.
+        p.modulus = u64::MAX;
+        let x = vec![1, 2, 3, 4, 5, 6];
+        let w = vec![7, 8, 9, 10, 11, 12];
+        let dy = vec![2, 3, 5, 7];
+        let honest = ThreeGemmWitness::honest(&p, x, w, dy).unwrap();
+        assert_eq!(honest.y, vec![58, 64, 139, 154]);
+        assert!(nel_freivalds(
+            &honest.x,
+            &honest.w,
+            &honest.y,
+            2,
+            3,
+            2,
+            &[vec![1, 2], vec![3, 5]],
+            FreivaldsProfile::StandardReps2
+        )
+        .unwrap());
+        let claim = train_claim();
+        assert!(freivalds(&p, &honest.x, &honest.w, &honest.y, h(31)).unwrap());
+        assert!(same_chunk_leaf(
+            &honest.x,
+            &honest.w,
+            &honest.y,
+            p.rows,
+            p.inner,
+            p.cols,
+            h(31)
+        )
+        .unwrap());
+        let report = audit_training_step(&p, &claim, &honest, h(31), 2).unwrap();
+        assert!(report.exact_fidelity_passed(), "{report:?}");
+        assert!(report.detected_attacks.is_empty());
+        assert!(!report.false_slash);
+
+        let mut sign_flip = honest.clone();
+        sign_flip.dw[0] = (p.modulus - sign_flip.dw[0]) % p.modulus;
+        let report = audit_training_step(&p, &claim, &sign_flip, h(31), 2).unwrap();
+        assert!(report
+            .detected_attacks
+            .contains(&TrainingAttack::SignFlippedGradient));
+
+        let mut fake_jacobian = honest.clone();
+        fake_jacobian.dx[0] = (fake_jacobian.dx[0] + 1) % p.modulus;
+        let report = audit_training_step(&p, &claim, &fake_jacobian, h(31), 2).unwrap();
+        assert!(report
+            .detected_attacks
+            .contains(&TrainingAttack::CoherentFakeJacobian));
+
+        let mut stale = claim.clone();
+        stale.policy_lag = 3;
+        let report = audit_training_step(&p, &stale, &honest, h(31), 2).unwrap();
+        assert!(report
+            .detected_attacks
+            .contains(&TrainingAttack::StalePolicy));
+
+        let mut unopened = claim;
+        unopened.local_opening_root[0] ^= 1;
+        let report = audit_training_step(&p, &unopened, &honest, h(31), 2).unwrap();
+        assert!(report
+            .detected_attacks
+            .contains(&TrainingAttack::UnopenedNodeCorruption));
+    }
+    #[test]
+    fn training_pilot_model_pins_reference_shape_ratio_and_rollback() {
+        let pilot = TrainingPilotModel {
+            hearths: 32,
+            model_parameters: 1_500_000_000,
+            outer_loop_h: 500,
+            local_batch_tokens: 8_192,
+            sync_milliseconds: 1_080,
+            compute_milliseconds: 1_000,
+            witness_bytes: 100,
+            witness_budget_bytes: 100,
+        };
+        assert_eq!(pilot.sync_compute_ratio_bps().unwrap(), 10_800);
+        assert!(pilot.local_thresholds_met().unwrap());
+        assert_eq!(
+            rollback_training(false, true),
+            TrainingFallback::SlashableCandidate
+        );
+        assert_eq!(
+            rollback_training(true, true),
+            TrainingFallback::TrustedFederationNoCredit
+        );
+        assert_eq!(
+            rollback_training(false, false),
+            TrainingFallback::TrustedFederationNoCredit
+        );
     }
     #[test]
     fn promotion_creates_new_revision() {

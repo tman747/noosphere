@@ -971,7 +971,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0f9ef7462f7c099f518d754361858f86d8a07af53ba9af0fe635bbccb151a63"
 dependencies = [
  "ff",
- "rand 0.8.6",
+ "rand 0.8.7",
  "rand_core 0.6.4",
  "rand_xorshift",
  "subtle",
@@ -1063,7 +1063,7 @@ dependencies = [
  "idna",
  "ipnet",
  "once_cell",
- "rand 0.9.4",
+ "rand 0.9.5",
  "ring",
  "socket2 0.5.10",
  "thiserror 2.0.18",
@@ -1086,7 +1086,7 @@ dependencies = [
  "moka",
  "once_cell",
  "parking_lot 0.12.5",
- "rand 0.9.4",
+ "rand 0.9.5",
  "resolv-conf",
  "smallvec",
  "thiserror 2.0.18",
@@ -1350,7 +1350,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "log",
- "rand 0.9.4",
+ "rand 0.9.5",
  "tokio",
  "url",
  "xmltree",
@@ -1542,7 +1542,7 @@ dependencies = [
  "parking_lot 0.12.5",
  "pin-project",
  "quick-protobuf",
- "rand 0.8.6",
+ "rand 0.8.7",
  "rw-stream-sink",
  "thiserror 2.0.18",
  "tracing",
@@ -1577,7 +1577,7 @@ dependencies = [
  "hkdf",
  "multihash",
  "prost",
- "rand 0.8.6",
+ "rand 0.8.7",
  "sha2",
  "thiserror 2.0.18",
  "tracing",
@@ -1596,7 +1596,7 @@ dependencies = [
  "libp2p-core",
  "libp2p-identity",
  "libp2p-swarm",
- "rand 0.8.6",
+ "rand 0.8.7",
  "smallvec",
  "socket2 0.5.10",
  "tokio",
@@ -1617,7 +1617,7 @@ dependencies = [
  "libp2p-tls",
  "quinn",
  "quinn-proto",
- "rand 0.8.6",
+ "rand 0.8.7",
  "ring",
  "rustls",
  "socket2 0.5.10",
@@ -1636,7 +1636,7 @@ dependencies = [
  "libp2p-core",
  "libp2p-identity",
  "libp2p-swarm",
- "rand 0.8.6",
+ "rand 0.8.7",
  "tracing",
 ]
 
@@ -1654,7 +1654,7 @@ dependencies = [
  "libp2p-core",
  "libp2p-identity",
  "multistream-select",
- "rand 0.8.6",
+ "rand 0.8.7",
  "smallvec",
  "tokio",
  "tracing",
@@ -2276,6 +2276,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "noos-analytics",
+ "noos-nel",
  "noos-species",
  "serde",
  "thiserror 2.0.18",
@@ -2751,9 +2752,9 @@ checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
 
 [[package]]
 name = "rand"
-version = "0.8.6"
+version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ca0ecfa931c29007047d1bc58e623ab12e5590e8c7cc53200d5202b69266d8a"
+checksum = "22f6172bdec972074665ed81ed53b71da00bfc44b65a753cfde883ec4c702a1a"
 dependencies = [
  "libc",
  "rand_chacha 0.3.1",
@@ -2762,9 +2763,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.9.4"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44c5af06bb1b7d3216d91932aed5265164bf384dc89cd6ba05cf59a35f5f76ea"
+checksum = "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41"
 dependencies = [
  "rand_chacha 0.9.0",
  "rand_core 0.9.5",
