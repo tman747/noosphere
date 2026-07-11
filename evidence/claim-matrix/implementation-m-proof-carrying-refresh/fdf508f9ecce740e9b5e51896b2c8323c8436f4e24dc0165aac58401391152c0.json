@@ -1,0 +1,73 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-private-besi",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-private-besi"
+        ]
+      },
+      "name": "claim-specific crate tests with falsifiers",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-PROOF-CARRYING-REFRESH": "cc9065b75ac6fbc9dc9645ee813682d69ce513d5fd7cbcb829d6a907872af257"
+  },
+  "claims": [
+    "M-PROOF-CARRYING-REFRESH"
+  ],
+  "command": [
+    "tools/gates/run_privacy_claim.py",
+    "--claim",
+    "M-PROOF-CARRYING-REFRESH"
+  ],
+  "evidence_sha256": "fdf508f9ecce740e9b5e51896b2c8323c8436f4e24dc0165aac58401391152c0",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-m-proof-carrying-refresh",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence.",
+    "The continuity tag is a symmetric audit-key stand-in, not the required zero-knowledge prover.",
+    "Only one local verifier family exists; no second independently authored verifier exists.",
+    "The exercised ciphertext is a toy Z/(2^64) negative control, not an admitted production suite."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-private-besi/Cargo.toml": "1a7fa58553b0285dfe833b02626c3479f85f6a464f0bd115531109b6267e9ac3",
+    "crates/noos-private-besi/src/refresh.rs": "a152331a340eaa6f5fef20202a5316383b9e86e137e53b1d9dbe4edf68c6d339"
+  }
+}

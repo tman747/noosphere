@@ -1,0 +1,74 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-umbra",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-umbra"
+        ]
+      },
+      "name": "claim-specific crate tests with falsifiers",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-NEL-08": "97f7996a0da41e4b22b24b62f70ac28e0e0e9c0d98960ff58b5bc208b07ca4a0"
+  },
+  "claims": [
+    "E-NEL-08"
+  ],
+  "command": [
+    "tools/gates/run_privacy_claim.py",
+    "--claim",
+    "E-NEL-08"
+  ],
+  "evidence_sha256": "5edbf1b8dd7ff993d82e7c93a74112d52dcc2cf5799168c8c84d01c5952248ac",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-e-nel-08",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence.",
+    "Attestation mutation, replay, rollback, cross-job, and cross-class behavior is exercised only against a deterministic fixture verifier.",
+    "No real TEE prompt timing/length campaign or preregistered hardware leakage budget has run.",
+    "No declared confidential-arbitration threshold/adversary has external evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-nel/src/lib.rs": "5baddc85c27150926dac44af8b9beaaeeaa020911bee964778bcb1162eaaf816",
+    "crates/noos-umbra/Cargo.toml": "2b821067f57ff5203a4878fcbe001b52780f0b7ad7cd7c6cb1b530d467033702",
+    "crates/noos-umbra/src/tee_fiber.rs": "ec33f9222db49b1357261e9876d69d2f1e2ff7dc2f222677087fa2562e4f67ba"
+  }
+}

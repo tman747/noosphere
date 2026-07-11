@@ -1,0 +1,74 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-private-besi",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-private-besi"
+        ]
+      },
+      "name": "claim-specific crate tests with falsifiers",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-HFHE-SUITE": "01c70a01b302c7e95bc675be5bd96a8efbc9daee9df6ede3ad36425435f90cf4"
+  },
+  "claims": [
+    "M-HFHE-SUITE"
+  ],
+  "command": [
+    "tools/gates/run_privacy_claim.py",
+    "--claim",
+    "M-HFHE-SUITE"
+  ],
+  "evidence_sha256": "9372b93f8a742205be07a8aaafc9b7d06de111de9c1e5082ea989294a600ee89",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-m-hfhe-suite",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence.",
+    "No IND-style model, standard-assumption reduction, independent concrete attack estimate, or production parameters exist.",
+    "The exact F_(2^127-1) circuit evaluator is a conformance reference, not encryption or a security claim.",
+    "No complete refresh prover or two independent verifier families exist."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-private-besi/Cargo.toml": "1a7fa58553b0285dfe833b02626c3479f85f6a464f0bd115531109b6267e9ac3",
+    "crates/noos-private-besi/src/hfhe.rs": "dbe6c75807f5cb8b3eae3c4bccc3e3b3465457439c192c1917fa9b0faa914dfe",
+    "crates/noos-private-besi/src/refresh.rs": "a152331a340eaa6f5fef20202a5316383b9e86e137e53b1d9dbe4edf68c6d339"
+  }
+}

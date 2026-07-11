@@ -13,7 +13,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod branch;
 pub mod fiber_dag;
 pub mod hidden;
+pub mod privacy_ir;
 pub mod stealth;
+pub mod tee_fiber;
 
 pub type Hash32 = [u8; 32];
 

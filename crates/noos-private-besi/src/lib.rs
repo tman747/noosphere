@@ -19,6 +19,7 @@ pub mod delivery;
 pub mod depth;
 pub mod dual_root;
 pub mod fused_audit;
+pub mod hfhe;
 pub mod mpc3;
 pub mod refresh;
 pub mod transformer;
@@ -49,6 +50,7 @@ pub enum BesiError {
     UnknownSuite,
     Epoch,
     AssuranceSubstitution,
+    NonCanonical,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -68,6 +70,54 @@ impl Matrix {
     fn at(&self, r: usize, c: usize) -> u64 {
         self.data[r * self.cols + c]
     }
+}
+
+#[must_use]
+pub fn encode_matrix(matrix: &Matrix) -> Vec<u8> {
+    let mut encoded = b"NOOS/BESI/MATRIX/Z2-64/V1".to_vec();
+    encoded.extend_from_slice(&(matrix.rows as u64).to_le_bytes());
+    encoded.extend_from_slice(&(matrix.cols as u64).to_le_bytes());
+    encoded.extend_from_slice(&(matrix.data.len() as u64).to_le_bytes());
+    for value in &matrix.data {
+        encoded.extend_from_slice(&value.to_le_bytes());
+    }
+    encoded
+}
+
+pub fn decode_matrix(encoded: &[u8]) -> Result<Matrix, BesiError> {
+    const DOMAIN: &[u8] = b"NOOS/BESI/MATRIX/Z2-64/V1";
+    if !encoded.starts_with(DOMAIN) || encoded.len() < DOMAIN.len() + 24 {
+        return Err(BesiError::NonCanonical);
+    }
+    let mut offset = DOMAIN.len();
+    let mut take_u64 = || {
+        let end = offset.checked_add(8).ok_or(BesiError::Overflow)?;
+        let bytes: [u8; 8] = encoded
+            .get(offset..end)
+            .ok_or(BesiError::NonCanonical)?
+            .try_into()
+            .map_err(|_| BesiError::NonCanonical)?;
+        offset = end;
+        Ok::<u64, BesiError>(u64::from_le_bytes(bytes))
+    };
+    let rows = usize::try_from(take_u64()?).map_err(|_| BesiError::Overflow)?;
+    let cols = usize::try_from(take_u64()?).map_err(|_| BesiError::Overflow)?;
+    let count = usize::try_from(take_u64()?).map_err(|_| BesiError::Overflow)?;
+    let expected = offset
+        .checked_add(count.checked_mul(8).ok_or(BesiError::Overflow)?)
+        .ok_or(BesiError::Overflow)?;
+    if expected != encoded.len() || rows.checked_mul(cols) != Some(count) {
+        return Err(BesiError::NonCanonical);
+    }
+    let mut data = Vec::with_capacity(count);
+    while offset < encoded.len() {
+        let bytes: [u8; 8] = encoded[offset..offset + 8]
+            .try_into()
+            .map_err(|_| BesiError::NonCanonical)?;
+        data.push(u64::from_le_bytes(bytes));
+        offset += 8;
+    }
+    Matrix::new(rows, cols, data)
 }
 
 /// Fresh additive sharing over Z/(2^64). `random_share` must come from an OS CSPRNG in production callers.
@@ -403,6 +453,30 @@ impl AdjudicationReceipt {
 #[must_use]
 pub fn exact_assurance(profile: &str, mode: &str, assurance: &str) -> bool {
     profile == PRIVACY_PROFILE && mode == EXECUTION_MODE && assurance == ASSURANCE
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SanitizedBesiResult {
+    pub job_id: [u8; 32],
+    pub output_commitment: [u8; 32],
+    pub integrity: bool,
+    pub public_bucket: usize,
+    pub remote_gemms: u32,
+    pub assurance: &'static str,
+}
+
+impl SanitizedBesiResult {
+    #[must_use]
+    pub fn field_names() -> [&'static str; 6] {
+        [
+            "job_id",
+            "output_commitment",
+            "integrity",
+            "public_bucket",
+            "remote_gemms",
+            "assurance",
+        ]
+    }
 }
 #[cfg(test)]
 mod tests;

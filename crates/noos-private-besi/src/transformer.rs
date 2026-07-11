@@ -14,9 +14,10 @@
 //! profile is this crate's frozen integer test profile, not any production model's.
 
 use crate::{
-    freivalds_exact_z, pad_rows, raw_public_weight_gemm, reconstruct, slice_after_verification,
-    split, BesiError, Matrix,
+    encode_matrix, freivalds_exact_z, pad_rows, raw_public_weight_gemm, reconstruct,
+    slice_after_verification, split, BesiError, Matrix,
 };
+use std::collections::BTreeSet;
 
 pub const SEQ: usize = 4;
 pub const D_MODEL: usize = 8;
@@ -53,6 +54,9 @@ impl GemmEngine for PlainEngine {
 pub struct BesiSplitEngine {
     reader: blake3::OutputReader,
     pub remote_gemms: u32,
+    pub accepted_challenges: u32,
+    pub executor_visible_rows: Vec<usize>,
+    challenge_commitments: BTreeSet<[u8; 32]>,
     /// Test hook: add 1 to executor 0's first accumulator word on the numbered remote GEMM.
     pub tamper_gemm: Option<u32>,
 }
@@ -65,6 +69,9 @@ impl BesiSplitEngine {
         Self {
             reader: hasher.finalize_xof(),
             remote_gemms: 0,
+            accepted_challenges: 0,
+            executor_visible_rows: Vec::new(),
+            challenge_commitments: BTreeSet::new(),
             tamper_gemm: None,
         }
     }
@@ -74,10 +81,31 @@ impl BesiSplitEngine {
         u64::from_le_bytes(buf)
     }
     /// Bounded odd challenge entries keep the exact-Z i128 envelope comfortable.
-    fn challenge(&mut self, len: usize) -> Vec<i64> {
-        (0..len)
+    fn challenge(
+        &mut self,
+        len: usize,
+        gemm_index: u32,
+        transcript: &[u8],
+    ) -> Result<Vec<i64>, BesiError> {
+        let mut secret = [0u8; 32];
+        self.reader.fill(&mut secret);
+        let mut hasher = blake3::Hasher::new_keyed(&secret);
+        hasher.update(b"NOOS/BESI/FREIVALDS-POST-RESPONSE/V1");
+        hasher.update(&gemm_index.to_le_bytes());
+        hasher.update(transcript);
+        let commitment = *hasher.finalize().as_bytes();
+        if !self.challenge_commitments.insert(commitment) {
+            return Err(BesiError::Replay);
+        }
+        let mut challenge_reader = blake3::Hasher::new_keyed(&secret);
+        challenge_reader.update(b"NOOS/BESI/FREIVALDS-CHALLENGE/V1");
+        challenge_reader.update(&commitment);
+        let mut reader = challenge_reader.finalize_xof();
+        let values = (0..len)
             .map(|_| {
-                let v = self.next_u64();
+                let mut bytes = [0u8; 8];
+                reader.fill(&mut bytes);
+                let v = u64::from_le_bytes(bytes);
                 let magnitude = (v % 1021) as i64 + 1;
                 if v & (1 << 63) == 0 {
                     magnitude
@@ -85,7 +113,8 @@ impl BesiSplitEngine {
                     -magnitude
                 }
             })
-            .collect()
+            .collect();
+        Ok(values)
     }
 }
 
@@ -94,6 +123,7 @@ impl GemmEngine for BesiSplitEngine {
         let index = self.remote_gemms;
         self.remote_gemms = self.remote_gemms.saturating_add(1);
         let (padded, true_rows) = pad_rows(x)?;
+        self.executor_visible_rows.push(padded.rows);
         let mask: Vec<u64> = (0..padded.data.len()).map(|_| self.next_u64()).collect();
         let (x0, x1) = split(&padded, mask)?;
         // Remote executors: raw public-weight accumulators over one share each.
@@ -104,10 +134,17 @@ impl GemmEngine for BesiSplitEngine {
         }
         let y = reconstruct(&y0, &y1)?;
         // Mandatory exact-Z Freivalds before anything is sliced or requantized.
+        let mut transcript = b"NOOS/BESI/RAW-GEMM-TRANSCRIPT/V1".to_vec();
+        transcript.extend_from_slice(&encode_matrix(&padded));
+        transcript.extend_from_slice(&encode_matrix(w));
+        transcript.extend_from_slice(&encode_matrix(&y));
         let challenges: Vec<Vec<i64>> = (0..FREIVALDS_CHALLENGES)
-            .map(|_| self.challenge(w.cols))
-            .collect();
+            .map(|_| self.challenge(w.cols, index, &transcript))
+            .collect::<Result<_, _>>()?;
         freivalds_exact_z(&padded, w, &y, &challenges)?;
+        self.accepted_challenges = self
+            .accepted_challenges
+            .saturating_add(FREIVALDS_CHALLENGES as u32);
         slice_after_verification(&y, true_rows, true)
     }
 }
@@ -322,6 +359,11 @@ mod tests {
         let sealed = transformer_block(&x, &weights, &mut engine).unwrap();
         assert_eq!(reference, sealed);
         assert_eq!(engine.remote_gemms, 6);
+        assert_eq!(engine.accepted_challenges, 12);
+        assert!(engine
+            .executor_visible_rows
+            .iter()
+            .all(|rows| *rows == PADDING_BUCKET));
         // Different split randomness, identical result: sharing never leaks into the output.
         let mut other = BesiSplitEngine::new(&[99u8; 32]);
         assert_eq!(

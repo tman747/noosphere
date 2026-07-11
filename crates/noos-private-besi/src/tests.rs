@@ -26,6 +26,16 @@ fn additive_shares_reconstruct_mod_2_64() {
     assert_eq!(reconstruct(&a, &b).unwrap(), x);
 }
 #[test]
+fn canonical_matrix_encoding_binds_shape_and_rejects_trailing_bytes() {
+    let row = Matrix::new(1, 2, vec![7, 8]).unwrap();
+    let col = Matrix::new(2, 1, vec![7, 8]).unwrap();
+    assert_ne!(encode_matrix(&row), encode_matrix(&col));
+    assert_eq!(decode_matrix(&encode_matrix(&row)).unwrap(), row);
+    let mut trailing = encode_matrix(&col);
+    trailing.push(0);
+    assert_eq!(decode_matrix(&trailing), Err(BesiError::NonCanonical));
+}
+#[test]
 fn public_weight_share_gemms_conserve() {
     let x = Matrix::new(2, 2, vec![1, 2, 3, 4]).unwrap();
     let w = Matrix::new(2, 1, vec![5, 6]).unwrap();
@@ -76,12 +86,51 @@ fn context_mutation_rejects() {
     let a = StaticSecret::from(h(11));
     let b = StaticSecret::from(h(12));
     let env = encrypt(&a, &PublicKey::from(&b), &ctx(), [8; 12], 2, b"share").unwrap();
-    let mut wrong = ctx();
-    wrong.tensor_id = h(99);
-    assert_eq!(
-        ReplayGuard::default().decrypt(&b, &wrong, &env),
-        Err(BesiError::Decrypt)
-    );
+    let original = ctx();
+    let mutations = vec![
+        ChannelContext {
+            party: 1,
+            ..original.clone()
+        },
+        ChannelContext {
+            request_id: h(99),
+            ..original.clone()
+        },
+        ChannelContext {
+            model_hash: h(99),
+            ..original.clone()
+        },
+        ChannelContext {
+            numeric_profile: h(99),
+            ..original.clone()
+        },
+        ChannelContext {
+            tensor_id: h(99),
+            ..original.clone()
+        },
+        ChannelContext {
+            rows: 127,
+            ..original.clone()
+        },
+        ChannelContext {
+            cols: 3,
+            ..original.clone()
+        },
+        ChannelContext {
+            chunk: 6,
+            ..original.clone()
+        },
+        ChannelContext {
+            block_order: 7,
+            ..original.clone()
+        },
+    ];
+    for wrong in mutations {
+        assert_eq!(
+            ReplayGuard::default().decrypt(&b, &wrong, &env),
+            Err(BesiError::Decrypt)
+        );
+    }
 }
 #[test]
 fn request_response_keys_are_separate() {
@@ -140,12 +189,43 @@ fn signed_private_adjudication_and_replay() {
 }
 #[test]
 fn adjudication_rebinding_rejects() {
-    let (mut r, k) = signed_receipt();
-    r.output_commitment = h(44);
-    assert_eq!(
-        r.verify(&k, 7, &mut BTreeSet::new()),
-        Err(BesiError::Signature)
-    );
+    let (original, k) = signed_receipt();
+    let mutations = vec![
+        AdjudicationReceipt {
+            job_id: h(44),
+            ..original.clone()
+        },
+        AdjudicationReceipt {
+            ordered_response_ciphertext_commitments: [h(44), h(3)],
+            ..original.clone()
+        },
+        AdjudicationReceipt {
+            output_commitment: h(44),
+            ..original.clone()
+        },
+        AdjudicationReceipt {
+            private_witness_proof_root: h(44),
+            ..original.clone()
+        },
+        AdjudicationReceipt {
+            verdict: Verdict::Accept,
+            ..original.clone()
+        },
+        AdjudicationReceipt {
+            nonce: 44,
+            ..original.clone()
+        },
+        AdjudicationReceipt {
+            signature: [44; 64],
+            ..original.clone()
+        },
+    ];
+    for mutation in mutations {
+        assert_eq!(
+            mutation.verify(&k, 7, &mut BTreeSet::new()),
+            Err(BesiError::Signature)
+        );
+    }
 }
 #[test]
 fn unknown_adjudication_suite_rejects() {
@@ -172,4 +252,28 @@ fn disabled_experiments_have_blockers() {
     assert!(m.contains("MAC"));
     let ExperimentStatus::Disabled(h) = HFHE_STATUS;
     assert!(h.contains("reduction"));
+}
+
+#[test]
+fn sanitized_default_result_has_no_prompt_token_logit_or_hidden_fields() {
+    let result = SanitizedBesiResult {
+        job_id: h(1),
+        output_commitment: h(2),
+        integrity: true,
+        public_bucket: PADDING_BUCKET,
+        remote_gemms: 8,
+        assurance: ASSURANCE,
+    };
+    assert_eq!(result.assurance, "ASSURED_SPLIT");
+    let fields = SanitizedBesiResult::field_names().join(",");
+    for forbidden in [
+        "prompt",
+        "token",
+        "logit",
+        "layer_digest",
+        "exact_length",
+        "final_hidden",
+    ] {
+        assert!(!fields.contains(forbidden));
+    }
 }

@@ -135,12 +135,33 @@ mod tests {
     )]
     use super::*;
     use crate::refresh::{
-        add, decrypt, derive_key, encrypt, measured_noise, mul_plain, refresh, AuditKey,
-        Ciphertext, RefreshError,
+        add, decrypt, derive_key, dispatch_refresh, encrypt, measured_noise, mul_plain, AuditKey,
+        Ciphertext, RefreshContext, RefreshError, REFRESH_SUITE,
     };
 
     const MASTER: [u8; 32] = [61u8; 32];
-    const AUDIT: AuditKey = AuditKey([62u8; 32]);
+
+    fn audit() -> AuditKey {
+        AuditKey::new([62u8; 32])
+    }
+
+    fn refresh_context(step: usize) -> RefreshContext {
+        let byte = u8::try_from(step.saturating_add(1)).unwrap_or(u8::MAX);
+        RefreshContext {
+            chain_id: [1; 32],
+            job_id: [byte; 32],
+            suite_from: REFRESH_SUITE,
+            suite_to: REFRESH_SUITE,
+            rights_root_from: [2; 32],
+            rights_root_to: [3; 32],
+            policy_root_from: [4; 32],
+            policy_root_to: [5; 32],
+            transcript_root: [6; 32],
+            challenge: [byte; 32],
+            challenge_issued_at: 1,
+            expires_at: 2,
+        }
+    }
 
     /// Executes the op sequence on a real ciphertext, returning the final state and epoch.
     fn execute(ops: &[DepthOp], m: u32) -> Ciphertext {
@@ -156,9 +177,15 @@ mod tests {
                 }
                 DepthOp::MulPlain(k) => mul_plain(&ct, *k).unwrap(),
                 DepthOp::Refresh => {
-                    refresh(&MASTER, &AUDIT, &ct, [0u8; 32], 200 + step as u64)
-                        .unwrap()
-                        .0
+                    dispatch_refresh(
+                        &MASTER,
+                        &audit(),
+                        &ct,
+                        &refresh_context(step),
+                        200 + step as u64,
+                    )
+                    .unwrap()
+                    .0
                 }
             };
         }
