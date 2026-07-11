@@ -2052,7 +2052,9 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "noos-agent-class",
+ "noos-commerce",
  "noos-grain",
+ "noos-work-loom",
  "serde",
  "thiserror 2.0.18",
 ]

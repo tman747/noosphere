@@ -1,0 +1,76 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-agent-class",
+          "-p",
+          "noos-contracts",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-agent-class",
+          "noos-contracts"
+        ]
+      },
+      "name": "claim-specific deterministic falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-AGENT": "e92e91e93a2df304b852300682898d7ebe86aa66573c83762145d3bcda9d4459"
+  },
+  "claims": [
+    "S-AGENT"
+  ],
+  "command": [
+    "tools/gates/run_agent_commerce_claim.py",
+    "--claim",
+    "S-AGENT"
+  ],
+  "evidence_sha256": "6ea0f329baaf5eaa9bbc02289effa52599c914e5e186e3b1ce3ff6e4deaeb531",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-s-agent",
+  "limitations": [
+    "This is deterministic local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-agent-class/Cargo.toml": "2ddcb38e7a47ae5603301d92cc97707aaaaca359f91cf9f81b87c1b5498b8579",
+    "crates/noos-agent-class/src/lib.rs": "0479338e036da7e057191f12893a039b7f83a97111f0c34b59ac0ddfd734d318",
+    "crates/noos-contracts/Cargo.toml": "17780b46cac4e57d2f390215f823095e30392eedcdeb7edc804c8207a2c77e9a",
+    "crates/noos-contracts/src/router.rs": "77e2df7782b001d6998d30afee702784649f8d8bd1fa00a2b4b75913d5a7a694",
+    "tools/gates/run_agent_commerce_claim.py": "6b30a65cf8288e30fb39d11b41ac0ea81e8b1c22ae653d1c06a62e35e1094b7b"
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-loam",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-loam"
+        ]
+      },
+      "name": "claim-specific deterministic falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-TWIN-PROFILE": "fae2f3a8015021a20b2ed97dd8d67da47476fe6a6b60355614765a685ad290a8"
+  },
+  "claims": [
+    "S-TWIN-PROFILE"
+  ],
+  "command": [
+    "tools/gates/run_agent_commerce_claim.py",
+    "--claim",
+    "S-TWIN-PROFILE"
+  ],
+  "evidence_sha256": "cdcfeca72d273e27ca3aa0d459bd2579d2a6990dbca1d027689e0524996a38cd",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-s-twin-profile",
+  "limitations": [
+    "This is deterministic local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-loam/Cargo.toml": "104e63c72cdfbe8e39c988576b7a8013d55393e419e3d9a66681b4aea0b27b25",
+    "crates/noos-loam/src/twin_profile.rs": "afac62721ac9ca580a5c9bdf85212ce70a9ad639e2c555c3eb38e170753b6b85",
+    "tools/gates/run_agent_commerce_claim.py": "6b30a65cf8288e30fb39d11b41ac0ea81e8b1c22ae653d1c06a62e35e1094b7b"
+  }
+}

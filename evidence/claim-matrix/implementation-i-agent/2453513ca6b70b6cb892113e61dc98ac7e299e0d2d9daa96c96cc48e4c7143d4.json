@@ -1,0 +1,122 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-agent-class",
+          "-p",
+          "noos-commerce",
+          "-p",
+          "noos-contracts",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-agent-class",
+          "noos-commerce",
+          "noos-contracts"
+        ]
+      },
+      "name": "claim-specific deterministic falsifier tests",
+      "passed": true
+    },
+    {
+      "command": [
+        "C:\\Users\\ntrap\\AppData\\Local\\Programs\\Python\\Python310\\python.exe",
+        "chorus_adapter.py"
+      ],
+      "fixture_sha256": {
+        "README.md": "696049f9a2430ec20ec5e0e7870245967181159e865500fbb194fcc88868e59b",
+        "chorus_adapter.py": "05756f05483a044e258fc77a2a3bf05b39e694c207a21e5867d52a076a908a7d",
+        "lineage_quorum_engine.py": "fc67a6efeecc13442d3bffc5334077cdfbaa6f942c71b8004a39ea8e36cebe57"
+      },
+      "name": "canonical fixture chorus-quorum-lab",
+      "output_sha256": "c5794776296b00f3191b5827ec97b094a2ed7974f8a7810bad623d9c008141b0",
+      "passed": true,
+      "required_metrics": [
+        "METRIC mechanism_false_accept=0",
+        "METRIC clone_collapsed_weight=1",
+        "METRIC engine_invariant_gate=1"
+      ]
+    },
+    {
+      "command": [
+        "C:\\Users\\ntrap\\AppData\\Local\\Programs\\Python\\Python310\\python.exe",
+        "nel_adapter.py"
+      ],
+      "fixture_sha256": {
+        "README.md": "4431fcaa965018999c8ec4affaaef3b01ba0037a775fec2b5ee64e1352fc8759",
+        "molecular_quarantine_test.py": "bc2ddd244b67e5ee378f65c10bbf39bf1e6697ce93c886b91c5c4ced434abe5b",
+        "nel_adapter.py": "93a0324983106d37d0ab5b8f039eb468584625a435d8364c063ba5d130ca7c14"
+      },
+      "name": "canonical fixture nel-quarantine-lab",
+      "output_sha256": "e466831f669d4d7b5dbc2fa76edb81f66c3072e9a1fbcd749cb8c2f6aa4a2512",
+      "passed": true,
+      "required_metrics": [
+        "METRIC double_payouts=0",
+        "METRIC gate_failures=0",
+        "GATE cinder_execution_right_reuse_refused expected=True measured=True verdict=PASS",
+        "GATE dryad_dispute_proof_reuse_refused expected=True measured=True verdict=PASS"
+      ]
+    }
+  ],
+  "claim_fingerprints": {
+    "I-AGENT": "30dc555c8e6f400cf61e3a489b9f74a4744ddcc810f767e0966feb14e9f75df5"
+  },
+  "claims": [
+    "I-AGENT"
+  ],
+  "command": [
+    "tools/gates/run_agent_commerce_claim.py",
+    "--claim",
+    "I-AGENT"
+  ],
+  "evidence_sha256": "2453513ca6b70b6cb892113e61dc98ac7e299e0d2d9daa96c96cc48e4c7143d4",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-i-agent",
+  "limitations": [
+    "This is deterministic local implementation evidence, not independent or production evidence.",
+    "The composed drill and its lineage/quarantine dependencies are lab fixtures, not a production phone mesh or settlement deployment."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-agent-class/Cargo.toml": "2ddcb38e7a47ae5603301d92cc97707aaaaca359f91cf9f81b87c1b5498b8579",
+    "crates/noos-agent-class/src/lib.rs": "0479338e036da7e057191f12893a039b7f83a97111f0c34b59ac0ddfd734d318",
+    "crates/noos-commerce/Cargo.toml": "32d97cfaa3a87a46973d349affcb12768befdab82f91ca986cf149c0b2c51297",
+    "crates/noos-commerce/src/lib.rs": "503983551931c9def252a5e384bfae72fb739ebd5c056f33ee408d5fad95f6ab",
+    "crates/noos-contracts/Cargo.toml": "17780b46cac4e57d2f390215f823095e30392eedcdeb7edc804c8207a2c77e9a",
+    "crates/noos-contracts/src/agent_object.rs": "e3a19a47d7ff756d04f349fd6e575e8bb464bc494b58c0264a2da6885a165847",
+    "crates/noos-contracts/src/router.rs": "77e2df7782b001d6998d30afee702784649f8d8bd1fa00a2b4b75913d5a7a694",
+    "tools/gates/run_agent_commerce_claim.py": "6b30a65cf8288e30fb39d11b41ac0ea81e8b1c22ae653d1c06a62e35e1094b7b"
+  }
+}

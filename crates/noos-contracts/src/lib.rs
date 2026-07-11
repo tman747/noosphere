@@ -2,6 +2,7 @@
 //! explicit immutable context and mediates every object read/write/call.
 #![forbid(unsafe_code)]
 
+pub mod agent_object;
 pub mod router;
 
 use noos_grain::{encode_noun, eval, GrainTrap, Meter, Noun, GRAIN_VERSION};

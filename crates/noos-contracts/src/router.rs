@@ -38,6 +38,10 @@ pub struct RouteTicket {
     source_digest: Hash32,
     effect: AuthorizedEffect,
     grant: Hash32,
+    mandate: Hash32,
+    agent_id: Hash32,
+    agent_version: u64,
+    active_key_root: Hash32,
     revocation_epoch: u64,
     remaining_class_budget: u128,
     callee: ObjectId,
@@ -142,6 +146,10 @@ impl ActionRouter {
         let class = authorize_class_v2(&class_request).map_err(RouteDenial::ClassGate)?;
         let source_digest = proposal.source_digest;
         let grant = proposal.intent.capability_ref;
+        let mandate = proposal.intent.mandate_ref;
+        let agent_id = proposal.intent.agent_id;
+        let agent_version = proposal.intent.agent_version;
+        let active_key_root = proposal.intent.active_key_root;
         let route_id = crate::domain_hash(
             ROUTE_DOMAIN,
             &[
@@ -168,6 +176,10 @@ impl ActionRouter {
             source_digest,
             effect,
             grant,
+            mandate,
+            agent_id,
+            agent_version,
+            active_key_root,
             revocation_epoch: class_request.current_revocation_epoch,
             remaining_class_budget: class.remaining_budget,
             callee,
@@ -193,6 +205,16 @@ impl ActionRouter {
         }
         if self.firewall.is_revoked(ticket.grant) {
             return Err(RouteDenial::Firewall(Denial::Grant));
+        }
+        if self.firewall.is_mandate_revoked(ticket.mandate) {
+            return Err(RouteDenial::Firewall(Denial::Mandate));
+        }
+        if !self.firewall.identity_binding_current(
+            ticket.agent_id,
+            ticket.agent_version,
+            ticket.active_key_root,
+        ) {
+            return Err(RouteDenial::Firewall(Denial::StaleIdentity));
         }
         if ticket.revocation_epoch != current_revocation_epoch {
             return Err(RouteDenial::ClassGate(ClassGateDenial::Revoked));
@@ -224,9 +246,16 @@ mod tests {
     use super::*;
     use crate::{Access, ContractManifest, ContractRecord, ReentrancyPolicy, UpgradePolicy};
     use noos_agent_class::{
-        action_scope_root, object_scope_root, AgentId, Attestation, CapabilityClass,
-        CapabilityGrant, Direction, Intent, PublicFinality, UntrustedText,
+        action_scope_root, object_scope_root, AgentId, AgentRotation, Attestation, CapabilityClass,
+        CapabilityGrant, Direction, Intent, Mandate, PublicFinality, RotationAuthority,
+        UntrustedText,
     };
+    use noos_commerce::{
+        AssuranceRequirement, Commerce, CommerceAction, CommerceError, CommerceJob, CommerceState,
+        LineageReputation, QualityRequirement, ReputationAttestation, SettlementResource,
+        SettlementResourceKind,
+    };
+    use noos_work_loom::JobState as WorkJobState;
     use std::collections::{BTreeMap, BTreeSet};
 
     const CALLEE: ObjectId = [12; 32];
@@ -263,12 +292,33 @@ mod tests {
             expiry_height: 1000,
             delegation_depth: 0,
             revocation_nonce: 0,
+            parent_grant: None,
             allowed_actions,
             allowed_objects,
         };
         grant.grant_id = grant.derive_id();
         let gid = grant.grant_id;
         firewall.install_grant(grant).unwrap();
+        let mut mandate = Mandate {
+            mandate_id: [0; 32],
+            issuer: [9; 32],
+            agent_id: aid,
+            capability_ref: gid,
+            job_id: [15; 32],
+            chain_id: [8; 32],
+            profile_id: [16; 32],
+            action_type: ActionType::ContractCall,
+            direction: Direction::FromAgent,
+            object_id: CALLEE,
+            max_budget: 100,
+            expiry_height: 1000,
+            max_uses: 100,
+            irreversible: false,
+            compensation_action: None,
+            revocation_nonce: 0,
+        };
+        mandate.mandate_id = mandate.derive_id();
+        firewall.install_mandate(mandate).unwrap();
         let mut host = ContractHost::new([(CALLEE, Access::ReadWrite)]);
         host.install(
             CALLEE,
@@ -336,6 +386,8 @@ mod tests {
     ) -> ActionEnvelope {
         let intent = Intent {
             agent_id: aid,
+            agent_version: 1,
+            active_key_root: [3; 32],
             action_type: ActionType::ContractCall,
             canonical_arguments: vec![1],
             finalized_prestate_root: PRESTATE,
@@ -343,9 +395,35 @@ mod tests {
             budget,
             deadline: 100,
             capability_ref: gid,
+            mandate_ref: {
+                let mut mandate = Mandate {
+                    mandate_id: [0; 32],
+                    issuer: [9; 32],
+                    agent_id: aid,
+                    capability_ref: gid,
+                    job_id: [15; 32],
+                    chain_id: [8; 32],
+                    profile_id: [16; 32],
+                    action_type: ActionType::ContractCall,
+                    direction: Direction::FromAgent,
+                    object_id: CALLEE,
+                    max_budget: 100,
+                    expiry_height: 1000,
+                    max_uses: 100,
+                    irreversible: false,
+                    compensation_action: None,
+                    revocation_nonce: 0,
+                };
+                mandate.mandate_id = mandate.derive_id();
+                mandate.mandate_id
+            },
             nonce,
             object_id: CALLEE,
             direction: Direction::FromAgent,
+            job_id: [15; 32],
+            chain_id: [8; 32],
+            profile_id: [16; 32],
+            irreversible: false,
         };
         ActionEnvelope {
             proposal: UntrustedText(text.into()).propose(intent),
@@ -426,6 +504,21 @@ mod tests {
     }
 
     #[test]
+    fn revoked_mandate_rejects_mid_flight() {
+        let (mut router, mut host, aid, gid) = setup();
+        let ticket = router
+            .route(envelope("call", aid, gid, 1, 2, 50), 1, PRESTATE, POSTSTATE)
+            .unwrap();
+        let mandate = ticket.effect().intent().mandate_ref;
+        router.firewall_mut().revoke_mandate(mandate, 0);
+        assert_eq!(
+            router.dispatch(ticket, &mut host, &context(), EPOCH),
+            Err(RouteDenial::Firewall(Denial::Mandate))
+        );
+        assert_eq!(storage_len(&host), 0);
+    }
+
+    #[test]
     fn class_revocation_epoch_race_rejects_mid_flight() {
         let (mut router, mut host, aid, gid) = setup();
         let ticket = router
@@ -465,6 +558,10 @@ mod tests {
             source_digest: [0; 32],
             effect: real.effect().clone(),
             grant: gid,
+            mandate: real.effect().intent().mandate_ref,
+            agent_id: aid,
+            agent_version: 1,
+            active_key_root: [3; 32],
             revocation_epoch: EPOCH,
             remaining_class_budget: u128::MAX,
             callee: CALLEE,
@@ -538,5 +635,201 @@ mod tests {
             .dispatch(ticket, &mut host, &context(), EPOCH)
             .unwrap();
         assert_eq!(storage_len(&host), 1);
+    }
+
+    fn commerce_job(id: u8, shared_right: Hash32) -> CommerceJob {
+        let job_id = [id; 32];
+        let mut job = CommerceJob {
+            job_id,
+            chain_id: [40; 32],
+            profile_id: [41; 32],
+            class_id: 7,
+            client: [42; 32],
+            provider: Some([43; 32]),
+            evaluator_policy: [44; 32],
+            request_schema: [45; 32],
+            request_commitment: [46; 32],
+            species_selector: None,
+            assurance_requirement: AssuranceRequirement::V0,
+            quality_requirement: QualityRequirement::Q0NoQualityAssurance,
+            confidentiality_requirement: [47; 32],
+            rights_requirement: [48; 32],
+            budget: Some(100),
+            evaluator_fee: 0,
+            expiry: 100,
+            state: CommerceState::Requested,
+            negotiated_terms_root: Some([49; 32]),
+            work_job_id: Some([50; 32]),
+            work_commitment: None,
+            availability_certificate: None,
+            artifact_commitment: Some([51; 32]),
+            challenge_window: 10,
+            challenge_deadline: None,
+            settlement_resources: vec![
+                SettlementResource {
+                    kind: SettlementResourceKind::EscrowNote,
+                    resource_id: [id.saturating_add(60); 32],
+                    job_id,
+                },
+                SettlementResource {
+                    kind: SettlementResourceKind::ExecutionRight,
+                    resource_id: shared_right,
+                    job_id,
+                },
+                SettlementResource {
+                    kind: SettlementResourceKind::DisputeProof,
+                    resource_id: [id.saturating_add(70); 32],
+                    job_id,
+                },
+            ],
+        };
+        job.availability_certificate = Some(noos_commerce::availability_certificate_for(
+            &job,
+            job.artifact_commitment.unwrap(),
+        ));
+        job
+    }
+
+    fn complete_commerce_job(commerce: &mut Commerce, id: Hash32) {
+        commerce
+            .transition(id, CommerceAction::OpenNegotiation, 1, None)
+            .unwrap();
+        commerce
+            .transition(id, CommerceAction::Agree, 2, None)
+            .unwrap();
+        commerce
+            .transition(id, CommerceAction::Fund, 3, Some(WorkJobState::Open))
+            .unwrap();
+        commerce
+            .transition(
+                id,
+                CommerceAction::BindProviderOffer,
+                3,
+                Some(WorkJobState::Committed),
+            )
+            .unwrap();
+        commerce
+            .transition(
+                id,
+                CommerceAction::StartExecution,
+                4,
+                Some(WorkJobState::Running),
+            )
+            .unwrap();
+        commerce
+            .transition(id, CommerceAction::Submit, 5, Some(WorkJobState::Submitted))
+            .unwrap();
+        commerce
+            .transition(
+                id,
+                CommerceAction::ConfirmAvailable,
+                6,
+                Some(WorkJobState::Challengeable),
+            )
+            .unwrap();
+        commerce
+            .transition(id, CommerceAction::Complete, 7, Some(WorkJobState::Settled))
+            .unwrap();
+    }
+
+    #[test]
+    fn composed_i_agent_four_attack_drill() {
+        let (router, mut host, aid, gid) = setup();
+        let mut reputation = LineageReputation::default();
+        let claim = [80; 32];
+        reputation
+            .register(ReputationAttestation {
+                attestation_id: [81; 32],
+                signer: [82; 32],
+                parent: None,
+                claim_root: claim,
+            })
+            .unwrap();
+        let mut clones = Vec::new();
+        for index in 0..12u8 {
+            let id = [index.saturating_add(90); 32];
+            reputation
+                .register(ReputationAttestation {
+                    attestation_id: id,
+                    signer: [index.saturating_add(110); 32],
+                    parent: Some([81; 32]),
+                    claim_root: claim,
+                })
+                .unwrap();
+            clones.push(id);
+        }
+        let mut commerce = Commerce::default();
+        commerce.register_class(7).unwrap();
+        commerce.open(commerce_job(1, [99; 32])).unwrap();
+        commerce.open(commerce_job(2, [99; 32])).unwrap();
+        let mut agent = crate::agent_object::AgentProtocolObject::new(router, reputation, commerce);
+        let mut acceptance_failures = 0u8;
+
+        // Attack 1: twelve clone signers still contribute one failure domain.
+        if agent
+            .reputation()
+            .failure_domain_weight(claim, &clones)
+            .unwrap()
+            >= 3
+        {
+            acceptance_failures = acceptance_failures.saturating_add(1);
+        }
+
+        // Attack 2: an exact mandate/envelope replay is rejected by the same router.
+        let replayed = envelope("mandated call", aid, gid, 1, 1, 50);
+        let ticket = agent
+            .router_mut()
+            .route(replayed.clone(), 1, PRESTATE, POSTSTATE)
+            .unwrap();
+        agent
+            .router_mut()
+            .dispatch(ticket, &mut host, &context(), EPOCH)
+            .unwrap();
+        if agent.router_mut().route(replayed, 1, PRESTATE, POSTSTATE)
+            != Err(RouteDenial::Firewall(Denial::Replay))
+        {
+            acceptance_failures = acceptance_failures.saturating_add(1);
+        }
+
+        // Attack 3: key rotation between route and dispatch invalidates the ticket.
+        let stale_ticket = agent
+            .router_mut()
+            .route(
+                envelope("steal rotating identity", aid, gid, 2, 1, 50),
+                1,
+                PRESTATE,
+                POSTSTATE,
+            )
+            .unwrap();
+        agent
+            .router_mut()
+            .firewall_mut()
+            .rotate_agent(AgentRotation {
+                agent_id: aid,
+                expected_version: 1,
+                new_active_key_root: [120; 32],
+                new_model_refs_root: [121; 32],
+                new_host_refs_root: [122; 32],
+                authority: RotationAuthority::ActiveKey([3; 32]),
+            })
+            .unwrap();
+        if agent
+            .router_mut()
+            .dispatch(stale_ticket, &mut host, &context(), EPOCH)
+            != Err(RouteDenial::Firewall(Denial::StaleIdentity))
+        {
+            acceptance_failures = acceptance_failures.saturating_add(1);
+        }
+
+        // Attack 4: one globally linear execution right cannot settle two jobs.
+        complete_commerce_job(agent.commerce_mut(), [1; 32]);
+        complete_commerce_job(agent.commerce_mut(), [2; 32]);
+        if !agent.commerce_mut().settle([1; 32]).unwrap().conserves()
+            || agent.commerce_mut().settle([2; 32]) != Err(CommerceError::ResourceAlreadyConsumed)
+        {
+            acceptance_failures = acceptance_failures.saturating_add(1);
+        }
+        assert_eq!(acceptance_failures, 0);
+        const { assert!(!crate::agent_object::ADDS_CONSENSUS_MECHANISM) };
     }
 }

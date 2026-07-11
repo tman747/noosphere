@@ -1,0 +1,72 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-commerce",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-commerce"
+        ]
+      },
+      "name": "claim-specific deterministic falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-ATTRIBUTION": "8d2820eed90445f55adf573f319efacb6159710c0b0c0da970b2161bffa8eeaa"
+  },
+  "claims": [
+    "S-ATTRIBUTION"
+  ],
+  "command": [
+    "tools/gates/run_agent_commerce_claim.py",
+    "--claim",
+    "S-ATTRIBUTION"
+  ],
+  "evidence_sha256": "08e1dc24d04430a070dc22c4cfe06e26f99cf494e68e664b1165446dfd64eb0d",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-s-attribution",
+  "limitations": [
+    "This is deterministic local implementation evidence, not independent or production evidence.",
+    "Attribution thresholds are measured on deterministic synthetic ground truth; the score is advisory and has zero consensus weight."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-commerce/Cargo.toml": "32d97cfaa3a87a46973d349affcb12768befdab82f91ca986cf149c0b2c51297",
+    "crates/noos-commerce/src/lib.rs": "503983551931c9def252a5e384bfae72fb739ebd5c056f33ee408d5fad95f6ab",
+    "tools/gates/run_agent_commerce_claim.py": "6b30a65cf8288e30fb39d11b41ac0ea81e8b1c22ae653d1c06a62e35e1094b7b"
+  }
+}
