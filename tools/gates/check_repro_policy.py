@@ -69,6 +69,7 @@ def validate_policy(p):
  if p.get("post_build_normalization")!="forbidden":e.append("post-build normalization must be forbidden")
  if p.get("hash_algorithm")!="sha256":e.append("comparison witness must be sha256")
  if p.get("require_two_independent_builders") is not True:e.append("two independent builders not required")
+ if set(p.get("builder_independence_fields",[]))!={"operator","host","toolchain_installation"}:e.append("builder independence fields drifted")
  if set(p.get("required_platforms",[]))!=PLATFORMS:e.append("required platform set incomplete")
  sig=p.get("signature_policy",{})
  if sig.get("required_before_build") is not True or set(sig.get("required_roles",[]))!={"release-owner","independent-build-reviewer"} or sig.get("unsigned_or_pending_state_blocks_release") is not True:e.append("signature policy incomplete")
@@ -152,11 +153,27 @@ def main(argv=None):
  ap=argparse.ArgumentParser();ap.add_argument("--root");ap.add_argument("--instance");ap.add_argument("--require-signed",action="store_true");args=ap.parse_args(argv)
  root=Path(args.root).resolve() if args.root else Path(__file__).resolve().parents[2]
  errors=[]
- try:policy=load_policy(root/"protocol/release/repro-policy-v1.toml");manifest=load_json(root/"protocol/release/manifest-template.json");schema=load_json(root/"protocol/release/manifest-schema-v1.json");vectors=load_json(root/"protocol/release/vectors/repro-policy-v1.json")
+ try:
+  policy=load_policy(root/"protocol/release/repro-policy-v1.toml");manifest=load_json(root/"protocol/release/manifest-template.json");schema=load_json(root/"protocol/release/manifest-schema-v1.json");vectors=load_json(root/"protocol/release/vectors/repro-policy-v1.json")
+  toolchains=load_json(root/"protocol/release/repro-toolchains-v1.json");attestation_schema=load_json(root/"protocol/release/repro-build-attestation-schema-v1.json");signature_schema=load_json(root/"protocol/release/detached-signature-schema-v1.json");trust_template=load_json(root/"protocol/release/trusted-repro-builders-template.json")
  except ValueError as exc:print(f"ERROR: {exc}");return 1
  errors+=validate_policy(policy);errors+=validate_manifest(manifest,False)
  policy_hash=hashlib.sha256((root/"protocol/release/repro-policy-v1.toml").read_bytes()).hexdigest()
  if manifest.get("toolchain_locks",{}).get("repro_policy_hash")!=policy_hash:errors.append("manifest repro_policy_hash does not bind policy bytes")
+ if toolchains.get("schema")!="noos/repro-toolchains/v1" or set(toolchains.get("targets",{}))!=PLATFORMS:errors.append("repro toolchain target lock invalid")
+ denv=toolchains.get("deterministic_environment",{})
+ if denv.get("dependencies_offline_during_build") is not True or denv.get("cargo_locked") is not True or denv.get("go_mod")!="readonly" or denv.get("post_build_normalization")!="forbidden" or denv.get("source_date_epoch")!="git_commit_timestamp":errors.append("deterministic/offline toolchain environment incomplete")
+ rust_lock=load_policy(root/"rust-toolchain.toml")
+ if toolchains.get("toolchains",{}).get("rustc",{}).get("channel")!=rust_lock.get("toolchain",{}).get("channel"):errors.append("Rust repro toolchain does not bind rust-toolchain.toml")
+ go_match=re.search(r"(?m)^go ([0-9]+\.[0-9]+)$",(root/"go/go.mod").read_text("utf-8"))
+ go_version=toolchains.get("toolchains",{}).get("go",{}).get("version","")
+ if not go_match or not go_version.startswith(go_match.group(1)+"."):errors.append("Go repro toolchain does not bind go.mod language version")
+ att_props=attestation_schema.get("properties",{})
+ if attestation_schema.get("additionalProperties") is not False or set(attestation_schema.get("required",[]))!={"schema","builder","build","artifact_hashes"} or set(att_props.get("build",{}).get("properties",{}).get("target",{}).get("enum",[]))!=PLATFORMS:errors.append("external build attestation schema is not closed and target-complete")
+ sig_props=signature_schema.get("properties",{})
+ if signature_schema.get("additionalProperties") is not False or sig_props.get("algorithm",{}).get("const")!="ed25519":errors.append("detached signature schema invalid")
+ builders=trust_template.get("builders",[])
+ if trust_template.get("schema")!="noos/trusted-repro-builders/v1" or len(builders)!=2 or any(b.get("test_only") is not False or b.get("external_to_release_owner") is not True or b.get("public_key_base64")!="EXTERNAL_INPUT_REQUIRED" for b in builders):errors.append("trusted external builder template must remain placeholder-only")
  try:api_roots=load_json(root/"protocol/api/contract-root-v1.json");telemetry_roots=load_json(root/"protocol/telemetry/contract-root-v1.json")
  except ValueError as exc:errors.append(str(exc));api_roots={};telemetry_roots={}
  bindings=manifest.get("schema_roots",{})

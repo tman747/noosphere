@@ -159,8 +159,8 @@ if ($FuzzHeavy -or $Release) {
 if ($Release) {
     Invoke-Step 'run_claim_matrix_release' @('python', 'tools/gates/run_claim_matrix.py', '--registry', 'protocol/claims/registry.json', '--all-actionable', '--include-negative-results', '--require-command', '--require-evidence', '--require-rollback', '--fail-on-missing') $Root
     Invoke-Step 'client_matrix' @('python', 'tools/e2e/run_network.py', '--scenario', 'client-matrix', '--pairs', 'AA,AB,BA,BB') $Root
-    Invoke-Step 'repro_build' @('python', 'tools/gates/repro_build.py', '--builders', 'windows-x86_64-a,windows-x86_64-b,ubuntu-x86_64-a,ubuntu-x86_64-b,ubuntu-aarch64-a,ubuntu-aarch64-b', '--locked', '--frozen') $Root
-    Invoke-Step 'generate_release_manifest' @('python', 'tools/gates/generate_release.py') $Root
+    $revision = (& git -C $Root rev-parse HEAD).Trim()
+    Invoke-Step 'repro_external_attestations' @('python', 'tools/gates/repro_build.py', 'verify-attestations', '--attestations', 'release/attestations', '--trusted-builders', 'protocol/release/trusted-repro-builders.json', '--revision', $revision, '--out', 'release/repro-assurance.json') $Root
     Invoke-Step 'verify_release' @('python', 'tools/gates/verify_release.py', 'release/manifest.json') $Root
 }
 

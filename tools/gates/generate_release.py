@@ -1,77 +1,191 @@
 #!/usr/bin/env python3
-"""Build release binaries and generate checksums, CycloneDX SBOM, in-toto
-provenance, and a release manifest.
+"""Create a deterministic, downloadable candidate release bundle for one target.
 
-Artifacts are REAL: noos-transition (Rust + independent Go) and noos-verify
-are built through the tools/gates/repro_build.py deterministic machinery.
-The SBOM enumerates every locked package from Cargo.lock (workspace crates
-flagged); provenance binds every artifact hash to the git head revision and
-the lockfile digests. Generated metadata records blockers; it never turns
-unavailable external builders, ceremony values, policy signatures, or human
-signatures into PASS.
+The bundle contains real binaries, checksums, CycloneDX SBOM, SLSA/in-toto
+provenance, and an unsigned external-attestation request.  It deliberately does
+not claim independent reproduction, a production signature, or gate passage.
 """
 from __future__ import annotations
-import argparse, hashlib, json, platform, subprocess, sys
-try:
- import tomllib
-except ModuleNotFoundError:
- import tomli as tomllib
-from datetime import date, datetime, timezone
+
+import argparse
+import json
+import shutil
+import subprocess
+import sys
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[2]
-sys.path.insert(0,str(ROOT/"tools/gates"))
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools/gates"))
 import repro_build
-def sha(p:Path)->str:return hashlib.sha256(p.read_bytes()).hexdigest()
-def version(cmd):
- try:return subprocess.run(cmd,cwd=ROOT,text=True,capture_output=True,check=True).stdout.splitlines()[0]
- except Exception:return "UNAVAILABLE"
-def cargo_lock_packages()->list[dict]:
- """Stdlib-only Cargo.lock reader: [[package]] rows with name/version/source.
- Workspace (path) crates carry no `source` key in the lockfile."""
- pkgs=[];cur=None
- for line in (ROOT/"Cargo.lock").read_text("utf-8").splitlines():
-  line=line.strip()
-  if line=="[[package]]":cur={};pkgs.append(cur);continue
-  if line.startswith("["):cur=None;continue
-  if cur is None or " = " not in line:continue
-  key,_,val=line.partition(" = ")
-  if key in ("name","version","source") and val.startswith('"') and val.endswith('"'):cur[key]=val[1:-1]
- bad=[p for p in pkgs if "name" not in p or "version" not in p]
- if bad:raise SystemExit(f"Cargo.lock parse failed: incomplete package rows {bad}")
- return sorted(pkgs,key=lambda p:(p["name"],p["version"]))
-def deterministic_serial(payload:bytes)->str:
- h=hashlib.sha256(payload).hexdigest()
- return f"urn:uuid:{h[0:8]}-{h[8:12]}-4{h[13:16]}-8{h[17:20]}-{h[20:32]}"
-def main()->int:
- p=argparse.ArgumentParser()
- p.add_argument("--artifacts",default="release/artifacts");p.add_argument("--out",default="release/manifest.json")
- p.add_argument("--version",default="0.1.0-dev")
- p.add_argument("--skip-build",action="store_true",help="hash existing release/artifacts without rebuilding")
- a=p.parse_args()
- ad=ROOT/a.artifacts;ad.mkdir(parents=True,exist_ok=True)
- if not a.skip_build:
-  repro_build.build_release_artifacts(ad,ROOT/"target/noos-release")
- files=sorted(x for x in ad.rglob("*") if x.is_file())
- hashes={x.relative_to(ROOT).as_posix():sha(x) for x in files}
- rel=ROOT/"release";rel.mkdir(exist_ok=True)
- checks=rel/"SHA256SUMS";checks.write_text("".join(f"{v}  {k}\n" for k,v in sorted(hashes.items())),encoding="ascii",newline="\n")
- # CycloneDX 1.5: artifact files (hashed) + every locked crate from Cargo.lock.
- components=[{"type":"file","name":k,"version":a.version,"hashes":[{"alg":"SHA-256","content":v}]} for k,v in sorted(hashes.items())]
- for pkg in cargo_lock_packages():
-  components.append({"type":"library","name":pkg["name"],"version":pkg["version"],
-   "purl":f"pkg:cargo/{pkg['name']}@{pkg['version']}",
-   "properties":[{"name":"noos:workspace","value":"true" if "source" not in pkg else "false"}]})
- comp_bytes=json.dumps(components,sort_keys=True,separators=(",",":")).encode()
- sbom={"bomFormat":"CycloneDX","specVersion":"1.5","serialNumber":deterministic_serial(comp_bytes),"version":1,"components":components}
- sbom_path=rel/"sbom.cdx.json";sbom_path.write_text(json.dumps(sbom,indent=2,sort_keys=True)+"\n",encoding="utf-8",newline="\n")
- repo_rev=version(["git","rev-parse","HEAD"])
- subjects=[{"name":k,"digest":{"sha256":v}} for k,v in sorted(hashes.items())]
- provenance={"_type":"https://in-toto.io/Statement/v1","subject":subjects,"predicateType":"https://slsa.dev/provenance/v1","predicate":{"buildDefinition":{"buildType":"https://mindchain.network/noos/repro-build/v1","externalParameters":{"locked":True,"frozen":True},"internalParameters":{"post_build_normalization":"forbidden"},"resolvedDependencies":[{"uri":"git+file://noosphere","digest":{"gitCommit":repo_rev}},{"uri":"Cargo.lock","digest":{"sha256":sha(ROOT/'Cargo.lock')}},{"uri":"go.sum","digest":{"sha256":sha(ROOT/'go/go.sum')}}]},"runDetails":{"builder":{"id":"windows-single-host-clean-target-smoke"},"metadata":{"invocationId":"local-release-generation"}}}}
- prov_path=rel/"provenance.intoto.jsonl";prov_path.write_text(json.dumps(provenance,sort_keys=True,separators=(",",":"))+"\n",encoding="utf-8",newline="\n")
- policy=tomllib.loads((ROOT/"protocol/release/repro-policy-v1.toml").read_text("utf-8")); blockers=[]
- if policy.get("state")!="SIGNED":blockers.append({"code":"UNSIGNED_REPRO_POLICY","status":"EXTERNAL_BLOCKED"})
- blockers += [{"code":"INDEPENDENT_BUILDER_REQUIRED","target":x,"status":"EXTERNAL_BLOCKED"} for x in ("linux-x86_64","linux-aarch64")]
- blockers += [{"code":"GENESIS_CEREMONY_REQUIRED","status":"EXTERNAL_BLOCKED"},{"code":"HUMAN_RELEASE_SIGNATURES_REQUIRED","status":"EXTERNAL_BLOCKED"}]
- manifest={"schema_version":1,"manifest_kind":"noosphere-release-manifest","release":{"version":a.version,"channel":"devnet","date":str(date.today()),"protocol_version":"v1","api_version":"v1"},"source":{"repo_revision":repo_rev,"spec_revision":sha(ROOT/"protocol/spec/constants-v1.toml")},"identity":{"chain_id":"EXTERNAL_BLOCKED_QUIET_WEEK","genesis_hash":"EXTERNAL_BLOCKED_CEREMONY","is_test_network":True},"toolchain_locks":{"rustc":version(["rustc","--version"]),"go":version(["go","version"]),"python":sys.version.split()[0],"cargo_lock_hash":sha(ROOT/"Cargo.lock"),"go_sum_hash":sha(ROOT/"go/go.sum"),"repro_policy_hash":sha(ROOT/"protocol/release/repro-policy-v1.toml")},"artifact_hashes":hashes,"checksums":{"path":"release/SHA256SUMS","sha256":sha(checks)},"sbom":{"format":"CycloneDX-1.5","path":"release/sbom.cdx.json","sha256":sha(sbom_path)},"provenance":{"format":"SLSA-v1/in-toto","path":"release/provenance.intoto.jsonl","sha256":sha(prov_path)},"gate_verdicts":[],"unresolved_findings":blockers,"signatures":[],"generated_at":datetime.now(timezone.utc).isoformat(),"host":platform.platform()}
- out=ROOT/a.out;out.write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n",encoding="utf-8",newline="\n");print(f"RESULT release_manifest_generation=PASS artifacts={len(files)} blockers={len(blockers)} out={out.relative_to(ROOT)}");return 0
-if __name__=="__main__":raise SystemExit(main())
+
+
+def cargo_packages() -> list[dict[str, str]]:
+    packages: list[dict[str, str]] = []
+    current: dict[str, str] | None = None
+    for raw in (ROOT / "Cargo.lock").read_text("utf-8").splitlines():
+        line = raw.strip()
+        if line == "[[package]]":
+            current = {}
+            packages.append(current)
+        elif line.startswith("["):
+            current = None
+        elif current is not None and " = " in line:
+            key, value = line.split(" = ", 1)
+            if key in {"name", "version", "source", "checksum"} and value.startswith('"') and value.endswith('"'):
+                current[key] = value[1:-1]
+    if any("name" not in package or "version" not in package for package in packages):
+        raise repro_build.AssuranceError("Cargo.lock contains an incomplete package row")
+    return sorted(packages, key=lambda package: (package["name"], package["version"], package.get("source", "")))
+
+
+def go_modules(env: dict[str, str]) -> list[dict[str, str]]:
+    completed = subprocess.run(
+        ["go", "list", "-mod=readonly", "-m", "-json", "all"],
+        cwd=ROOT / "go", env=env, check=True, text=True, capture_output=True,
+    )
+    decoder = json.JSONDecoder()
+    text = completed.stdout
+    offset = 0
+    modules: list[dict[str, str]] = []
+    while offset < len(text):
+        while offset < len(text) and text[offset].isspace():
+            offset += 1
+        if offset == len(text):
+            break
+        value, offset = decoder.raw_decode(text, offset)
+        modules.append({"path": value["Path"], "version": value.get("Version", "workspace")})
+    return sorted(modules, key=lambda module: (module["path"], module["version"]))
+
+
+def deterministic_uuid(payload: bytes) -> str:
+    digest = repro_build.sha256_bytes(payload)
+    return f"urn:uuid:{digest[:8]}-{digest[8:12]}-4{digest[13:16]}-8{digest[17:20]}-{digest[20:32]}"
+
+
+def create_bundle(target: str, out: Path, version: str, *, smoke: bool, revision: str | None = None) -> dict[str, Any]:
+    out = repro_build.safe_repository_output(out)
+    if out.exists():
+        for child in out.iterdir():
+            if child.name != ".cargo-target":
+                if child.is_dir():
+                    shutil.rmtree(child)
+                else:
+                    child.unlink()
+    out.mkdir(parents=True, exist_ok=True)
+    details = repro_build.build_target(target, out, revision=revision, smoke=smoke)
+    identity = details["source"]
+    env = repro_build.deterministic_environment(ROOT, out / ".metadata-target", target, identity["source_date_epoch"])
+    binary_hashes = details["binary_hashes"]
+
+    components: list[dict[str, Any]] = [
+        {"type": "file", "name": name, "version": version, "hashes": [{"alg": "SHA-256", "content": digest}]}
+        for name, digest in sorted(binary_hashes.items())
+    ]
+    for package in cargo_packages():
+        component: dict[str, Any] = {
+            "type": "library", "name": package["name"], "version": package["version"],
+            "purl": f"pkg:cargo/{package['name']}@{package['version']}",
+            "properties": [{"name": "noos:workspace", "value": "false" if "source" in package else "true"}],
+        }
+        if "checksum" in package:
+            component["hashes"] = [{"alg": "SHA-256", "content": package["checksum"]}]
+        components.append(component)
+    for module in go_modules(env):
+        components.append({
+            "type": "library", "name": module["path"], "version": module["version"],
+            "purl": f"pkg:golang/{module['path']}@{module['version']}",
+        })
+    component_bytes = repro_build.canonical_json(components)
+    sbom = {
+        "bomFormat": "CycloneDX", "specVersion": "1.5",
+        "serialNumber": deterministic_uuid(component_bytes), "version": 1,
+        "metadata": {"component": {"type": "application", "name": "noosphere", "version": version}},
+        "components": components,
+    }
+    (out / "sbom.cdx.json").write_bytes(repro_build.canonical_json(sbom))
+
+    subjects = [{"name": name, "digest": {"sha256": digest}} for name, digest in sorted(binary_hashes.items())]
+    provenance = {
+        "_type": "https://in-toto.io/Statement/v1",
+        "subject": subjects,
+        "predicateType": "https://slsa.dev/provenance/v1",
+        "predicate": {
+            "buildDefinition": {
+                "buildType": "https://mindchain.network/noos/repro-build/v1",
+                "externalParameters": {"target": target, "locked": True, "offline": True},
+                "internalParameters": {
+                    "sourceDateEpoch": identity["source_date_epoch"],
+                    "pathRemap": "/workspace/noosphere",
+                    "postBuildNormalization": "forbidden-and-not-performed",
+                },
+                "resolvedDependencies": [
+                    {"uri": "git+https://github.com/mindchain/noosphere", "digest": {"gitCommit": identity["revision"], "gitTree": identity["tree"]}},
+                    {"uri": "Cargo.lock", "digest": {"sha256": repro_build.sha256_file(ROOT / "Cargo.lock")}},
+                    {"uri": "go/go.sum", "digest": {"sha256": repro_build.sha256_file(ROOT / "go/go.sum")}},
+                    {"uri": "protocol/release/repro-toolchains-v1.json", "digest": {"sha256": repro_build.sha256_file(repro_build.TOOLCHAINS)}},
+                ],
+            },
+            "runDetails": {
+                "builder": {"id": "github-actions-candidate-single-control-plane" if not smoke else "local-same-machine-smoke"},
+                "metadata": {"independentBuilderEvidence": False, "evidenceClass": "smoke-only"},
+            },
+        },
+    }
+    (out / "provenance.intoto.jsonl").write_bytes(repro_build.canonical_json(provenance))
+
+    covered = {
+        **binary_hashes,
+        "build-details.json": repro_build.sha256_file(out / "build-details.json"),
+        "sbom.cdx.json": repro_build.sha256_file(out / "sbom.cdx.json"),
+        "provenance.intoto.jsonl": repro_build.sha256_file(out / "provenance.intoto.jsonl"),
+    }
+    checksums = "".join(f"{digest}  {name}\n" for name, digest in sorted(covered.items()))
+    (out / "SHA256SUMS").write_text(checksums, encoding="ascii", newline="\n")
+    manifest = {
+        "schema": "noos/repro-candidate-bundle/v1",
+        "evidence_class": "public-candidate-smoke-not-independent-reproduction",
+        "release_version": version,
+        "target": target,
+        "source": identity,
+        "toolchain_lock_sha256": repro_build.sha256_file(repro_build.TOOLCHAINS),
+        "files": covered,
+        "checksums_sha256": repro_build.sha256_file(out / "SHA256SUMS"),
+        "external_builder_gate": "EXTERNAL_BLOCKED",
+        "promotion_ledger_mutation": "PROHIBITED",
+    }
+    (out / "bundle-manifest.json").write_bytes(repro_build.canonical_json(manifest))
+    request = {
+        "schema": "noos/external-attestation-request/v1",
+        "not_an_attestation": True,
+        "not_a_signature": True,
+        "target": target,
+        "source_revision": identity["revision"],
+        "source_tree": identity["tree"],
+        "toolchain_lock_sha256": repro_build.sha256_file(repro_build.TOOLCHAINS),
+        "candidate_bundle_manifest_sha256": repro_build.sha256_file(out / "bundle-manifest.json"),
+        "instructions": "Rebuild from the bound source with an externally controlled pinned installation; sign your own canonical attestation payload with a registered external Ed25519 key.",
+    }
+    (out / "external-attestation-request.json").write_bytes(repro_build.canonical_json(request))
+    return manifest
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--target", choices=sorted(repro_build.REQUIRED_TARGETS), required=True)
+    parser.add_argument("--out", required=True)
+    parser.add_argument("--version", default="0.1.0-dev")
+    parser.add_argument("--revision")
+    parser.add_argument("--smoke", action="store_true", help="permit unsigned policy locally; bundle remains smoke-only")
+    args = parser.parse_args(argv)
+    try:
+        result = create_bundle(args.target, ROOT / args.out, args.version, smoke=args.smoke, revision=args.revision)
+    except (repro_build.AssuranceError, OSError, subprocess.CalledProcessError) as exc:
+        print(f"RESULT generate_release=FAIL reason={exc}", file=sys.stderr)
+        return 1
+    print(f"RESULT generate_release={'SMOKE_ONLY' if args.smoke else 'CANDIDATE_ONLY'} target={args.target} files={len(result['files'])} out={args.out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

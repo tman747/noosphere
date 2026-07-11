@@ -1,0 +1,88 @@
+name: reproducible release candidates
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    name: candidate ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows-x86_64
+            runner: windows-2025
+            rust_target: x86_64-pc-windows-msvc
+          - target: linux-x86_64
+            runner: ubuntu-24.04
+            rust_target: x86_64-unknown-linux-gnu
+          - target: linux-aarch64
+            runner: ubuntu-24.04-arm
+            rust_target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - name: Check out bound revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install pinned Python orchestration runtime
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.13.5"
+
+      - name: Install pinned Go toolchain
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: "1.25.4"
+          cache: false
+
+      - name: Install pinned Rust toolchain and acquire locked dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.1 --profile minimal --target "${{ matrix.rust_target }}"
+          rustup default 1.96.1
+          cargo fetch --locked --target "${{ matrix.rust_target }}"
+          (cd go && go mod download && go mod verify)
+
+      - name: Build offline deterministic candidate bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME:-0.1.0-dev}"
+          python tools/gates/generate_release.py \
+            --target "${{ matrix.target }}" \
+            --out "release/candidates/${{ matrix.target }}" \
+            --version "$version" \
+            --revision "$GITHUB_SHA" \
+            --smoke
+
+      - name: Publish public candidate artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: noosphere-${{ matrix.target }}-${{ github.sha }}-candidate-smoke
+          path: release/candidates/${{ matrix.target }}/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  policy-boundary:
+    name: external builder gate remains external
+    runs-on: ubuntu-24.04
+    needs: candidate
+    steps:
+      - name: Record workflow boundary
+        shell: bash
+        run: |
+          echo "Candidate artifacts are downloadable smoke evidence."
+          echo "This workflow has one repository control plane and cannot satisfy the two-external-builder gate."
+          echo "No promotion or registry state is changed."

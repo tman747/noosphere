@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:noos:detached-ed25519-signature:v1",
+  "title": "NOOSPHERE detached Ed25519 signature",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "algorithm", "key_id", "payload_sha256", "signature_base64"],
+  "properties": {
+    "schema": {"const": "noos/detached-ed25519-signature/v1"},
+    "algorithm": {"const": "ed25519"},
+    "key_id": {"type": "string", "minLength": 1},
+    "payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "signature_base64": {"type": "string", "minLength": 1}
+  }
+}

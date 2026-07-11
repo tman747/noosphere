@@ -1,0 +1,28 @@
+{
+  "schema": "noos/trusted-repro-builders/v1",
+  "_comment": "Template only. Production keys and identity records must arrive from externally controlled builders. Never replace these placeholders with test keys or CI job identities.",
+  "builders": [
+    {
+      "key_id": "EXTERNAL_BUILDER_A_KEY_ID",
+      "public_key_base64": "EXTERNAL_INPUT_REQUIRED",
+      "operator": "EXTERNAL_OPERATOR_A",
+      "control_plane_identity": "EXTERNAL_CONTROL_PLANE_A",
+      "host_identity": "EXTERNAL_HOST_FLEET_A",
+      "toolchain_installation": "EXTERNAL_PINNED_INSTALLATION_A",
+      "authorized_targets": ["windows-x86_64", "linux-x86_64", "linux-aarch64"],
+      "external_to_release_owner": true,
+      "test_only": false
+    },
+    {
+      "key_id": "EXTERNAL_BUILDER_B_KEY_ID",
+      "public_key_base64": "EXTERNAL_INPUT_REQUIRED",
+      "operator": "EXTERNAL_OPERATOR_B",
+      "control_plane_identity": "EXTERNAL_CONTROL_PLANE_B",
+      "host_identity": "EXTERNAL_HOST_FLEET_B",
+      "toolchain_installation": "EXTERNAL_PINNED_INSTALLATION_B",
+      "authorized_targets": ["windows-x86_64", "linux-x86_64", "linux-aarch64"],
+      "external_to_release_owner": true,
+      "test_only": false
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:noos:repro-build-attestation:v1",
+  "title": "NOOSPHERE external reproducible-build attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "builder", "build", "artifact_hashes"],
+  "properties": {
+    "schema": {"const": "noos/repro-build-attestation/v1"},
+    "builder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator", "control_plane_identity", "host_identity", "toolchain_installation"],
+      "properties": {
+        "operator": {"type": "string", "minLength": 1},
+        "control_plane_identity": {"type": "string", "minLength": 1},
+        "host_identity": {"type": "string", "minLength": 1},
+        "toolchain_installation": {"type": "string", "minLength": 1}
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_revision", "source_tree", "target", "host_architecture", "toolchain_lock_sha256", "toolchains", "source_date_epoch"],
+      "properties": {
+        "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "source_tree": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "target": {"enum": ["windows-x86_64", "linux-x86_64", "linux-aarch64"]},
+        "host_architecture": {"enum": ["x86_64", "aarch64"]},
+        "toolchain_lock_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "toolchains": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rustc", "cargo", "go"],
+          "properties": {"rustc": {"type": "string"}, "cargo": {"type": "string"}, "go": {"type": "string"}}
+        },
+        "source_date_epoch": {"type": "integer", "minimum": 1}
+      }
+    },
+    "artifact_hashes": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^artifacts/[A-Za-z0-9._-]+$"},
+      "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+    }
+  }
+}

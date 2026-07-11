@@ -1,0 +1,52 @@
+{
+  "schema": "noos/repro-toolchains/v1",
+  "toolchains": {
+    "rustc": {
+      "channel": "1.96.1",
+      "version_output": "rustc 1.96.1 (31fca3adb 2026-06-26)"
+    },
+    "cargo": {
+      "channel": "1.96.1",
+      "version_output": "cargo 1.96.1 (356927216 2026-06-26)"
+    },
+    "go": {
+      "version": "1.25.4"
+    }
+  },
+  "deterministic_environment": {
+    "cargo_incremental": false,
+    "cargo_locked": true,
+    "dependencies_offline_during_build": true,
+    "go_buildvcs": false,
+    "go_mod": "readonly",
+    "go_trimpath": true,
+    "locale": "C.UTF-8",
+    "path_remap": "/workspace/noosphere",
+    "post_build_normalization": "forbidden",
+    "source_date_epoch": "git_commit_timestamp",
+    "timezone": "UTC"
+  },
+  "targets": {
+    "windows-x86_64": {
+      "runner": "windows-2025",
+      "rust_target": "x86_64-pc-windows-msvc",
+      "goos": "windows",
+      "goarch": "amd64",
+      "native_required": true
+    },
+    "linux-x86_64": {
+      "runner": "ubuntu-24.04",
+      "rust_target": "x86_64-unknown-linux-gnu",
+      "goos": "linux",
+      "goarch": "amd64",
+      "native_required": true
+    },
+    "linux-aarch64": {
+      "runner": "ubuntu-24.04-arm",
+      "rust_target": "aarch64-unknown-linux-gnu",
+      "goos": "linux",
+      "goarch": "arm64",
+      "native_required": true
+    }
+  }
+}
