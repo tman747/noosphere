@@ -25,14 +25,18 @@ use crate::backoff::ReconnectBackoff;
 use crate::envelope::{
     message_digest, BodyReplyV1, BodyRequestV1, Bounded, BoundedList, ChainAttestationV1, Flag,
     HandshakeMsgV1, HeaderMsgV1, HeaderReplyV1, LoomReceiptPushV1, Protocol, PushReplyV1,
-    RangeReplyV1, RangeRequestV1, RejectCode, ShardReplyV1, ShardRequestV1,
-    SnapshotChunkRequestV1, SnapshotReplyV1, TxPushV1, VotePushV1, APP_PROTOCOLS,
-    MAX_RANGE_HEADERS, RANGE_REPLY_BYTE_BUDGET,
+    RangeReplyV1, RangeRequestV1, RejectCode, ShardReplyV1, ShardRequestV1, SnapshotChunkRequestV1,
+    SnapshotReplyV1, TxPushV1, VotePushV1, APP_PROTOCOLS, MAX_RANGE_HEADERS,
+    RANGE_REPLY_BYTE_BUDGET,
 };
-use crate::frame::{read_frame, write_frame, FrameError, MAX_FRAME_BYTES, MAX_HANDSHAKE_FRAME_BYTES};
+use crate::frame::{
+    read_frame, write_frame, FrameError, MAX_FRAME_BYTES, MAX_HANDSHAKE_FRAME_BYTES,
+};
 use crate::identity::{sign_attestation, verify_attestation, ChainIdentity};
-use crate::limits::{CooldownLedger, DupCache, LimitsConfig, TokenBucket, Violation, DISCONNECT_SCORE};
-use crate::queue::{Outbox, OutboundItem};
+use crate::limits::{
+    CooldownLedger, DupCache, LimitsConfig, TokenBucket, Violation, DISCONNECT_SCORE,
+};
+use crate::queue::{OutboundItem, Outbox};
 
 /// Grace a not-yet-ready peer gets on an early application stream before it
 /// counts as a violation (covers the Ack-in-flight handshake race).
@@ -103,7 +107,11 @@ pub trait ProtocolStore: Send + Sync + 'static {
         (Vec::new(), false)
     }
     /// `(total_chunks, chunk_bytes)` for a finalized snapshot root.
-    fn snapshot_chunk(&self, _snapshot_root: &[u8; 32], _chunk_index: u32) -> Option<(u32, Vec<u8>)> {
+    fn snapshot_chunk(
+        &self,
+        _snapshot_root: &[u8; 32],
+        _chunk_index: u32,
+    ) -> Option<(u32, Vec<u8>)> {
         None
     }
     fn shard(&self, _content_root: &[u8; 32], _shard_index: u32) -> Option<Vec<u8>> {
@@ -613,7 +621,9 @@ fn ensure_peer(shared: &Arc<Shared>, peer: PeerId) {
     }
     let now = shared.now_ms();
     let (ready_tx, ready_rx) = watch::channel(ReadyState::Pending);
-    let outbox = Arc::new(Mutex::new(Outbox::new(shared.config.outbox_capacity_per_lane)));
+    let outbox = Arc::new(Mutex::new(Outbox::new(
+        shared.config.outbox_capacity_per_lane,
+    )));
     let notify = Arc::new(Notify::new());
     let limiters: [TokenBucket; 8] = core::array::from_fn(|i| {
         let protocol = APP_PROTOCOLS[i];
@@ -628,7 +638,7 @@ fn ensure_peer(shared: &Arc<Shared>, peer: PeerId) {
     let peer_bytes = peer.to_bytes();
     let mut mix = shared.config.backoff_seed;
     for (i, b) in peer_bytes.iter().enumerate() {
-        mix ^= u64::from(*b) << ((i % 8) * 8);
+        mix ^= u64::from(*b) << ((i % 8).wrapping_mul(8));
     }
     let entry = PeerEntry {
         ready_tx,
@@ -648,13 +658,19 @@ fn ensure_peer(shared: &Arc<Shared>, peer: PeerId) {
     };
     peers.insert(peer, entry);
     drop(peers);
-    tokio::spawn(outbox_worker(Arc::clone(shared), peer, outbox, notify, ready_rx));
+    tokio::spawn(outbox_worker(
+        Arc::clone(shared),
+        peer,
+        outbox,
+        notify,
+        ready_rx,
+    ));
 }
 
 fn set_ready_state(shared: &Arc<Shared>, peer: PeerId, state: ReadyState) {
     let peers = lock(&shared.peers);
     if let Some(entry) = peers.get(&peer) {
-        let _ = entry.ready_tx.send(state);
+        let _ = entry.ready_tx.send_replace(state);
         entry.notify.notify_one();
     }
 }
@@ -687,7 +703,15 @@ fn mark_rejected(shared: &Arc<Shared>, peer: PeerId, code: RejectCode, by_remote
         code,
         by_remote,
     });
-    shared.cmd(SwarmCmd::Disconnect(peer));
+    // Delay the connection teardown: a QUIC application close can outrun the
+    // in-flight Reject frame, and the remote deserves to learn WHY it was
+    // dropped (`wrong_protocol_identity`, not a silent reset). The session is
+    // already `Rejected`, so no application traffic passes meanwhile.
+    let sh = Arc::clone(shared);
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        sh.cmd(SwarmCmd::Disconnect(peer));
+    });
 }
 
 /// Records a violation; disconnects at the threshold or immediately.
@@ -749,7 +773,7 @@ async fn swarm_loop(
 fn handle_swarm_event(shared: &Arc<Shared>, event: SwarmEvent<()>) {
     match event {
         SwarmEvent::NewListenAddr { address, .. } => {
-            let _ = shared.listen_tx.send(Some(address.clone()));
+            let _ = shared.listen_tx.send_replace(Some(address.clone()));
             shared.emit(P2pEvent::Listening { address });
         }
         SwarmEvent::ConnectionEstablished {
@@ -774,7 +798,7 @@ fn handle_swarm_event(shared: &Arc<Shared>, event: SwarmEvent<()>) {
                     }
                     // A fresh connection gets a fresh handshake verdict.
                     if *entry.ready_tx.borrow() == ReadyState::Rejected {
-                        let _ = entry.ready_tx.send(ReadyState::Pending);
+                        let _ = entry.ready_tx.send_replace(ReadyState::Pending);
                     }
                 }
             }
@@ -800,7 +824,7 @@ fn handle_swarm_event(shared: &Arc<Shared>, event: SwarmEvent<()>) {
                     entry.score = 0;
                     rejected = *entry.ready_tx.borrow() == ReadyState::Rejected;
                     if !rejected {
-                        let _ = entry.ready_tx.send(ReadyState::Pending);
+                        let _ = entry.ready_tx.send_replace(ReadyState::Pending);
                     }
                 }
             }
@@ -832,9 +856,7 @@ fn schedule_reconnect(shared: &Arc<Shared>, peer: PeerId) {
         let Some(entry) = peers.get_mut(&peer) else {
             return;
         };
-        if entry.reconnecting
-            || entry.connected
-            || *entry.ready_tx.borrow() == ReadyState::Rejected
+        if entry.reconnecting || entry.connected || *entry.ready_tx.borrow() == ReadyState::Rejected
         {
             return;
         }
@@ -893,9 +915,13 @@ async fn handshake_dialer(shared: Arc<Shared>, peer: PeerId) {
         return;
     };
     let attest = HandshakeMsgV1::Attest(shared.local_attestation.clone());
-    if write_frame(&mut s, &attest.encode_canonical(), MAX_HANDSHAKE_FRAME_BYTES)
-        .await
-        .is_err()
+    if write_frame(
+        &mut s,
+        &attest.encode_canonical(),
+        MAX_HANDSHAKE_FRAME_BYTES,
+    )
+    .await
+    .is_err()
     {
         shared.cmd(SwarmCmd::Disconnect(peer));
         return;
@@ -908,7 +934,10 @@ async fn handshake_dialer(shared: Arc<Shared>, peer: PeerId) {
         Ok(HandshakeMsgV1::Attest(att)) => match validate_remote(&shared, peer, &att) {
             Ok(()) => {
                 let ack = HandshakeMsgV1::Ack.encode_canonical();
-                if write_frame(&mut s, &ack, MAX_HANDSHAKE_FRAME_BYTES).await.is_ok() {
+                if write_frame(&mut s, &ack, MAX_HANDSHAKE_FRAME_BYTES)
+                    .await
+                    .is_ok()
+                {
                     let _ = futures::io::AsyncWriteExt::close(&mut s).await;
                     mark_ready(&shared, peer, att);
                 } else {
@@ -958,7 +987,10 @@ async fn serve_handshake(shared: Arc<Shared>, peer: PeerId, mut s: libp2p::Strea
         }
         Ok(()) => {
             let own = HandshakeMsgV1::Attest(shared.local_attestation.clone()).encode_canonical();
-            if write_frame(&mut s, &own, MAX_HANDSHAKE_FRAME_BYTES).await.is_err() {
+            if write_frame(&mut s, &own, MAX_HANDSHAKE_FRAME_BYTES)
+                .await
+                .is_err()
+            {
                 shared.cmd(SwarmCmd::Disconnect(peer));
                 return;
             }
@@ -996,7 +1028,11 @@ async fn handshake_watchdog(shared: Arc<Shared>, peer: PeerId) {
 // Inbound protocol serving
 // ---------------------------------------------------------------------------
 
-async fn accept_loop(shared: Arc<Shared>, protocol: Protocol, mut streams: stream::IncomingStreams) {
+async fn accept_loop(
+    shared: Arc<Shared>,
+    protocol: Protocol,
+    mut streams: stream::IncomingStreams,
+) {
     while let Some((peer, stream)) = streams.next().await {
         let sh = Arc::clone(&shared);
         if protocol == Protocol::Handshake {
@@ -1016,7 +1052,9 @@ async fn wait_ready(shared: &Arc<Shared>, peer: PeerId) -> bool {
     let Some(mut rx) = rx else {
         return false;
     };
-    let deadline = tokio::time::Instant::now() + Duration::from_millis(READY_GRACE_MS);
+    let deadline = tokio::time::Instant::now()
+        .checked_add(Duration::from_millis(READY_GRACE_MS))
+        .unwrap_or_else(tokio::time::Instant::now);
     loop {
         match *rx.borrow() {
             ReadyState::Ready => return true,
@@ -1187,7 +1225,10 @@ fn dispatch(
             let req = SnapshotChunkRequestV1::decode_canonical(payload)
                 .map_err(|_| Violation::MalformedEnvelope)?;
             check_chain(shared, &req.chain_id)?;
-            let reply = match shared.store.snapshot_chunk(&req.snapshot_root, req.chunk_index) {
+            let reply = match shared
+                .store
+                .snapshot_chunk(&req.snapshot_root, req.chunk_index)
+            {
                 Some((total_chunks, chunk)) => SnapshotReplyV1::Chunk {
                     total_chunks,
                     chunk: Bounded(chunk),

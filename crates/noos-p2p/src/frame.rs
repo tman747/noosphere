@@ -81,7 +81,9 @@ pub async fn write_frame<S: AsyncWrite + Unpin>(
             max,
         });
     }
-    stream.write_all(&(payload.len() as u32).to_le_bytes()).await?;
+    stream
+        .write_all(&(payload.len() as u32).to_le_bytes())
+        .await?;
     stream.write_all(payload).await?;
     stream.flush().await?;
     Ok(())
@@ -111,7 +113,9 @@ mod tests {
     fn round_trip() {
         block_on(async {
             let mut buf = Cursor::new(Vec::new());
-            write_frame(&mut buf, b"hello", MAX_FRAME_BYTES).await.unwrap();
+            write_frame(&mut buf, b"hello", MAX_FRAME_BYTES)
+                .await
+                .unwrap();
             let mut rd = Cursor::new(buf.into_inner());
             let got = read_frame(&mut rd, MAX_FRAME_BYTES).await.unwrap();
             assert_eq!(got, b"hello");
@@ -139,7 +143,9 @@ mod tests {
         block_on(async {
             let payload = vec![7u8; MAX_FRAME_BYTES];
             let mut buf = Cursor::new(Vec::new());
-            write_frame(&mut buf, &payload, MAX_FRAME_BYTES).await.unwrap();
+            write_frame(&mut buf, &payload, MAX_FRAME_BYTES)
+                .await
+                .unwrap();
             let mut rd = Cursor::new(buf.into_inner());
             assert_eq!(read_frame(&mut rd, MAX_FRAME_BYTES).await.unwrap(), payload);
         });

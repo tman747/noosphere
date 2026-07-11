@@ -640,7 +640,10 @@ impl NoosDecode for ShardReplyV1 {
 /// `H("NOOS/P2P/MSG/V1" || protocol_id || envelope_bytes)`. Local anti-replay
 /// only; never a consensus commitment.
 pub fn message_digest(protocol: Protocol, envelope_bytes: &[u8]) -> [u8; 32] {
-    match hash_domain(DomainId::P2pMsg, &[protocol.id().as_bytes(), envelope_bytes]) {
+    match hash_domain(
+        DomainId::P2pMsg,
+        &[protocol.id().as_bytes(), envelope_bytes],
+    ) {
         Ok(h) => h.into_bytes(),
         // D-P2P-MSG is a registered BLAKE3_CONTEXT row; a kind mismatch is
         // impossible for a compiled registry.
@@ -746,7 +749,10 @@ mod tests {
         let mut w = Writer::new();
         w.put_u8(2);
         let mut r = Reader::new(w.as_bytes());
-        assert_eq!(Flag::decode(&mut r).unwrap_err(), CodecError::UnknownDiscriminant);
+        assert_eq!(
+            Flag::decode(&mut r).unwrap_err(),
+            CodecError::UnknownDiscriminant
+        );
     }
 
     #[test]

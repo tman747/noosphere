@@ -58,7 +58,9 @@ impl ReconnectBackoff {
             .max(1);
         self.attempt = self.attempt.saturating_add(1);
         let half = exp / 2;
-        half + self.rng.next_u64() % (exp - half + 1)
+        // `span >= 1` always: exp >= 1 and half = exp / 2 <= exp.
+        let span = exp.saturating_sub(half).saturating_add(1);
+        half.saturating_add(self.rng.next_u64().checked_rem(span).unwrap_or(0))
     }
 
     /// A successful, handshake-complete connection resets the schedule
@@ -98,7 +100,11 @@ mod tests {
                 .saturating_mul(1u64.checked_shl(n).unwrap_or(u64::MAX))
                 .min(30_000);
             let d = b.next_delay_ms();
-            assert!(d >= exp / 2 && d <= exp, "attempt {n}: {d} outside [{}, {exp}]", exp / 2);
+            assert!(
+                d >= exp / 2 && d <= exp,
+                "attempt {n}: {d} outside [{}, {exp}]",
+                exp / 2
+            );
         }
     }
 
@@ -110,6 +116,9 @@ mod tests {
         }
         b.reset();
         let d = b.next_delay_ms();
-        assert!(d >= 100 && d <= 200, "post-reset delay {d} must be first-attempt sized");
+        assert!(
+            (100..=200).contains(&d),
+            "post-reset delay {d} must be first-attempt sized"
+        );
     }
 }

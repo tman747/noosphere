@@ -10,9 +10,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use noos_p2p::{
-    write_raw_declared, ChainIdentity, InboundItem, P2pConfig, P2pEvent, P2pHandle, P2pNode,
-    PeerId, ProtocolStore, PushReplyV1, RejectCode, SendError, Violation, BodyReplyV1,
-    HeaderReplyV1, ShardReplyV1, SnapshotReplyV1,
+    write_raw_declared, BodyReplyV1, ChainIdentity, HeaderReplyV1, InboundItem, P2pConfig,
+    P2pEvent, P2pHandle, P2pNode, PeerId, ProtocolStore, PushReplyV1, RejectCode, SendError,
+    ShardReplyV1, SnapshotReplyV1, Violation,
 };
 use tokio::sync::mpsc;
 use tokio::time::timeout;
@@ -56,7 +56,9 @@ impl ProtocolStore for MemStore {
         if start >= self.range.len() {
             return (Vec::new(), false);
         }
-        let end = start.saturating_add(max_headers as usize).min(self.range.len());
+        let end = start
+            .saturating_add(max_headers as usize)
+            .min(self.range.len());
         (self.range[start..end].to_vec(), end < self.range.len())
     }
     fn snapshot_chunk(&self, snapshot_root: &[u8; 32], chunk_index: u32) -> Option<(u32, Vec<u8>)> {
@@ -105,8 +107,14 @@ async fn connect_ready(
 ) {
     let addr = b.listen_addr().await;
     a.connect(addr);
-    wait_for(a_rx, "a PeerReady", |e| matches!(e, P2pEvent::PeerReady { .. })).await;
-    wait_for(b_rx, "b PeerReady", |e| matches!(e, P2pEvent::PeerReady { .. })).await;
+    wait_for(a_rx, "a PeerReady", |e| {
+        matches!(e, P2pEvent::PeerReady { .. })
+    })
+    .await;
+    wait_for(b_rx, "b PeerReady", |e| {
+        matches!(e, P2pEvent::PeerReady { .. })
+    })
+    .await;
 }
 
 // ---------------------------------------------------------------------------
@@ -218,9 +226,7 @@ async fn all_eight_protocols_round_trip_one_canonical_message() {
     store
         .chunks
         .insert(([0x33; 32], 1), (4, b"snapshot-chunk-1".to_vec()));
-    store
-        .shards
-        .insert(([0x44; 32], 7), b"da-shard-7".to_vec());
+    store.shards.insert(([0x44; 32], 7), b"da-shard-7".to_vec());
 
     let (a, mut a_rx) = spawn(7, chain_a(), MemStore::default(), |_| {});
     let (b, mut b_rx) = spawn(8, chain_a(), store, |_| {});
@@ -234,10 +240,20 @@ async fn all_eight_protocols_round_trip_one_canonical_message() {
         .unwrap();
     assert_eq!(reply, HeaderReplyV1::Ack);
     let ev = wait_for(&mut b_rx, "header announce", |e| {
-        matches!(e, P2pEvent::Inbound { item: InboundItem::HeaderAnnounce { .. }, .. })
+        matches!(
+            e,
+            P2pEvent::Inbound {
+                item: InboundItem::HeaderAnnounce { .. },
+                ..
+            }
+        )
     })
     .await;
-    let P2pEvent::Inbound { peer, item: InboundItem::HeaderAnnounce { header: got } } = ev else {
+    let P2pEvent::Inbound {
+        peer,
+        item: InboundItem::HeaderAnnounce { header: got },
+    } = ev
+    else {
         unreachable!()
     };
     assert_eq!(peer, a.local_peer_id());
@@ -259,7 +275,10 @@ async fn all_eight_protocols_round_trip_one_canonical_message() {
     assert_eq!(reply, HeaderReplyV1::NotFound);
 
     // 2. /noos/braid/body/1 — request/transfer (targeted repair primitive).
-    let reply = timeout(WAIT, a.request_body(bp, [0x22; 32])).await.unwrap().unwrap();
+    let reply = timeout(WAIT, a.request_body(bp, [0x22; 32]))
+        .await
+        .unwrap()
+        .unwrap();
     match reply {
         BodyReplyV1::Body(got) => assert_eq!(got.0, body),
         other => panic!("expected body, got {other:?}"),
@@ -267,37 +286,69 @@ async fn all_eight_protocols_round_trip_one_canonical_message() {
 
     // 3. /noos/braid/vote/1 — push.
     let vote = b"checkpoint-vote".to_vec();
-    let reply = timeout(WAIT, a.push_vote(bp, vote.clone())).await.unwrap().unwrap();
+    let reply = timeout(WAIT, a.push_vote(bp, vote.clone()))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(reply, PushReplyV1::Accepted);
     let ev = wait_for(&mut b_rx, "vote push", |e| {
-        matches!(e, P2pEvent::Inbound { item: InboundItem::Vote { .. }, .. })
+        matches!(
+            e,
+            P2pEvent::Inbound {
+                item: InboundItem::Vote { .. },
+                ..
+            }
+        )
     })
     .await;
-    let P2pEvent::Inbound { item: InboundItem::Vote { vote: got }, .. } = ev else {
+    let P2pEvent::Inbound {
+        item: InboundItem::Vote { vote: got },
+        ..
+    } = ev
+    else {
         unreachable!()
     };
     assert_eq!(got, vote);
 
     // 4. /noos/lumen/tx/1 — push.
     let tx = b"signed-intent".to_vec();
-    let reply = timeout(WAIT, a.push_tx(bp, tx.clone())).await.unwrap().unwrap();
+    let reply = timeout(WAIT, a.push_tx(bp, tx.clone()))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(reply, PushReplyV1::Accepted);
     let ev = wait_for(&mut b_rx, "tx push", |e| {
-        matches!(e, P2pEvent::Inbound { item: InboundItem::Tx { .. }, .. })
+        matches!(
+            e,
+            P2pEvent::Inbound {
+                item: InboundItem::Tx { .. },
+                ..
+            }
+        )
     })
     .await;
-    let P2pEvent::Inbound { item: InboundItem::Tx { tx: got }, .. } = ev else {
+    let P2pEvent::Inbound {
+        item: InboundItem::Tx { tx: got },
+        ..
+    } = ev
+    else {
         unreachable!()
     };
     assert_eq!(got, tx);
 
     // 5. /noos/sync/range/1 — request/response with continuation flag.
-    let reply = timeout(WAIT, a.request_range(bp, 1, 2)).await.unwrap().unwrap();
+    let reply = timeout(WAIT, a.request_range(bp, 1, 2))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(reply.headers.0.len(), 2);
     assert_eq!(reply.headers.0[0].0, b"h1".to_vec());
     assert_eq!(reply.headers.0[1].0, b"h2".to_vec());
     assert!(!reply.more.0);
-    let reply = timeout(WAIT, a.request_range(bp, 0, 2)).await.unwrap().unwrap();
+    let reply = timeout(WAIT, a.request_range(bp, 0, 2))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(reply.headers.0.len(), 2);
     assert!(reply.more.0, "one more header remains past the page");
 
@@ -307,7 +358,10 @@ async fn all_eight_protocols_round_trip_one_canonical_message() {
         .unwrap()
         .unwrap();
     match reply {
-        SnapshotReplyV1::Chunk { total_chunks, chunk } => {
+        SnapshotReplyV1::Chunk {
+            total_chunks,
+            chunk,
+        } => {
             assert_eq!(total_chunks, 4);
             assert_eq!(chunk.0, b"snapshot-chunk-1".to_vec());
         }
@@ -315,12 +369,18 @@ async fn all_eight_protocols_round_trip_one_canonical_message() {
     }
 
     // 7. /noos/blob/shard/1 — shard request/transfer.
-    let reply = timeout(WAIT, a.request_shard(bp, [0x44; 32], 7)).await.unwrap().unwrap();
+    let reply = timeout(WAIT, a.request_shard(bp, [0x44; 32], 7))
+        .await
+        .unwrap()
+        .unwrap();
     match reply {
         ShardReplyV1::Shard(got) => assert_eq!(got.0, b"da-shard-7".to_vec()),
         other => panic!("expected shard, got {other:?}"),
     }
-    let reply = timeout(WAIT, a.request_shard(bp, [0x44; 32], 8)).await.unwrap().unwrap();
+    let reply = timeout(WAIT, a.request_shard(bp, [0x44; 32], 8))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(reply, ShardReplyV1::NotFound);
 
     // 8. /noos/loom/receipt/1 — lane disabled at genesis: explicit
@@ -388,7 +448,10 @@ async fn rate_limit_trips_score_and_disconnects() {
 
     // Two in-budget pushes succeed.
     for i in 0..2u8 {
-        let reply = timeout(WAIT, a.push_tx(bp, vec![i; 8])).await.unwrap().unwrap();
+        let reply = timeout(WAIT, a.push_tx(bp, vec![i; 8]))
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(reply, PushReplyV1::Accepted);
     }
     // The flood beyond the budget trips violations; fire-and-forget because
@@ -431,24 +494,43 @@ async fn duplicate_push_is_suppressed_and_answered_duplicate() {
     let bp = b.local_peer_id();
 
     let tx = b"same-tx-bytes".to_vec();
-    let first = timeout(WAIT, a.push_tx(bp, tx.clone())).await.unwrap().unwrap();
+    let first = timeout(WAIT, a.push_tx(bp, tx.clone()))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(first, PushReplyV1::Accepted);
-    let second = timeout(WAIT, a.push_tx(bp, tx.clone())).await.unwrap().unwrap();
+    let second = timeout(WAIT, a.push_tx(bp, tx.clone()))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(second, PushReplyV1::Duplicate);
 
     // Exactly one Inbound Tx event; the sentinel push flushes the queue and
     // proves no second dispatch of the duplicate happened.
     let sentinel = b"different-tx".to_vec();
-    let reply = timeout(WAIT, a.push_tx(bp, sentinel.clone())).await.unwrap().unwrap();
+    let reply = timeout(WAIT, a.push_tx(bp, sentinel.clone()))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(reply, PushReplyV1::Accepted);
 
     let mut seen = Vec::new();
     while seen.len() < 2 {
         let ev = wait_for(&mut b_rx, "inbound tx", |e| {
-            matches!(e, P2pEvent::Inbound { item: InboundItem::Tx { .. }, .. })
+            matches!(
+                e,
+                P2pEvent::Inbound {
+                    item: InboundItem::Tx { .. },
+                    ..
+                }
+            )
         })
         .await;
-        let P2pEvent::Inbound { item: InboundItem::Tx { tx: got }, .. } = ev else {
+        let P2pEvent::Inbound {
+            item: InboundItem::Tx { tx: got },
+            ..
+        } = ev
+        else {
             unreachable!()
         };
         seen.push(got);
@@ -518,10 +600,11 @@ async fn unknown_noos_protocol_is_refused_at_negotiation() {
     let (b, mut b_rx) = spawn(18, chain_a(), MemStore::default(), |_| {});
     connect_ready(&a, &mut a_rx, &b, &mut b_rx).await;
 
-    let res = a
-        .open_raw_stream(b.local_peer_id(), "/noos/bogus/1")
-        .await;
-    assert!(res.is_err(), "unknown /noos/ protocol must fail negotiation");
+    let res = a.open_raw_stream(b.local_peer_id(), "/noos/bogus/1").await;
+    assert!(
+        res.is_err(),
+        "unknown /noos/ protocol must fail negotiation"
+    );
 }
 
 fn _assert_send<T: Send>(_: &T) {}

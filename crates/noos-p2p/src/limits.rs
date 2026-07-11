@@ -68,14 +68,38 @@ impl Default for LimitsConfig {
         // snapshot, shard, loom receipt.
         LimitsConfig {
             per_protocol: [
-                RateLimit { burst: 64, per_second: 32 },  // braid/header
-                RateLimit { burst: 16, per_second: 8 },   // braid/body
-                RateLimit { burst: 128, per_second: 64 }, // braid/vote
-                RateLimit { burst: 256, per_second: 128 },// lumen/tx
-                RateLimit { burst: 8, per_second: 4 },    // sync/range
-                RateLimit { burst: 16, per_second: 8 },   // sync/snapshot
-                RateLimit { burst: 32, per_second: 16 },  // blob/shard
-                RateLimit { burst: 16, per_second: 8 },   // loom/receipt
+                RateLimit {
+                    burst: 64,
+                    per_second: 32,
+                }, // braid/header
+                RateLimit {
+                    burst: 16,
+                    per_second: 8,
+                }, // braid/body
+                RateLimit {
+                    burst: 128,
+                    per_second: 64,
+                }, // braid/vote
+                RateLimit {
+                    burst: 256,
+                    per_second: 128,
+                }, // lumen/tx
+                RateLimit {
+                    burst: 8,
+                    per_second: 4,
+                }, // sync/range
+                RateLimit {
+                    burst: 16,
+                    per_second: 8,
+                }, // sync/snapshot
+                RateLimit {
+                    burst: 32,
+                    per_second: 16,
+                }, // blob/shard
+                RateLimit {
+                    burst: 16,
+                    per_second: 8,
+                }, // loom/receipt
             ],
         }
     }
@@ -253,9 +277,7 @@ impl CooldownLedger {
 
     /// Is the peer currently cooling down?
     pub fn active(&self, peer: &[u8], now_ms: u64) -> bool {
-        self.entries
-            .get(peer)
-            .is_some_and(|e| e.until_ms > now_ms)
+        self.entries.get(peer).is_some_and(|e| e.until_ms > now_ms)
     }
 }
 

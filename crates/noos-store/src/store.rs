@@ -553,6 +553,14 @@ impl Store {
             .collect())
     }
 
+    /// Read-only ascending prefix scan over a section column family
+    /// (headers / indices / receipts). Additive node-runtime API: the
+    /// node's restart replay enumerates its height index and certificate
+    /// log through this; nothing here mutates state.
+    pub fn scan(&self, cf: Cf, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, StoreError> {
+        self.engine.prefix_scan(cf, prefix)
+    }
+
     // -- writes ----------------------------------------------------------------
 
     fn ensure_live(&self) -> Result<(), StoreError> {

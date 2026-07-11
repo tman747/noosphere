@@ -1,0 +1,25 @@
+[package]
+name = "noos-node"
+version = "0.1.0"
+description = "NOOSPHERE node runtime (plan §7.5-7.7): the noosd bounded supervisor — deterministic single-writer Braid/Lumen pipeline task, store/RPC/sync as separate tasks behind bounded channels, proof checks in a bounded verdict pool, persist-before-vote via the noos-witness DurabilityBarrier wired to noos-store, mempool with canonical-decode admission and fee-density eviction, header-first full sync / finalized snapshot sync / light mode behind the NetworkEdge trait, and the minimal localhost bearer-token operator RPC with noos_* metrics. Public REST API v1, CUDA/Go worker processes, and installers are later phases."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "noosd"
+path = "src/bin/noosd.rs"
+
+[dependencies]
+noos-braid = { path = "../noos-braid" }
+noos-codec = { path = "../noos-codec" }
+noos-crypto = { path = "../noos-crypto" }
+noos-da = { path = "../noos-da" }
+noos-ground = { path = "../noos-ground" }
+noos-lumen = { path = "../noos-lumen" }
+noos-store = { path = "../noos-store" }
+noos-witness = { path = "../noos-witness" }
+
+[lints]
+workspace = true

@@ -15,3 +15,13 @@ unsafe_code = "deny"
 unwrap_used = "warn"
 expect_used = "warn"
 arithmetic_side_effects = "warn"
+
+# Heavy pure-math dependencies stay optimized even in dev/test builds:
+# Reed-Solomon body coding, BLAKE3 hashing, and BLS pairings dominate the
+# node e2e wall time and are consensus-observable only through bytes.
+[profile.dev.package.reed-solomon-erasure]
+opt-level = 3
+[profile.dev.package.blake3]
+opt-level = 3
+[profile.dev.package.blst]
+opt-level = 3

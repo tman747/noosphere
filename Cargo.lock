@@ -1901,6 +1901,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "noos-node"
+version = "0.1.0"
+dependencies = [
+ "noos-braid",
+ "noos-codec",
+ "noos-crypto",
+ "noos-da",
+ "noos-ground",
+ "noos-lumen",
+ "noos-store",
+ "noos-witness",
+]
+
+[[package]]
 name = "noos-p2p"
 version = "0.1.0"
 dependencies = [

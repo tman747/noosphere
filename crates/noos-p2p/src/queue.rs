@@ -64,7 +64,9 @@ impl Outbox {
 
     /// Dequeues the next item: priority lane strictly first.
     pub fn pop(&mut self) -> Option<OutboundItem> {
-        self.priority.pop_front().or_else(|| self.normal.pop_front())
+        self.priority
+            .pop_front()
+            .or_else(|| self.normal.pop_front())
     }
 
     #[cfg(test)]
@@ -74,7 +76,7 @@ impl Outbox {
 
     #[cfg(test)]
     pub fn len(&self) -> usize {
-        self.priority.len() + self.normal.len()
+        self.priority.len().saturating_add(self.normal.len())
     }
 
     /// Fails every queued item (peer rejected: wrong chain identity).
@@ -90,7 +92,10 @@ impl Outbox {
 mod tests {
     use super::*;
 
-    fn item(protocol: Protocol, marker: u8) -> (OutboundItem, oneshot::Receiver<Result<Vec<u8>, SendError>>) {
+    fn item(
+        protocol: Protocol,
+        marker: u8,
+    ) -> (OutboundItem, oneshot::Receiver<Result<Vec<u8>, SendError>>) {
         let (tx, rx) = oneshot::channel();
         (
             OutboundItem {
@@ -130,7 +135,10 @@ mod tests {
         ob.push(a);
         let (b, mut rx_b) = item(Protocol::LumenTx, 2);
         ob.push(b);
-        assert!(matches!(rx_b.try_recv().unwrap(), Err(SendError::QueueFull)));
+        assert!(matches!(
+            rx_b.try_recv().unwrap(),
+            Err(SendError::QueueFull)
+        ));
         // The other lane is unaffected.
         let (c, _rx_c) = item(Protocol::BraidVote, 3);
         ob.push(c);
@@ -147,7 +155,11 @@ mod tests {
         let head = ob.pop().unwrap();
         assert_eq!(head.payload, vec![1]);
         ob.push_front(head);
-        assert_eq!(ob.pop().unwrap().payload, vec![1], "requeued item stays head");
+        assert_eq!(
+            ob.pop().unwrap().payload,
+            vec![1],
+            "requeued item stays head"
+        );
     }
 
     #[test]
@@ -159,7 +171,13 @@ mod tests {
         ob.push(b);
         ob.fail_all(SendError::PeerRejected);
         assert!(ob.is_empty());
-        assert!(matches!(ra.try_recv().unwrap(), Err(SendError::PeerRejected)));
-        assert!(matches!(rb.try_recv().unwrap(), Err(SendError::PeerRejected)));
+        assert!(matches!(
+            ra.try_recv().unwrap(),
+            Err(SendError::PeerRejected)
+        ));
+        assert!(matches!(
+            rb.try_recv().unwrap(),
+            Err(SendError::PeerRejected)
+        ));
     }
 }
