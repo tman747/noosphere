@@ -1,0 +1,39 @@
+{
+  "claims": {
+    "P5-S-KERNEL-JET": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-jet"],
+      "command": "python tools/gates/run_risc0_proof_claim.py --claim P5-S-KERNEL-JET",
+      "rollback_command": "python tools/gates/run_risc0_proof_claim.py --claim P5-S-KERNEL-JET --rollback-check",
+      "notes": "PARTIAL only. The canonical slow Grain relation remains authoritative; certified jet admission, deterministic Grain-to-RV32 lowering, boundary-heavy differential corpora, domain-exit fallback, and the RISC Zero guest's separately implemented RV32 execution agree locally. A wrong or uncertified jet and any image substitution are rejected. The exact frozen threshold is not met: there is no CuTe/CUDA kernel, CUDA compiler/device matrix, race/layout campaign, or second independently implemented checker on this AMD workstation. Rollback remains quarantine plus pure Grain/reference execution."
+    },
+    "A-JET-CERT": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-jet"],
+      "command": "python tools/gates/run_risc0_proof_claim.py --claim A-JET-CERT",
+      "rollback_command": "python tools/gates/run_risc0_proof_claim.py --claim A-JET-CERT --rollback-check",
+      "notes": "PARTIAL only. RISC Zero proof construction accepts only a JetId already admitted by JetRegistry and only the byte-identical deterministic RV32 lowering of that admitted certificate's canonical Grain formula. The public journal binds JetId, semantics hash, certificate digest, RV32 image id, input, result, steps, chain, domain, and proof-architecture profile; uncertified-jet and substituted-image falsifiers reject. The frozen universal-equivalence threshold remains external: no proof-assistant certificate/kernel, emitted-binary translation validation, second independent checker, or 10^8 differential campaign is claimed."
+    },
+    "M-RECURSIVE-VERIFIER": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-jet"],
+      "command": "python tools/gates/run_risc0_proof_claim.py --claim M-RECURSIVE-VERIFIER",
+      "rollback_command": "python tools/gates/run_risc0_proof_claim.py --claim M-RECURSIVE-VERIFIER --rollback-check",
+      "notes": "PARTIAL only. A real RISC Zero 3.0.5 guest method is reproducibly built with guest-builder r0.1.88.0 and embedded behind the explicit risc0 feature. Non-dev local CPU proving and cryptographic verification passed for both composite and recursively compressed succinct receipts. Receipt tamper, RISC Zero method substitution, canonical RV32 image substitution, journal splice, cross-chain replay, wrong domain, wrong profile, and uncertified jet all reject; interpreted fallback equality also passes. The deterministic LocalExecutionChecker remains a visibly separate non-production backend. The frozen threshold is still unmet: this is one first-party RISC Zero verifier, not an independent reproduction of Pearl's Plonky2/STARKy path, and there is no second independently implemented verifier or 10^8 structured/mutated-proof campaign."
+    },
+    "S-PROOF-ARCH": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-jet"],
+      "command": "python tools/gates/run_risc0_proof_claim.py --claim S-PROOF-ARCH",
+      "rollback_command": "python tools/gates/run_risc0_proof_claim.py --claim S-PROOF-ARCH --rollback-check",
+      "notes": "PARTIAL only. ProofArchitectureManifest canonically binds numeric profile, checkpoint, activation commitment, deterministic projection hook, constrained MoE route policy, and tolerance into the profile id carried by the RISC Zero journal. Mutation of every field changes the id, and wrong-profile receipt replay rejects. The frozen pass threshold remains external because cross-hardware conformance within tolerance has not been run on independent hardware for all vectors. No universal efficiency claim is made."
+    },
+    "S-GPU-COMMIT": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-jet"],
+      "command": "python tools/gates/run_risc0_proof_claim.py --claim S-GPU-COMMIT",
+      "rollback_command": "python tools/gates/run_risc0_proof_claim.py --claim S-GPU-COMMIT --rollback-check",
+      "notes": "PARTIAL only. The canonical CPU/reference commitment mechanics now separate stable ArtifactId from challenge-bound WorkCommit and bind profile id, trace root, and versioned fused-relation id; every mutation invalidates the declaration. No GPU result is relabeled as this reference path. The exact frozen threshold remains external: no GPU implementation/root corpus, imperfect-tree and partial-chunk GPU campaign, compiler/race matrix, transfer-integrated end-to-end advantage, or independent pinned H100 latency/energy reproduction exists on this AMD workstation. Rollback is the canonical CPU/reference commitment."
+    }
+  }
+}

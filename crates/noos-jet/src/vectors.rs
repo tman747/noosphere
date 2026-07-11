@@ -461,3 +461,70 @@ pub fn vector_files() -> Vec<(&'static str, String)> {
 pub fn rv32_subject(leaves: &[u32]) -> Noun {
     subject_noun(leaves)
 }
+
+/// Reproducible binding vector for the real RISC Zero guest. The vector pins
+/// the compiled method id/ELF digest and exact private-input/public-journal
+/// bytes. It intentionally does not embed or characterize a generated proof;
+/// the dedicated claim runner performs real CPU proving and verification.
+#[cfg(feature = "risc0")]
+#[must_use]
+pub fn risc0_json() -> String {
+    use crate::architecture::ProofArchitectureManifest;
+    use crate::cert::{jet_id, semantics_hash};
+    use crate::risc0::{risc0_method_id, Risc0ProofContext, Risc0ProofInput};
+
+    let registry = shipped_registry();
+    let formula = inc_formula();
+    let id = jet_id(&semantics_hash(&formula), INC_IMPL_TAG);
+    let image = match lower(&formula, 1) {
+        Ok(image) => image,
+        Err(error) => unreachable!("shipped inc lowering failed: {error}"),
+    };
+    let profile = ProofArchitectureManifest {
+        numeric_profile: [0x11; 32],
+        checkpoint: [0x22; 32],
+        activation_commitment: [0x33; 32],
+        projection_hook: [0x44; 32],
+        moe_route_policy: [0x55; 32],
+        tolerance_ppm: 250,
+    };
+    let context = Risc0ProofContext {
+        chain_id: [0x91; 32],
+        domain: [0x92; 32],
+        profile_id: profile.profile_id(),
+    };
+    let input =
+        match Risc0ProofInput::certified(&registry, &id, &image, &[41], context, RV32_MAX_STEPS) {
+            Ok(input) => input,
+            Err(error) => unreachable!("shipped RISC Zero vector failed: {error}"),
+        };
+    let method_words = risc0_method_id()
+        .iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    let guest_input = input.canonical_guest_input();
+    let claim_bytes = input.request().claim.canonical_bytes();
+    let elf_digest = blake3::hash(noos_jet_risc0_methods::JET_PROOF_ELF);
+    let input_digest = blake3::hash(&guest_input);
+    let claim_digest = blake3::hash(&claim_bytes);
+    format!(
+        "{{\"schema\":\"noos/jet/risc0-proof-v1\",\"sdk_version\":\"3.0.5\",\"guest_build\":\"risc0-guest-builder-r0.1.88.0\",\"receipt_kind\":\"composite\",\"method_id_words\":[{method_words}],\"guest_elf_blake3\":\"{}\",\"cases\":[{{\"name\":\"certified_inc_41\",\"kind\":\"positive\",\"chain_id\":\"{}\",\"domain\":\"{}\",\"profile_id\":\"{}\",\"jet_id\":\"{}\",\"semantics_hash\":\"{}\",\"cert_digest\":\"{}\",\"rv32_image_id\":\"{}\",\"rv32_image_bytes\":\"{}\",\"leaves\":[41],\"guest_input\":\"{}\",\"guest_input_blake3\":\"{}\",\"journal\":\"{}\",\"journal_blake3\":\"{}\",\"status\":{},\"value\":{},\"steps\":{}}}]}}\n",
+        hex(elf_digest.as_bytes()),
+        hex(&context.chain_id),
+        hex(&context.domain),
+        hex(&context.profile_id),
+        hex(&input.request().claim.jet_id),
+        hex(&input.request().claim.semantics_hash),
+        hex(&input.request().claim.cert_digest),
+        hex(&input.request().claim.rv32_image_id),
+        hex(&image.bytes()),
+        hex(&guest_input),
+        hex(input_digest.as_bytes()),
+        hex(&claim_bytes),
+        hex(claim_digest.as_bytes()),
+        input.request().claim.status,
+        input.request().claim.value,
+        input.request().claim.steps,
+    )
+}

@@ -1,0 +1,98 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": [
+        {
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "noos-jet",
+            "--locked",
+            "tests::proof_architecture_profile_binds_every_declared_choice",
+            "--",
+            "--test-threads=1"
+          ],
+          "duration_seconds": 0.282,
+          "exit_code": 0,
+          "log_sha256": "4ccb75cfc832314cd843a85bd873855ce6937802d0967a09baf0d64c83c63f21"
+        }
+      ],
+      "name": "exact local precursor tests",
+      "passed": true
+    },
+    {
+      "detail": "Local precursors passed; external threshold components are explicitly unsatisfied.",
+      "name": "frozen pass threshold honesty check",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-PROOF-ARCH": "f80835df077d269052db8427a7e10652858cc36690ba53f959df34948b60f07e"
+  },
+  "claims": [
+    "S-PROOF-ARCH"
+  ],
+  "command": [
+    "tools/gates/run_risc0_proof_claim.py",
+    "--claim",
+    "S-PROOF-ARCH"
+  ],
+  "evidence_sha256": "e66bc03a7aa106c44a906d522d61c2c3649214c9410e001296fcebde059ecc06",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "risc0-proof-s-proof-arch",
+  "limitations": [
+    "Profile binding is implemented, but cross-hardware conformance for every vector and profile tolerance has not been run on independent hardware."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "Cargo.lock": "5601740bd8b424ff521ca4e087ab50b1a68ffa6cb5579f8a2ea93b95a6ca4968",
+    "Cargo.toml": "a6fb49c0f93418aab06a7b7869d1b63ca9e2d91d85abf2c5b178e21eae5b26c5",
+    "crates/noos-jet/Cargo.toml": "fb787eab322d76feca51801ad2e2086f6291b5753a2012e253b79a4623e280d6",
+    "crates/noos-jet/risc0-methods/Cargo.lock": "768b75541036f180484e1c1ed363803f21a5804492f0cd6f1be72e76cbb685f7",
+    "crates/noos-jet/risc0-methods/Cargo.toml": "b01d38f8069907b1e9800965cc88a782bceecadc104f047e33e39390e2e9108d",
+    "crates/noos-jet/risc0-methods/artifacts/jet_proof.bin": "59380a0e2bb19566aa9c7e90eabd56a89729ca53a0eb0a4d3cb9f0f075e044ce",
+    "crates/noos-jet/risc0-methods/build.rs": "f72260794d219992f36763f7646db0a84250d1bd629c18f6308dcca566c3a42e",
+    "crates/noos-jet/risc0-methods/guest/Cargo.toml": "a69b6d2134b0505856d7d0602cc6511108c78cd23fac38bfb7ffc22d3f405cda",
+    "crates/noos-jet/risc0-methods/guest/src/main.rs": "ae119441cbdf17d963ecbb47d7febd5c9cbf444b25f210a801490feaa0ed6685",
+    "crates/noos-jet/risc0-methods/rebuild-guest.ps1": "6667f6f0ebea742f84eedaaa6b7b5a75b991b66d56fe2b32ec11d1333ad563f2",
+    "crates/noos-jet/risc0-methods/shared/Cargo.toml": "558117f59e61b4989437bf1ba4736589ae626114b88f4018f35308ea2914d31e",
+    "crates/noos-jet/risc0-methods/shared/src/lib.rs": "b86d7e26386279342228022b7df1b63b71eafd49e25dde9e74c0cef1881eaae6",
+    "crates/noos-jet/risc0-methods/src/lib.rs": "898c386d8c863b7fd78c1d0560c55b9612563eea3945b251cb1b26313992e816",
+    "crates/noos-jet/src/architecture.rs": "d6f40820283fcd2d3812114b4e6c6560d50c44ab5afaaa14ed7539887decca2d",
+    "crates/noos-jet/src/bin/jet-risc0-vec.rs": "38e73568ea62e0671379b99e51720595cbdbadd6e1a5c86fdaba17cf4427e4fa",
+    "crates/noos-jet/src/lib.rs": "b4d96be481d260b737c33f5d5c76fdd20d91dddfb0cb710a639d5f813db7099c",
+    "crates/noos-jet/src/proof.rs": "4394e677829010f3fea9fd86a0eb999f761f75e8eb71ea2239c4e5454cc6a35a",
+    "crates/noos-jet/src/risc0.rs": "60a0f9749b3a90b07b6030d69eaa383a99f0ef478c34cdfaebfb78a3156e2b55",
+    "crates/noos-jet/src/rv32.rs": "d382c0f941fe0b639f23219d382c7c6eee16bf7fa111041e8668e4321d644ffe",
+    "crates/noos-jet/src/tests.rs": "8e01139c48c83f1305003beae762e1e5bf90563d54d8424067264b2a60fd4fa5",
+    "crates/noos-jet/src/vectors.rs": "cdfc007ab4fc42e1e86a9f499406d11aaf63d519d0ab6a80cfd6cf38e42e83b7",
+    "protocol/vectors/jet/jet-risc0-proof-v1.json": "fce10ed386b653b6707e724259db9c8ab309a200b83c52b72692b8f7e4c3618c",
+    "tools/gates/run_risc0_proof_claim.py": "7ed5a0d8e6ef7fefd5930cb470b12bfda5c24363f040b5928e0d21da12a98226"
+  }
+}

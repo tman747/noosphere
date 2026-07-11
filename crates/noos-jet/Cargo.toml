@@ -10,6 +10,22 @@ description = "NOOSPHERE jet system (M-JET / A-JET-CERT): certified jet registry
 [dependencies]
 noos-grain = { path = "../noos-grain" }
 blake3 = "1.8"
+noos-jet-risc0-methods = { path = "risc0-methods", optional = true }
+noos-jet-risc0-shared = { path = "risc0-methods/shared", optional = true }
+risc0-zkvm = { version = "=3.0.5", optional = true, default-features = false, features = ["prove", "disable-dev-mode"] }
+
+[features]
+default = []
+risc0 = [
+  "dep:noos-jet-risc0-methods",
+  "dep:noos-jet-risc0-shared",
+  "dep:risc0-zkvm",
+]
+
+[[bin]]
+name = "jet-risc0-vec"
+path = "src/bin/jet-risc0-vec.rs"
+required-features = ["risc0"]
 
 [dev-dependencies]
 

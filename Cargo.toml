@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/*"]
+exclude = ["crates/noos-jet/risc0-methods"]
 
 [workspace.package]
 edition = "2021"

@@ -3,13 +3,15 @@
 //!
 //! A [`ProofRequest`] names WHAT must be proven — an exact [`Rv32Image`]
 //! image id, an input commitment, and a journal commitment — independently
-//! of HOW it is proven. [`ReceiptVerifier`] is the how: the production
-//! target is a succinct recursive verifier (external toolchain; see the
-//! M-RECURSIVE-VERIFIER registry row), and the local deterministic backing
-//! is [`LocalExecutionChecker`], which re-executes the pinned image and
-//! rejects on any mismatch. Re-execution is exact, so it has zero false
+//! of HOW it is proven. [`LocalExecutionChecker`] is the deterministic
+//! non-production implementation of [`ReceiptVerifier`]: it re-executes the
+//! pinned image and rejects on any mismatch. Re-execution is exact, so it has zero false
 //! accepts by construction — but it is NOT succinct and earns no
-//! compression claim. A receipt that fails verification is worthless
+//! compression claim. The feature-gated `crate::risc0` module is deliberately
+//! separate: it proves and verifies real composite or succinct RISC Zero
+//! receipts with additional certificate and chain/domain/profile bindings.
+//! Neither backend supplies the independent dual-verifier campaign required
+//! by M-RECURSIVE-VERIFIER. A receipt that fails verification is worthless
 //! everywhere downstream: no proofpower-style credit may ever attach to it.
 
 use core::fmt;

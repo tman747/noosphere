@@ -8,6 +8,11 @@ use core::cell::Cell;
 
 use noos_grain::{encode_noun, eval, eval_with_jets, GrainTrap, JetHook, Meter, Noun};
 
+use crate::architecture::{
+    artifact_id, work_commit, CommitmentDeclaration, CommitmentError, ProofArchitectureManifest,
+};
+#[cfg(feature = "risc0")]
+use crate::cert::JetId;
 use crate::cert::{jet_id, semantics_hash, JetCert};
 use crate::corpus::{self, SplitMix64};
 use crate::jets::{
@@ -742,4 +747,249 @@ fn vector_json_names_are_unique() {
             );
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Proof architecture and exact commitment reference mechanics
+// ---------------------------------------------------------------------------
+
+fn proof_architecture() -> ProofArchitectureManifest {
+    ProofArchitectureManifest {
+        numeric_profile: [0x11; 32],
+        checkpoint: [0x22; 32],
+        activation_commitment: [0x33; 32],
+        projection_hook: [0x44; 32],
+        moe_route_policy: [0x55; 32],
+        tolerance_ppm: 250,
+    }
+}
+
+#[test]
+fn proof_architecture_profile_binds_every_declared_choice() {
+    let manifest = proof_architecture();
+    let id = manifest.profile_id();
+    let mutations = [
+        ProofArchitectureManifest {
+            numeric_profile: [0x12; 32],
+            ..manifest
+        },
+        ProofArchitectureManifest {
+            checkpoint: [0x23; 32],
+            ..manifest
+        },
+        ProofArchitectureManifest {
+            activation_commitment: [0x34; 32],
+            ..manifest
+        },
+        ProofArchitectureManifest {
+            projection_hook: [0x45; 32],
+            ..manifest
+        },
+        ProofArchitectureManifest {
+            moe_route_policy: [0x56; 32],
+            ..manifest
+        },
+        ProofArchitectureManifest {
+            tolerance_ppm: 251,
+            ..manifest
+        },
+    ];
+    for mutation in mutations {
+        assert_ne!(mutation.profile_id(), id);
+    }
+}
+
+#[test]
+fn cpu_commitment_reference_binds_artifact_challenge_profile_and_fused_relation() {
+    let artifact = artifact_id(b"canonical tensor bytes");
+    let profile_id = proof_architecture().profile_id();
+    let challenge = [0x66; 32];
+    let trace_root = [0x77; 32];
+    let relation = [0x88; 32];
+    let mut declaration = CommitmentDeclaration {
+        artifact_id: artifact,
+        profile_id,
+        challenge,
+        trace_root,
+        fused_relation_id: relation,
+        work_commit: work_commit(artifact, profile_id, challenge, trace_root, relation),
+    };
+    assert_eq!(declaration.validate(), Ok(()));
+    declaration.trace_root[0] ^= 1;
+    assert_eq!(
+        declaration.validate(),
+        Err(CommitmentError::WorkCommitMismatch)
+    );
+    assert_ne!(
+        artifact_id(b"canonical tensor bytes"),
+        artifact_id(b"canonical tensor bytes\0")
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Feature-gated real RISC Zero backend
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "risc0")]
+fn risc0_context() -> crate::risc0::Risc0ProofContext {
+    crate::risc0::Risc0ProofContext {
+        chain_id: [0x91; 32],
+        domain: [0x92; 32],
+        profile_id: proof_architecture().profile_id(),
+    }
+}
+
+#[cfg(feature = "risc0")]
+fn certified_inc_risc0_input(
+    leaves: &[u32],
+) -> (JetRegistry, crate::risc0::Risc0ProofInput, Rv32Image, JetId) {
+    let registry = vectors::shipped_registry();
+    let id = jet_id(&semantics_hash(&inc_formula()), INC_IMPL_TAG);
+    let image = lower(&inc_formula(), 1).unwrap();
+    let input = crate::risc0::Risc0ProofInput::certified(
+        &registry,
+        &id,
+        &image,
+        leaves,
+        risc0_context(),
+        RV32_MAX_STEPS,
+    )
+    .unwrap();
+    (registry, input, image, id)
+}
+
+#[cfg(feature = "risc0")]
+#[test]
+fn risc0_builder_rejects_uncertified_jet_and_image_substitution() {
+    let registry = vectors::shipped_registry();
+    let unknown = JetId([0xED; 32]);
+    let image = lower(&inc_formula(), 1).unwrap();
+    assert_eq!(
+        crate::risc0::Risc0ProofInput::certified(
+            &registry,
+            &unknown,
+            &image,
+            &[41],
+            risc0_context(),
+            RV32_MAX_STEPS,
+        ),
+        Err(crate::risc0::Risc0Error::UncertifiedJet)
+    );
+    let inc_id = jet_id(&semantics_hash(&inc_formula()), INC_IMPL_TAG);
+    let substitute = lower(&c2(a(1), a(42)), 1).unwrap();
+    assert_eq!(
+        crate::risc0::Risc0ProofInput::certified(
+            &registry,
+            &inc_id,
+            &substitute,
+            &[41],
+            risc0_context(),
+            RV32_MAX_STEPS,
+        ),
+        Err(crate::risc0::Risc0Error::ImageSubstitution)
+    );
+}
+
+#[cfg(feature = "risc0")]
+#[test]
+fn risc0_guest_execution_matches_host_rv32_and_interpreted_fallback() {
+    for leaf in [41, u32::MAX] {
+        let (_, input, image, _) = certified_inc_risc0_input(&[leaf]);
+        let decoded =
+            noos_jet_risc0_shared::ProofInput::decode(&input.canonical_guest_input()).unwrap();
+        let guest_claim = decoded.execute().unwrap();
+        assert_eq!(&guest_claim, &input.request().claim);
+        let host = execute(&image, &[leaf], RV32_MAX_STEPS).unwrap();
+        assert_eq!(
+            (guest_claim.status, guest_claim.value, guest_claim.steps),
+            (host.status, host.value, host.steps)
+        );
+        let mut meter = Meter::new(1_000_000, 1_000_000);
+        let interpreted = eval(1, subject_noun(&[leaf]), inc_formula(), &mut meter).unwrap();
+        if guest_claim.status == 0 {
+            assert_eq!(interpreted, a(u64::from(guest_claim.value)));
+        } else {
+            assert_eq!(guest_claim.status, 1);
+            assert_eq!(interpreted, a(u64::from(u32::MAX) + 1));
+        }
+    }
+}
+
+#[cfg(feature = "risc0")]
+#[test]
+fn real_risc0_cpu_receipt_verifies_and_all_binding_falsifiers_reject() {
+    let (registry, input, _, _) = certified_inc_risc0_input(&[41]);
+    let verifier = crate::risc0::Risc0Verifier::new(&registry, risc0_context());
+    let (request, receipt) = crate::risc0::prove_risc0_cpu(&input).unwrap();
+    assert_eq!(verifier.verify(&request, &receipt), Ok(()));
+
+    let mut tampered_receipt = receipt.clone();
+    crate::risc0::tamper_receipt_journal(&mut tampered_receipt);
+    assert_eq!(
+        verifier.verify(&request, &tampered_receipt),
+        Err(crate::risc0::Risc0Error::ReceiptVerification)
+    );
+
+    let mut image_substitution = request.clone();
+    image_substitution.claim.rv32_image_id[0] ^= 1;
+    assert_eq!(
+        verifier.verify(&image_substitution, &receipt),
+        Err(crate::risc0::Risc0Error::JournalMismatch)
+    );
+
+    let mut journal_splice = request.clone();
+    journal_splice.claim.value ^= 1;
+    journal_splice.claim.journal_commit[0] ^= 1;
+    assert_eq!(
+        verifier.verify(&journal_splice, &receipt),
+        Err(crate::risc0::Risc0Error::JournalMismatch)
+    );
+
+    let mut wrong_method = request.clone();
+    wrong_method.method_id[0] ^= 1;
+    assert_eq!(
+        verifier.verify(&wrong_method, &receipt),
+        Err(crate::risc0::Risc0Error::MethodImageMismatch)
+    );
+
+    let mut replay = request.clone();
+    replay.claim.context.chain_id[0] ^= 1;
+    assert_eq!(
+        verifier.verify(&replay, &receipt),
+        Err(crate::risc0::Risc0Error::ContextMismatch)
+    );
+
+    let mut wrong_domain = request.clone();
+    wrong_domain.claim.context.domain[0] ^= 1;
+    assert_eq!(
+        verifier.verify(&wrong_domain, &receipt),
+        Err(crate::risc0::Risc0Error::ContextMismatch)
+    );
+
+    let mut wrong_profile = request;
+    wrong_profile.claim.context.profile_id[0] ^= 1;
+    assert_eq!(
+        verifier.verify(&wrong_profile, &receipt),
+        Err(crate::risc0::Risc0Error::ContextMismatch)
+    );
+}
+
+#[cfg(feature = "risc0")]
+#[test]
+fn real_risc0_recursive_succinct_receipt_verifies() {
+    let (registry, input, _, _) = certified_inc_risc0_input(&[41]);
+    let verifier = crate::risc0::Risc0Verifier::new(&registry, risc0_context());
+    let (request, receipt) = crate::risc0::prove_risc0_succinct_cpu(&input).unwrap();
+    assert!(receipt.is_succinct());
+    assert_eq!(verifier.verify(&request, &receipt), Ok(()));
+}
+
+#[cfg(feature = "risc0")]
+#[test]
+fn committed_risc0_vector_is_byte_exact() {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../protocol/vectors/jet/jet-risc0-proof-v1.json");
+    let committed = std::fs::read(&path)
+        .unwrap_or_else(|error| panic!("missing committed vector {}: {error}", path.display()));
+    assert_eq!(committed, vectors::risc0_json().as_bytes());
 }

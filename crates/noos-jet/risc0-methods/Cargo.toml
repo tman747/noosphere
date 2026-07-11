@@ -1,0 +1,16 @@
+[package]
+name = "noos-jet-risc0-methods"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[workspace]
+resolver = "2"
+members = ["guest", "shared"]
+
+[target.'cfg(unix)'.build-dependencies]
+risc0-build = { version = "=3.0.5", features = ["docker"] }
+
+[package.metadata.risc0]
+methods = ["guest"]
