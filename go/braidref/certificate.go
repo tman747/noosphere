@@ -251,11 +251,11 @@ func (c *FinalityCertificateV1) SignerIndices(memberCount int) ([]int, error) {
 type CertErrorClass string
 
 const (
-	CertBitmapOutOfRange      CertErrorClass = "bitmap_out_of_range"
-	CertEmptySignerSet        CertErrorClass = "empty_signer_set"
-	CertMembershipMismatch    CertErrorClass = "membership_root_mismatch"
-	CertWeightSumMismatch     CertErrorClass = "weight_sum_mismatch"
-	CertAggregateInvalid      CertErrorClass = "aggregate_invalid"
+	CertBitmapOutOfRange   CertErrorClass = "bitmap_out_of_range"
+	CertEmptySignerSet     CertErrorClass = "empty_signer_set"
+	CertMembershipMismatch CertErrorClass = "membership_root_mismatch"
+	CertWeightSumMismatch  CertErrorClass = "weight_sum_mismatch"
+	CertAggregateInvalid   CertErrorClass = "aggregate_invalid"
 )
 
 // CertError is a typed certificate rejection.

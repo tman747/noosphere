@@ -10,7 +10,7 @@ import (
 
 // Braid vector runners (protocol/vectors/braid/).
 
-func runBraidHeader(cases []vecCase) []CaseResult {
+func runBraidHeader(_ *runCtx, cases []vecCase) []CaseResult {
 	out := make([]CaseResult, 0, len(cases))
 	for i := range cases {
 		c := &cases[i]
@@ -49,7 +49,7 @@ func runBraidHeader(cases []vecCase) []CaseResult {
 	return out
 }
 
-func runBraidValidation(cases []vecCase) []CaseResult {
+func runBraidValidation(_ *runCtx, cases []vecCase) []CaseResult {
 	out := make([]CaseResult, 0, len(cases))
 	for i := range cases {
 		c := &cases[i]
@@ -76,7 +76,7 @@ func runBraidValidation(cases []vecCase) []CaseResult {
 	return out
 }
 
-func runBraidCommitment(cases []vecCase) []CaseResult {
+func runBraidCommitment(_ *runCtx, cases []vecCase) []CaseResult {
 	out := make([]CaseResult, 0, len(cases))
 	for i := range cases {
 		c := &cases[i]
@@ -108,7 +108,7 @@ func runBraidCommitment(cases []vecCase) []CaseResult {
 // runBraidForkChoice: bytes = two 80-byte branch tuples (finalized_epoch
 // u64 || justified_epoch u64 || work u256 LE || block_hash 32); expected
 // names the winner ("a" = first).
-func runBraidForkChoice(cases []vecCase) []CaseResult {
+func runBraidForkChoice(_ *runCtx, cases []vecCase) []CaseResult {
 	out := make([]CaseResult, 0, len(cases))
 	for i := range cases {
 		c := &cases[i]
@@ -146,7 +146,7 @@ func runBraidForkChoice(cases []vecCase) []CaseResult {
 	return out
 }
 
-func runBraidBody(cases []vecCase) []CaseResult {
+func runBraidBody(_ *runCtx, cases []vecCase) []CaseResult {
 	out := make([]CaseResult, 0, len(cases))
 	for i := range cases {
 		c := &cases[i]

@@ -24,10 +24,10 @@ const (
 	groundTicketCtx    = "NOOS/GROUND/TICKET/V1"
 
 	// Frozen [ground] constants.
-	SlotMS                = 6000
-	EpochLength           = 256
-	MaxSlotSkip           = 20
-	MedianTimePastBlocks  = 11
+	SlotMS                 = 6000
+	EpochLength            = 256
+	MaxSlotSkip            = 20
+	MedianTimePastBlocks   = 11
 	DevnetMaxFutureDriftMS = 12000
 )
 

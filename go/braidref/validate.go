@@ -12,9 +12,9 @@ import "fmt"
 type ValidationErrorClass string
 
 const (
-	ErrWrongProtocolIdentity  ValidationErrorClass = "wrong_protocol_identity"
-	ErrWrongGroundProfile     ValidationErrorClass = "wrong_ground_profile"
-	ErrLoomCreditDisabled     ValidationErrorClass = "loom_credit_disabled"
+	ErrWrongProtocolIdentity   ValidationErrorClass = "wrong_protocol_identity"
+	ErrWrongGroundProfile      ValidationErrorClass = "wrong_ground_profile"
+	ErrLoomCreditDisabled      ValidationErrorClass = "loom_credit_disabled"
 	ErrJustifiedBelowFinalized ValidationErrorClass = "justified_below_finalized"
 )
 

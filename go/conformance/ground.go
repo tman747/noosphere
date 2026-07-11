@@ -9,7 +9,7 @@ import (
 
 // Ground vector runners (protocol/vectors/ground/).
 
-func runGroundTicket(cases []vecCase) []CaseResult {
+func runGroundTicket(_ *runCtx, cases []vecCase) []CaseResult {
 	out := make([]CaseResult, 0, len(cases))
 	for i := range cases {
 		c := &cases[i]
@@ -64,7 +64,7 @@ func runGroundTicket(cases []vecCase) []CaseResult {
 	return out
 }
 
-func runPulse(cases []vecCase) []CaseResult {
+func runPulse(_ *runCtx, cases []vecCase) []CaseResult {
 	out := make([]CaseResult, 0, len(cases))
 	for i := range cases {
 		c := &cases[i]

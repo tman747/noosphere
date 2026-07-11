@@ -13,7 +13,7 @@ import (
 // runLumenSMT: bytes = expected_root(32) || u32 count || (key(32) ||
 // u32 len || value)*; rebuild the tree and compare roots. Negative cases
 // carry a claimed root the honest rebuild must NOT reproduce.
-func runLumenSMT(cases []vecCase) []CaseResult {
+func runLumenSMT(_ *runCtx, cases []vecCase) []CaseResult {
 	out := make([]CaseResult, 0, len(cases))
 	for i := range cases {
 		c := &cases[i]
@@ -63,7 +63,7 @@ func runLumenSMT(cases []vecCase) []CaseResult {
 
 // runLumenIDs: bytes = claimed_id(32) || preimage; the preimage layout
 // depends on id_kind. Recompute and compare; negatives must not match.
-func runLumenIDs(cases []vecCase) []CaseResult {
+func runLumenIDs(_ *runCtx, cases []vecCase) []CaseResult {
 	out := make([]CaseResult, 0, len(cases))
 	for i := range cases {
 		c := &cases[i]
@@ -132,7 +132,7 @@ func runLumenIDs(cases []vecCase) []CaseResult {
 
 // runLumenTx: envelope decode law. Positives roundtrip byte-identically;
 // negatives reject. Two named cases decode standalone sub-objects.
-func runLumenTx(cases []vecCase) []CaseResult {
+func runLumenTx(_ *runCtx, cases []vecCase) []CaseResult {
 	out := make([]CaseResult, 0, len(cases))
 	for i := range cases {
 		c := &cases[i]

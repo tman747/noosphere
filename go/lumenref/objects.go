@@ -291,7 +291,7 @@ func decodeTransactionFields(r *codec.Reader) (*TransactionV1, error) {
 	if err = r.Tag(9); err != nil {
 		return nil, err
 	}
-	nAcc, err := r.ListLen(MaxObjectAccess, 33)
+	nAcc, err := r.ListLen(MaxObjectAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +306,7 @@ func decodeTransactionFields(r *codec.Reader) (*TransactionV1, error) {
 	if err = r.Tag(10); err != nil {
 		return nil, err
 	}
-	nAct, err := r.ListLen(MaxActions, 4)
+	nAct, err := r.ListLen(MaxActions)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +321,7 @@ func decodeTransactionFields(r *codec.Reader) (*TransactionV1, error) {
 	if err = r.Tag(11); err != nil {
 		return nil, err
 	}
-	nOut, err := r.ListLen(MaxOutputs, 2)
+	nOut, err := r.ListLen(MaxOutputs)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +349,7 @@ func decodeHash32List(r *codec.Reader, tag uint16, max uint32) ([][32]byte, erro
 	if err := r.Tag(tag); err != nil {
 		return nil, err
 	}
-	n, err := r.ListLen(max, 32)
+	n, err := r.ListLen(max)
 	if err != nil {
 		return nil, err
 	}
@@ -520,7 +520,7 @@ func DecodeWitnessesFrom(r *codec.Reader) (*TransactionWitnessesV1, error) {
 	if err := r.Tag(1); err != nil {
 		return nil, err
 	}
-	n, err := r.ListLen(MaxIntents, 2)
+	n, err := r.ListLen(MaxIntents)
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +535,7 @@ func DecodeWitnessesFrom(r *codec.Reader) (*TransactionWitnessesV1, error) {
 	if err := r.Tag(2); err != nil {
 		return nil, err
 	}
-	m, err := r.ListLen(MaxLockReveals, 4)
+	m, err := r.ListLen(MaxLockReveals)
 	if err != nil {
 		return nil, err
 	}

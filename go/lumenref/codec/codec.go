@@ -191,10 +191,14 @@ func (r *Reader) VarBytes(max uint32) ([]byte, error) {
 	return r.Fixed(int(n))
 }
 
-// ListLen reads a canonical u32 collection count bounded by max, validating
-// count*elemMinBytes against the remaining input before any allocation
-// (the byte-floor law: a forged count must fail before the caller loops).
-func (r *Reader) ListLen(max uint32, elemMinBytes int) (uint32, error) {
+// ListLen reads a canonical u32 collection count bounded by max. The
+// byte-floor law fires BEFORE any allocation: a count exceeding the
+// remaining input at one byte per element is a forged count and rejects
+// as length_exceeds_bound. A count that passes the floor but whose
+// elements outrun the input rejects later, per element, as truncated
+// (the codec vectors pin both classes: list_huge_count_no_alloc vs
+// list_element_truncated).
+func (r *Reader) ListLen(max uint32) (uint32, error) {
 	n, err := r.U32()
 	if err != nil {
 		return 0, err
@@ -202,9 +206,9 @@ func (r *Reader) ListLen(max uint32, elemMinBytes int) (uint32, error) {
 	if n > max {
 		return 0, errf(ErrLengthExceedsBound, "count %d > max %d", n, max)
 	}
-	if elemMinBytes > 0 && uint64(n)*uint64(elemMinBytes) > uint64(r.Remaining()) {
+	if uint64(n) > uint64(r.Remaining()) {
 		return 0, errf(ErrLengthExceedsBound,
-			"count %d needs >= %d bytes, %d remain", n, uint64(n)*uint64(elemMinBytes), r.Remaining())
+			"count %d exceeds %d remaining bytes", n, r.Remaining())
 	}
 	return n, nil
 }
@@ -311,7 +315,7 @@ func NewWriter() *Writer { return &Writer{} }
 
 func (w *Writer) Bytes() []byte { return w.buf }
 
-func (w *Writer) U8(v byte)   { w.buf = append(w.buf, v) }
+func (w *Writer) U8(v byte) { w.buf = append(w.buf, v) }
 func (w *Writer) U16(v uint16) {
 	w.buf = binary.LittleEndian.AppendUint16(w.buf, v)
 }

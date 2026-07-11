@@ -26,15 +26,15 @@ const (
 
 // WitnessBond is the registration object (witness-v1.md §1.1).
 type WitnessBond struct {
-	ValidatorID                 [32]byte
-	ConsensusBLSKey             [48]byte
-	WithdrawalKey               [32]byte
-	NetworkEndpointsCommitment  [32]byte
-	FailureDomains              []byte
-	BondedNoos                  codec.U128
-	ActivationEpoch             uint64
-	ExitEpoch                   uint64
-	ProofpowerAccount           [32]byte
+	ValidatorID                [32]byte
+	ConsensusBLSKey            [48]byte
+	WithdrawalKey              [32]byte
+	NetworkEndpointsCommitment [32]byte
+	FailureDomains             []byte
+	BondedNoos                 codec.U128
+	ActivationEpoch            uint64
+	ExitEpoch                  uint64
+	ProofpowerAccount          [32]byte
 }
 
 // DecodeBondFields decodes one canonical WitnessBond from the reader

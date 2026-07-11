@@ -21,19 +21,19 @@ import (
 
 // Frozen v0 limits (weft-v0.md §2).
 const (
-	weftV0Version             = 0
-	maxProfileNameBytes       = 32
-	maxTargetTripleBytes      = 64
-	maxTypeSignatureBytes     = 4096
-	maxSizeVars               = 8
-	maxSizeVarNameBytes       = 16
-	maxCostBranches           = 16
-	maxCostTerms              = 64
-	maxCostTrials             = 16
-	maxEmbeddedFormulaBytes   = 65536
-	maxTrialSubjectBytes      = 65536
-	maxProfileRefs            = 8
-	maxObligationRefs         = 32
+	weftV0Version           = 0
+	maxProfileNameBytes     = 32
+	maxTargetTripleBytes    = 64
+	maxTypeSignatureBytes   = 4096
+	maxSizeVars             = 8
+	maxSizeVarNameBytes     = 16
+	maxCostBranches         = 16
+	maxCostTerms            = 64
+	maxCostTrials           = 16
+	maxEmbeddedFormulaBytes = 65536
+	maxTrialSubjectBytes    = 65536
+	maxProfileRefs          = 8
+	maxObligationRefs       = 32
 )
 
 // Weft object kinds as named by the vector files.
@@ -163,7 +163,7 @@ func decodeCostCertificate(r *codec.Reader) error {
 	f.step(1, func() (e error) { _, e = r.Hash32(); return })
 	f.step(2, func() (e error) { _, e = r.U32(); return })
 	f.step(3, func() error { // size_vars
-		n, e := r.ListLen(maxSizeVars, 4+8)
+		n, e := r.ListLen(maxSizeVars)
 		if e != nil {
 			return e
 		}
@@ -178,12 +178,12 @@ func decodeCostCertificate(r *codec.Reader) error {
 		return nil
 	})
 	f.step(4, func() error { // branches
-		n, e := r.ListLen(maxCostBranches, 4)
+		n, e := r.ListLen(maxCostBranches)
 		if e != nil {
 			return e
 		}
 		for range n {
-			m, e := r.ListLen(maxCostTerms, 8+4)
+			m, e := r.ListLen(maxCostTerms)
 			if e != nil {
 				return e
 			}
@@ -200,12 +200,12 @@ func decodeCostCertificate(r *codec.Reader) error {
 	})
 	f.step(5, func() (e error) { _, e = r.VarBytes(maxEmbeddedFormulaBytes); return })
 	f.step(6, func() error { // trials
-		n, e := r.ListLen(maxCostTrials, 4+4)
+		n, e := r.ListLen(maxCostTrials)
 		if e != nil {
 			return e
 		}
 		for range n {
-			m, e := r.ListLen(maxSizeVars, 8)
+			m, e := r.ListLen(maxSizeVars)
 			if e != nil {
 				return e
 			}
@@ -234,7 +234,7 @@ func decodeMeaningContract(r *codec.Reader) error {
 	f.step(4, func() (e error) { _, e = r.Hash32(); return })
 	f.step(5, func() (e error) { _, e = r.VarBytes(maxTypeSignatureBytes); return })
 	f.step(6, func() error {
-		n, e := r.ListLen(maxProfileRefs, 32)
+		n, e := r.ListLen(maxProfileRefs)
 		if e != nil {
 			return e
 		}
@@ -248,7 +248,7 @@ func decodeMeaningContract(r *codec.Reader) error {
 	f.step(7, func() (e error) { _, e = r.Hash32(); return })
 	f.step(8, func() (e error) { _, e = r.Hash32(); return })
 	f.step(9, func() error {
-		n, e := r.ListLen(maxObligationRefs, 32)
+		n, e := r.ListLen(maxObligationRefs)
 		if e != nil {
 			return e
 		}

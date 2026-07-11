@@ -29,10 +29,10 @@ type VerifierID uint32
 // (PROPOSED-G0) and MUST be re-frozen against the registry table before
 // any cross-client differential run of leaf receipts.
 const (
-	VerifierEnvelopeV1          VerifierID = 1
-	VerifierRisc0FreivaldsLeaf  VerifierID = 2
-	VerifierRisc0NonlinearLeaf  VerifierID = 3
-	VerifierSpecializedChunkV1  VerifierID = 4
+	VerifierEnvelopeV1         VerifierID = 1
+	VerifierRisc0FreivaldsLeaf VerifierID = 2
+	VerifierRisc0NonlinearLeaf VerifierID = 3
+	VerifierSpecializedChunkV1 VerifierID = 4
 )
 
 // LeafKind is envelope field 2: 0 = GEMM Freivalds, 1 = nonlinear
@@ -40,9 +40,9 @@ const (
 type LeafKind uint8
 
 const (
-	LeafGEMMFreivalds     LeafKind = 0
+	LeafGEMMFreivalds      LeafKind = 0
 	LeafNonlinearRecompute LeafKind = 1
-	leafKindCount                  = 2
+	leafKindCount                   = 2
 )
 
 // LeafReceiptEnvelope is the fixed canonical envelope (nel-wire.md): the

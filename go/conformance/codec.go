@@ -55,7 +55,7 @@ func decodeDemo(b []byte) ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-func runCodec(cases []vecCase) []CaseResult {
+func runCodec(_ *runCtx, cases []vecCase) []CaseResult {
 	out := make([]CaseResult, 0, len(cases))
 	for i := range cases {
 		c := &cases[i]
@@ -118,7 +118,7 @@ func runCodecCase(c *vecCase) CaseResult {
 		})
 	case strings.HasPrefix(name, "list_u16_"):
 		err = whole(func(r *codec.Reader) error {
-			n, e := r.ListLen(8, 2)
+			n, e := r.ListLen(8)
 			if e != nil {
 				return e
 			}
@@ -133,7 +133,7 @@ func runCodecCase(c *vecCase) CaseResult {
 		err = whole(func(r *codec.Reader) error {
 			// ctx: get_list<u64> max=2^32-1 — only the byte-floor
 			// check can stop the forged count.
-			n, e := r.ListLen(^uint32(0), 8)
+			n, e := r.ListLen(^uint32(0))
 			if e != nil {
 				return e
 			}
@@ -147,7 +147,7 @@ func runCodecCase(c *vecCase) CaseResult {
 	case strings.HasPrefix(name, "list_"):
 		err = whole(func(r *codec.Reader) error {
 			// ctx: get_list<u64> max=8
-			n, e := r.ListLen(8, 8)
+			n, e := r.ListLen(8)
 			if e != nil {
 				return e
 			}

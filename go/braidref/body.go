@@ -109,7 +109,7 @@ func DecodeBody(b []byte) (*BlockBodyV1, error) {
 	if err := r.Tag(1); err != nil {
 		return nil, err
 	}
-	n, err := r.ListLen(MaxBodyTransactions, 2)
+	n, err := r.ListLen(MaxBodyTransactions)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func DecodeBody(b []byte) (*BlockBodyV1, error) {
 	if err := r.Tag(2); err != nil {
 		return nil, err
 	}
-	if n, err = r.ListLen(MaxBodyWitnesses, 2); err != nil {
+	if n, err = r.ListLen(MaxBodyWitnesses); err != nil {
 		return nil, err
 	}
 	for range n {
@@ -136,7 +136,7 @@ func DecodeBody(b []byte) (*BlockBodyV1, error) {
 	if err := r.Tag(3); err != nil {
 		return nil, err
 	}
-	if n, err = r.ListLen(MaxBodySystemTransitions, 4); err != nil {
+	if n, err = r.ListLen(MaxBodySystemTransitions); err != nil {
 		return nil, err
 	}
 	for range n {
@@ -149,7 +149,7 @@ func DecodeBody(b []byte) (*BlockBodyV1, error) {
 	if err := r.Tag(4); err != nil {
 		return nil, err
 	}
-	if n, err = r.ListLen(MaxBodyCertificates, 2); err != nil {
+	if n, err = r.ListLen(MaxBodyCertificates); err != nil {
 		return nil, err
 	}
 	for range n {
@@ -168,13 +168,13 @@ func DecodeBody(b []byte) (*BlockBodyV1, error) {
 	if err := r.Tag(6); err != nil {
 		return nil, err
 	}
-	if _, err = r.ListLen(MaxBodyLoomClaims, 1); err != nil {
+	if _, err = r.ListLen(MaxBodyLoomClaims); err != nil {
 		return nil, err
 	}
 	if err := r.Tag(7); err != nil {
 		return nil, err
 	}
-	if n, err = r.ListLen(MaxBodyBlobDescriptors, 2); err != nil {
+	if n, err = r.ListLen(MaxBodyBlobDescriptors); err != nil {
 		return nil, err
 	}
 	for range n {
