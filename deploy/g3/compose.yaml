@@ -1,0 +1,39 @@
+services:
+  node:
+    image: ${NOOS_NODE_IMAGE:?exact immutable node image digest required}
+    read_only: true
+    restart: unless-stopped
+    environment:
+      NOOS_DESCRIPTOR: /run/noos/descriptor.json
+      NOOS_GENESIS: /run/noos/genesis.bin
+      NOOS_STATE_ROOT: /var/lib/noosphere
+    volumes:
+      - ${NOOS_DESCRIPTOR:?descriptor path required}:/run/noos/descriptor.json:ro
+      - ${NOOS_GENESIS:?genesis path required}:/run/noos/genesis.bin:ro
+      - node-state:/var/lib/noosphere
+    ports:
+      - "${NOOS_PUBLIC_RPC_BIND:?public RPC bind required}:9650:9650"
+      - "${NOOS_PUBLIC_P2P_BIND:?public P2P bind required}:9651:9651"
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:?immutable Prometheus image digest required}
+    read_only: true
+    restart: unless-stopped
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=120d"]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./g3-alerts.yml:/etc/prometheus/g3-alerts.yml:ro
+      - prometheus-state:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+  verifier:
+    image: ${NOOS_G3_VERIFIER_IMAGE:?exact immutable verifier image digest required}
+    read_only: true
+    user: noos-g3
+    volumes:
+      - ${NOOS_G3_MANIFEST:?active manifest required}:/evidence/manifest.json:ro
+      - ${NOOS_G3_LEDGER:?append-only ledger required}:/evidence/checkpoints.ndjson:ro
+    command: ["verify", "--manifest", "/evidence/manifest.json", "--ledger", "/evidence/checkpoints.ndjson", "--live"]
+    restart: "no"
+volumes:
+  node-state: {}
+  prometheus-state: {}

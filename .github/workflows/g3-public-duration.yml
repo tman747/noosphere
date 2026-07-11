@@ -1,0 +1,40 @@
+name: G3 public-duration verifier
+
+on:
+  pull_request:
+    paths:
+      - "tools/g3/**"
+      - "deploy/g3/**"
+      - "evidence/g3/**"
+      - ".github/workflows/g3-public-duration.yml"
+  push:
+    paths:
+      - "tools/g3/**"
+      - "deploy/g3/**"
+      - "evidence/g3/**"
+      - ".github/workflows/g3-public-duration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verifier-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run adversarial verifier tests
+        run: python -m unittest -v tools/g3/test_public_duration.py
+      - name: Confirm the checked-in template is not started
+        run: >-
+          python tools/g3/public_duration.py verify
+          --manifest deploy/g3/public-testnet.manifest.template.json
+          --ledger evidence/g3/checkpoints.ndjson
+      - name: Verify only the externally supplied public record
+        if: ${{ hashFiles('evidence/g3/active-manifest.json') != '' && hashFiles('evidence/g3/checkpoints.ndjson') != '' }}
+        run: >-
+          python tools/g3/public_duration.py verify --live
+          --manifest evidence/g3/active-manifest.json
+          --ledger evidence/g3/checkpoints.ndjson
+      # This workflow intentionally has no signing key, checkpoint writer, synthetic
+      # clock, artifact mutation, or promotion-ledger permission.

@@ -1,0 +1,22 @@
+[
+  {
+    "lane_id": "base-cryptographic-economic",
+    "state": "ACTIVE",
+    "telemetry_sequence": 0,
+    "sample_count": 0,
+    "window_start_utc": "REPLACE_FROM_PUBLIC_TELEMETRY",
+    "window_end_utc": "REPLACE_FROM_PUBLIC_TELEMETRY",
+    "maximum_sample_gap_seconds": 0,
+    "discontinuities": 0
+  },
+  {
+    "lane_id": "non-authoritative-application",
+    "state": "ACTIVE",
+    "telemetry_sequence": 0,
+    "sample_count": 0,
+    "window_start_utc": "REPLACE_FROM_PUBLIC_TELEMETRY",
+    "window_end_utc": "REPLACE_FROM_PUBLIC_TELEMETRY",
+    "maximum_sample_gap_seconds": 0,
+    "discontinuities": 0
+  }
+]

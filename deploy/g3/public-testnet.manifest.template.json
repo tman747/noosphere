@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "manifest_kind": "noos-g3-public-duration",
+  "manifest_state": "TEMPLATE_NOT_STARTED",
+  "network": {
+    "network_id": "REPLACE_PUBLIC_TESTNET_ID",
+    "chain_id": "REPLACE_64_HEX_CHAIN_ID",
+    "genesis_hash": "REPLACE_64_HEX_GENESIS_HASH",
+    "is_test_network": true,
+    "asset_label": "NOOS_TEST"
+  },
+  "release_binding": {
+    "exact_revision": "REPLACE_EXACT_G2_FROZEN_REVISION",
+    "release_manifest_path": "REPLACE_EXACT_RELEASE_MANIFEST_PATH",
+    "release_manifest_sha256": "REPLACE_64_HEX_RELEASE_MANIFEST_SHA256",
+    "protocol_version": "v1",
+    "api_version": "v1"
+  },
+  "evidence_policy": {
+    "minimum_operators": 3,
+    "minimum_independent_signatures": 2,
+    "checkpoint_period_seconds": 86400,
+    "maximum_checkpoint_gap_seconds": 93600,
+    "maximum_telemetry_gap_seconds": 300,
+    "maximum_sign_delay_seconds": 7200,
+    "simulated_time_accepted": false,
+    "test_keys_accepted": false,
+    "promotion_effect": "NONE"
+  },
+  "operators": [
+    {
+      "operator_id": "operator-a",
+      "organization": "REPLACE_INDEPENDENT_OPERATOR_A",
+      "control_domain": "operator-a.example.org",
+      "region": "REPLACE_REGION_A",
+      "infrastructure_provider": "REPLACE_PROVIDER_A",
+      "network_carrier": "REPLACE_CARRIER_A",
+      "client_family": "rust-reference",
+      "key_id": "REPLACE_OPERATOR_A_PRODUCTION_KEY_ID",
+      "key_usage": "TEST_ONLY",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nREPLACE_OPERATOR_A_ED25519_SPKI\n-----END PUBLIC KEY-----\n",
+      "rpc_url": "https://rpc.operator-a.example.org/api/status",
+      "telemetry_url": "https://telemetry.operator-a.example.org/g3/snapshot.json",
+      "checkpoint_url": "https://evidence.operator-a.example.org/g3/checkpoints.ndjson"
+    },
+    {
+      "operator_id": "operator-b",
+      "organization": "REPLACE_INDEPENDENT_OPERATOR_B",
+      "control_domain": "operator-b.example.net",
+      "region": "REPLACE_REGION_B",
+      "infrastructure_provider": "REPLACE_PROVIDER_B",
+      "network_carrier": "REPLACE_CARRIER_B",
+      "client_family": "go-independent",
+      "key_id": "REPLACE_OPERATOR_B_PRODUCTION_KEY_ID",
+      "key_usage": "TEST_ONLY",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nREPLACE_OPERATOR_B_ED25519_SPKI\n-----END PUBLIC KEY-----\n",
+      "rpc_url": "https://rpc.operator-b.example.net/api/status",
+      "telemetry_url": "https://telemetry.operator-b.example.net/g3/snapshot.json",
+      "checkpoint_url": "https://evidence.operator-b.example.net/g3/checkpoints.ndjson"
+    },
+    {
+      "operator_id": "operator-c",
+      "organization": "REPLACE_INDEPENDENT_OPERATOR_C",
+      "control_domain": "operator-c.example.com",
+      "region": "REPLACE_REGION_C",
+      "infrastructure_provider": "REPLACE_PROVIDER_C",
+      "network_carrier": "REPLACE_CARRIER_C",
+      "client_family": "REPLACE_SECOND_INDEPENDENT_CLIENT_OR_VERIFIER_FAMILY",
+      "key_id": "REPLACE_OPERATOR_C_PRODUCTION_KEY_ID",
+      "key_usage": "TEST_ONLY",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nREPLACE_OPERATOR_C_ED25519_SPKI\n-----END PUBLIC KEY-----\n",
+      "rpc_url": "https://rpc.operator-c.example.com/api/status",
+      "telemetry_url": "https://telemetry.operator-c.example.com/g3/snapshot.json",
+      "checkpoint_url": "https://evidence.operator-c.example.com/g3/checkpoints.ndjson"
+    }
+  ],
+  "lanes": [
+    {
+      "lane_id": "base-cryptographic-economic",
+      "classification": "cryptographic_economic",
+      "required_real_days": 90,
+      "authoritative": true,
+      "telemetry_metric": "noos_g3_lane_continuity"
+    },
+    {
+      "lane_id": "non-authoritative-application",
+      "classification": "application",
+      "required_real_days": 30,
+      "authoritative": false,
+      "telemetry_metric": "noos_g3_lane_continuity"
+    }
+  ],
+  "topology": {
+    "minimum_regions": 3,
+    "minimum_infrastructure_providers": 3,
+    "minimum_network_carriers": 3,
+    "minimum_client_families": 2
+  },
+  "drill_schedule": [
+    {
+      "drill_id": "restart-day-3",
+      "drill_type": "restart",
+      "start_after_real_days": 3,
+      "duration_seconds": 3600,
+      "required_observers": 2,
+      "instructions": "Restart one operator at a time; retain pre/post height, state-root, peer, and finality telemetry."
+    },
+    {
+      "drill_id": "wan-day-7",
+      "drill_type": "wan",
+      "start_after_real_days": 7,
+      "duration_seconds": 21600,
+      "required_observers": 2,
+      "instructions": "Exercise 50-800 ms latency, 0-10 percent loss, reordering, and bandwidth asymmetry across public regions."
+    },
+    {
+      "drill_id": "partition-day-10",
+      "drill_type": "partition",
+      "start_after_real_days": 10,
+      "duration_seconds": 21600,
+      "required_observers": 2,
+      "instructions": "Partition up to the declared fault bound for six real hours and verify no conflicting finality or unavailable-block finalization."
+    },
+    {
+      "drill_id": "ai-off-day-14-through-21",
+      "drill_type": "ai-off",
+      "start_after_real_days": 14,
+      "duration_seconds": 604800,
+      "required_observers": 2,
+      "instructions": "Disable every AI, worker, prover, model, Chorus, Umbra, dream, and Reflex process for seven uninterrupted public real days."
+    },
+    {
+      "drill_id": "blackout-day-21",
+      "drill_type": "blackout",
+      "start_after_real_days": 21,
+      "duration_seconds": 21600,
+      "required_observers": 2,
+      "instructions": "Kill AI endpoints at admitted load while base validators retain ordinary network access; record refund, expiry, and finality behavior."
+    }
+  ],
+  "public_ledger_urls": [
+    "https://evidence.operator-a.example.org/g3/checkpoints.ndjson",
+    "https://evidence.operator-b.example.net/g3/checkpoints.ndjson"
+  ],
+  "manifest_signatures": []
+}

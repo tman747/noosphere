@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+rule_files:
+  - /etc/prometheus/g3-alerts.yml
+scrape_configs:
+  - job_name: noos-public-testnet
+    static_configs:
+      - targets: ["node:9650"]

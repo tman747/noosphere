@@ -1,0 +1,32 @@
+[
+  {
+    "operator_id": "operator-a",
+    "telemetry_url": "https://telemetry.operator-a.example.org/g3/snapshot.json",
+    "observed_at_utc": "REPLACE_FROM_PUBLIC_TELEMETRY",
+    "telemetry_sequence": 0,
+    "chain_height": 0,
+    "finalized_height": 0,
+    "telemetry_sha256": "REPLACE_SHA256_OF_RAW_PUBLIC_SNAPSHOT",
+    "ai_processes_enabled": true
+  },
+  {
+    "operator_id": "operator-b",
+    "telemetry_url": "https://telemetry.operator-b.example.net/g3/snapshot.json",
+    "observed_at_utc": "REPLACE_FROM_PUBLIC_TELEMETRY",
+    "telemetry_sequence": 0,
+    "chain_height": 0,
+    "finalized_height": 0,
+    "telemetry_sha256": "REPLACE_SHA256_OF_RAW_PUBLIC_SNAPSHOT",
+    "ai_processes_enabled": true
+  },
+  {
+    "operator_id": "operator-c",
+    "telemetry_url": "https://telemetry.operator-c.example.com/g3/snapshot.json",
+    "observed_at_utc": "REPLACE_FROM_PUBLIC_TELEMETRY",
+    "telemetry_sequence": 0,
+    "chain_height": 0,
+    "finalized_height": 0,
+    "telemetry_sha256": "REPLACE_SHA256_OF_RAW_PUBLIC_SNAPSHOT",
+    "ai_processes_enabled": true
+  }
+]

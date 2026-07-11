@@ -1,0 +1,17 @@
+groups:
+  - name: noos-g3-continuity
+    rules:
+      - alert: NoosG3TelemetryMissing
+        expr: absent(up{job="noos-public-testnet"}) or max_over_time(up{job="noos-public-testnet"}[5m]) < 1
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "G3 telemetry is absent or discontinuous; elapsed evidence is blocked"
+      - alert: NoosG3TargetRevisionChanged
+        expr: count(count by (revision) (noos_build_info{job="noos-public-testnet"})) != 1
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "More than one or no exact revision is visible; duration must restart"

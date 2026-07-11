@@ -1,0 +1,17 @@
+#cloud-config
+# Provider-neutral VM bootstrap. Replace every token from an independently reviewed,
+# immutable operator release; this template is not deployment or duration evidence.
+packages: [docker.io, docker-compose-v2, openssl, ca-certificates]
+users:
+  - name: noos-operator
+    groups: [docker]
+    lock_passwd: true
+write_files:
+  - path: /etc/noos-g3/README
+    permissions: '0444'
+    content: |
+      Install deploy/g3 at /opt/noos-g3, provision the exact manifest and genesis,
+      configure public DNS/TLS, and start docker compose only after independent review.
+      Never place operator private signing keys in this VM image or source repository.
+runcmd:
+  - [mkdir, -p, /opt/noos-g3, /var/lib/noos-g3]
