@@ -2265,6 +2265,7 @@ name = "noos-training"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "noos-analytics",
  "noos-species",
  "serde",
  "thiserror 2.0.18",

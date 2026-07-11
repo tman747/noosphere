@@ -1,0 +1,74 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-analytics",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-analytics"
+        ]
+      },
+      "name": "claim-specific deterministic behavior and falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-RESIDUE": "f6ffef136f6e5088b6d951266162864e5b5b9045ac429d07ce589bbf5ca47bd3"
+  },
+  "claims": [
+    "M-RESIDUE"
+  ],
+  "command": [
+    "tools/gates/run_tensor_hdf_claim.py",
+    "--claim",
+    "M-RESIDUE"
+  ],
+  "evidence_sha256": "6dfac2b88a2439c149391358b9dee02d3a269515902624fe54e2b95cfb50fc44",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-m-residue",
+  "limitations": [
+    "This is local precursor evidence, not independent or production evidence.",
+    "Fast and residual-dot verifiers are independently structured local code in one repository, not independently authored verifier families.",
+    "Exhaustive F3 enumeration exercises the exact q^-rank identity locally; preregistered production beacon uniformity and independence tests remain external.",
+    "Large-field soundness is the proved field theorem and is not inferred from the seeded empirical sweep."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-analytics/Cargo.toml": "d1af1318d679b7efc79ecd514f963d194e3cbd7285017955628f0369dee93d87",
+    "crates/noos-analytics/src/residue.rs": "5afea08221a727b3bc03474df51273a59f21b2ef066875f8930c75fb8dceb0dd",
+    "tools/gates/run_tensor_hdf_claim.py": "aa65721a9ea542ba46261bb57fd19e4bb8f5545320e6d17bb7e3ebd603520887"
+  }
+}

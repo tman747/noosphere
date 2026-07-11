@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
+pub mod adjoint;
+
 pub const LIFECYCLE: &str = "EXPERIMENTAL";
 pub const RESULT: &str = "SHADOW_ONLY";
 pub const TRAINING_SLASHABLE: bool = false;

@@ -1,0 +1,74 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-analytics",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-analytics"
+        ]
+      },
+      "name": "claim-specific deterministic behavior and falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-TENSOR": "bbe193661f8c97910394c2ae77bb860e9dea0e790feff16ce70f7cfd4d11844e"
+  },
+  "claims": [
+    "M-TENSOR"
+  ],
+  "command": [
+    "tools/gates/run_tensor_hdf_claim.py",
+    "--claim",
+    "M-TENSOR"
+  ],
+  "evidence_sha256": "c7cdd49879c3e84f6a178cc68f368564cff678be26585af34b478cd5d6c6ca2b",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-m-tensor",
+  "limitations": [
+    "This is local precursor evidence, not independent or production evidence.",
+    "The canonical vectors and mutation corpus are local Rust evidence, not two independently authored cross-verifiers.",
+    "Post-commit beacon unpredictability is an explicit external randomness assumption; no production beacon campaign is claimed.",
+    "The frozen 256x256 paid encrypted-delivery trial and calibrated work-per-joule campaign remain external."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-analytics/Cargo.toml": "d1af1318d679b7efc79ecd514f963d194e3cbd7285017955628f0369dee93d87",
+    "crates/noos-analytics/src/tensor.rs": "4a691f0d5b265209a16020b6a56026da1eef7dded6749cc1ead1422e948c2d09",
+    "tools/gates/run_tensor_hdf_claim.py": "aa65721a9ea542ba46261bb57fd19e4bb8f5545320e6d17bb7e3ebd603520887"
+  }
+}

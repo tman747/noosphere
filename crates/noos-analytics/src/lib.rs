@@ -10,6 +10,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
+pub mod hdf_profile;
+pub mod residue;
+pub mod tensor;
+
 pub type Hash32 = [u8; 32];
 
 pub const M_HDF_STATUS: &str = "RETIRED";
@@ -53,6 +57,10 @@ pub enum AnalyticsError {
     DuplicateProfile,
     #[error("unknown profile")]
     UnknownProfile,
+    #[error("submission ID already exists in this immutable profile")]
+    DuplicateSubmission,
+    #[error("reproduction does not bind the challenged profile, strategy, or whole attempt")]
+    ReproductionBindingMismatch,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -128,7 +136,7 @@ pub struct EnergyEstimate {
 /// integer Walsh-Hadamard transform. Since normalized `Z` divides transformed
 /// values by `sqrt(rows*cols)`, the theorem's `rows*cols` factor cancels and
 /// the energy estimate is exactly `sum(sample_square) / sample_count`.
-pub fn estimate_hdf_energy(
+pub(crate) fn estimate_hdf_energy(
     residual: &IntegerResidual,
     challenge: &EnergyChallenge,
 ) -> Result<ShadowObservation<EnergyEstimate>, AnalyticsError> {
@@ -278,6 +286,9 @@ pub enum AlgorithmFamily {
     FftFmm,
     CachedOperand,
     SparseStructured,
+    DiagonalStructured,
+    LowRankStructured,
+    OutputOnly,
     CustomHardware,
 }
 
@@ -366,6 +377,12 @@ impl ShadowAuction {
             .profiles
             .get_mut(&measurement.profile_id)
             .ok_or(AnalyticsError::UnknownProfile)?;
+        if profile
+            .measurements
+            .contains_key(&measurement.submission_id)
+        {
+            return Err(AnalyticsError::DuplicateSubmission);
+        }
         let missing_whole_attempt =
             !measurement.commitment_and_proof_included || !measurement.deliverable_materialized;
         let advantage = ratio_exceeds_105(&measurement, &profile.baseline)?;
@@ -400,6 +417,16 @@ impl ShadowAuction {
             .measurements
             .get(&submission_id)
             .ok_or(AnalyticsError::UnknownProfile)?;
+        if reproduction.profile_id != profile_id
+            || reproduction.submission_id == submission_id
+            || reproduction.family != winner.family
+            || reproduction.credited_work != winner.credited_work
+            || !reproduction.commitment_and_proof_included
+            || !reproduction.deliverable_materialized
+            || reproduction.implementation_family == winner.implementation_family
+        {
+            return Err(AnalyticsError::ReproductionBindingMismatch);
+        }
         if !within_ten_percent(reproduction.energy_microjoules, winner.energy_microjoules)? {
             return Err(AnalyticsError::ReproductionMismatch);
         }
@@ -623,9 +650,12 @@ mod tests {
             AlgorithmFamily::FftFmm,
             AlgorithmFamily::CachedOperand,
             AlgorithmFamily::SparseStructured,
+            AlgorithmFamily::DiagonalStructured,
+            AlgorithmFamily::LowRankStructured,
+            AlgorithmFamily::OutputOnly,
             AlgorithmFamily::CustomHardware,
         ]);
-        assert_eq!(families.len(), 7);
+        assert_eq!(families.len(), 10);
     }
 
     #[test]
@@ -710,6 +740,45 @@ mod tests {
                 measurement(1, 2, AlgorithmFamily::FftFmm, 100, 89, "lab-a")
             ),
             Err(AnalyticsError::ReproductionMismatch)
+        );
+    }
+
+    #[test]
+    fn reproduction_profile_strategy_and_whole_attempt_are_bound() {
+        let base = measurement(1, 0, AlgorithmFamily::Naive, 100, 100, "baseline");
+        let winner = measurement(1, 1, AlgorithmFamily::FftFmm, 100, 80, "winner");
+        let mut auction = ShadowAuction::default();
+        auction.register_profile(base).unwrap();
+        auction.submit(winner).unwrap();
+
+        let wrong_profile = measurement(2, 2, AlgorithmFamily::FftFmm, 100, 80, "lab-a");
+        assert_eq!(
+            auction.reproduce([1; 32], [1; 32], wrong_profile),
+            Err(AnalyticsError::ReproductionBindingMismatch)
+        );
+        let wrong_family = measurement(1, 2, AlgorithmFamily::Naive, 100, 80, "lab-a");
+        assert_eq!(
+            auction.reproduce([1; 32], [1; 32], wrong_family),
+            Err(AnalyticsError::ReproductionBindingMismatch)
+        );
+        let mut incomplete = measurement(1, 2, AlgorithmFamily::FftFmm, 100, 80, "lab-a");
+        incomplete.commitment_and_proof_included = false;
+        assert_eq!(
+            auction.reproduce([1; 32], [1; 32], incomplete),
+            Err(AnalyticsError::ReproductionBindingMismatch)
+        );
+    }
+
+    #[test]
+    fn immutable_submission_ids_do_not_overwrite_evidence() {
+        let base = measurement(1, 0, AlgorithmFamily::Naive, 100, 100, "baseline");
+        let candidate = measurement(1, 1, AlgorithmFamily::Tiled, 100, 100, "candidate");
+        let mut auction = ShadowAuction::default();
+        auction.register_profile(base).unwrap();
+        auction.submit(candidate.clone()).unwrap();
+        assert_eq!(
+            auction.submit(candidate),
+            Err(AnalyticsError::DuplicateSubmission)
         );
     }
 

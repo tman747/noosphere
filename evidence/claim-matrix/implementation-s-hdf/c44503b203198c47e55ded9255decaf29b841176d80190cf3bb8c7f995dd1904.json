@@ -1,0 +1,74 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-analytics",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-analytics"
+        ]
+      },
+      "name": "claim-specific deterministic behavior and falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-HDF": "1db272da7d5b83279eaa130a818f4924c830f3b4ba9f5c1e0aed023889f5adab"
+  },
+  "claims": [
+    "S-HDF"
+  ],
+  "command": [
+    "tools/gates/run_tensor_hdf_claim.py",
+    "--claim",
+    "S-HDF"
+  ],
+  "evidence_sha256": "c44503b203198c47e55ded9255decaf29b841176d80190cf3bb8c7f995dd1904",
+  "expected_result": "KILLED",
+  "gate": "implementation-s-hdf",
+  "limitations": [
+    "This is local precursor evidence, not independent or production evidence.",
+    "S-HDF inherits the retired universal M-HDF disposition; passing one local model/profile cannot generalize.",
+    "The profile-bound wrapper is only an M-HDF-ENERGY shadow precursor and rejects model, numeric-profile, challenge, and residual splices.",
+    "Profile-specific multi-hardware false-positive and cost thresholds remain external."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "KILLED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-analytics/Cargo.toml": "d1af1318d679b7efc79ecd514f963d194e3cbd7285017955628f0369dee93d87",
+    "crates/noos-analytics/src/hdf_profile.rs": "988369f2431791e126e0d0adb46edf245d97e6f2dd15048d45f63d9093c528b4",
+    "tools/gates/run_tensor_hdf_claim.py": "aa65721a9ea542ba46261bb57fd19e4bb8f5545320e6d17bb7e3ebd603520887"
+  }
+}

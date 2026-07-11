@@ -1,0 +1,46 @@
+{
+  "claims": {
+    "M-TENSOR": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-analytics"],
+      "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-TENSOR",
+      "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-TENSOR --rollback-check",
+      "notes": "tensor.rs implements the frozen Work Loom commit-before-beacon envelope with an injective exact-I64 tensor descriptor (role/order, shape, dtype, byte order, chunk boundary, signed-zero/NaN/quantization/compression policy), stable ArtifactID, pre-beacon input/output/delivery/profile/relation binding, finalized-after-commit challenge, challenge-keyed WorkCommit, evidence/delivery lifecycle, and single-use (job,worker,nonce). Deterministic root vectors plus post-beacon output, profile, trace, challenge, malformed/overflow, withholding, undecryptable-delivery, and replay falsifiers pass. PARTIAL: no independently authored second verifier/CPU-GPU root family, production beacon unpredictability campaign, frozen 256x256 encrypted paid-delivery trial, or calibrated work-per-joule evidence."
+    },
+    "M-RESIDUE": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-analytics"],
+      "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-RESIDUE",
+      "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-RESIDUE --rollback-check",
+      "notes": "residue.rs implements exact prime-field rectangular A(Br)=Cr with canonical representatives, checked u128 modular arithmetic, deterministic prime validation, claim-before-beacon binding, rejection-sampled full-field challenges, round/domain separation, and range bounds at the adjoint integration. A fast verifier and independently structured residual-dot oracle agree on a 1024-case seeded sweep; exhaustive F3 enumeration covers all 80 nonzero 2x2 residuals and matches q^-rank exactly; characteristic two remains a valid exact residue field while HDF collapse stays separate. Alias, composite modulus, timing, challenge-tamper, and adaptive-error falsifiers reject. PARTIAL: both implementations are local, not independently authored verifier families, and production beacon uniformity/independence testing remains external; no large-field bound is inferred empirically."
+    },
+    "M-HDF": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-analytics"],
+      "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF",
+      "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF --rollback-check",
+      "notes": "The universal M-HDF claim stays RETIRED/KILLED. noos-analytics exposes no universal acceptor: permanent tests retain the all-ones flat-error miss regression, spike/flat duality, characteristic-two singular collapse, post-commit binding, and 4x4 quantization-floor witness, while result types hard-code universal_dominance=false and exact_freivalds_amplification=false. The only executable survivor is the narrower M-HDF-ENERGY shadow estimator."
+    },
+    "M-HDF-ENERGY": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-analytics"],
+      "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF-ENERGY",
+      "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF-ENERGY --rollback-check",
+      "notes": "noos-analytics implements exact unnormalized signed Walsh-Hadamard transformation with checked i128 arithmetic, exact integer-square energy estimates, the frozen 8||E||_F^4/s variance bound, profile-bound post-commit row/column signs and hidden coordinates, and SHADOW_ONLY output types. Exhaustive {-1,0,1}^{2x2} nonzero residuals exercise exact unbiasedness and the variance boundary; 64 seeded sign profiles exercise energy conservation; malformed dimensions/signs/samples and overflow fail closed. FMM shadow accounting enumerates naive, tiled, Strassen, FFT, cached, sparse, diagonal, low-rank, output-only, and custom-hardware strategies; >1.05x work/joule, missing whole attempts, demand starvation, or any material challenge irreversibly zero shadow credit, with immutable submissions and two distinct profile/strategy-bound reproductions. PARTIAL: named-attack detection, false-positive, non-inferiority, compatible-resident-HD latency, pinned energy meters, and independent hardware reproductions remain external."
+    },
+    "S-HDF": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-analytics"],
+      "command": "python tools/gates/run_tensor_hdf_claim.py --claim S-HDF",
+      "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim S-HDF --rollback-check",
+      "notes": "S-HDF remains RETIRED/KILLED with M-HDF. hdf_profile.rs provides only a specialized M-HDF-ENERGY precursor: an immutable model root + numeric profile + dimensions + sample count derives the profile ID; residual commitment and finalized-after-commit beacon deterministically derive independent two-sided signs and coordinates; model/profile/residual/challenge splices reject. It cannot set exact Freivalds acceptance and reports only SHADOW_ONLY energy. PARTIAL: one local profile cannot satisfy the complete per-model, multi-hardware M-HDF thresholds or profile-specific false-positive gate."
+    },
+    "M-ADJOINT": {
+      "local_implementation_state": "PARTIAL",
+      "packages": ["noos-training", "noos-analytics"],
+      "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-ADJOINT",
+      "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-ADJOINT --rollback-check",
+      "notes": "adjoint.rs implements a deterministic exact-integer R_adj precursor binding C_theta,C_x,C_t,C_y,C_L,C_fwd,C_bwd,C_g,C_opt,C_theta', policy version, numeric profile, and lag before challenge. It verifies the three frozen GEMMs Y=XW, G_X=G_YW^T, G_W=X^TG_Y through distinct post-commit residue domains, checks the exact global dual identity, prevents modular aliases, and fully checks frozen ties-away clipping/momentum/learning-rate/updated-weight semantics. A 32^3 operation census is 11,264 certificate multiplications versus 100,352 replay multiplications; tamper/splice/profile/policy/timing/overflow tests reject, including a recomputed coherent fake that passes the scalar dual identity but fails a local graph relation. The local 10^7 structured capsule-header campaign has zero accepts. PARTIAL: the full 10^7 relation-level adversarial campaign, production training numeric profile, real proof plus witness-availability cost, independently authored verifier, and private-example leakage measurement remain external; output is SHADOW_ONLY and non-slashable."
+    }
+  }
+}

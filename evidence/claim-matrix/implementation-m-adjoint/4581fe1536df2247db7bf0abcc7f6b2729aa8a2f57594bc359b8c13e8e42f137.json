@@ -1,0 +1,79 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-training",
+          "-p",
+          "noos-analytics",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-training",
+          "noos-analytics"
+        ]
+      },
+      "name": "claim-specific deterministic behavior and falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-ADJOINT": "b2d9d0edf2f6b2d992919faaa06818da89090516b49ca7c6546c24d13a935b2c"
+  },
+  "claims": [
+    "M-ADJOINT"
+  ],
+  "command": [
+    "tools/gates/run_tensor_hdf_claim.py",
+    "--claim",
+    "M-ADJOINT"
+  ],
+  "evidence_sha256": "4581fe1536df2247db7bf0abcc7f6b2729aa8a2f57594bc359b8c13e8e42f137",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-m-adjoint",
+  "limitations": [
+    "This is local precursor evidence, not independent or production evidence.",
+    "The local exact-integer precursor binds all three training GEMMs, global dual identity, optimizer clipping/momentum/update, policy lag, and post-commit challenges.",
+    "The local 10^7 campaign exercises structured capsule header/profile/root mutations; full relation-level adversarial capsules at that scale, private-example leakage measurement, and an independent proof/verifier campaign remain external.",
+    "The operation census is below deterministic GEMM replay at the exercised 32^3 profile, but real proof plus witness-availability cost on a production training profile is unmeasured; training remains SHADOW_ONLY and non-slashable."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-analytics/Cargo.toml": "d1af1318d679b7efc79ecd514f963d194e3cbd7285017955628f0369dee93d87",
+    "crates/noos-analytics/src/residue.rs": "5afea08221a727b3bc03474df51273a59f21b2ef066875f8930c75fb8dceb0dd",
+    "crates/noos-training/Cargo.toml": "d6bc583fdfed6f2b938fa4379af27d90903e3eda5c76c062e11a4ab1bfb9bed4",
+    "crates/noos-training/src/adjoint.rs": "86c92f4ee94bbb166b57022b377082d264839e3c731842ccca37a45aa40cbb1f",
+    "tools/gates/run_tensor_hdf_claim.py": "aa65721a9ea542ba46261bb57fd19e4bb8f5545320e6d17bb7e3ebd603520887"
+  }
+}
