@@ -1,0 +1,136 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-reflex\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-reflex\"]}]",
+      "id": "local-precursor",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "[\"The complete local lifecycle exercises signed bonded ticks, exact roots/gas, handoff pause, canonical inclusion/omission/contradiction, class-gate binding, monotone budgets, split-view liability, integer compensation, and canonical-only rollback.\",\"The required live-devnet cadence, handoff-gap p95, partitioned delivery trials, and real bond payouts have not run; production enablement remains impossible from local evidence.\"]",
+      "id": "external-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-REFLEX": "5a993ebda48660b9f7004e2d880f96812576fd05de82fd515b7e421cad5339e7"
+  },
+  "claims": [
+    "A-REFLEX"
+  ],
+  "command": [
+    "tools/gates/run_identity_reflex_claim.py",
+    "--claim",
+    "A-REFLEX"
+  ],
+  "evidence_sha256": "117ae03aa3abd76e03d0c35ebad6d92976216fe6938ec40c0df6d7520b614a15",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-a-reflex",
+  "limitations": [
+    "The complete local lifecycle exercises signed bonded ticks, exact roots/gas, handoff pause, canonical inclusion/omission/contradiction, class-gate binding, monotone budgets, split-view liability, integer compensation, and canonical-only rollback.",
+    "The required live-devnet cadence, handoff-gap p95, partitioned delivery trials, and real bond payouts have not run; production enablement remains impossible from local evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 41183,
+        "git_blob": "76a9d66df0a1ce340de01660d8b66f0f3e705c68",
+        "git_mode": "100644",
+        "path": "crates/noos-agent-class/src/lib.rs",
+        "sha256": "0479338e036da7e057191f12893a039b7f83a97111f0c34b59ac0ddfd734d318"
+      },
+      {
+        "bytes": 610,
+        "git_blob": "6b4f7cf2b7cab0524675789d67e65077175d72ab",
+        "git_mode": "100644",
+        "path": "crates/noos-reflex/Cargo.toml",
+        "sha256": "f947bf21e9789a7124212b141949b5d41d95544ade491c6caf07c6b33023c581"
+      },
+      {
+        "bytes": 10773,
+        "git_blob": "0eb906984a73400d5a070f44bc15a43f5584e84c",
+        "git_mode": "100644",
+        "path": "crates/noos-reflex/src/clock.rs",
+        "sha256": "f921fd9186bf5b7d79adcbad68c632090d98473a01789a65d0b8682049c89be6"
+      },
+      {
+        "bytes": 40233,
+        "git_blob": "35265763a34f8718162400fc5b74fc3352ac78f0",
+        "git_mode": "100644",
+        "path": "crates/noos-reflex/src/identity.rs",
+        "sha256": "609773c2aaa2a3742f92011eedb82d6a959149adad53b0557c17bdae3aa8a549"
+      },
+      {
+        "bytes": 40589,
+        "git_blob": "eb2cfb74b8a0446d194f32ef988a258e2b7a444c",
+        "git_mode": "100644",
+        "path": "crates/noos-reflex/src/lib.rs",
+        "sha256": "821baeb980d6f555e614b57fb3f6d50d5c99ac7400f93f994a27120e99df8030"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 8721,
+        "git_blob": "56f3c75c343f71bbaf5d284eeabe9dc04f4701ed",
+        "git_mode": "100644",
+        "path": "tools/gates/run_identity_reflex_claim.py",
+        "sha256": "8459678c3775c16b21512684ea7c182027d667794f3f1a93d8a970fa55ffed91"
+      }
+    ],
+    "manifest_sha256": "5d421728f170fdcc378e0e261e668ea1e0b094d19762fc96e370730e5610ae8d",
+    "source_revision": "58737cd043b59f9e888dcec93fc33900fd084065",
+    "source_tree": "47521e12e71da156e2dd780c64c807de6ff62769"
+  }
+}
