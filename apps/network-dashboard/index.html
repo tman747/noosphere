@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css?v=2">
+  <link rel="stylesheet" href="/styles.css?v=6">
 </head>
 <body>
   <aside class="rail" aria-label="Dashboard navigation">
@@ -22,7 +22,8 @@
     <div class="rail-foot"><span id="rail-pulse" class="pulse"></span><span id="rail-state">CONNECTING</span></div>
   </aside>
   <main>
-    <div id="app" aria-live="polite"><div class="boot"><span class="spinner"></span>ESTABLISHING INSTRUMENT FEED</div></div>
+    <div id="app" aria-live="off"><div class="boot"><span class="spinner"></span>ESTABLISHING INSTRUMENT FEED</div></div>
+    <p id="live-status" class="sr-only" role="status" aria-live="polite"></p>
   </main>
   <footer class="mobile-tabs" aria-label="Dashboard navigation">
     <a href="#overview" data-route="overview"><b>01</b>OVERVIEW</a>
@@ -30,6 +31,6 @@
     <a href="#compute" data-route="compute"><b>03</b>COMPUTE</a>
     <a href="#nodes" data-route="nodes"><b>04</b>NODES</a>
   </footer>
-  <script src="/app.js?v=2" defer></script>
+  <script src="/app.js?v=8" defer></script>
 </body>
 </html>

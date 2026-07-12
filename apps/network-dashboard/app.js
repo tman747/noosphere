@@ -1,12 +1,14 @@
 "use strict";
 
 const app = document.querySelector("#app");
+const liveStatus = document.querySelector("#live-status");
 const routes = new Set(["overview", "consensus", "compute", "nodes"]);
 const endpoints = {overview:"/api/overview",consensus:"/api/consensus",compute:"/api/compute",nodes:"/api/nodes"};
 let activeRoute = "overview";
 let refreshTimer = null;
 let selectedBlock = null;
 let loadGeneration = 0;
+let revealObserver = null;
 const cache = new Map();
 
 const esc = value => String(value ?? "—").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
@@ -15,8 +17,12 @@ const short = (value, size=12) => value ? `${String(value).slice(0,size)}…${St
 const ago = ms => ms ? `${Math.max(0,Math.round((Date.now()-ms)/1000))}s ago` : "not reported";
 const stateDot = state => `<i class="status-dot ${esc(state)}"></i>`;
 const errors = data => Object.keys(data.errors || {}).length ? `<div class="error-banner">PARTIAL FEED · ${esc(Object.entries(data.errors).map(([k,v])=>`${k}: ${v}`).join(" · "))}</div>` : "";
-const pageHead = (eyebrow,title,metrics) => `<header class="page-head"><div class="page-title"><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1></div>${metrics.map(m=>`<div class="head-metric"><span class="metric-label">${esc(m.label)}</span><span class="metric-value">${esc(m.value)}</span><span class="metric-sub">${esc(m.sub || "")}</span></div>`).join("")}</header>`;
+const pageHead = (eyebrow,title,metrics) => `<header class="page-head"><div class="page-title"><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1></div>${metrics.map((m,index)=>`<div class="head-metric" style="--metric-delay:${80+index*70}ms"><span class="metric-label">${esc(m.label)}</span><span class="metric-value">${esc(m.value)}</span><span class="metric-sub">${esc(m.sub || "")}</span></div>`).join("")}</header>`;
 const sectionHead = (label,note="") => `<div class="section-head"><span class="section-label">${esc(label)}</span><span class="section-note">${esc(note)}</span></div>`;
+function announce(message){
+  if(!liveStatus||liveStatus.textContent===message)return;
+  liveStatus.textContent=message;
+}
 
 function lineChart(rows,key){
   const values=rows.map(row=>Number(row[key])).filter(Number.isFinite);
@@ -24,7 +30,7 @@ function lineChart(rows,key){
   const min=Math.min(...values), max=Math.max(...values), span=max-min||1;
   const points=values.map((v,i)=>`${(i/(values.length-1)*100).toFixed(2)},${(94-(v-min)/span*78).toFixed(2)}`).join(" ");
   const last=points.split(" ").at(-1).split(",");
-  return `<div class="chart-frame"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="${esc(key)} history"><polyline points="${points}" fill="none" stroke="#3a352b" stroke-width="1.15" vector-effect="non-scaling-stroke"/><line x1="${last[0]}" y1="${last[1]}" x2="100" y2="${last[1]}" stroke="#b8340f" stroke-width=".7" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/><circle cx="${last[0]}" cy="${last[1]}" r="1.8" fill="#b8340f" vector-effect="non-scaling-stroke"/></svg></div>`;
+  return `<div class="chart-frame"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="${esc(key)} history"><polyline pathLength="1" points="${points}" fill="none" stroke="#3a352b" stroke-width="1.15" vector-effect="non-scaling-stroke"/><line x1="${last[0]}" y1="${last[1]}" x2="100" y2="${last[1]}" stroke="#b8340f" stroke-width=".7" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/><circle cx="${last[0]}" cy="${last[1]}" r="1.8" fill="#b8340f" vector-effect="non-scaling-stroke"/></svg></div>`;
 }
 
 function averageCadence(history){
@@ -93,23 +99,100 @@ function renderCompute(data){
 function capacity(node){const c=node.capacity;if(!c)return `<span class="node-telemetry">capacity not reported</span>`;return `<div class="capacity-bars" title="${number(c.cpu_threads)} threads · ${number(c.memory_mb)} MB"><i style="height:${Math.min(30,6+c.cpu_threads*5)}px"></i><i style="height:${Math.min(30,6+c.memory_mb/64)}px"></i><i style="height:${c.capabilities&2?30:6}px"></i></div><span class="micro">CPU · MEM · GPU</span>`}
 function renderNodes(data){
   const online=data.nodes.filter(n=>n.state==="online").length;
+  const nodeClass=node=>{
+    if(node.state!=="online")return "is-offline";
+    if(node.last_report_ms&&Date.now()-node.last_report_ms>600000)return "is-offline";
+    if(node.last_report_ms&&Date.now()-node.last_report_ms>60000)return "is-stale";
+    return "is-online";
+  };
   return `${pageHead("CENTRAL REPORTING PLANE","Node Fleet",[
     {label:"Reported nodes",value:number(data.nodes.length),sub:`${number(online)} online`},
     {label:"Active incidents",value:number(data.incidents.length),sub:"source failures"},
     {label:"Unreported",value:"—",sub:"count unknown"}
   ])}${errors(data)}<div class="content">
-  <section class="section">${sectionHead("Fleet topology","solid = reported · dashed = not centrally reported")}<div class="topology"><svg viewBox="0 0 100 100" aria-label="Node fleet topology"><line x1="20" y1="50" x2="51" y2="50" stroke="#3a352b" stroke-width=".6"/><line x1="51" y1="50" x2="80" y2="50" stroke="#3a352b" stroke-width=".6" stroke-dasharray="2 2"/><circle cx="20" cy="50" r="4" fill="#3a352b"/><rect x="47" y="46" width="8" height="8" fill="#3a352b"/><circle cx="80" cy="50" r="4" fill="#f7f2e5" stroke="#3a352b" stroke-width=".7" stroke-dasharray="1 1"/><text x="20" y="63" text-anchor="middle" font-family="Fira Code" font-size="3">PRODUCER</text><text x="51" y="63" text-anchor="middle" font-family="Fira Code" font-size="3">COMPUTE WORKER</text><text x="80" y="63" text-anchor="middle" font-family="Fira Code" font-size="3">MAC · UNREPORTED</text></svg></div></section>
-  <section class="section">${sectionHead("Node comparison rail",`${number(data.nodes.length)} centrally visible`)}<div class="fleet">${data.nodes.map((n,i)=>`<article class="node-row"><div class="node-glyph ${n.role.includes('worker')?'worker':''}">${String(i+1).padStart(2,'0')}</div><div><div class="node-name">${esc(n.label)}</div><div class="node-role">${esc(n.role)}</div></div><div>${kvRows([["state",n.state],["height",number(n.height)],["head",short(n.head_hash)]])}</div><div>${capacity(n)}</div><div class="node-telemetry">${esc(n.telemetry_state.replaceAll('_',' '))}<br>${ago(n.last_report_ms)}</div></article>`).join("")}<article class="node-row"><div class="node-glyph">—</div><div><div class="node-name">Mac node</div><div class="node-role">node presence known locally</div></div><div class="node-telemetry">${esc(data.unreported.message)}</div><div class="unavailable"><span>SET UP CENTRAL REPORTER</span></div><div class="node-telemetry">not reported</div></article></div></section>
+  <section class="section">${sectionHead("Fleet topology","solid = reported · dashed = not centrally reported")}<div class="topology"><svg viewBox="0 0 100 100" aria-label="Node fleet topology"><line class="edge-confirmed" x1="20" y1="50" x2="51" y2="50" stroke="#3a352b" stroke-width=".6"/><line class="edge-expected" x1="51" y1="50" x2="80" y2="50" stroke="#3a352b" stroke-width=".6" stroke-dasharray="2 2"/><circle class="glyph-reported" cx="20" cy="50" r="4" fill="#3a352b"/><rect class="glyph-reported" x="47" y="46" width="8" height="8" fill="#3a352b"/><circle class="glyph-ghost" cx="80" cy="50" r="4" fill="#f7f2e5" stroke="#3a352b" stroke-width=".7" stroke-dasharray="1 1"/><text x="20" y="63" text-anchor="middle" font-family="Fira Code" font-size="3">PRODUCER</text><text x="51" y="63" text-anchor="middle" font-family="Fira Code" font-size="3">COMPUTE WORKER</text><text x="80" y="63" text-anchor="middle" font-family="Fira Code" font-size="3">MAC · UNREPORTED</text></svg></div></section>
+  <section class="section">${sectionHead("Node comparison rail",`${number(data.nodes.length)} centrally visible`)}<div class="fleet">${data.nodes.map((n,i)=>`<article class="node-row ${nodeClass(n)}" data-node-id="${esc(n.id)}"><div class="node-glyph ${n.role.includes("worker")?"worker":""}">${String(i+1).padStart(2,"0")}</div><div><div class="node-name">${esc(n.label)}</div><div class="node-role">${esc(n.role)}</div></div><div>${kvRows([["state",n.state],["height",number(n.height)],["head",short(n.head_hash)]])}</div><div>${capacity(n)}</div><div class="node-telemetry">${esc(n.telemetry_state.replaceAll("_"," "))}<br>${ago(n.last_report_ms)}</div></article>`).join("")}<article class="node-row is-ghost"><div class="node-glyph">—</div><div><div class="node-name">Mac node</div><div class="node-role">node presence known locally</div></div><div class="node-telemetry">${esc(data.unreported.message)}</div><div class="unavailable"><span>SET UP CENTRAL REPORTER</span></div><div class="node-telemetry">not reported</div></article></div></section>
   <section class="section">${sectionHead("Fleet incidents","active source failures")}${data.incidents.length?data.incidents.map(x=>`<div class="incident">${esc(x.source).toUpperCase()} · ${esc(x.detail)}</div>`).join(""):`<div class="empty-fleet">NO ACTIVE SOURCE INCIDENTS<br>Unknown fleet telemetry remains explicitly unreported above.</div>`}</section></div>`;
 }
 
 const renderers={overview:renderOverview,consensus:renderConsensus,compute:renderCompute,nodes:renderNodes};
+const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+function activateMotion({refresh=false,previousMetrics=[]}={}){
+  revealObserver?.disconnect();
+  const sections=[...app.querySelectorAll(".section")];
+  app.dataset.route=activeRoute;
+  app.classList.remove("route-enter","live-refresh");
+  if(prefersReducedMotion.matches){
+    sections.forEach(section=>section.classList.add("motion-visible"));
+    return;
+  }
+  if(refresh){
+    const metrics=[...app.querySelectorAll(".metric-value,.lag-read strong,.state-step strong")];
+    metrics.forEach((metric,index)=>{
+      if(previousMetrics[index]!==undefined&&previousMetrics[index]!==metric.textContent){
+        metric.animate(
+          [{transform:"translateY(0)",opacity:1},{transform:"translateY(-5px)",opacity:.3,offset:.42},{transform:"translateY(0)",opacity:1}],
+          {duration:520,easing:"cubic-bezier(.22,1,.36,1)"}
+        );
+      }
+    });
+    sections.forEach(section=>section.classList.add("motion-visible"));
+  }else{
+    app.classList.add("route-enter");
+    sections.forEach(section=>section.classList.add("motion-pending"));
+    revealObserver=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(!entry.isIntersecting)return;
+        entry.target.classList.remove("motion-pending");
+        entry.target.classList.add("motion-visible");
+        revealObserver?.unobserve(entry.target);
+      });
+    },{threshold:.08,rootMargin:"0px 0px -7% 0px"});
+    sections.forEach((section,index)=>{
+      section.style.transitionDelay=`${Math.min(index,4)*55}ms`;
+      revealObserver.observe(section);
+    });
+    setTimeout(()=>app.classList.remove("route-enter"),1200);
+  }
+  if(!refresh){
+    app.querySelectorAll(".chart-frame svg polyline").forEach(path=>{
+      const matrix=path.getScreenCTM();
+      const length=path.getTotalLength()*Math.max(Math.abs(matrix?.a||1),Math.abs(matrix?.d||1));
+      path.style.setProperty("--path-length",`${length}px`);
+      path.classList.add("motion-path");
+    });
+    app.querySelectorAll(".topology svg line:not([stroke-dasharray])").forEach((line,index)=>{
+      const length=line.getTotalLength();
+      line.animate(
+        [{strokeDasharray:`${length} ${length}`,strokeDashoffset:length,opacity:.15},{strokeDasharray:`${length} ${length}`,strokeDashoffset:0,opacity:1}],
+        {duration:850+index*120,easing:"cubic-bezier(.16,1,.3,1)",fill:"both"}
+      );
+    });
+    app.querySelectorAll(".ribbon button").forEach((button,index)=>{
+      button.animate(
+        [{transform:"scaleY(.12)",opacity:.12},{transform:"scaleY(1)",opacity:1}],
+        {duration:520,delay:Math.min(index*12,620),easing:"cubic-bezier(.22,1,.36,1)",fill:"both"}
+      );
+    });
+  }
+  app.querySelectorAll(".capacity-bars i").forEach((bar,index)=>bar.style.setProperty("--bar-delay",`${index*80}ms`));
+  app.querySelectorAll(".section,.chart-frame,.topology,.head-metric").forEach(surface=>{
+    surface.addEventListener("pointermove",event=>{
+      const box=surface.getBoundingClientRect();
+      surface.style.setProperty("--pointer-x",`${((event.clientX-box.left)/box.width*100).toFixed(1)}%`);
+      surface.style.setProperty("--pointer-y",`${((event.clientY-box.top)/box.height*100).toFixed(1)}%`);
+    },{passive:true});
+  });
+}
+
 async function loadRoute(route,{silent=false}={}){
   const requestedRoute=routes.has(route)?route:"overview";
   activeRoute=requestedRoute;
   const generation=++loadGeneration;
-  document.querySelectorAll("[data-route]").forEach(link=>link.classList.toggle("active",link.dataset.route===requestedRoute));
+  document.querySelectorAll("a[data-route]").forEach(link=>link.classList.toggle("active",link.dataset.route===requestedRoute));
   if(!silent&&!cache.has(requestedRoute))app.innerHTML='<div class="boot"><span class="spinner"></span>ESTABLISHING INSTRUMENT FEED</div>';
+  const previousMetrics=[...app.querySelectorAll(".metric-value,.lag-read strong,.state-step strong")].map(metric=>metric.textContent);
+  const focusedBlock=document.activeElement?.dataset?.blockIndex||document.activeElement?.dataset?.block;
   try{
     const response=await fetch(endpoints[requestedRoute],{headers:{Accept:"application/json"},cache:"no-store"});
     if(!response.ok)throw new Error(`HTTP ${response.status}`);
@@ -118,12 +201,16 @@ async function loadRoute(route,{silent=false}={}){
     cache.set(requestedRoute,data);app.innerHTML=renderers[requestedRoute](data);
     document.querySelector("#rail-pulse")?.classList.add("live");document.querySelector("#rail-state").textContent="LIVE FEED";
     bindInteractions(data);
+    if(!silent)announce(`${document.querySelector("h1")?.textContent || "Dashboard"} loaded`);
+    activateMotion({refresh:silent,previousMetrics});
+    if(focusedBlock)document.querySelector(`[data-block-index="${CSS.escape(focusedBlock)}"],[data-block="${CSS.escape(focusedBlock)}"]`)?.focus({preventScroll:true});
   }catch(error){
     if(generation!==loadGeneration||requestedRoute!==activeRoute)return;
     const previous=cache.get(requestedRoute);
     if(previous)app.innerHTML=`<div class="error-banner">STALE VIEW · ${esc(error.message)}</div>${renderers[requestedRoute](previous)}`;
     else app.innerHTML=`<div class="boot"><div><span class="eyebrow">FEED UNAVAILABLE</span><h1>${esc(error.message)}</h1><p class="hash">The dashboard does not invent replacement telemetry. Retrying automatically.</p></div></div>`;
     document.querySelector("#rail-pulse")?.classList.remove("live");document.querySelector("#rail-state").textContent="FEED LOST";
+    announce(`Dashboard feed unavailable: ${error.message}`);
   }
   if(generation!==loadGeneration)return;
   clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>loadRoute(activeRoute,{silent:true}),5000);
@@ -131,11 +218,42 @@ async function loadRoute(route,{silent=false}={}){
 function bindInteractions(data){
   if(activeRoute!=="consensus")return;
   const blocks=data.blocks||[];
-  document.querySelectorAll("[data-block-index],[data-block]").forEach(el=>el.addEventListener("click",()=>{
-    const height=Number(el.dataset.blockIndex||el.dataset.block);selectedBlock=blocks.find(b=>Number(b.height)===height)||null;
-    document.querySelector("#block-drawer").innerHTML=blockDrawer(selectedBlock);
-    document.querySelectorAll("[data-block-index]").forEach(x=>x.classList.toggle("selected",Number(x.dataset.blockIndex)===height));
-  }));
+  const drawer=document.querySelector("#block-drawer");
+  if(drawer){
+    drawer.setAttribute("role","region");
+    drawer.setAttribute("aria-label","Block inspection");
+  }
+  const selectBlock=element=>{
+    const height=Number(element.dataset.blockIndex||element.dataset.block);
+    selectedBlock=blocks.find(block=>Number(block.height)===height)||null;
+    if(drawer){
+      drawer.classList.remove("drawer-in");
+      drawer.innerHTML=blockDrawer(selectedBlock);
+      requestAnimationFrame(()=>drawer.classList.add("drawer-in"));
+    }
+    document.querySelectorAll("[data-block-index],[data-block]").forEach(item=>{
+      const selected=Number(item.dataset.blockIndex||item.dataset.block)===height;
+      item.classList.toggle("selected",selected);
+      if(item.matches("button"))item.setAttribute("aria-pressed",String(selected));
+    });
+  };
+  document.querySelectorAll("[data-block-index],[data-block]").forEach(element=>{
+    const height=element.dataset.blockIndex||element.dataset.block;
+    if(element.matches("button")){
+      element.setAttribute("aria-label",`Inspect block ${height}`);
+      element.setAttribute("aria-pressed",String(element.classList.contains("selected")));
+    }else{
+      element.tabIndex=0;
+      element.setAttribute("role","button");
+      element.setAttribute("aria-label",`Inspect block ${height}`);
+    }
+    element.addEventListener("click",()=>selectBlock(element));
+    element.addEventListener("keydown",event=>{
+      if(event.key!=="Enter"&&event.key!==" ")return;
+      event.preventDefault();
+      selectBlock(element);
+    });
+  });
 }
 function routeFromHash(){return location.hash.slice(1).split("/")[0]||"overview"}
 window.addEventListener("hashchange",()=>{selectedBlock=null;loadRoute(routeFromHash())});
