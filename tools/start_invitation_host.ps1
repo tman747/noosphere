@@ -118,6 +118,36 @@ if (-not $ApiReady) {
     )
     Start-Process python -WorkingDirectory $Repo -ArgumentList $IndexerArgs -WindowStyle Minimized
 }
+$MarketSeed = "C:\tmp\mindchain-owner.seed"
+$MarketToken = "C:\tmp\mindchain-admin.token"
+$MarketDatabase = "C:\tmp\mindchain-compute-live.sqlite3"
+$MarketReady = $null -ne (Get-NetTCPConnection -LocalPort 18110 -State Listen -ErrorAction SilentlyContinue)
+if (-not $MarketReady -and (Test-Path -LiteralPath $MarketSeed) -and (Test-Path -LiteralPath $MarketToken)) {
+    $Deadline = (Get-Date).AddSeconds(30)
+    do {
+        Start-Sleep -Milliseconds 500
+        try {
+            $ApiReady = $null -ne (Invoke-RestMethod -Uri "http://127.0.0.1:21080/api/status" -TimeoutSec 2)
+        } catch {
+            $ApiReady = $false
+        }
+    } until (($ApiReady -and (Test-Path -LiteralPath $Profile)) -or (Get-Date) -ge $Deadline)
+    if ($ApiReady -and (Test-Path -LiteralPath $Profile)) {
+        $MarketArgs = @(
+            (Join-Path $Repo "tools\compute_market.py"),
+            "--profile", $Profile,
+            "--seed-file", $MarketSeed,
+            "--listen", "0.0.0.0:18110",
+            "--database", $MarketDatabase,
+            "--admin-token-file", $MarketToken
+        )
+        Start-Process python -WorkingDirectory $Repo -ArgumentList $MarketArgs -WindowStyle Minimized
+        $MarketReady = $true
+    }
+}
+if (-not $MarketReady) {
+    Write-Warning "The validator is online, but the optional compute market did not start."
+}
 
 Write-Host "MindChain invitation host is online." -ForegroundColor Green
 Write-Host "Validator: $ExpectedHost UDP 21701"
