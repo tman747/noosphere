@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Inspect MindChain blocks, transactions, protocol identity, and application surfaces.">
+  <title>MindScan — MindChain Explorer</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="/">MIND<span>SCAN</span></a>
+    <nav aria-label="MindChain applications">
+      <a href="http://localhost:18120">Network</a>
+      <a href="http://localhost:18110">Compute</a>
+      <a href="http://localhost:18140">Market</a>
+    </nav>
+    <div class="live" id="live"><i></i><span>Connecting</span></div>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="title">
+      <div class="hero-copy">
+        <p class="eyebrow">Public chain explorer</p>
+        <h1 id="title">Trace the ledger.<br><span>Verify the state.</span></h1>
+        <p class="intro">Blocks and transactions from the durable public index. Unsafe, justified, and finalized state stay separate.</p>
+      </div>
+      <form class="search" id="search" role="search">
+        <label for="query">Block height, block hash, or transaction ID</label>
+        <div class="search-control">
+          <input id="query" name="query" autocomplete="off" spellcheck="false" placeholder="925 or 64 lowercase hex characters">
+          <button type="submit">Inspect</button>
+        </div>
+        <p id="search-help">A 64-character identifier is checked as a block first, then as a transaction.</p>
+      </form>
+    </section>
+
+    <section class="identity" aria-label="Protocol identity">
+      <div><span>CHAIN ID</span><code id="chain-id">Loading</code></div>
+      <div><span>GENESIS</span><code id="genesis-hash">Loading</code></div>
+      <div><span>INDEX GENERATION</span><strong id="generation">—</strong></div>
+    </section>
+
+    <section class="heads" aria-label="Consensus heads">
+      <article class="head head-primary">
+        <span>UNSAFE HEAD</span>
+        <strong id="unsafe-height">—</strong>
+        <code id="unsafe-hash">Waiting for indexer</code>
+      </article>
+      <article class="head">
+        <span>JUSTIFIED</span>
+        <strong id="justified-height">—</strong>
+        <code id="justified-hash">Waiting for indexer</code>
+      </article>
+      <article class="head">
+        <span>FINALIZED</span>
+        <strong id="finalized-height">—</strong>
+        <code id="finalized-hash">Waiting for indexer</code>
+      </article>
+    </section>
+
+    <section class="ledger" aria-labelledby="recent-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">Canonical index</p><h2 id="recent-title">Recent blocks</h2></div>
+        <button class="text-button" id="refresh" type="button">Refresh ledger</button>
+      </div>
+      <div class="block-list" id="blocks" aria-live="polite">
+        <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+      </div>
+    </section>
+
+    <section class="result" id="result" hidden aria-live="polite">
+      <div class="section-heading"><div><p class="eyebrow">Lookup result</p><h2 id="result-title">Record</h2></div><button class="text-button" id="close-result" type="button">Close</button></div>
+      <pre id="result-body"></pre>
+    </section>
+
+    <section class="directory" aria-labelledby="apps-title">
+      <div class="section-heading"><div><p class="eyebrow">Protocol-backed applications</p><h2 id="apps-title">Use the network</h2></div></div>
+      <div class="app-grid">
+        <a href="http://localhost:18140/launch/"><span>01 / ASSETS</span><h3>Foundry</h3><p>Issue a fixed-supply asset and seed its first NOOS pool.</p><b>Open launchpad</b></a>
+        <a href="http://localhost:18140/exchange/"><span>02 / DEFI</span><h3>Current</h3><p>Quote and execute constant-product swaps against consensus reserves.</p><b>Open exchange</b></a>
+        <a href="http://localhost:18110"><span>03 / COMPUTE</span><h3>Work Market</h3><p>Request bounded MIX32 work or register an independently paid worker.</p><b>Open compute</b></a>
+        <a href="http://localhost:18120"><span>04 / OPERATIONS</span><h3>Network Room</h3><p>Inspect finality, node health, throughput, and compute supply.</p><b>Open network</b></a>
+      </div>
+    </section>
+  </main>
+  <footer><span>MindChain engineering network</span><span>Valueless test assets · Independent head semantics</span></footer>
+  <script src="/app.js" defer></script>
+</body>
+</html>

@@ -10,6 +10,8 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+from invitation_leases import issue_lease
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -21,6 +23,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--platform", choices=("windows", "macos"), required=True)
     parser.add_argument("--noosd", required=True)
+    parser.add_argument("--noos-cli")
     parser.add_argument("--manifest", required=True)
     parser.add_argument("--profile", required=True)
     parser.add_argument("--validator-host", required=True)
@@ -28,6 +31,9 @@ def main() -> int:
     parser.add_argument("--local-p2p-port", type=int, default=19702)
     parser.add_argument("--compute-market-url", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--lease-database")
+    parser.add_argument("--lease-seed-file")
+    parser.add_argument("--lease-ttl-seconds", type=int, default=86400)
     args = parser.parse_args()
 
     manifest_path = Path(args.manifest).resolve()
@@ -44,9 +50,18 @@ def main() -> int:
     node = Path(args.noosd).resolve()
     if not node.is_file():
         raise SystemExit(f"node binary not found: {node}")
+    cli = Path(args.noos_cli).resolve() if args.noos_cli else None
+    if cli is not None and not cli.is_file():
+        raise SystemExit(f"CLI binary not found: {cli}")
+    if bool(args.lease_database) != bool(args.lease_seed_file):
+        raise SystemExit("--lease-database and --lease-seed-file must be supplied together")
+    if args.lease_database and cli is None:
+        raise SystemExit("--noos-cli is required for a signed invitation bundle")
+
     invite = {
         "schema": "noos/one-click-invite/v1",
-        "chain_id": profile["chain_id"], "genesis_hash": profile["genesis_hash"],
+        "chain_id": profile["chain_id"],
+        "genesis_hash": profile["genesis_hash"],
         "genesis_time_ms": manifest["genesis_time_ms"],
         "params_sha256": manifest["params_sha256"],
         "validator_host": args.validator_host,
@@ -58,14 +73,32 @@ def main() -> int:
         "compute_market_url": args.compute_market_url,
         "test_network": True,
     }
+    if args.lease_database:
+        invite = issue_lease(
+            Path(args.lease_database).resolve(),
+            Path(args.lease_seed_file).resolve(),
+            invite,
+            f"witness-{args.witness_index}",
+            args.platform,
+            args.lease_ttl_seconds,
+        )
+
     output = Path(args.output).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="mindchain-join-") as temp_name:
         temp = Path(temp_name)
         shutil.copy2(params, temp / "devnet-parameters.toml")
-        (temp / "invite.json").write_text(json.dumps(invite, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        (temp / "invite.json").write_text(
+            json.dumps(invite, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        if invite.get("signing_key"):
+            (temp / "trusted-invitation-key.txt").write_text(
+                str(invite["signing_key"]) + "\n", encoding="ascii", newline="\n"
+            )
         if args.platform == "windows":
             shutil.copy2(node, temp / "noosd.exe")
+            if cli is not None:
+                shutil.copy2(cli, temp / "noos-cli.exe")
             shutil.copy2(ROOT / "tools/operator_onboard.ps1", temp / "operator_onboard.ps1")
             (temp / "JOIN MINDCHAIN.cmd").write_text(
                 '@echo off\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0operator_onboard.ps1" -BundleRoot "%~dp0"\r\n',
@@ -73,6 +106,8 @@ def main() -> int:
             )
         else:
             shutil.copy2(node, temp / "noosd")
+            if cli is not None:
+                shutil.copy2(cli, temp / "noos-cli")
             shutil.copy2(ROOT / "tools/operator_onboard.command", temp / "JOIN MINDCHAIN.command")
             shutil.copy2(ROOT / "tools/node_status_dashboard.py", temp / "node_status_dashboard.py")
         members = sorted(path for path in temp.iterdir() if path.is_file())
@@ -80,15 +115,26 @@ def main() -> int:
             for path in members:
                 info = zipfile.ZipInfo(path.name)
                 info.compress_type = zipfile.ZIP_DEFLATED
-                info.external_attr = (0o755 if path.suffix in {".command", ".cmd", ".ps1"} or path.name == "noosd" else 0o644) << 16
+                executable = path.suffix in {".command", ".cmd", ".ps1"} or path.name in {"noosd", "noos-cli"}
+                info.external_attr = (0o755 if executable else 0o644) << 16
                 archive.writestr(info, path.read_bytes())
     evidence = {
-        "schema": "noos/one-click-bundle-evidence/v1", "platform": args.platform,
-        "bundle": output.name, "sha256": sha256(output), "node_sha256": sha256(node),
-        "chain_id": invite["chain_id"], "genesis_hash": invite["genesis_hash"],
+        "schema": "noos/one-click-bundle-evidence/v1",
+        "platform": args.platform,
+        "bundle": output.name,
+        "sha256": sha256(output),
+        "node_sha256": sha256(node),
+        "cli_sha256": sha256(cli) if cli is not None else None,
+        "chain_id": invite["chain_id"],
+        "genesis_hash": invite["genesis_hash"],
         "witness_index": args.witness_index,
+        "lease_id": invite.get("lease_id"),
+        "lease_expires_unix_ms": invite.get("expires_unix_ms"),
+        "lease_signing_key": invite.get("signing_key"),
     }
-    output.with_suffix(output.suffix + ".json").write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output.with_suffix(output.suffix + ".json").write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     print(json.dumps(evidence, indent=2, sort_keys=True))
     return 0
 

@@ -77,6 +77,9 @@ async fn independent_heads_never_infer_finality() {
     assert_eq!(body["unsafe_head"]["height"], "9");
     assert_eq!(body["justified"]["height"], "7");
     assert_eq!(body["finalized"]["height"], "0");
+    assert_eq!(body["readiness"], "starting");
+    assert_eq!(body["ready"], false);
+    assert_eq!(body["indexed_generation"], "0");
 }
 
 #[tokio::test]

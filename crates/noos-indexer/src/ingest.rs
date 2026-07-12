@@ -22,13 +22,17 @@
 //!   calls, preserving the independent-heads contract.
 
 use crate::{
-    atomic_write, is_hash, ChainPoint, Identity, IndexedBlock, Indexer, IndexerError, Result,
-    ZERO_HASH,
+    is_hash, ChainPoint, Identity, IndexReadiness, IndexState, IndexedBlock, Indexer,
+    IndexerError, Result, TelemetryParser, ZERO_HASH,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
+use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// Epoch length in block heights (ch01 §4.1; `noos-braid` `EPOCH_LENGTH`).
@@ -38,19 +42,24 @@ const EPOCH_LENGTH: u64 = 256;
 /// Checkpoint tail size: the deepest offline reorg the indexer can roll
 /// back without a resync.
 const RETAINED_POINTS: usize = 64;
-const CHECKPOINT_FILE: &str = "ingest-checkpoint-v1.json";
-const CHECKPOINT_SCHEMA: &str = "noos-ingest-checkpoint-v1";
-const MAX_OPERATOR_RESPONSE_BYTES: usize = 64 * 1024;
+const GENERATION_PREFIX: &str = "index-generation-v2-";
+const GENERATION_SCHEMA: &str = "noos-index-generation-v2";
+const CHECKPOINT_SCHEMA: &str = "noos-index-checkpoint-v2";
+const MAX_OPERATOR_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_OPERATOR_HEADER_BYTES: usize = 16 * 1024;
 
-/// Node `/status` view (identity + unsafe head only; justified/finalized
-/// are epoch-keyed there and deliberately not consumed by ingestion).
+/// Node `/status` view with protocol identity and the three independently
+/// reported consensus heads.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NodeStatus {
     pub chain_id: String,
     pub genesis_hash: String,
     pub head_height: u64,
     pub head_hash: String,
+    pub justified_epoch: u64,
+    pub justified_hash: String,
+    pub finalized_epoch: u64,
+    pub finalized_hash: String,
 }
 
 /// Node `/block/<height>` view.
@@ -79,6 +88,22 @@ pub trait NodeSource {
     fn status(&mut self) -> Result<NodeStatus>;
     /// `Ok(None)` when the node does not (yet) serve the height.
     fn block_by_height(&mut self, height: u64) -> Result<Option<NodeBlock>>;
+    /// Bounded contiguous block range. Production overrides this to avoid
+    /// one TCP connection per historical block; scripted sources inherit
+    /// the exact-height fallback.
+    fn blocks_from(&mut self, start: u64, limit: u32) -> Result<Vec<NodeBlock>> {
+        let mut blocks = Vec::with_capacity(limit as usize);
+        for offset in 0..u64::from(limit) {
+            let Some(height) = start.checked_add(offset) else {
+                break;
+            };
+            let Some(block) = self.block_by_height(height)? else {
+                break;
+            };
+            blocks.push(block);
+        }
+        Ok(blocks)
+    }
     /// Best-effort receipt lookup; `Ok(None)` when unknown or still pending.
     fn receipt(&mut self, txid: &str) -> Result<Option<NodeReceipt>>;
 }
@@ -97,12 +122,186 @@ struct RecentPoint {
     hash: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct Checkpoint {
     schema: String,
     identity: Identity,
     next_height: String,
     recent: Vec<RecentPoint>,
+    generation: u64,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct PersistedState {
+    unsafe_head: Option<ChainPoint>,
+    justified: Option<ChainPoint>,
+    finalized: Option<ChainPoint>,
+    blocks: BTreeMap<u64, IndexedBlock>,
+    block_txids: BTreeMap<u64, Vec<String>>,
+    transactions: BTreeMap<String, Value>,
+    evidence: BTreeMap<String, Value>,
+}
+
+impl PersistedState {
+    fn capture(state: &IndexState) -> Self {
+        Self {
+            unsafe_head: state.unsafe_head.clone(),
+            justified: state.justified.clone(),
+            finalized: state.finalized.clone(),
+            blocks: state.blocks.clone(),
+            block_txids: state.block_txids.clone(),
+            transactions: state
+                .transactions
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect(),
+            evidence: state
+                .evidence
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect(),
+        }
+    }
+
+    fn restore(self) -> IndexState {
+        IndexState {
+            unsafe_head: self.unsafe_head,
+            justified: self.justified,
+            finalized: self.finalized,
+            blocks: self.blocks,
+            block_txids: self.block_txids,
+            transactions: self.transactions.into_iter().collect(),
+            evidence: self.evidence.into_iter().collect(),
+            telemetry: TelemetryParser::default(),
+            readiness: IndexReadiness::Starting,
+            generation: 0,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct GenerationPayload {
+    schema: String,
+    identity: Identity,
+    sequence: u64,
+    checkpoint: Checkpoint,
+    state: PersistedState,
+}
+
+#[derive(Serialize, Deserialize)]
+struct GenerationEnvelope {
+    payload: GenerationPayload,
+    sha256: String,
+}
+
+fn payload_digest(payload: &GenerationPayload) -> Result<String> {
+    let bytes = serde_json::to_vec(payload).map_err(|error| IndexerError::Io(error.to_string()))?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+fn generation_paths(root: &Path) -> Result<Vec<PathBuf>> {
+    let mut paths = Vec::new();
+    for entry in fs::read_dir(root).map_err(|error| IndexerError::Io(error.to_string()))? {
+        let path = entry
+            .map_err(|error| IndexerError::Io(error.to_string()))?
+            .path();
+        if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with(GENERATION_PREFIX) && name.ends_with(".json"))
+        {
+            paths.push(path);
+        }
+    }
+    paths.sort_by(|left, right| right.file_name().cmp(&left.file_name()));
+    Ok(paths)
+}
+
+fn generation_consistent(payload: &GenerationPayload) -> bool {
+    if payload.schema != GENERATION_SCHEMA
+        || payload.sequence == 0
+        || payload.checkpoint.generation != payload.sequence
+        || payload.checkpoint.identity != payload.identity
+    {
+        return false;
+    }
+    let Ok((tip_height, tip_hash)) = payload.checkpoint.tip() else {
+        return false;
+    };
+    let state_tip = payload
+        .state
+        .unsafe_head
+        .as_ref()
+        .and_then(|point| point.numeric_height().ok());
+    if state_tip != Some(tip_height) {
+        return false;
+    }
+    if tip_height == 0 {
+        return payload.state.blocks.is_empty() && is_hash(tip_hash);
+    }
+    payload
+        .state
+        .blocks
+        .get(&tip_height)
+        .is_some_and(|block| block.hash == tip_hash)
+        && payload.state.blocks.keys().next_back().copied() == Some(tip_height)
+}
+
+fn load_latest_generation(root: &Path, identity: &Identity) -> Result<Option<GenerationPayload>> {
+    let paths = generation_paths(root)?;
+    if paths.is_empty() {
+        return Ok(None);
+    }
+    for path in paths {
+        let Ok(bytes) = fs::read(path) else {
+            continue;
+        };
+        let Ok(envelope) = serde_json::from_slice::<GenerationEnvelope>(&bytes) else {
+            continue;
+        };
+        let Ok(digest) = payload_digest(&envelope.payload) else {
+            continue;
+        };
+        if envelope.sha256 == digest
+            && envelope.payload.identity == *identity
+            && generation_consistent(&envelope.payload)
+        {
+            return Ok(Some(envelope.payload));
+        }
+    }
+    Err(IndexerError::StateDiverged)
+}
+
+pub(super) fn restore_index_state(root: &Path, identity: &Identity) -> Result<Option<IndexState>> {
+    Ok(load_latest_generation(root, identity)?.map(|generation| {
+        let sequence = generation.sequence;
+        let mut state = generation.state.restore();
+        state.generation = sequence;
+        state
+    }))
+}
+
+fn durable_store_generation(root: &Path, payload: GenerationPayload) -> Result<()> {
+    let sha256 = payload_digest(&payload)?;
+    let envelope = GenerationEnvelope { payload, sha256 };
+    let bytes =
+        serde_json::to_vec_pretty(&envelope).map_err(|error| IndexerError::Io(error.to_string()))?;
+    let sequence = envelope.payload.sequence;
+    let final_path = root.join(format!("{GENERATION_PREFIX}{sequence:020}.json"));
+    let stage_path = root.join(format!("{GENERATION_PREFIX}{sequence:020}.stage"));
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&stage_path)
+        .map_err(|error| IndexerError::Io(error.to_string()))?;
+    file.write_all(&bytes)
+        .and_then(|()| file.sync_all())
+        .map_err(|error| IndexerError::Io(error.to_string()))?;
+    fs::rename(&stage_path, &final_path).map_err(|error| IndexerError::Io(error.to_string()))?;
+    for obsolete in generation_paths(root)?.into_iter().skip(3) {
+        let _ = fs::remove_file(obsolete);
+    }
+    Ok(())
 }
 
 impl Checkpoint {
@@ -139,47 +338,119 @@ impl Indexer {
             return Err(IndexerError::WrongProtocolIdentity);
         }
         let mut cp = self.load_checkpoint()?;
+        {
+            let mut state = self.inner.write().await;
+            state.readiness = IndexReadiness::CatchingUp;
+            state.generation = cp.generation;
+        }
         let mut next = parse_u64(&cp.next_height)?;
         let mut ingested = 0u64;
         let mut rolled_back = 0u64;
-        while next <= status.head_height && ingested < max_blocks {
-            let Some(block) = source.block_by_height(next)? else {
+        'fetch: while next <= status.head_height && ingested < max_blocks {
+            let available = status.head_height.saturating_sub(next).saturating_add(1);
+            let remaining = max_blocks.saturating_sub(ingested).min(available).min(64);
+            let limit = u32::try_from(remaining)
+                .map_err(|_| IndexerError::Source("block range overflow".into()))?;
+            let blocks = source.blocks_from(next, limit)?;
+            if blocks.is_empty() {
                 break; // source lag: retry on the next pass, same height
-            };
-            if block.height != next
-                || !is_hash(&block.hash)
-                || !is_hash(&block.parent_hash)
-                || block.txids.iter().any(|t| !is_hash(t))
-            {
-                return Err(IndexerError::Source(format!(
-                    "malformed block frame at height {next}"
-                )));
             }
-            let (tip_height, tip_hash) = cp.tip()?;
-            debug_assert_eq!(tip_height.saturating_add(1), next);
-            if block.parent_hash != tip_hash {
-                // Fork: find the deepest retained ancestor still on the
-                // source's chain, then delete exactly the orphaned rows.
-                let ancestor = find_ancestor(source, &cp)?;
-                rolled_back = rolled_back.saturating_add(tip_height.saturating_sub(ancestor));
-                self.rollback_to(ancestor, &mut cp).await;
-                next = ancestor.saturating_add(1);
-                continue;
+            if blocks.len() > limit as usize {
+                return Err(IndexerError::Source("oversized block range".into()));
             }
-            self.apply_block(source, &block).await?;
-            cp.recent.push(RecentPoint {
-                height: block.height.to_string(),
-                hash: block.hash.clone(),
-            });
-            if cp.recent.len() > RETAINED_POINTS {
-                let overflow = cp.recent.len().saturating_sub(RETAINED_POINTS);
-                cp.recent.drain(..overflow);
+            for block in blocks {
+                if block.height != next
+                    || !is_hash(&block.hash)
+                    || !is_hash(&block.parent_hash)
+                    || block.txids.iter().any(|txid| !is_hash(txid))
+                {
+                    return Err(IndexerError::Source(format!(
+                        "malformed block frame at height {next}"
+                    )));
+                }
+                let (tip_height, tip_hash) = {
+                    let (height, hash) = cp.tip()?;
+                    (height, hash.to_owned())
+                };
+                debug_assert_eq!(tip_height.saturating_add(1), next);
+                // The protocol identity's `genesis_hash` commits the genesis
+                // body, while block 1 links to the canonical genesis header
+                // hash. Anchor a fresh checkpoint from that authenticated
+                // first block instead of assuming those distinct hashes match.
+                if block.height == 1 && tip_height == 0 && cp.generation == 0 {
+                    cp.recent[0].hash.clone_from(&block.parent_hash);
+                }
+                if block.parent_hash != tip_hash {
+                    // Fork: find the deepest retained ancestor still on the
+                    // source's chain, then delete exactly the orphaned rows.
+                    let ancestor = find_ancestor(source, &cp)?;
+                    rolled_back =
+                        rolled_back.saturating_add(tip_height.saturating_sub(ancestor));
+                    self.rollback_to(ancestor, &mut cp).await;
+                    next = ancestor.saturating_add(1);
+                    continue 'fetch;
+                }
+                self.apply_block(source, &block).await?;
+                cp.recent.push(RecentPoint {
+                    height: block.height.to_string(),
+                    hash: block.hash.clone(),
+                });
+                if cp.recent.len() > RETAINED_POINTS {
+                    let overflow = cp.recent.len().saturating_sub(RETAINED_POINTS);
+                    cp.recent.drain(..overflow);
+                }
+                ingested = ingested.saturating_add(1);
+                next = next.saturating_add(1);
             }
-            ingested = ingested.saturating_add(1);
-            next = next.saturating_add(1);
         }
+        let justified_height = status
+            .justified_epoch
+            .checked_mul(EPOCH_LENGTH)
+            .ok_or_else(|| IndexerError::Source("justified checkpoint height overflow".into()))?;
+        let finalized_height = status
+            .finalized_epoch
+            .checked_mul(EPOCH_LENGTH)
+            .ok_or_else(|| IndexerError::Source("finalized checkpoint height overflow".into()))?;
+        if justified_height > status.head_height
+            || finalized_height > justified_height
+            || !is_hash(&status.justified_hash)
+            || !is_hash(&status.finalized_hash)
+        {
+            return Err(IndexerError::Source("malformed finality checkpoint".into()));
+        }
+        self.ingest_head(
+            identity,
+            crate::HeadKind::Justified,
+            ChainPoint {
+                height: justified_height.to_string(),
+                hash: status.justified_hash,
+                state_root: ZERO_HASH.into(),
+            },
+        )
+        .await?;
+        self.ingest_head(
+            identity,
+            crate::HeadKind::Finalized,
+            ChainPoint {
+                height: finalized_height.to_string(),
+                hash: status.finalized_hash,
+                state_root: ZERO_HASH.into(),
+            },
+        )
+        .await?;
         cp.next_height = next.to_string();
-        self.store_checkpoint(&cp)?;
+        if ingested > 0 || rolled_back > 0 || cp.generation == 0 {
+            self.store_generation(&mut cp).await?;
+        }
+        {
+            let mut state = self.inner.write().await;
+            state.generation = cp.generation;
+            state.readiness = if next > status.head_height {
+                IndexReadiness::Ready
+            } else {
+                IndexReadiness::CatchingUp
+            };
+        }
         Ok(SyncReport {
             ingested,
             rolled_back,
@@ -188,30 +459,46 @@ impl Indexer {
     }
 
     fn load_checkpoint(&self) -> Result<Checkpoint> {
-        let path = self.root.join(CHECKPOINT_FILE);
-        if !path.exists() {
-            return Ok(Checkpoint {
-                schema: CHECKPOINT_SCHEMA.into(),
-                identity: self.identity.clone(),
-                next_height: "1".into(),
-                recent: vec![RecentPoint {
-                    height: "0".into(),
-                    hash: self.identity.genesis_hash.clone(),
-                }],
-            });
+        if let Some(generation) = load_latest_generation(&self.root, &self.identity)? {
+            let checkpoint = generation.checkpoint;
+            if checkpoint.schema != CHECKPOINT_SCHEMA
+                || checkpoint.identity != self.identity
+                || checkpoint.recent.is_empty()
+            {
+                return Err(IndexerError::StateDiverged);
+            }
+            return Ok(checkpoint);
         }
-        let bytes = std::fs::read(&path).map_err(|e| IndexerError::Io(e.to_string()))?;
-        let cp: Checkpoint =
-            serde_json::from_slice(&bytes).map_err(|_| IndexerError::SchemaMismatch)?;
-        if cp.schema != CHECKPOINT_SCHEMA || cp.identity != self.identity || cp.recent.is_empty() {
-            return Err(IndexerError::SchemaMismatch);
-        }
-        Ok(cp)
+        Ok(Checkpoint {
+            schema: CHECKPOINT_SCHEMA.into(),
+            identity: self.identity.clone(),
+            next_height: "1".into(),
+            recent: vec![RecentPoint {
+                height: "0".into(),
+                hash: self.identity.genesis_hash.clone(),
+            }],
+            generation: 0,
+        })
     }
 
-    fn store_checkpoint(&self, cp: &Checkpoint) -> Result<()> {
-        let bytes = serde_json::to_vec_pretty(cp).map_err(|e| IndexerError::Io(e.to_string()))?;
-        atomic_write(&self.root.join(CHECKPOINT_FILE), &bytes)
+    async fn store_generation(&self, checkpoint: &mut Checkpoint) -> Result<()> {
+        checkpoint.generation = checkpoint
+            .generation
+            .checked_add(1)
+            .ok_or(IndexerError::StateDiverged)?;
+        let state_guard = self.inner.read().await;
+        let state = PersistedState::capture(&state_guard);
+        drop(state_guard);
+        durable_store_generation(
+            &self.root,
+            GenerationPayload {
+                schema: GENERATION_SCHEMA.into(),
+                identity: self.identity.clone(),
+                sequence: checkpoint.generation,
+                checkpoint: checkpoint.clone(),
+                state,
+            },
+        )
     }
 
     /// Deletes every block row above `ancestor` together with exactly the
@@ -485,6 +772,28 @@ pub enum ForwardError {
     MalformedResponse,
 }
 
+fn decode_node_block(value: &Value) -> Result<NodeBlock> {
+    let txids = value["txids"]
+        .as_array()
+        .ok_or_else(|| IndexerError::Source("block without txids".into()))?
+        .iter()
+        .map(|txid| {
+            txid
+                .as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| IndexerError::Source("non-string txid".into()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(NodeBlock {
+        hash: str_field(value, "hash")?,
+        height: u64_field(value, "height")?,
+        slot: u64_field(value, "slot")?,
+        timestamp_ms: u64_field(value, "timestamp_ms")?,
+        parent_hash: str_field(value, "parent_hash")?,
+        txids,
+    })
+}
+
 impl NodeSource for LineProtocolSource {
     fn status(&mut self) -> Result<NodeStatus> {
         let (code, v) = self.get("/status")?;
@@ -496,6 +805,10 @@ impl NodeSource for LineProtocolSource {
             genesis_hash: str_field(&v, "genesis_hash")?,
             head_height: u64_field(&v["unsafe_head"], "height")?,
             head_hash: str_field(&v["unsafe_head"], "hash")?,
+            justified_epoch: u64_field(&v["justified"], "epoch")?,
+            justified_hash: str_field(&v["justified"], "hash")?,
+            finalized_epoch: u64_field(&v["finalized"], "epoch")?,
+            finalized_hash: str_field(&v["finalized"], "hash")?,
         })
     }
 
@@ -508,24 +821,27 @@ impl NodeSource for LineProtocolSource {
                 return Err(IndexerError::Source(format!("/block returned {other}")));
             }
         }
-        let txids = v["txids"]
+        Ok(Some(decode_node_block(&v)?))
+    }
+
+    fn blocks_from(&mut self, start: u64, limit: u32) -> Result<Vec<NodeBlock>> {
+        if !(1..=64).contains(&limit) {
+            return Err(IndexerError::Source("block range limit must be 1..64".into()));
+        }
+        let (code, value) = self.get(&format!("/blocks/{start}/{limit}"))?;
+        match code {
+            200 => {}
+            404 | 410 => return Ok(Vec::new()),
+            other => {
+                return Err(IndexerError::Source(format!("/blocks returned {other}")));
+            }
+        }
+        value["items"]
             .as_array()
-            .ok_or_else(|| IndexerError::Source("block without txids".into()))?
+            .ok_or_else(|| IndexerError::Source("block range without items".into()))?
             .iter()
-            .map(|t| {
-                t.as_str()
-                    .map(str::to_owned)
-                    .ok_or_else(|| IndexerError::Source("non-string txid".into()))
-            })
-            .collect::<Result<Vec<_>>>()?;
-        Ok(Some(NodeBlock {
-            hash: str_field(&v, "hash")?,
-            height: u64_field(&v, "height")?,
-            slot: u64_field(&v, "slot")?,
-            timestamp_ms: u64_field(&v, "timestamp_ms")?,
-            parent_hash: str_field(&v, "parent_hash")?,
-            txids,
-        }))
+            .map(decode_node_block)
+            .collect()
     }
 
     fn receipt(&mut self, txid: &str) -> Result<Option<NodeReceipt>> {

@@ -14,8 +14,10 @@
 
 #![forbid(unsafe_code)]
 mod manifest;
+mod invitation;
 
 pub use manifest::manifest_verify;
+pub use invitation::invitation_verify;
 
 use noos_codec::{NoosDecode, NoosEncode};
 use noos_lumen::objects::{
@@ -805,6 +807,7 @@ pub const USAGE: &str = "noos-cli <command>\n\
   tx submit --node <addr> --token <t> --chain-id <hex32> --genesis-hash <hex32> --tx <hex> --witnesses <hex>\n\
   query     block <height|hash> --indexer <addr> | tx <txid> --indexer <addr>\n\
   manifest  verify --file <path> --public-key <hex32> [--now-unix-ms <u64>]\n\
+  invitation verify --file <path> --public-key <hex32> [--now-unix-ms <u64>]\n\
   status    --node <addr> --token <t> | --indexer <addr>";
 
 /// Runs one CLI invocation; returns the exact stdout payload.
@@ -880,6 +883,31 @@ pub fn run(args: &[String]) -> Result<String> {
                     })?,
             };
             pretty(manifest_verify(
+                &encoded,
+                &required(rest, "--public-key")?,
+                now_unix_ms,
+            )?)
+        }
+        [invitation, verify, rest @ ..]
+            if invitation == "invitation" && verify == "verify" =>
+        {
+            let path = required(rest, "--file")?;
+            let encoded = std::fs::read_to_string(&path)
+                .map_err(|error| CliError::Usage(format!("--file {path}: {error}")))?;
+            let now_unix_ms = match flag(rest, "--now-unix-ms") {
+                Some(value) => value
+                    .parse()
+                    .map_err(|_| CliError::Usage("--now-unix-ms must be a u64".into()))?,
+                None => SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map_err(|_| CliError::Malformed("system clock precedes Unix epoch".into()))?
+                    .as_millis()
+                    .try_into()
+                    .map_err(|_| {
+                        CliError::Malformed("system clock does not fit u64 milliseconds".into())
+                    })?,
+            };
+            pretty(invitation_verify(
                 &encoded,
                 &required(rest, "--public-key")?,
                 now_unix_ms,

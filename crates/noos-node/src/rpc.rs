@@ -11,6 +11,7 @@
 //!                   observer mode → 409 feature_disabled with the
 //!                   mechanism id, never empty success
 //! GET  /block/<height|hash-hex>
+//! GET  /blocks/<start-height>/<limit> (authenticated, limit 1..64)
 //! GET  /receipt/<txid-hex>
 //! GET  /assets      fixed-supply user asset registry
 //! GET  /pools       constant-product pool registry
@@ -214,6 +215,9 @@ fn handle_connection(
     match (method.as_str(), path.as_str()) {
         ("GET", "/status") => status_route(consensus_tx),
         ("POST", "/submit_tx") => submit_route(cfg, consensus_tx, &body),
+        _ if method == "GET" && path.starts_with("/blocks/") => {
+            blocks_route(consensus_tx, &path["/blocks/".len()..])
+        }
         _ if method == "GET" && path.starts_with("/block/") => {
             block_route(consensus_tx, &path["/block/".len()..])
         }
@@ -376,6 +380,69 @@ fn block_route(consensus_tx: &SyncSender<ConsensusMsg>, id_raw: &str) -> String 
         ViewLookup::Pruned => json_error("410 Gone", "pruned", "outside the retention window"),
         ViewLookup::NotFound => json_error("404 Not Found", "not_found", "unknown block"),
     }
+}
+
+fn blocks_route(consensus_tx: &SyncSender<ConsensusMsg>, range_raw: &str) -> String {
+    let mut parts = range_raw.split('/');
+    let (Some(start_raw), Some(limit_raw), None) = (parts.next(), parts.next(), parts.next()) else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "expected /blocks/<start-height>/<limit>",
+        );
+    };
+    let (Ok(start), Ok(limit)) = (start_raw.parse::<u64>(), limit_raw.parse::<usize>()) else {
+        return json_error("400 Bad Request", "malformed", "bad block range");
+    };
+    if !(1..=64).contains(&limit) {
+        return json_error("400 Bad Request", "malformed", "block range limit must be 1..64");
+    }
+    let mut items = Vec::with_capacity(limit);
+    for offset in 0..limit {
+        let Ok(offset) = u64::try_from(offset) else {
+            return json_error("400 Bad Request", "malformed", "block range overflow");
+        };
+        let Some(height) = start.checked_add(offset) else {
+            return json_error("400 Bad Request", "malformed", "block range overflow");
+        };
+        let Some(lookup) = round_trip(consensus_tx, |reply| ConsensusMsg::GetBlock {
+            id: BlockId::Height(height),
+            reply,
+        }) else {
+            return json_error(
+                "503 Service Unavailable",
+                "consensus_unavailable",
+                "no reply",
+            );
+        };
+        match lookup {
+            ViewLookup::Found(block) => {
+                let txids: Vec<String> = block
+                    .txids
+                    .iter()
+                    .map(|txid| format!("\"{}\"", hex(txid)))
+                    .collect();
+                items.push(format!(
+                    r#"{{"hash":"{}","height":{},"slot":{},"timestamp_ms":{},"parent_hash":"{}","txids":[{}]}}"#,
+                    hex(&block.hash),
+                    block.height,
+                    block.slot,
+                    block.timestamp_ms,
+                    hex(&block.parent_hash),
+                    txids.join(",")
+                ));
+            }
+            ViewLookup::NotFound => break,
+            ViewLookup::Pruned => {
+                return json_error("410 Gone", "pruned", "outside the retention window");
+            }
+        }
+    }
+    http(
+        "200 OK",
+        "application/json",
+        &format!(r#"{{"items":[{}]}}"#, items.join(",")),
+    )
 }
 
 fn receipt_route(consensus_tx: &SyncSender<ConsensusMsg>, txid_raw: &str) -> String {

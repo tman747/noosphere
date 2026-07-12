@@ -663,6 +663,10 @@ async fn query_reads_blocks_and_transactions_from_a_live_indexer() {
                 genesis_hash: self.0.genesis_hash.clone(),
                 head_height: 1,
                 head_hash: "c".repeat(64),
+                justified_epoch: 0,
+                justified_hash: self.0.genesis_hash.clone(),
+                finalized_epoch: 0,
+                finalized_hash: self.0.genesis_hash.clone(),
             })
         }
         fn block_by_height(&mut self, h: u64) -> noos_indexer::Result<Option<NodeBlock>> {

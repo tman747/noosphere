@@ -15,7 +15,18 @@ try {
     Fail "This MindChain invitation is incomplete. Download the bundle again."
   }
   $invite = Get-Content -Raw $invitePath | ConvertFrom-Json
-  if ($invite.schema -ne "noos/one-click-invite/v1") { Fail "This invitation format is not supported." }
+  if ($invite.schema -eq "noos/invitation-lease/v2") {
+    $cli = Join-Path $BundleRoot "noos-cli.exe"
+    $trustedKey = Join-Path $BundleRoot "trusted-invitation-key.txt"
+    if (-not (Test-Path $cli) -or -not (Test-Path $trustedKey)) {
+      Fail "This signed MindChain invitation is missing its verifier."
+    }
+    $publicKey = (Get-Content -LiteralPath $trustedKey -Raw).Trim()
+    & $cli invitation verify --file $invitePath --public-key $publicKey | Out-Null
+    if ($LASTEXITCODE -ne 0) { Fail "This MindChain invitation is invalid or expired." }
+  } elseif ($invite.schema -ne "noos/one-click-invite/v1") {
+    Fail "This invitation format is not supported."
+  }
   $paramsHash = (Get-FileHash $paramsSource -Algorithm SHA256).Hash.ToLowerInvariant()
   if ($paramsHash -ne $invite.params_sha256) { Fail "The network parameters failed their checksum." }
 

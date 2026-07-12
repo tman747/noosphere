@@ -39,7 +39,7 @@ async fn main() -> std::io::Result<()> {
                 // Short blocking localhost round-trips; acceptable in this
                 // dedicated operator task.
                 if let Err(error) = ingest_indexer
-                    .sync_from_node(&ingest_identity, &mut source, 1024)
+                    .sync_from_node(&ingest_identity, &mut source, 16)
                     .await
                 {
                     eprintln!("ingest: {error}");

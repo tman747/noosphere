@@ -11,6 +11,7 @@ use noos_indexer::ingest::{
 };
 use noos_indexer::{Identity, Indexer, IndexerError};
 use std::collections::BTreeMap;
+use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 
@@ -88,6 +89,10 @@ impl ScriptedSource {
                 genesis_hash: id.genesis_hash.clone(),
                 head_height: head,
                 head_hash,
+                justified_epoch: 0,
+                justified_hash: id.genesis_hash.clone(),
+                finalized_epoch: 0,
+                finalized_hash: id.genesis_hash.clone(),
             },
             blocks,
             requested: Vec::new(),
@@ -150,6 +155,66 @@ async fn stored_tx(indexer: &Indexer, txid: &str) -> Option<serde_json::Value> {
     }
     serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).ok()
 }
+async fn status_json(indexer: &Indexer) -> serde_json::Value {
+    use axum::body::{to_bytes, Body};
+    use axum::http::Request;
+    use tower::ServiceExt;
+    let response = noos_indexer::router(indexer.clone())
+        .oneshot(Request::builder().uri("/api/status").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap()
+}
+
+
+
+#[tokio::test]
+async fn first_block_anchors_distinct_genesis_header_hash() {
+    let dir = tempfile::tempdir().unwrap();
+    let id = identity();
+    let header_hash = hash('c');
+    assert_ne!(header_hash, id.genesis_hash);
+    let blocks = ScriptedSource::chain(0xaa, &header_hash, 1, 2, 0);
+    let indexer = Indexer::open(dir.path(), id.clone(), id.clone()).unwrap();
+    let mut source = ScriptedSource::new(&id, blocks);
+
+    let report = indexer.sync_from_node(&id, &mut source, 16).await.unwrap();
+    assert_eq!(report.ingested, 2);
+    assert_eq!(report.next_height, 3);
+    assert_eq!(stored_block_hash(&indexer, 1).await, Some(block_hash(0xaa, 1)));
+
+    drop(indexer);
+    let restored = Indexer::open(dir.path(), id.clone(), id).unwrap();
+    assert_eq!(stored_block_hash(&restored, 2).await, Some(block_hash(0xaa, 2)));
+}
+
+
+#[tokio::test]
+async fn explicit_node_finality_heads_are_indexed_and_persisted() {
+    let dir = tempfile::tempdir().unwrap();
+    let id = identity();
+    let blocks = ScriptedSource::chain(0xaa, &id.genesis_hash, 1, 600, 0);
+    let indexer = Indexer::open(dir.path(), id.clone(), id.clone()).unwrap();
+    let mut source = ScriptedSource::new(&id, blocks);
+    source.status.justified_epoch = 2;
+    source.status.justified_hash = hash('c');
+    source.status.finalized_epoch = 1;
+    source.status.finalized_hash = hash('d');
+
+    indexer.sync_from_node(&id, &mut source, 600).await.unwrap();
+    let status = status_json(&indexer).await;
+    assert_eq!(status["justified"]["height"], "512");
+    assert_eq!(status["justified"]["hash"], hash('c'));
+    assert_eq!(status["finalized"]["height"], "256");
+    assert_eq!(status["finalized"]["hash"], hash('d'));
+
+    drop(indexer);
+    let restored = Indexer::open(dir.path(), id.clone(), id).unwrap();
+    let status = status_json(&restored).await;
+    assert_eq!(status["justified"]["height"], "512");
+    assert_eq!(status["finalized"]["height"], "256");
+}
+
 
 #[tokio::test]
 async fn fork_replaces_prior_head_rows_exactly() {
@@ -239,6 +304,15 @@ async fn resume_requests_exactly_the_next_height_after_restart() {
     }
     // Restart: fresh Indexer instance over the same root.
     let indexer = Indexer::open(dir.path(), identity(), identity()).unwrap();
+    assert_eq!(
+        stored_block_hash(&indexer, 4).await.as_deref(),
+        Some(block_hash(0xaa, 4).as_str()),
+        "query block state survives with the cursor"
+    );
+    assert!(
+        stored_tx(&indexer, &txid_for(0xaa, 4, 0)).await.is_some(),
+        "query transaction state survives with the cursor"
+    );
     let mut src = ScriptedSource::new(&id, ScriptedSource::chain(0xaa, &id.genesis_hash, 1, 7, 1));
     let report = indexer
         .sync_from_node(&id, &mut src, u64::MAX)
@@ -254,6 +328,79 @@ async fn resume_requests_exactly_the_next_height_after_restart() {
     );
     // Falsifier: a restart that re-scans or skips would request != [5,6,7].
     assert_eq!(src.requested, vec![5, 6, 7]);
+}
+
+#[tokio::test]
+async fn corrupt_latest_generation_falls_back_without_skipping_rows() {
+    let dir = tempfile::tempdir().unwrap();
+    let id = identity();
+    let indexer = Indexer::open(dir.path(), id.clone(), id.clone()).unwrap();
+    let mut first =
+        ScriptedSource::new(&id, ScriptedSource::chain(0xaa, &id.genesis_hash, 1, 3, 1));
+    indexer
+        .sync_from_node(&id, &mut first, u64::MAX)
+        .await
+        .unwrap();
+    let mut second =
+        ScriptedSource::new(&id, ScriptedSource::chain(0xaa, &id.genesis_hash, 1, 5, 1));
+    indexer
+        .sync_from_node(&id, &mut second, u64::MAX)
+        .await
+        .unwrap();
+    drop(indexer);
+
+    let mut generations: Vec<_> = fs::read_dir(dir.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("index-generation-v2-") && name.ends_with(".json"))
+        })
+        .collect();
+    generations.sort();
+    fs::write(generations.last().unwrap(), b"truncated generation").unwrap();
+
+    let recovered = Indexer::open(dir.path(), id.clone(), id.clone()).unwrap();
+    assert!(stored_block_hash(&recovered, 3).await.is_some());
+    assert!(stored_block_hash(&recovered, 4).await.is_none());
+    let mut source =
+        ScriptedSource::new(&id, ScriptedSource::chain(0xaa, &id.genesis_hash, 1, 5, 1));
+    recovered
+        .sync_from_node(&id, &mut source, u64::MAX)
+        .await
+        .unwrap();
+    assert_eq!(source.requested, vec![4, 5]);
+    assert!(stored_tx(&recovered, &txid_for(0xaa, 5, 0)).await.is_some());
+}
+
+#[tokio::test]
+async fn all_corrupt_generations_fail_closed() {
+    let dir = tempfile::tempdir().unwrap();
+    let id = identity();
+    let indexer = Indexer::open(dir.path(), id.clone(), id.clone()).unwrap();
+    let mut source =
+        ScriptedSource::new(&id, ScriptedSource::chain(0xaa, &id.genesis_hash, 1, 1, 1));
+    indexer
+        .sync_from_node(&id, &mut source, u64::MAX)
+        .await
+        .unwrap();
+    drop(indexer);
+    for entry in fs::read_dir(dir.path()).unwrap() {
+        let path = entry.unwrap().path();
+        if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with("index-generation-v2-"))
+        {
+            fs::write(path, b"corrupt").unwrap();
+        }
+    }
+    let error = match Indexer::open(dir.path(), id.clone(), id) {
+        Ok(_) => panic!("corrupt cursor/query generations must fail closed"),
+        Err(error) => error,
+    };
+    assert_eq!(error, IndexerError::StateDiverged);
 }
 
 #[tokio::test]
@@ -388,6 +535,33 @@ fn spawn_node_shaped_server(
                     ),
                     id.chain_id, id.genesis_hash, head, head_hash, id.genesis_hash, id.genesis_hash
                 )
+            } else if let Some(rest) = path.strip_prefix("/blocks/") {
+                let mut parts = rest.split('/');
+                let start = parts.next().and_then(|value| value.parse::<u64>().ok());
+                let limit = parts.next().and_then(|value| value.parse::<u32>().ok());
+                let items: Vec<String> = match (start, limit) {
+                    (Some(start), Some(limit)) => (0..u64::from(limit))
+                        .filter_map(|offset| blocks.get(&start.saturating_add(offset)))
+                        .map(|block| {
+                            let txids: Vec<String> = block
+                                .txids
+                                .iter()
+                                .map(|txid| format!("\"{txid}\""))
+                                .collect();
+                            format!(
+                                r#"{{"hash":"{}","height":{},"slot":{},"timestamp_ms":{},"parent_hash":"{}","txids":[{}]}}"#,
+                                block.hash,
+                                block.height,
+                                block.slot,
+                                block.timestamp_ms,
+                                block.parent_hash,
+                                txids.join(",")
+                            )
+                        })
+                        .collect(),
+                    _ => Vec::new(),
+                };
+                format!(r#"{{"items":[{}]}}"#, items.join(","))
             } else if let Some(rest) = path.strip_prefix("/block/") {
                 match rest.parse::<u64>().ok().and_then(|h| blocks.get(&h)) {
                     Some(b) => {

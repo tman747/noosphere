@@ -136,6 +136,35 @@ def get_payload(market: str, job_id: str) -> dict:
     return value
 
 
+def validate_payload(job: dict, payload: dict, max_operations: int) -> tuple[int, int, int, int]:
+    """Bind coordinator bytes to the claimed on-chain job and local meter."""
+    if job.get("workload_kind") != 0:
+        raise ValueError("unregistered workload kind")
+    if set(payload) != {"seed", "start", "units", "rounds"}:
+        raise ValueError("MIX32 payload fields mismatch")
+    if any(type(payload[name]) is not int for name in payload):
+        raise ValueError("MIX32 payload fields must be integers")
+    seed, start, units, rounds = (
+        payload["seed"], payload["start"], payload["units"], payload["rounds"]
+    )
+    if not 0 <= seed <= 0xFFFFFFFF or not 0 <= start <= 0xFFFFFFFFFFFFFFFF:
+        raise ValueError("MIX32 seed or start is out of range")
+    if not 1 <= units <= 1_000_000 or not 1 <= rounds <= 1_048_576:
+        raise ValueError("MIX32 workload bounds exceeded")
+    operations = units * rounds
+    if max_operations < 1 or operations > max_operations:
+        raise ValueError("MIX32 deterministic operation budget exceeded")
+    if units != int(job.get("units", "0")) or rounds != int(job.get("unit_size", "0")):
+        raise ValueError("MIX32 payload differs from the on-chain meter")
+    commitment = hashlib.sha256(
+        b"NOOS/COMPUTE/MIX32/INPUT/V1"
+        + json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    if commitment != job.get("input_root"):
+        raise ValueError("MIX32 payload commitment mismatch")
+    return seed, start, units, rounds
+
+
 def notify_result(market: str, job_id: str, result_root: str) -> dict:
     request = urllib.request.Request(
         f"{market.rstrip('/')}/api/result", method="POST",
@@ -177,9 +206,11 @@ def run_worker(args: argparse.Namespace, profile: dict, seed: str, worker: str) 
                 time.sleep(0.5)
                 continue
             payload = get_payload(args.market, job_id)
+            workload_seed, start, units, rounds = validate_payload(
+                job, payload, args.max_operations
+            )
             started = time.perf_counter()
-            result_root = compute_root(int(payload["seed"]), int(payload["start"]),
-                                       int(payload["units"]), int(payload["rounds"]), args.threads)
+            result_root = compute_root(workload_seed, start, units, rounds, args.threads)
             elapsed = time.perf_counter() - started
             submit_action(profile, seed, args.account, args.index, {
                 "type": "submit_compute_result", "worker": worker, "job_id": job_id,
@@ -204,6 +235,7 @@ def main() -> int:
     parser.add_argument("--threads", type=int, default=max(1, os.cpu_count() or 1))
     parser.add_argument("--memory-mb", type=int, default=4096)
     parser.add_argument("--price-per-unit", type=int, default=1)
+    parser.add_argument("--max-operations", type=int, default=100_000_000)
     parser.add_argument("--poll", type=float, default=2)
     parser.add_argument("command", choices=("register", "run", "register-and-run"))
     args = parser.parse_args()

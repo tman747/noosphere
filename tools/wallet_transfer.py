@@ -27,15 +27,32 @@ HEX32 = re.compile(r"^[0-9a-f]{64}$")
 
 
 def cargo_binary(name: str) -> Path:
-    metadata = json.loads(subprocess.check_output(
-        ["cargo", "metadata", "--format-version", "1", "--no-deps"],
-        cwd=ROOT, text=True,
-    ))
     suffix = ".exe" if os.name == "nt" else ""
-    path = Path(metadata["target_directory"]) / "debug" / f"{name}{suffix}"
-    if not path.is_file():
-        raise SystemExit(f"missing {path}; run cargo build -p noos-cli --bin noos-cli --locked")
-    return path
+    packaged = [
+        ROOT / "target" / "release" / f"{name}{suffix}",
+        ROOT / "target" / "debug" / f"{name}{suffix}",
+    ]
+    for path in packaged:
+        if path.is_file():
+            return path
+
+    try:
+        metadata = json.loads(subprocess.check_output(
+            ["cargo", "metadata", "--format-version", "1", "--no-deps"],
+            cwd=ROOT, text=True,
+        ))
+    except (FileNotFoundError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+        raise SystemExit(
+            f"missing packaged {name}{suffix} and unable to inspect a Cargo workspace"
+        ) from exc
+    target = Path(metadata["target_directory"])
+    for profile in ("release", "debug"):
+        path = target / profile / f"{name}{suffix}"
+        if path.is_file():
+            return path
+    raise SystemExit(
+        f"missing {name}{suffix}; run cargo build -p noos-cli --bin noos-cli --release --locked"
+    )
 
 
 def api_json(base: str, path: str, *, body: dict | None = None, timeout: float = 10) -> dict:

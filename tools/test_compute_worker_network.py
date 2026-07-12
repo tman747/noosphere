@@ -1,4 +1,5 @@
 import io
+import hashlib
 import json
 import sys
 import unittest
@@ -47,6 +48,42 @@ class ComputeNetworkTests(unittest.TestCase):
             record = compute_worker.settlement_record(profile, "ab" * 32)
         self.assertEqual(record["state"], "INCLUDED")
         self.assertEqual(record["receipt"]["state"]["settled_height"], 4914)
+
+    def test_payload_is_bound_to_on_chain_commitment_and_meter(self) -> None:
+        payload = {"seed": 7, "start": 11, "units": 32, "rounds": 64}
+        commitment = hashlib.sha256(
+            b"NOOS/COMPUTE/MIX32/INPUT/V1"
+            + json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        job = {
+            "workload_kind": 0,
+            "input_root": commitment,
+            "units": "32",
+            "unit_size": "64",
+        }
+        self.assertEqual(
+            compute_worker.validate_payload(job, payload, 2_048),
+            (7, 11, 32, 64),
+        )
+
+        tampered = dict(payload, seed=8)
+        with self.assertRaisesRegex(ValueError, "commitment mismatch"):
+            compute_worker.validate_payload(job, tampered, 2_048)
+
+    def test_unregistered_or_over_budget_workload_is_refused(self) -> None:
+        payload = {"seed": 1, "start": 0, "units": 10, "rounds": 10}
+        job = {
+            "workload_kind": 9,
+            "input_root": "00" * 32,
+            "units": "10",
+            "unit_size": "10",
+        }
+        with self.assertRaisesRegex(ValueError, "unregistered"):
+            compute_worker.validate_payload(job, payload, 100)
+        job["workload_kind"] = 0
+        with self.assertRaisesRegex(ValueError, "operation budget"):
+            compute_worker.validate_payload(job, payload, 99)
+
 
 
 if __name__ == "__main__":

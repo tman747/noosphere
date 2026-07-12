@@ -151,3 +151,4 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--signal);outline-off
 #app[data-route="compute"] .chart-frame svg circle{animation:none}
 @media(max-width:900px){.section::before{inset:6px -6px}.section:hover::before{opacity:.45}.head-metric:hover,.chart-frame:hover,.topology:hover,.stage:hover,.supply-item:hover,.state-step:hover,.node-row:hover{transform:none}.pipeline{perspective:none}.connector{animation:none}.topology svg line.motion-link{animation-duration:4200ms}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}.section.motion-pending{opacity:1;transform:none;filter:none}.chart-frame:hover,.topology:hover,.stage:hover,.node-row:hover{transform:none}}
+.status-dot.stalled{border-color:var(--signal);background:var(--signal);box-shadow:0 0 0 4px rgba(184,52,15,.10)}

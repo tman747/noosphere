@@ -47,15 +47,21 @@ def local_ip() -> str:
 
 
 def binary(name: str) -> Path:
-    metadata = json.loads(subprocess.check_output(
-        ["cargo", "metadata", "--format-version", "1", "--no-deps"], cwd=ROOT, text=True
-    ))
     suffix = ".exe" if os.name == "nt" else ""
-    target = Path(metadata["target_directory"])
-    candidates = [
-        target / "debug" / f"{name}{suffix}",
-        target / "release" / f"{name}{suffix}",
-    ]
+    profiles = ("debug", "release") if name == "noosd" else ("release", "debug")
+    candidates: list[Path] = []
+    if (ROOT / "Cargo.toml").is_file():
+        try:
+            metadata = json.loads(subprocess.check_output(
+                ["cargo", "metadata", "--format-version", "1", "--no-deps"],
+                cwd=ROOT,
+                text=True,
+            ))
+            target = Path(metadata["target_directory"])
+            candidates.extend(target / profile / f"{name}{suffix}" for profile in profiles)
+        except (FileNotFoundError, subprocess.CalledProcessError, json.JSONDecodeError):
+            pass
+    candidates.extend(ROOT / "target" / profile / f"{name}{suffix}" for profile in profiles)
     for path in candidates:
         if path.is_file():
             return path
@@ -130,10 +136,13 @@ def run_validator(args: argparse.Namespace) -> None:
     secret = json.loads(Path(args.operator_secret).read_text(encoding="utf-8"))
     port = int(manifest["ports"]["p2p"])
     rpc = int(manifest["ports"]["operator_rpc"])
+    finality_role = ["--validator"] if args.standalone_finality else [
+        "--devnet-producer", "--devnet-witness", "0"
+    ]
     command = common_node(manifest, Path(args.data_dir)) + [
         "--rpc", f"127.0.0.1:{rpc}", "--rpc-token", secret["rpc_token"],
         "--p2p-listen", f"/ip4/0.0.0.0/udp/{port}/quic-v1",
-        "--devnet-producer", "--devnet-witness", "0",
+        *finality_role,
         "--produce-interval-ms", str(manifest["produce_interval_ms"]),
         "--devnet-contract-fixture",
     ]
@@ -218,6 +227,11 @@ def build_parser() -> argparse.ArgumentParser:
     validator.add_argument("--manifest", required=True)
     validator.add_argument("--operator-secret", required=True)
     validator.add_argument("--data-dir", default=str(DEFAULT_ROOT / "validator"))
+    validator.add_argument(
+        "--standalone-finality",
+        action="store_true",
+        help="drive the test-only 3-of-4 fixture quorum locally",
+    )
     observer = sub.add_parser("run-observer")
     observer.add_argument("--manifest", required=True)
     observer.add_argument("--validator-host", required=True)

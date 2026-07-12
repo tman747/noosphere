@@ -5,13 +5,22 @@ INVITE="$ROOT/invite.json"
 NODE="$ROOT/noosd"
 PARAMS="$ROOT/devnet-parameters.toml"
 DASHBOARD="$ROOT/node_status_dashboard.py"
+CLI="$ROOT/noos-cli"
+TRUSTED_KEY="$ROOT/trusted-invitation-key.txt"
 if [[ ! -f "$INVITE" || ! -x "$NODE" || ! -f "$PARAMS" || ! -f "$DASHBOARD" ]]; then
   osascript -e 'display dialog "This MindChain invitation is incomplete. Download the bundle again." buttons {"OK"} default button "OK" with icon stop'
   exit 1
 fi
 read_json() { /usr/bin/python3 -c 'import json,sys; v=json.load(open(sys.argv[1])); x=v'"$2"'; print(x)' "$INVITE"; }
 SCHEMA="$(read_json '' '["schema"]')"
-[[ "$SCHEMA" == "noos/one-click-invite/v1" ]] || { osascript -e 'display dialog "Unsupported MindChain invitation." buttons {"OK"} with icon stop'; exit 1; }
+if [[ "$SCHEMA" == "noos/invitation-lease/v2" ]]; then
+  [[ -x "$CLI" && -f "$TRUSTED_KEY" ]] || { osascript -e 'display dialog "This signed MindChain invitation is missing its verifier." buttons {"OK"} with icon stop'; exit 1; }
+  PUBLIC_KEY="$(tr -d '[:space:]' < "$TRUSTED_KEY")"
+  "$CLI" invitation verify --file "$INVITE" --public-key "$PUBLIC_KEY" >/dev/null || { osascript -e 'display dialog "This MindChain invitation is invalid or expired." buttons {"OK"} with icon stop'; exit 1; }
+elif [[ "$SCHEMA" != "noos/one-click-invite/v1" ]]; then
+  osascript -e 'display dialog "Unsupported MindChain invitation." buttons {"OK"} with icon stop'
+  exit 1
+fi
 EXPECTED="$(read_json '' '["params_sha256"]')"
 ACTUAL="$(shasum -a 256 "$PARAMS" | awk '{print $1}')"
 [[ "$EXPECTED" == "$ACTUAL" ]] || { osascript -e 'display dialog "The network parameters failed their checksum." buttons {"OK"} with icon stop'; exit 1; }

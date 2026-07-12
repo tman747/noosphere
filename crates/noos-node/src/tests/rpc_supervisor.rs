@@ -148,6 +148,13 @@ fn rpc_submission_settles_and_receipts_are_served() {
         None,
     );
     assert_eq!(code, 200, "{body}");
+    let (code, body) = http_request(addr, "GET", "/blocks/1/64", token, None);
+    assert_eq!(code, 200, "{body}");
+    assert!(body.contains(r#""items":["#), "{body}");
+    assert!(body.contains(&hex(&block_hash)), "{body}");
+    assert!(body.contains(&hex(&txid)), "{body}");
+    let (code, body) = http_request(addr, "GET", "/blocks/1/65", token, None);
+    assert_eq!(code, 400, "{body}");
 
     let (code, body) = http_request(
         addr,

@@ -42,6 +42,8 @@ pub enum IndexerError {
     /// A fork's ancestor is older than the retained checkpoint tail;
     /// resuming would silently skip rollback, so ingestion fails closed.
     ReorgBeyondCheckpoint,
+    /// Persisted cursor and query-state generation disagree or are corrupt.
+    StateDiverged,
 }
 impl std::fmt::Display for IndexerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -53,6 +55,7 @@ impl std::fmt::Display for IndexerError {
             Self::NonMonotonicHead => f.write_str("non-monotonic head update"),
             Self::Source(v) => write!(f, "node source: {v}"),
             Self::ReorgBeyondCheckpoint => f.write_str("reorg beyond checkpoint tail"),
+            Self::StateDiverged => f.write_str("index cursor/query state divergence"),
         }
     }
 }
@@ -112,6 +115,15 @@ pub enum HeadKind {
     Finalized,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IndexReadiness {
+    #[default]
+    Starting,
+    CatchingUp,
+    Ready,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct IndexedBlock {
     pub hash: String,
@@ -149,6 +161,8 @@ struct IndexState {
     transactions: HashMap<String, Value>,
     evidence: HashMap<String, Value>,
     telemetry: TelemetryParser,
+    readiness: IndexReadiness,
+    generation: u64,
 }
 
 impl Indexer {
@@ -175,15 +189,16 @@ impl Indexer {
             atomic_write(&descriptor_path, &bytes)?;
         }
         let genesis = ChainPoint::genesis(&expected.genesis_hash);
+        let state = ingest::restore_index_state(&root, &expected)?.unwrap_or_else(|| IndexState {
+            unsafe_head: Some(genesis.clone()),
+            justified: Some(genesis.clone()),
+            finalized: Some(genesis),
+            ..IndexState::default()
+        });
         Ok(Self {
             identity: expected,
             root,
-            inner: Arc::new(RwLock::new(IndexState {
-                unsafe_head: Some(genesis.clone()),
-                justified: Some(genesis.clone()),
-                finalized: Some(genesis),
-                ..IndexState::default()
-            })),
+            inner: Arc::new(RwLock::new(state)),
         })
     }
     pub fn root(&self) -> &FsPath {
@@ -417,6 +432,8 @@ async fn status(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Resp
     accepted(&headers)?;
     let st = s.indexer.inner.read().await;
     Ok(api_json(json!({
+        "readiness":st.readiness,"ready":st.readiness == IndexReadiness::Ready,
+        "indexed_generation":st.generation.to_string(),
         "chain_id":s.indexer.identity.chain_id,"genesis_hash":s.indexer.identity.genesis_hash,
         "protocol_version":"v1","api_version":"v1","release_version":env!("CARGO_PKG_VERSION"),
         "unsafe_head":st.unsafe_head,"justified":st.justified,"finalized":st.finalized,

@@ -234,6 +234,11 @@ class DashboardData:
             {"name": "Producer RPC", "state": "online" if snapshot["operator"] else "offline", "detail": self.operator},
             {"name": "Public indexer", "state": "degraded" if "indexer" in snapshot["errors"] or int_value(((snapshot.get("indexer_status") or {}).get("unsafe_head") or {}).get("height")) < sample["height"] else "online", "detail": self.indexer},
             {"name": "Compute coordinator", "state": "online" if (snapshot.get("compute_health") or {}).get("ok") else "upgrade_required" if snapshot.get("compute_health") else "offline", "detail": self.compute},
+            {
+                "name": "Consensus finality",
+                "state": "stalled" if current_epoch >= 2 and sample["finalized_epoch"] == 0 else "online",
+                "detail": f"justified E{sample['justified_epoch']} · finalized E{sample['finalized_epoch']}",
+            },
         ]
         return {
             "schema": "noos/network-dashboard-overview/v1",
@@ -359,6 +364,18 @@ class DashboardData:
             }
             for worker in snapshot["workers"]
         ]
+        sample = snapshot["sample"]
+        current_epoch = sample["height"] // EPOCH_LENGTH if sample["height"] else 0
+        incidents = [
+            {"source": source, "state": "active", "detail": detail}
+            for source, detail in snapshot["errors"].items()
+        ]
+        if current_epoch >= 2 and sample["finalized_epoch"] == 0:
+            incidents.append({
+                "source": "finality",
+                "state": "active",
+                "detail": f"finalized checkpoint remains at genesis while head is in epoch {current_epoch}",
+            })
         return {
             "schema": "noos/network-dashboard-nodes/v1",
             "observed_ms": snapshot["sample"]["observed_ms"],
@@ -367,10 +384,7 @@ class DashboardData:
                 "count": None,
                 "message": "The Mac node is online locally but does not yet publish central fleet telemetry.",
             },
-            "incidents": [
-                {"source": source, "state": "active", "detail": detail}
-                for source, detail in snapshot["errors"].items()
-            ],
+            "incidents": incidents,
             "errors": snapshot["errors"],
         }
 

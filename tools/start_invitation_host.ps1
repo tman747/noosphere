@@ -1,5 +1,8 @@
 param(
     [string]$NetworkRoot = "C:\tmp\mindchain-lan-proof",
+    [string]$ExpectedHost = "192.168.1.158",
+    [ValidateSet("PrivateLan", "Tailscale")]
+    [string]$NetworkMode = "PrivateLan",
     [switch]$CheckOnly
 )
 
@@ -9,7 +12,6 @@ $Manifest = Join-Path $NetworkRoot "lan-manifest.json"
 $OperatorSecret = Join-Path $NetworkRoot "operator-secret.json"
 $ValidatorData = Join-Path $NetworkRoot "validator"
 $Profile = Join-Path $NetworkRoot "wallet-profile-live.json"
-$ExpectedHost = "192.168.1.158"
 
 foreach ($path in @($Manifest, $OperatorSecret)) {
     if (-not (Test-Path -LiteralPath $path)) {
@@ -24,8 +26,8 @@ $NodeBinary = @(
     (Join-Path $Repo "target\release\noosd.exe")
 ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 $IndexerBinary = @(
-    (Join-Path $Repo "target\debug\noos-indexer.exe"),
-    (Join-Path $Repo "target\release\noos-indexer.exe")
+    (Join-Path $Repo "target\release\noos-indexer.exe"),
+    (Join-Path $Repo "target\debug\noos-indexer.exe")
 ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 if (-not $NodeBinary -or -not $IndexerBinary) {
     throw "MindChain host binaries are missing. Build noosd and noos-indexer before starting the invitation host."
@@ -51,23 +53,29 @@ $IsAdministrator = ([Security.Principal.WindowsPrincipal][Security.Principal.Win
 if (-not $IsAdministrator) {
     $Arguments = @(
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ('"' + $PSCommandPath + '"'),
-        "-NetworkRoot", ('"' + $NetworkRoot + '"')
+        "-NetworkRoot", ('"' + $NetworkRoot + '"'),
+        "-ExpectedHost", ('"' + $ExpectedHost + '"'),
+        "-NetworkMode", $NetworkMode
     )
     Start-Process powershell.exe -Verb RunAs -ArgumentList $Arguments
     Write-Host "Approve the Windows administrator prompt to open the MindChain LAN ports." -ForegroundColor Yellow
     exit 0
 }
 
+$RulePrefix = if ($NetworkMode -eq "Tailscale") { "MindChain-Tailscale" } else { "MindChain-LAN" }
+$RemoteAddress = if ($NetworkMode -eq "Tailscale") { "100.64.0.0/10" } else { "LocalSubnet" }
 $FirewallRules = @(
-    @{ Name = "MindChain-P2P-UDP-21701"; Protocol = "UDP"; Port = 21701 },
-    @{ Name = "MindChain-API-TCP-21080"; Protocol = "TCP"; Port = 21080 },
-    @{ Name = "MindChain-Compute-TCP-18110"; Protocol = "TCP"; Port = 18110 },
-    @{ Name = "MindChain-Dashboard-TCP-18120"; Protocol = "TCP"; Port = 18120 }
+    @{ Name = "$RulePrefix-P2P-UDP-21701"; Protocol = "UDP"; Port = 21701 },
+    @{ Name = "$RulePrefix-API-TCP-21080"; Protocol = "TCP"; Port = 21080 },
+    @{ Name = "$RulePrefix-Compute-TCP-18110"; Protocol = "TCP"; Port = 18110 },
+    @{ Name = "$RulePrefix-Dashboard-TCP-18120"; Protocol = "TCP"; Port = 18120 },
+    @{ Name = "$RulePrefix-Explorer-TCP-18130"; Protocol = "TCP"; Port = 18130 }
 )
 foreach ($rule in $FirewallRules) {
     if (-not (Get-NetFirewallRule -DisplayName $rule.Name -ErrorAction SilentlyContinue)) {
         New-NetFirewallRule -DisplayName $rule.Name -Direction Inbound -Action Allow `
-            -Protocol $rule.Protocol -LocalPort $rule.Port -Profile Private | Out-Null
+            -Protocol $rule.Protocol -LocalPort $rule.Port -Profile Private `
+            -RemoteAddress $RemoteAddress | Out-Null
     }
 }
 
@@ -79,12 +87,22 @@ try {
 } catch {
     $Status = $null
 }
+if ($Status -and [uint64]$Status.unsafe_head.height -ge 512 -and [uint64]$Status.finalized.epoch -eq 0) {
+    Write-Warning "Finality is stalled at genesis; restarting the engineering host with standalone fixture finality."
+    $NodeListener = Get-NetTCPConnection -LocalPort 21632 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($NodeListener) {
+        Stop-Process -Id $NodeListener.OwningProcess -Force
+        Start-Sleep -Seconds 1
+    }
+    $Status = $null
+}
 if (-not $Status) {
     $ValidatorArgs = @(
         (Join-Path $Repo "tools\lan_testnet.py"), "run-validator",
         "--manifest", $Manifest,
         "--operator-secret", $OperatorSecret,
-        "--data-dir", $ValidatorData
+        "--data-dir", $ValidatorData,
+        "--standalone-finality"
     )
     Start-Process python -WorkingDirectory $Repo -ArgumentList $ValidatorArgs -WindowStyle Minimized
     $Deadline = (Get-Date).AddSeconds(30)
@@ -101,20 +119,32 @@ if (-not $Status) {
     }
 }
 
+$IndexerData = Join-Path $NetworkRoot "indexer"
 $ApiReady = $false
-try {
-    $ApiReady = $null -ne (Invoke-RestMethod -Uri "http://127.0.0.1:21080/api/status" -TimeoutSec 2)
-} catch {
-    $ApiReady = $false
+$ApiRunning = $false
+$ApiListener = Get-NetTCPConnection -LocalPort 21080 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($ApiListener) {
+    try {
+        $ApiStatus = Invoke-RestMethod -Uri "http://127.0.0.1:21080/api/status" -TimeoutSec 2
+        if ($ApiStatus.PSObject.Properties.Name -contains "readiness") {
+            $ApiRunning = $true
+            $ApiReady = ($ApiStatus.ready -eq $true)
+        }
+    } catch {
+        $ApiRunning = $false
+    }
+    if (-not $ApiRunning) {
+        Stop-Process -Id $ApiListener.OwningProcess -Force
+        Start-Sleep -Seconds 1
+    }
 }
-if (-not $ApiReady) {
-    $Session = Join-Path $NetworkRoot ("indexer-session-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+if (-not $ApiRunning) {
     $IndexerArgs = @(
         (Join-Path $Repo "tools\lan_testnet.py"), "run-indexer",
         "--manifest", $Manifest,
         "--operator-secret", $OperatorSecret,
         "--public-host", $ExpectedHost,
-        "--data-dir", $Session,
+        "--data-dir", $IndexerData,
         "--profile-out", $Profile
     )
     Start-Process python -WorkingDirectory $Repo -ArgumentList $IndexerArgs -WindowStyle Minimized
@@ -141,7 +171,8 @@ if (-not $MarketReady -and (Test-Path -LiteralPath $MarketSeed) -and (Test-Path 
     do {
         Start-Sleep -Milliseconds 500
         try {
-            $ApiReady = $null -ne (Invoke-RestMethod -Uri "http://127.0.0.1:21080/api/status" -TimeoutSec 2)
+            $ApiStatus = Invoke-RestMethod -Uri "http://127.0.0.1:21080/api/status" -TimeoutSec 2
+            $ApiReady = ($ApiStatus.ready -eq $true)
         } catch {
             $ApiReady = $false
         }
@@ -198,8 +229,38 @@ if (-not $DashboardReady) {
     Write-Warning "The validator is online, but the network dashboard did not start."
 }
 
+$ExplorerReady = $false
+try {
+    $ExplorerHealth = Invoke-RestMethod -Uri "http://127.0.0.1:18130/api/health" -TimeoutSec 2
+    $ExplorerReady = ($ExplorerHealth.schema -eq "noos/mindscan-health/v1")
+} catch {
+    $ExplorerReady = $false
+}
+if (-not $ExplorerReady) {
+    $ExplorerArgs = @(
+        (Join-Path $Repo "tools\mindscan.py"),
+        "--indexer", "http://127.0.0.1:21080",
+        "--listen", "0.0.0.0:18130"
+    )
+    Start-Process python -WorkingDirectory $Repo -ArgumentList $ExplorerArgs -WindowStyle Minimized
+    $ExplorerDeadline = (Get-Date).AddSeconds(15)
+    do {
+        Start-Sleep -Milliseconds 300
+        try {
+            $ExplorerHealth = Invoke-RestMethod -Uri "http://127.0.0.1:18130/api/health" -TimeoutSec 2
+            $ExplorerReady = ($ExplorerHealth.schema -eq "noos/mindscan-health/v1")
+        } catch {
+            $ExplorerReady = $false
+        }
+    } until ($ExplorerReady -or (Get-Date) -ge $ExplorerDeadline)
+}
+if (-not $ExplorerReady) {
+    Write-Warning "The validator is online, but MindScan did not start."
+}
+
 Write-Host "MindChain invitation host is online." -ForegroundColor Green
 Write-Host "Validator: $ExpectedHost UDP 21701"
 Write-Host "Public API: http://${ExpectedHost}:21080"
 Write-Host "Network dashboards: http://${ExpectedHost}:18120"
+Write-Host "MindScan explorer: http://${ExpectedHost}:18130"
 Write-Host "Keep this PC awake and connected while invited nodes are running."
