@@ -1,0 +1,124 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-analytics\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-analytics\"]}",
+      "id": "local-precursor",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[\"Local exact integer tests exercise energy conservation, exhaustive 2x2 unbiasedness/fourth-moment variance bounds, commit-before-derived-challenge binding, and permanent counterexamples.\",\"The <=1e-6 false-positive, >=99.9% named-attack detection, equal-cost non-inferiority, and <=0.5% compatible-resident-HD latency thresholds require pinned hardware/error-distribution experiments.\",\"All outputs are SHADOW_ONLY and cannot affect exact Freivalds acceptance, Ground, Ring weight, issuance, or production settlement.\"]",
+      "id": "external-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-HDF-ENERGY": "cfdd8f651b0e9ae09c78ad113c30dccc3786bbe2e0d6bb230e3137f9434a63ec"
+  },
+  "claims": [
+    "M-HDF-ENERGY"
+  ],
+  "command": [
+    "tools/gates/run_tensor_hdf_claim.py",
+    "--claim",
+    "M-HDF-ENERGY"
+  ],
+  "evidence_sha256": "f2132ee105801e7577f3a485dca4419c74bca271af06c94ad00d4f84734a872b",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-m-hdf-energy",
+  "limitations": [
+    "This is local precursor evidence, not independent or production evidence.",
+    "Local exact integer tests exercise energy conservation, exhaustive 2x2 unbiasedness/fourth-moment variance bounds, commit-before-derived-challenge binding, and permanent counterexamples.",
+    "The <=1e-6 false-positive, >=99.9% named-attack detection, equal-cost non-inferiority, and <=0.5% compatible-resident-HD latency thresholds require pinned hardware/error-distribution experiments.",
+    "All outputs are SHADOW_ONLY and cannot affect exact Freivalds acceptance, Ground, Ring weight, issuance, or production settlement."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 282,
+        "git_blob": "956e41073a56658fe0f7aa9d5516cf9dd1ce7814",
+        "git_mode": "100644",
+        "path": "crates/noos-analytics/Cargo.toml",
+        "sha256": "d1af1318d679b7efc79ecd514f963d194e3cbd7285017955628f0369dee93d87"
+      },
+      {
+        "bytes": 14984,
+        "git_blob": "d0fc60f136763df2b7385393cc4c741b975e5587",
+        "git_mode": "100644",
+        "path": "crates/noos-analytics/src/hdf_profile.rs",
+        "sha256": "988369f2431791e126e0d0adb46edf245d97e6f2dd15048d45f63d9093c528b4"
+      },
+      {
+        "bytes": 29030,
+        "git_blob": "74ebc655031728788a29586a799c43877461d6fe",
+        "git_mode": "100644",
+        "path": "crates/noos-analytics/src/lib.rs",
+        "sha256": "89de4f7faee055767b3c05b5e5e1d70526583ee1a11d72c3006859529aa41dfb"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 6212,
+        "git_blob": "da09f629b3b8d80e3379dd1b1e7f590a6ccdeaa2",
+        "git_mode": "100644",
+        "path": "tools/gates/run_tensor_hdf_claim.py",
+        "sha256": "8a9d97b88754f5ed6885b1be93813708be40dccc5d40838f0581b5972a0d2774"
+      }
+    ],
+    "manifest_sha256": "f889dd229bca713280b19ddf30b1761d30b8a98db9ada638db9681873f06553d",
+    "source_revision": "b95da12fa54fb50fb460db39a645b3501137cc8a",
+    "source_tree": "16e6ecce1d96ae3783390c9bb6141eb2b4d1d9a8"
+  }
+}

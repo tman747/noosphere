@@ -1,0 +1,117 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-analytics\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-analytics\"]}",
+      "id": "local-precursor",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[\"The canonical vectors and mutation corpus are local Rust evidence, not two independently authored cross-verifiers.\",\"Post-commit beacon unpredictability is an explicit external randomness assumption; no production beacon campaign is claimed.\",\"The frozen 256x256 paid encrypted-delivery trial and calibrated work-per-joule campaign remain external.\"]",
+      "id": "external-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-TENSOR": "89df7daf7d4750195fc824e6294e8c96b8b1979764b01c01f3ccb59ba546d9c9"
+  },
+  "claims": [
+    "M-TENSOR"
+  ],
+  "command": [
+    "tools/gates/run_tensor_hdf_claim.py",
+    "--claim",
+    "M-TENSOR"
+  ],
+  "evidence_sha256": "c798b67b88adc48d8c4a4e3d4670a143c28f3cf46f9cc0318f6558265faed875",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-m-tensor",
+  "limitations": [
+    "This is local precursor evidence, not independent or production evidence.",
+    "The canonical vectors and mutation corpus are local Rust evidence, not two independently authored cross-verifiers.",
+    "Post-commit beacon unpredictability is an explicit external randomness assumption; no production beacon campaign is claimed.",
+    "The frozen 256x256 paid encrypted-delivery trial and calibrated work-per-joule campaign remain external."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 282,
+        "git_blob": "956e41073a56658fe0f7aa9d5516cf9dd1ce7814",
+        "git_mode": "100644",
+        "path": "crates/noos-analytics/Cargo.toml",
+        "sha256": "d1af1318d679b7efc79ecd514f963d194e3cbd7285017955628f0369dee93d87"
+      },
+      {
+        "bytes": 21811,
+        "git_blob": "aa573594498e628b219568ae70096bf16578a89b",
+        "git_mode": "100644",
+        "path": "crates/noos-analytics/src/tensor.rs",
+        "sha256": "4a691f0d5b265209a16020b6a56026da1eef7dded6749cc1ead1422e948c2d09"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 6212,
+        "git_blob": "da09f629b3b8d80e3379dd1b1e7f590a6ccdeaa2",
+        "git_mode": "100644",
+        "path": "tools/gates/run_tensor_hdf_claim.py",
+        "sha256": "8a9d97b88754f5ed6885b1be93813708be40dccc5d40838f0581b5972a0d2774"
+      }
+    ],
+    "manifest_sha256": "35e8bb720c721b7adf1607e2ddca4c5c0159f1dcfc0e88b7f3c02f8930ff7e48",
+    "source_revision": "b95da12fa54fb50fb460db39a645b3501137cc8a",
+    "source_tree": "16e6ecce1d96ae3783390c9bb6141eb2b4d1d9a8"
+  }
+}

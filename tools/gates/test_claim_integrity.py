@@ -30,9 +30,9 @@ class ClaimIntegrityTests(unittest.TestCase):
         self.assertEqual(len(rows), 136)
         self.assertEqual(
             Counter(row["local_implementation_state"] for row in rows),
-            {"IMPLEMENTED": 63, "PARTIAL": 73},
+            {"IMPLEMENTED": 69, "PARTIAL": 67},
         )
-        self.assertEqual(sum(bool(row["external_blockers"]) for row in rows), 36)
+        self.assertEqual(sum(bool(row["external_blockers"]) for row in rows), 40)
         self.assertFalse([row["claim_id"] for row in rows if isinstance(row.get("command"), str) and "reproduce_claim.py" in row["command"]])
         self.assertFalse([error for row in rows for error in MATRIX.audit_row(row)])
 
@@ -57,10 +57,16 @@ class ClaimIntegrityTests(unittest.TestCase):
 
     def test_negative_results_bind_real_falsifiers(self) -> None:
         negative = [row for row in self.registry["claims"] if row["expected_result"] in {"KILLED", "DISABLED"}]
-        self.assertEqual({row["claim_id"] for row in negative}, {"A-CLASS-GATE.v1", "E-DEMAND-WASH-01"})
+        self.assertEqual(
+            {row["claim_id"] for row in negative},
+            {"A-CLASS-GATE.v1", "E-DEMAND-WASH-01", "M-HDF", "S-HDF"},
+        )
         for row in negative:
             self.assertEqual(row["command"], row["reproduction_command"])
-            self.assertIn("run_negative_claim.py", row["command"])
+            self.assertTrue(
+                "run_negative_claim.py" in row["command"]
+                or "run_tensor_hdf_claim.py" in row["command"]
+            )
 
     def test_reproducer_reports_local_incomplete_without_evidence(self) -> None:
         missing = next(row for row in self.registry["claims"] if row["local_implementation_state"] == "PARTIAL")

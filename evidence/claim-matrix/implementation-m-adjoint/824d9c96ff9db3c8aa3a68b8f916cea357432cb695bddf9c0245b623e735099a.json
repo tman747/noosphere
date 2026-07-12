@@ -1,0 +1,131 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-training\",\"-p\",\"noos-analytics\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-training\",\"noos-analytics\"]}",
+      "id": "local-precursor",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[\"The local exact-integer precursor binds all three training GEMMs, global dual identity, optimizer clipping/momentum/update, policy lag, and post-commit challenges.\",\"The local 10^7 campaign exercises structured capsule header/profile/root mutations; full relation-level adversarial capsules at that scale, private-example leakage measurement, and an independent proof/verifier campaign remain external.\",\"The operation census is below deterministic GEMM replay at the exercised 32^3 profile, but real proof plus witness-availability cost on a production training profile is unmeasured; training remains SHADOW_ONLY and non-slashable.\"]",
+      "id": "external-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-ADJOINT": "23c0125a9f6744c457c5e909c8d1e8e532676d38d6bc01dc69ceee28dea09b88"
+  },
+  "claims": [
+    "M-ADJOINT"
+  ],
+  "command": [
+    "tools/gates/run_tensor_hdf_claim.py",
+    "--claim",
+    "M-ADJOINT"
+  ],
+  "evidence_sha256": "824d9c96ff9db3c8aa3a68b8f916cea357432cb695bddf9c0245b623e735099a",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-m-adjoint",
+  "limitations": [
+    "This is local precursor evidence, not independent or production evidence.",
+    "The local exact-integer precursor binds all three training GEMMs, global dual identity, optimizer clipping/momentum/update, policy lag, and post-commit challenges.",
+    "The local 10^7 campaign exercises structured capsule header/profile/root mutations; full relation-level adversarial capsules at that scale, private-example leakage measurement, and an independent proof/verifier campaign remain external.",
+    "The operation census is below deterministic GEMM replay at the exercised 32^3 profile, but real proof plus witness-availability cost on a production training profile is unmeasured; training remains SHADOW_ONLY and non-slashable."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 282,
+        "git_blob": "956e41073a56658fe0f7aa9d5516cf9dd1ce7814",
+        "git_mode": "100644",
+        "path": "crates/noos-analytics/Cargo.toml",
+        "sha256": "d1af1318d679b7efc79ecd514f963d194e3cbd7285017955628f0369dee93d87"
+      },
+      {
+        "bytes": 18906,
+        "git_blob": "c04b72fadf51b1da29654ca913d50460fee9776b",
+        "git_mode": "100644",
+        "path": "crates/noos-analytics/src/residue.rs",
+        "sha256": "5afea08221a727b3bc03474df51273a59f21b2ef066875f8930c75fb8dceb0dd"
+      },
+      {
+        "bytes": 381,
+        "git_blob": "85b5adf2472aa5d24ec3b361640bc701114873c1",
+        "git_mode": "100644",
+        "path": "crates/noos-training/Cargo.toml",
+        "sha256": "2d172c616a6041cbb5801a472b71c4b26386b0a2c0956aefec77c4e6a52ef02a"
+      },
+      {
+        "bytes": 33539,
+        "git_blob": "abbad2196c72ddd03d504598d1d0181df0eaaaa5",
+        "git_mode": "100644",
+        "path": "crates/noos-training/src/adjoint.rs",
+        "sha256": "86c92f4ee94bbb166b57022b377082d264839e3c731842ccca37a45aa40cbb1f"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 6212,
+        "git_blob": "da09f629b3b8d80e3379dd1b1e7f590a6ccdeaa2",
+        "git_mode": "100644",
+        "path": "tools/gates/run_tensor_hdf_claim.py",
+        "sha256": "8a9d97b88754f5ed6885b1be93813708be40dccc5d40838f0581b5972a0d2774"
+      }
+    ],
+    "manifest_sha256": "558d14426db0cbf1a410989a06389cd10f8292d1d81a5710bf9ec9574befc4b6",
+    "source_revision": "b95da12fa54fb50fb460db39a645b3501137cc8a",
+    "source_tree": "16e6ecce1d96ae3783390c9bb6141eb2b4d1d9a8"
+  }
+}

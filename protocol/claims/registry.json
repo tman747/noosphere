@@ -1210,10 +1210,10 @@
       "actionable": true,
       "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-TENSOR",
       "evidence_root": "evidence/claim-matrix/implementation-m-tensor",
-      "evidence_sha256": null,
+      "evidence_sha256": "4fcaf7ee204e144f8b4204a18e6da4bde53bc8936c9f28f26c1f2bc7327943c8",
       "expected_result": "EXTERNAL_BLOCKED",
       "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-TENSOR --rollback-check",
-      "reproduction_command": null,
+      "reproduction_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-TENSOR",
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
@@ -1221,7 +1221,7 @@
         "Independent cross-verifier authorship, production beacon unpredictability, and pinned encrypted-delivery/work-per-joule campaigns remain unavailable locally."
       ],
       "local_implementation_state": "IMPLEMENTED",
-      "local_evidence_state": "MISSING"
+      "local_evidence_state": "PARTIAL"
     },
     {
       "claim_id": "M-RESIDUE",
@@ -1275,10 +1275,10 @@
       "actionable": true,
       "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-RESIDUE",
       "evidence_root": "evidence/claim-matrix/implementation-m-residue",
-      "evidence_sha256": null,
+      "evidence_sha256": "37d1e7105f0aaee64c6bf490518b5f07dde57d43404394482aa1b595151b948c",
       "expected_result": "EXTERNAL_BLOCKED",
       "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-RESIDUE --rollback-check",
-      "reproduction_command": null,
+      "reproduction_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-RESIDUE",
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
@@ -1286,7 +1286,7 @@
         "Independently authored verifier families and preregistered production-beacon uniformity and independence measurements remain unavailable locally."
       ],
       "local_implementation_state": "IMPLEMENTED",
-      "local_evidence_state": "MISSING"
+      "local_evidence_state": "PARTIAL"
     },
     {
       "claim_id": "M-HDF",
@@ -1345,16 +1345,16 @@
       "actionable": true,
       "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF",
       "evidence_root": "evidence/claim-matrix/implementation-m-hdf",
-      "evidence_sha256": null,
+      "evidence_sha256": "aa36c2a7b2676e54bc427a99d379fa29dd0aaf1dcc4b0018f84eed5021aabfab",
       "expected_result": "KILLED",
       "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF --rollback-check",
-      "reproduction_command": null,
+      "reproduction_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF",
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
       "local_implementation_state": "IMPLEMENTED",
-      "local_evidence_state": "MISSING"
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "M-HDF-ENERGY",
@@ -1413,10 +1413,10 @@
       "actionable": true,
       "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF-ENERGY",
       "evidence_root": "evidence/claim-matrix/implementation-m-hdf-energy",
-      "evidence_sha256": null,
+      "evidence_sha256": "5d08beeb2a4bb413207fd4979c04979f3313e98f1b00b7c567a996f546d3b1f9",
       "expected_result": "EXTERNAL_BLOCKED",
       "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF-ENERGY --rollback-check",
-      "reproduction_command": null,
+      "reproduction_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF-ENERGY",
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
@@ -1424,7 +1424,7 @@
         "Pinned hardware/error-distribution false-positive, detection, equal-cost non-inferiority, and compatible-resident-HD latency campaigns remain unavailable locally."
       ],
       "local_implementation_state": "IMPLEMENTED",
-      "local_evidence_state": "MISSING"
+      "local_evidence_state": "PARTIAL"
     },
     {
       "claim_id": "S-HDF",
@@ -1482,16 +1482,16 @@
       "actionable": true,
       "command": "python tools/gates/run_tensor_hdf_claim.py --claim S-HDF",
       "evidence_root": "evidence/claim-matrix/implementation-s-hdf",
-      "evidence_sha256": null,
+      "evidence_sha256": "c713b767229ce899c017b0d821384c822db692890704e4c3d34bce8b3aeecff4",
       "expected_result": "KILLED",
       "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim S-HDF --rollback-check",
-      "reproduction_command": null,
+      "reproduction_command": "python tools/gates/run_tensor_hdf_claim.py --claim S-HDF",
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
       "local_implementation_state": "IMPLEMENTED",
-      "local_evidence_state": "MISSING"
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "M-OMEGA",
@@ -3547,10 +3547,10 @@
       "actionable": true,
       "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-ADJOINT",
       "evidence_root": "evidence/claim-matrix/implementation-m-adjoint",
-      "evidence_sha256": null,
+      "evidence_sha256": "bd763ab8efae5740042a35c1cdb031f17aa9262b09693f6a09199474e34096df",
       "expected_result": "EXTERNAL_BLOCKED",
       "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-ADJOINT --rollback-check",
-      "reproduction_command": null,
+      "reproduction_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-ADJOINT",
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
@@ -3558,7 +3558,7 @@
         "A full 10^7 relation-level adversarial-capsule campaign, independent proof/verifier family, production witness-cost comparison, and private-example leakage measurement remain unavailable locally."
       ],
       "local_implementation_state": "IMPLEMENTED",
-      "local_evidence_state": "MISSING"
+      "local_evidence_state": "PARTIAL"
     },
     {
       "claim_id": "S-TOPLOC",
