@@ -1,0 +1,117 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "4872e6b98255cfecf5aea94bd7c526e3c8987c26673906cb624d918e9017905b",
+      "evidence/base-base-transfer-contract.json": "d120db9e228cec6a99b828dd919a0e1c7daaae8e7c6470c6513a3eb552c3e20d",
+      "evidence/base-crash-matrix.json": "62b45c91fb123ba3e9e016a776f218a222cfda097686d8fe131aa70f53c02c59"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-analytics\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-analytics\"]}",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-HDF": "06daf7a2543e74f7ba8684b20b9ab6e62d23d87dc9e42aacde94eabb83160366"
+  },
+  "claims": [
+    "M-HDF"
+  ],
+  "command": [
+    "tools/gates/run_tensor_hdf_claim.py",
+    "--claim",
+    "M-HDF"
+  ],
+  "evidence_sha256": "60cc675995ed23e4f67940517019b9c2f9dd2df85e2a9cca36fbddaf2ab3d6c7",
+  "expected_result": "KILLED",
+  "gate": "implementation-m-hdf",
+  "limitations": [
+    "This is local precursor evidence, not independent or production evidence.",
+    "The universal M-HDF claim remains RETIRED: flat-error worsening, characteristic-two collapse, adaptive timing, and quantization-floor counterexamples are permanent tests.",
+    "No exact Freivalds amplification or pointwise detection dominance is implemented or claimed."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "KILLED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 282,
+        "git_blob": "956e41073a56658fe0f7aa9d5516cf9dd1ce7814",
+        "git_mode": "100644",
+        "path": "crates/noos-analytics/Cargo.toml",
+        "sha256": "d1af1318d679b7efc79ecd514f963d194e3cbd7285017955628f0369dee93d87"
+      },
+      {
+        "bytes": 14984,
+        "git_blob": "d0fc60f136763df2b7385393cc4c741b975e5587",
+        "git_mode": "100644",
+        "path": "crates/noos-analytics/src/hdf_profile.rs",
+        "sha256": "988369f2431791e126e0d0adb46edf245d97e6f2dd15048d45f63d9093c528b4"
+      },
+      {
+        "bytes": 29030,
+        "git_blob": "74ebc655031728788a29586a799c43877461d6fe",
+        "git_mode": "100644",
+        "path": "crates/noos-analytics/src/lib.rs",
+        "sha256": "89de4f7faee055767b3c05b5e5e1d70526583ee1a11d72c3006859529aa41dfb"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 6212,
+        "git_blob": "da09f629b3b8d80e3379dd1b1e7f590a6ccdeaa2",
+        "git_mode": "100644",
+        "path": "tools/gates/run_tensor_hdf_claim.py",
+        "sha256": "8a9d97b88754f5ed6885b1be93813708be40dccc5d40838f0581b5972a0d2774"
+      }
+    ],
+    "manifest_sha256": "f889dd229bca713280b19ddf30b1761d30b8a98db9ada638db9681873f06553d",
+    "source_revision": "c21952d801b8e4f98ac6dc4682f3ef47feeddb01",
+    "source_tree": "0ae7591ed38ef55722744430d1e2f7b64d15ecf1"
+  }
+}
