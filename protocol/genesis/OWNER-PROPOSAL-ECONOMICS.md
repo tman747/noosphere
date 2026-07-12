@@ -1,11 +1,14 @@
 # Production economics owner-proposal review packet
 
-Status: **DRAFT / UNSIGNED / NOT FROZEN / NOT PRODUCTION LOADABLE**.
+Status: **OWNER_APPROVED_PENDING_SIGNATURE / UNSIGNED / NOT FROZEN / NOT PRODUCTION LOADABLE**.
 
-This packet recommends conservative integer parameters. It records no owner
-approval and no legal or economic review. `constants-v1.toml` remains unchanged:
-its `OWNER_BLOCKED` and `UNRESOLVED_SOURCE` markers are still authoritative until
-the exact reviewed artifact is signed.
+The owner approves this exact 1,000,000,000-NOOS capped fixed-envelope draft for
+independent economist and counsel review. No independent review has yet been
+performed. The required hardware/offline release-owner key and detached
+signature are absent. This approval is not a freeze or production authorization.
+`constants-v1.toml` remains unchanged: its `OWNER_BLOCKED` and
+`UNRESOLVED_SOURCE` markers are still authoritative until every required
+external artifact exists and the exact final artifact is signed.
 
 ## Recommended envelope
 
@@ -47,9 +50,9 @@ The freeze gate must continue to reject the proposal until all of these exist:
 2. A complete allocation entry list under the tested `noos-bech32m-v1` law,
    including recipient, amount, category, unlock height, memo, duplicate checks,
    exact 300-million-NOOS sum, and canonical allocation root.
-3. The release-owner Ed25519 public key and detached signature over the exact
-   final manifest. The selected policy has one required signing role; this draft
-   contains no signature.
+3. The hardware/offline release-owner Ed25519 public key and detached signature
+   over the exact final manifest. The selected policy has one required signing
+   role; this draft contains neither the key nor a signature.
 4. Named public self-hosted 5-of-7 DKG participants and the post-Quiet-Week
    transcript root. No participant identity or transcript is invented here.
 5. Quiet-Week claim-registry, conformance-vector, and software-manifest roots;
@@ -108,5 +111,5 @@ cargo test -p noos-work-loom zero_jobs_and_shadow_never_influence_production --l
 ```
 
 Running the freeze gate without `--allow-draft` must return exit code 2 and
-`DRAFT_BLOCKED`. A production loader accepting this unsigned proposal is a
-release-blocking defect.
+`OWNER_APPROVED_PENDING_SIGNATURE_BLOCKED`. A production loader accepting this
+unsigned proposal is a release-blocking defect.

@@ -1,0 +1,1530 @@
+{
+  "adversarial_inflation_grid": [
+    {
+      "allocation_utilization_bp": 5000,
+      "emission_realization_bp": 5000,
+      "fee_burn_as_gross_emission_bp": 0,
+      "year_1_net_inflation_ppm": 60215
+    },
+    {
+      "allocation_utilization_bp": 5000,
+      "emission_realization_bp": 5000,
+      "fee_burn_as_gross_emission_bp": 2500,
+      "year_1_net_inflation_ppm": 45161
+    },
+    {
+      "allocation_utilization_bp": 5000,
+      "emission_realization_bp": 5000,
+      "fee_burn_as_gross_emission_bp": 5000,
+      "year_1_net_inflation_ppm": 30107
+    },
+    {
+      "allocation_utilization_bp": 5000,
+      "emission_realization_bp": 5000,
+      "fee_burn_as_gross_emission_bp": 10000,
+      "year_1_net_inflation_ppm": 0
+    },
+    {
+      "allocation_utilization_bp": 5000,
+      "emission_realization_bp": 7500,
+      "fee_burn_as_gross_emission_bp": 0,
+      "year_1_net_inflation_ppm": 90322
+    },
+    {
+      "allocation_utilization_bp": 5000,
+      "emission_realization_bp": 7500,
+      "fee_burn_as_gross_emission_bp": 2500,
+      "year_1_net_inflation_ppm": 67741
+    },
+    {
+      "allocation_utilization_bp": 5000,
+      "emission_realization_bp": 7500,
+      "fee_burn_as_gross_emission_bp": 5000,
+      "year_1_net_inflation_ppm": 45161
+    },
+    {
+      "allocation_utilization_bp": 5000,
+      "emission_realization_bp": 7500,
+      "fee_burn_as_gross_emission_bp": 10000,
+      "year_1_net_inflation_ppm": 0
+    },
+    {
+      "allocation_utilization_bp": 5000,
+      "emission_realization_bp": 10000,
+      "fee_burn_as_gross_emission_bp": 0,
+      "year_1_net_inflation_ppm": 120430
+    },
+    {
+      "allocation_utilization_bp": 5000,
+      "emission_realization_bp": 10000,
+      "fee_burn_as_gross_emission_bp": 2500,
+      "year_1_net_inflation_ppm": 90322
+    },
+    {
+      "allocation_utilization_bp": 5000,
+      "emission_realization_bp": 10000,
+      "fee_burn_as_gross_emission_bp": 5000,
+      "year_1_net_inflation_ppm": 60215
+    },
+    {
+      "allocation_utilization_bp": 5000,
+      "emission_realization_bp": 10000,
+      "fee_burn_as_gross_emission_bp": 10000,
+      "year_1_net_inflation_ppm": 0
+    },
+    {
+      "allocation_utilization_bp": 7500,
+      "emission_realization_bp": 5000,
+      "fee_burn_as_gross_emission_bp": 0,
+      "year_1_net_inflation_ppm": 40143
+    },
+    {
+      "allocation_utilization_bp": 7500,
+      "emission_realization_bp": 5000,
+      "fee_burn_as_gross_emission_bp": 2500,
+      "year_1_net_inflation_ppm": 30107
+    },
+    {
+      "allocation_utilization_bp": 7500,
+      "emission_realization_bp": 5000,
+      "fee_burn_as_gross_emission_bp": 5000,
+      "year_1_net_inflation_ppm": 20071
+    },
+    {
+      "allocation_utilization_bp": 7500,
+      "emission_realization_bp": 5000,
+      "fee_burn_as_gross_emission_bp": 10000,
+      "year_1_net_inflation_ppm": 0
+    },
+    {
+      "allocation_utilization_bp": 7500,
+      "emission_realization_bp": 7500,
+      "fee_burn_as_gross_emission_bp": 0,
+      "year_1_net_inflation_ppm": 60215
+    },
+    {
+      "allocation_utilization_bp": 7500,
+      "emission_realization_bp": 7500,
+      "fee_burn_as_gross_emission_bp": 2500,
+      "year_1_net_inflation_ppm": 45161
+    },
+    {
+      "allocation_utilization_bp": 7500,
+      "emission_realization_bp": 7500,
+      "fee_burn_as_gross_emission_bp": 5000,
+      "year_1_net_inflation_ppm": 30107
+    },
+    {
+      "allocation_utilization_bp": 7500,
+      "emission_realization_bp": 7500,
+      "fee_burn_as_gross_emission_bp": 10000,
+      "year_1_net_inflation_ppm": 0
+    },
+    {
+      "allocation_utilization_bp": 7500,
+      "emission_realization_bp": 10000,
+      "fee_burn_as_gross_emission_bp": 0,
+      "year_1_net_inflation_ppm": 80286
+    },
+    {
+      "allocation_utilization_bp": 7500,
+      "emission_realization_bp": 10000,
+      "fee_burn_as_gross_emission_bp": 2500,
+      "year_1_net_inflation_ppm": 60215
+    },
+    {
+      "allocation_utilization_bp": 7500,
+      "emission_realization_bp": 10000,
+      "fee_burn_as_gross_emission_bp": 5000,
+      "year_1_net_inflation_ppm": 40143
+    },
+    {
+      "allocation_utilization_bp": 7500,
+      "emission_realization_bp": 10000,
+      "fee_burn_as_gross_emission_bp": 10000,
+      "year_1_net_inflation_ppm": 0
+    },
+    {
+      "allocation_utilization_bp": 10000,
+      "emission_realization_bp": 5000,
+      "fee_burn_as_gross_emission_bp": 0,
+      "year_1_net_inflation_ppm": 30107
+    },
+    {
+      "allocation_utilization_bp": 10000,
+      "emission_realization_bp": 5000,
+      "fee_burn_as_gross_emission_bp": 2500,
+      "year_1_net_inflation_ppm": 22580
+    },
+    {
+      "allocation_utilization_bp": 10000,
+      "emission_realization_bp": 5000,
+      "fee_burn_as_gross_emission_bp": 5000,
+      "year_1_net_inflation_ppm": 15053
+    },
+    {
+      "allocation_utilization_bp": 10000,
+      "emission_realization_bp": 5000,
+      "fee_burn_as_gross_emission_bp": 10000,
+      "year_1_net_inflation_ppm": 0
+    },
+    {
+      "allocation_utilization_bp": 10000,
+      "emission_realization_bp": 7500,
+      "fee_burn_as_gross_emission_bp": 0,
+      "year_1_net_inflation_ppm": 45161
+    },
+    {
+      "allocation_utilization_bp": 10000,
+      "emission_realization_bp": 7500,
+      "fee_burn_as_gross_emission_bp": 2500,
+      "year_1_net_inflation_ppm": 33870
+    },
+    {
+      "allocation_utilization_bp": 10000,
+      "emission_realization_bp": 7500,
+      "fee_burn_as_gross_emission_bp": 5000,
+      "year_1_net_inflation_ppm": 22580
+    },
+    {
+      "allocation_utilization_bp": 10000,
+      "emission_realization_bp": 7500,
+      "fee_burn_as_gross_emission_bp": 10000,
+      "year_1_net_inflation_ppm": 0
+    },
+    {
+      "allocation_utilization_bp": 10000,
+      "emission_realization_bp": 10000,
+      "fee_burn_as_gross_emission_bp": 0,
+      "year_1_net_inflation_ppm": 60215
+    },
+    {
+      "allocation_utilization_bp": 10000,
+      "emission_realization_bp": 10000,
+      "fee_burn_as_gross_emission_bp": 2500,
+      "year_1_net_inflation_ppm": 45161
+    },
+    {
+      "allocation_utilization_bp": 10000,
+      "emission_realization_bp": 10000,
+      "fee_burn_as_gross_emission_bp": 5000,
+      "year_1_net_inflation_ppm": 30107
+    },
+    {
+      "allocation_utilization_bp": 10000,
+      "emission_realization_bp": 10000,
+      "fee_burn_as_gross_emission_bp": 10000,
+      "year_1_net_inflation_ppm": 0
+    }
+  ],
+  "adversarial_schedule_grid": [
+    {
+      "allocation_plus_schedule_micro_noos": 495698908080000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 10,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 502389428160000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 10,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 503194647360000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 10,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 537096688320000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 10,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 562499882400000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 10,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 569909107920000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 10,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 586021481040000,
+      "cap_breached": false,
+      "decay": "2/3",
+      "era_years": 10,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 652926997200000,
+      "cap_breached": false,
+      "decay": "2/3",
+      "era_years": 10,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 690592229040000,
+      "cap_breached": false,
+      "decay": "2/3",
+      "era_years": 10,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 691397816160000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 20,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 704778856320000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 20,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 706389294720000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 20,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 774193376640000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 20,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 824999764800000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 20,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 839818215840000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 20,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 872042962080000,
+      "cap_breached": false,
+      "decay": "2/3",
+      "era_years": 20,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1005853994400000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 20,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1081184458080000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 20,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 887096724240000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 30,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 907168284480000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 30,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 909583942080000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 30,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1011290064960000,
+      "cap_breached": true,
+      "decay": "1/2",
+      "era_years": 30,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1087499647200000,
+      "cap_breached": true,
+      "decay": "1/2",
+      "era_years": 30,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1109727323760000,
+      "cap_breached": true,
+      "decay": "1/2",
+      "era_years": 30,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1158064443120000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 30,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1358780991600000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 30,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1471776687120000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 30,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 7500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 560931859920000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 10,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 569852553360000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 10,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 570926249040000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 10,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 616129005360000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 10,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 649999930800000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 10,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 659878950720000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 10,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 681361957200000,
+      "cap_breached": false,
+      "decay": "2/3",
+      "era_years": 10,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 770569417200000,
+      "cap_breached": false,
+      "decay": "2/3",
+      "era_years": 10,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 820789866480000,
+      "cap_breached": false,
+      "decay": "2/3",
+      "era_years": 10,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 821863719840000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 20,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 839705106720000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 20,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 841852498080000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 20,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 932258010720000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 20,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 999999861600000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 20,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1019757901440000,
+      "cap_breached": true,
+      "decay": "1/2",
+      "era_years": 20,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1062723914400000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 20,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1241138834400000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 20,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1341579732960000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 20,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1082795579760000,
+      "cap_breached": true,
+      "decay": "1/3",
+      "era_years": 30,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1109557660080000,
+      "cap_breached": true,
+      "decay": "1/3",
+      "era_years": 30,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1112778747120000,
+      "cap_breached": true,
+      "decay": "1/3",
+      "era_years": 30,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1248387016080000,
+      "cap_breached": true,
+      "decay": "1/2",
+      "era_years": 30,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1349999792400000,
+      "cap_breached": true,
+      "decay": "1/2",
+      "era_years": 30,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1379636852160000,
+      "cap_breached": true,
+      "decay": "1/2",
+      "era_years": 30,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1444085871600000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 30,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1711708251600000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 30,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1862369599440000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 30,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 10000
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 626164811760000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 10,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 637315731120000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 10,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 638657903280000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 10,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 695161217280000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 10,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 737499874080000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 10,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 749848583280000,
+      "cap_breached": false,
+      "decay": "1/2",
+      "era_years": 10,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 776702433360000,
+      "cap_breached": false,
+      "decay": "2/3",
+      "era_years": 10,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 888211679520000,
+      "cap_breached": false,
+      "decay": "2/3",
+      "era_years": 10,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 950987188560000,
+      "cap_breached": false,
+      "decay": "2/3",
+      "era_years": 10,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 952329623520000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 20,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 974631462240000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 20,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 977315806560000,
+      "cap_breached": false,
+      "decay": "1/3",
+      "era_years": 20,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1090322434560000,
+      "cap_breached": true,
+      "decay": "1/2",
+      "era_years": 20,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1174999748160000,
+      "cap_breached": true,
+      "decay": "1/2",
+      "era_years": 20,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1199697166560000,
+      "cap_breached": true,
+      "decay": "1/2",
+      "era_years": 20,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1253404866720000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 20,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1476423359040000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 20,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1601974377120000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 20,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1278494435280000,
+      "cap_breached": true,
+      "decay": "1/3",
+      "era_years": 30,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1311947193360000,
+      "cap_breached": true,
+      "decay": "1/3",
+      "era_years": 30,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1315973709840000,
+      "cap_breached": true,
+      "decay": "1/3",
+      "era_years": 30,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1485483651840000,
+      "cap_breached": true,
+      "decay": "1/2",
+      "era_years": 30,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1612499622240000,
+      "cap_breached": true,
+      "decay": "1/2",
+      "era_years": 30,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1649545749840000,
+      "cap_breached": true,
+      "decay": "1/2",
+      "era_years": 30,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 1730107300080000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 30,
+      "eras": 3,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 2064635038560000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 30,
+      "eras": 5,
+      "initial_rate_bp_of_selected": 12500
+    },
+    {
+      "allocation_plus_schedule_micro_noos": 2252961565680000,
+      "cap_breached": true,
+      "decay": "2/3",
+      "era_years": 30,
+      "eras": 8,
+      "initial_rate_bp_of_selected": 12500
+    }
+  ],
+  "analysis_kind": "NOOS_PRODUCTION_ECONOMICS_SENSITIVITY",
+  "annual_inflation_points": [
+    {
+      "gross_inflation_ppm": 60215,
+      "scheduled_micro_noos": 18064514592000,
+      "year": 1
+    },
+    {
+      "gross_inflation_ppm": 48526,
+      "scheduled_micro_noos": 18064514592000,
+      "year": 5
+    },
+    {
+      "gross_inflation_ppm": 39051,
+      "scheduled_micro_noos": 18064514592000,
+      "year": 10
+    },
+    {
+      "gross_inflation_ppm": 28084,
+      "scheduled_micro_noos": 18064514592000,
+      "year": 20
+    },
+    {
+      "gross_inflation_ppm": 10844,
+      "scheduled_micro_noos": 9032257296000,
+      "year": 40
+    },
+    {
+      "gross_inflation_ppm": 4867,
+      "scheduled_micro_noos": 4516128648000,
+      "year": 60
+    },
+    {
+      "gross_inflation_ppm": 2315,
+      "scheduled_micro_noos": 2258061696000,
+      "year": 80
+    },
+    {
+      "gross_inflation_ppm": 1130,
+      "scheduled_micro_noos": 1129030848000,
+      "year": 100
+    }
+  ],
+  "assumption_warning": "Token prices, stake participation, allocation utilization, fee burn, and block realization are adversarial scenarios, not forecasts.",
+  "exact_tests": {
+    "cap_terminal": {
+      "allocation_plus_scheduled_micro_noos": 999999861600000,
+      "cap_headroom_micro_noos": 138400000,
+      "range_rows_checked": 5,
+      "scheduled_micro_noos": 699999861600000
+    },
+    "duplex_hard_zero": {
+      "all_zero": true,
+      "binding_claim": "E-DEMAND-WASH-01",
+      "production_values_checked": 3
+    },
+    "no_recreated_emission": {
+      "height_domain": "0..8",
+      "max_attempt_sequence_length": 6,
+      "sequences_checked": 597871
+    },
+    "production_loader_refusal": {
+      "gate_error_count": 5,
+      "genesis_ceremony_mainnet_path": "REFUSED",
+      "mainnet_manifest_gate": "REFUSED",
+      "noos_node_runtime_loader": "REFUSED"
+    },
+    "rounding": {
+      "all_basis_point_residues_checked": true,
+      "amounts_checked": 10006,
+      "rounding_rule": "witness floor; treasury floor; ground exact remainder"
+    }
+  },
+  "proposal_sha256": "0706ce7983a95e1eaf6c3ad8d84510c2e52ccf9c3f9b8b3bd46656fa76aed468",
+  "schema_version": 1,
+  "selected": {
+    "genesis_allocation_limit_micro_noos": 300000000000000,
+    "max_supply_micro_noos": 1000000000000000,
+    "table_root": "616a3cf355c64ae62f2a20f4f99f9c3da5d72b4f1bedae6aba17f53ad8117b35",
+    "terminal_height": 525600000
+  },
+  "status": "OWNER_APPROVED_PENDING_SIGNATURE_NON_FORECAST",
+  "validator_security_grid": [
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 8000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 2666666666667,
+      "slash_loss_micro_noos": 1600000000000,
+      "threshold_cost_usd_cents": 2666666
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 8000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 2666666666667,
+      "slash_loss_micro_noos": 1600000000000,
+      "threshold_cost_usd_cents": 26666666
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 8000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 2666666666667,
+      "slash_loss_micro_noos": 1600000000000,
+      "threshold_cost_usd_cents": 266666666
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 8000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 2666666666667,
+      "slash_loss_micro_noos": 1600000000000,
+      "threshold_cost_usd_cents": 2666666666
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 16000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 5333333333334,
+      "slash_loss_micro_noos": 3200000000000,
+      "threshold_cost_usd_cents": 5333333
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 16000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 5333333333334,
+      "slash_loss_micro_noos": 3200000000000,
+      "threshold_cost_usd_cents": 53333333
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 16000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 5333333333334,
+      "slash_loss_micro_noos": 3200000000000,
+      "threshold_cost_usd_cents": 533333333
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 16000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 5333333333334,
+      "slash_loss_micro_noos": 3200000000000,
+      "threshold_cost_usd_cents": 5333333333
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 32000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 10666666666667,
+      "slash_loss_micro_noos": 6400000000000,
+      "threshold_cost_usd_cents": 10666666
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 32000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 10666666666667,
+      "slash_loss_micro_noos": 6400000000000,
+      "threshold_cost_usd_cents": 106666666
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 32000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 10666666666667,
+      "slash_loss_micro_noos": 6400000000000,
+      "threshold_cost_usd_cents": 1066666666
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 32000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 10666666666667,
+      "slash_loss_micro_noos": 6400000000000,
+      "threshold_cost_usd_cents": 10666666666
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 80000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 26666666666667,
+      "slash_loss_micro_noos": 16000000000000,
+      "threshold_cost_usd_cents": 26666666
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 80000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 26666666666667,
+      "slash_loss_micro_noos": 16000000000000,
+      "threshold_cost_usd_cents": 266666666
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 80000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 26666666666667,
+      "slash_loss_micro_noos": 16000000000000,
+      "threshold_cost_usd_cents": 2666666666
+    },
+    {
+      "active_validators": 32,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 80000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 26666666666667,
+      "slash_loss_micro_noos": 16000000000000,
+      "threshold_cost_usd_cents": 26666666666
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 16000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 5333333333334,
+      "slash_loss_micro_noos": 3200000000000,
+      "threshold_cost_usd_cents": 5333333
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 16000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 5333333333334,
+      "slash_loss_micro_noos": 3200000000000,
+      "threshold_cost_usd_cents": 53333333
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 16000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 5333333333334,
+      "slash_loss_micro_noos": 3200000000000,
+      "threshold_cost_usd_cents": 533333333
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 16000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 5333333333334,
+      "slash_loss_micro_noos": 3200000000000,
+      "threshold_cost_usd_cents": 5333333333
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 32000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 10666666666667,
+      "slash_loss_micro_noos": 6400000000000,
+      "threshold_cost_usd_cents": 10666666
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 32000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 10666666666667,
+      "slash_loss_micro_noos": 6400000000000,
+      "threshold_cost_usd_cents": 106666666
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 32000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 10666666666667,
+      "slash_loss_micro_noos": 6400000000000,
+      "threshold_cost_usd_cents": 1066666666
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 32000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 10666666666667,
+      "slash_loss_micro_noos": 6400000000000,
+      "threshold_cost_usd_cents": 10666666666
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 64000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 21333333333334,
+      "slash_loss_micro_noos": 12800000000000,
+      "threshold_cost_usd_cents": 21333333
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 64000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 21333333333334,
+      "slash_loss_micro_noos": 12800000000000,
+      "threshold_cost_usd_cents": 213333333
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 64000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 21333333333334,
+      "slash_loss_micro_noos": 12800000000000,
+      "threshold_cost_usd_cents": 2133333333
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 64000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 21333333333334,
+      "slash_loss_micro_noos": 12800000000000,
+      "threshold_cost_usd_cents": 21333333333
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 160000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 53333333333334,
+      "slash_loss_micro_noos": 32000000000000,
+      "threshold_cost_usd_cents": 53333333
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 160000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 53333333333334,
+      "slash_loss_micro_noos": 32000000000000,
+      "threshold_cost_usd_cents": 533333333
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 160000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 53333333333334,
+      "slash_loss_micro_noos": 32000000000000,
+      "threshold_cost_usd_cents": 5333333333
+    },
+    {
+      "active_validators": 64,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 160000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 53333333333334,
+      "slash_loss_micro_noos": 32000000000000,
+      "threshold_cost_usd_cents": 53333333333
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 32000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 10666666666667,
+      "slash_loss_micro_noos": 6400000000000,
+      "threshold_cost_usd_cents": 10666666
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 32000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 10666666666667,
+      "slash_loss_micro_noos": 6400000000000,
+      "threshold_cost_usd_cents": 106666666
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 32000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 10666666666667,
+      "slash_loss_micro_noos": 6400000000000,
+      "threshold_cost_usd_cents": 1066666666
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 32000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 10666666666667,
+      "slash_loss_micro_noos": 6400000000000,
+      "threshold_cost_usd_cents": 10666666666
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 64000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 21333333333334,
+      "slash_loss_micro_noos": 12800000000000,
+      "threshold_cost_usd_cents": 21333333
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 64000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 21333333333334,
+      "slash_loss_micro_noos": 12800000000000,
+      "threshold_cost_usd_cents": 213333333
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 64000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 21333333333334,
+      "slash_loss_micro_noos": 12800000000000,
+      "threshold_cost_usd_cents": 2133333333
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 64000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 21333333333334,
+      "slash_loss_micro_noos": 12800000000000,
+      "threshold_cost_usd_cents": 21333333333
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 128000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 42666666666667,
+      "slash_loss_micro_noos": 25600000000000,
+      "threshold_cost_usd_cents": 42666666
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 128000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 42666666666667,
+      "slash_loss_micro_noos": 25600000000000,
+      "threshold_cost_usd_cents": 426666666
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 128000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 42666666666667,
+      "slash_loss_micro_noos": 25600000000000,
+      "threshold_cost_usd_cents": 4266666666
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 128000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 42666666666667,
+      "slash_loss_micro_noos": 25600000000000,
+      "threshold_cost_usd_cents": 42666666666
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 320000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 106666666666667,
+      "slash_loss_micro_noos": 64000000000000,
+      "threshold_cost_usd_cents": 106666666
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 320000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 106666666666667,
+      "slash_loss_micro_noos": 64000000000000,
+      "threshold_cost_usd_cents": 1066666666
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 320000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 106666666666667,
+      "slash_loss_micro_noos": 64000000000000,
+      "threshold_cost_usd_cents": 10666666666
+    },
+    {
+      "active_validators": 128,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 320000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 106666666666667,
+      "slash_loss_micro_noos": 64000000000000,
+      "threshold_cost_usd_cents": 106666666666
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 64000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 21333333333334,
+      "slash_loss_micro_noos": 12800000000000,
+      "threshold_cost_usd_cents": 21333333
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 64000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 21333333333334,
+      "slash_loss_micro_noos": 12800000000000,
+      "threshold_cost_usd_cents": 213333333
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 64000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 21333333333334,
+      "slash_loss_micro_noos": 12800000000000,
+      "threshold_cost_usd_cents": 2133333333
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 1,
+      "minimum_total_bonded_micro_noos": 64000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 21333333333334,
+      "slash_loss_micro_noos": 12800000000000,
+      "threshold_cost_usd_cents": 21333333333
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 128000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 42666666666667,
+      "slash_loss_micro_noos": 25600000000000,
+      "threshold_cost_usd_cents": 42666666
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 128000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 42666666666667,
+      "slash_loss_micro_noos": 25600000000000,
+      "threshold_cost_usd_cents": 426666666
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 128000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 42666666666667,
+      "slash_loss_micro_noos": 25600000000000,
+      "threshold_cost_usd_cents": 4266666666
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 2,
+      "minimum_total_bonded_micro_noos": 128000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 42666666666667,
+      "slash_loss_micro_noos": 25600000000000,
+      "threshold_cost_usd_cents": 42666666666
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 256000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 85333333333334,
+      "slash_loss_micro_noos": 51200000000000,
+      "threshold_cost_usd_cents": 85333333
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 256000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 85333333333334,
+      "slash_loss_micro_noos": 51200000000000,
+      "threshold_cost_usd_cents": 853333333
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 256000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 85333333333334,
+      "slash_loss_micro_noos": 51200000000000,
+      "threshold_cost_usd_cents": 8533333333
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 4,
+      "minimum_total_bonded_micro_noos": 256000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 85333333333334,
+      "slash_loss_micro_noos": 51200000000000,
+      "threshold_cost_usd_cents": 85333333333
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 640000000000000,
+      "noos_price_usd_cents": 1,
+      "one_third_plus_one_micro_noos": 213333333333334,
+      "slash_loss_micro_noos": 128000000000000,
+      "threshold_cost_usd_cents": 213333333
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 640000000000000,
+      "noos_price_usd_cents": 10,
+      "one_third_plus_one_micro_noos": 213333333333334,
+      "slash_loss_micro_noos": 128000000000000,
+      "threshold_cost_usd_cents": 2133333333
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 640000000000000,
+      "noos_price_usd_cents": 100,
+      "one_third_plus_one_micro_noos": 213333333333334,
+      "slash_loss_micro_noos": 128000000000000,
+      "threshold_cost_usd_cents": 21333333333
+    },
+    {
+      "active_validators": 256,
+      "average_bond_multiple": 10,
+      "minimum_total_bonded_micro_noos": 640000000000000,
+      "noos_price_usd_cents": 1000,
+      "one_third_plus_one_micro_noos": 213333333333334,
+      "slash_loss_micro_noos": 128000000000000,
+      "threshold_cost_usd_cents": 213333333333
+    }
+  ]
+}

@@ -1,14 +1,15 @@
 # NOOSPHERE production economics OWNER-PROPOSAL
 #
-# STATUS: DRAFT / UNSIGNED / NOT PRODUCTION LOADABLE.
-# This is a recommendation for owner, independent economist, and counsel
-# review. It is not an approval, freeze, signed genesis manifest, or legal or
-# economic opinion. Production loaders and the freeze gate MUST refuse it.
+# STATUS: OWNER_APPROVED_PENDING_SIGNATURE / UNSIGNED / NOT PRODUCTION LOADABLE.
+# The owner approved this exact fixed economics envelope for independent
+# economist and counsel review. It is not frozen, signed, production-authorized,
+# or a legal or economic opinion. Production loaders and the freeze gate MUST
+# refuse it.
 
 schema_version = 1
 proposal_kind = "OWNER-PROPOSAL"
 proposal_id = "ODR-ECONOMICS-2026-07-11-V1"
-status = "DRAFT"
+status = "OWNER_APPROVED_PENDING_SIGNATURE"
 signature_status = "UNSIGNED"
 chain_name = "MindChain Mainnet"
 is_test_network = false
@@ -153,6 +154,7 @@ recipient_entries = "OWNER_INPUT_REQUIRED"
 [release_authority]
 signature_scheme = "Ed25519"
 required_roles = ["release-owner"]
+key_custody_requirement = "HARDWARE_OR_OFFLINE"
 release_owner_public_key = "OWNER_INPUT_REQUIRED"
 detached_signature_record = "OWNER_INPUT_REQUIRED"
 
@@ -172,3 +174,4 @@ software_manifest_root = "QUIET_WEEK_INPUT_REQUIRED"
 owner_decision_record = "protocol/genesis/owner-decision.economics.proposal.json"
 review_checklist = "protocol/genesis/OWNER-PROPOSAL-ECONOMICS.md"
 sensitivity_analysis = "evidence/economics/production-economics-sensitivity-v1.json"
+independent_review_authorization = "APPROVED_TO_PROCEED"

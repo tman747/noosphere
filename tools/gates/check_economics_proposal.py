@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Validate the unsigned production-economics owner proposal, fail closed.
+"""Validate the owner-approved, unsigned production-economics proposal, fail closed.
 
-`--allow-draft` proves the arithmetic and honest blockers while returning 0.
-Without it, a valid draft returns 2. A proposal can return PASS only after all
-owner inputs, reviews, evidence-selected drift, and signatures exist; this
-script deliberately cannot manufacture those artifacts.
+`--allow-draft` proves the arithmetic and honest blockers while returning 0;
+the legacy flag name is retained for release-script compatibility. Without it,
+the valid owner-approved-pending-signature draft returns 2. A proposal can
+return PASS only after all owner inputs, reviews, evidence-selected drift, and
+signatures exist; this script deliberately cannot manufacture those artifacts.
 """
 from __future__ import annotations
 
@@ -223,7 +224,7 @@ def sensitivity(doc: dict, rows: list[emission.RangeRow], tests: dict) -> dict:
     return {
         "schema_version": 1,
         "analysis_kind": "NOOS_PRODUCTION_ECONOMICS_SENSITIVITY",
-        "status": "DRAFT_UNREVIEWED_NON_FORECAST",
+        "status": "OWNER_APPROVED_PENDING_SIGNATURE_NON_FORECAST",
         "proposal_sha256": hashlib.sha256(PROPOSAL.read_bytes()).hexdigest(),
         "assumption_warning": "Token prices, stake participation, allocation utilization, fee burn, and block realization are adversarial scenarios, not forecasts.",
         "selected": {"max_supply_micro_noos": max_supply, "genesis_allocation_limit_micro_noos": allocation,
@@ -251,8 +252,15 @@ def validate(proposal_path: Path = PROPOSAL, write_analysis: bool = False) -> tu
     allocations = load(ALLOCATIONS)
     decisions = load(DECISIONS)
     assert doc["proposal_kind"] == "OWNER-PROPOSAL"
-    assert doc["status"] == "DRAFT" and doc["signature_status"] == "UNSIGNED"
+    assert doc["status"] == "OWNER_APPROVED_PENDING_SIGNATURE"
+    assert doc["signature_status"] == "UNSIGNED"
     assert doc["production_loadable"] is False and doc["owner_signed"] is False
+    assert doc["release_authority"]["key_custody_requirement"] == "HARDWARE_OR_OFFLINE"
+    assert doc["release_authority"]["release_owner_public_key"] == "OWNER_INPUT_REQUIRED"
+    assert doc["release_authority"]["detached_signature_record"] == "OWNER_INPUT_REQUIRED"
+    assert doc["review"]["independent_review_authorization"] == "APPROVED_TO_PROCEED"
+    assert doc["independent_economic_review"] == "NOT_PERFORMED"
+    assert doc["counsel_review"] == "NOT_PERFORMED"
     assert doc["consensus"]["max_future_drift_ms"] == "PENDING_E_WAN_01"
     assert doc["dkg"]["participants"] == 7 and doc["dkg"]["threshold"] == 5
     assert doc["release_authority"]["required_roles"] == ["release-owner"]
@@ -263,6 +271,16 @@ def validate(proposal_path: Path = PROPOSAL, write_analysis: bool = False) -> tu
     assert sum(c["share_of_max_supply_bp"] for c in allocations["categories"]) == 3000
     odrs = {record["odr_id"] for record in decisions["records"]}
     assert odrs == EXPECTED_ODRS, f"ODR coverage mismatch missing={EXPECTED_ODRS-odrs} extra={odrs-EXPECTED_ODRS}"
+    assert decisions["status"] == doc["status"]
+    assert decisions["signature_status"] == "UNSIGNED"
+    assert decisions["production_effect"] == "NONE"
+    assert decisions["owner_approval"] is True
+    assert decisions["approved_scope"] == "EXACT_1_000_000_000_NOOS_CAPPED_FIXED_ENVELOPE_DRAFT"
+    assert decisions["independent_review_authorization"] == "APPROVED_FOR_INDEPENDENT_ECONOMIST_AND_COUNSEL_REVIEW"
+    assert decisions["independent_economic_review"] == "NOT_PERFORMED"
+    assert decisions["counsel_review"] == "NOT_PERFORMED"
+    assert decisions["hardware_or_offline_release_owner_key"] == "OWNER_INPUT_REQUIRED"
+    assert decisions["detached_signature"] == "OWNER_INPUT_REQUIRED"
 
     root, _, _ = emission.verify(proposal_path, ROOT / doc["emission"]["emission_table_path"])
     assert root == doc["emission"]["emission_table_root"]
@@ -289,13 +307,13 @@ def validate(proposal_path: Path = PROPOSAL, write_analysis: bool = False) -> tu
         errors.append("sensitivity analysis missing or stale; run --write-analysis")
 
     blockers = [
-        "proposal is DRAFT/UNSIGNED",
+        "owner-approved fixed-envelope proposal is pending hardware/offline release-owner key and detached signature",
         "E-WAN-01 has not selected max_future_drift_ms",
         "allocation recipient entries and allocations_root are OWNER_INPUT_REQUIRED",
-        "release-owner public key and detached signature are OWNER_INPUT_REQUIRED",
         "independent economist review is NOT_PERFORMED",
         "counsel review is NOT_PERFORMED",
-        "Quiet Week commitments, public 5-of-7 DKG identities, and post-freeze transcript root do not exist",
+        "public 5-of-7 DKG participant identities, complaints/exclusions, transcript, and final identity do not exist",
+        "Quiet Week commitments and production authorization do not exist",
     ]
     return errors, {"tests": tests, "blockers": blockers}
 
@@ -304,6 +322,7 @@ def self_test() -> int:
     errors, result = validate(write_analysis=False)
     assert not errors, errors
     assert result["blockers"]
+    assert "hardware/offline release-owner key" in result["blockers"][0]
     with tempfile.TemporaryDirectory() as tmp:
         text = PROPOSAL.read_text("utf-8").replace('owner_signed = false', 'owner_signed = true')
         bad = Path(tmp) / "dishonest.toml"
@@ -314,7 +333,7 @@ def self_test() -> int:
             pass
         else:
             raise AssertionError("dishonest signed claim was not refused")
-    print("RESULT economics_proposal_self_test=PASS dishonest_signed_claim_refused=true")
+    print("RESULT economics_proposal_self_test=PASS status=OWNER_APPROVED_PENDING_SIGNATURE dishonest_signed_claim_refused=true")
     return 0
 
 
@@ -335,7 +354,7 @@ def main() -> int:
     if errors:
         print("RESULT economics_proposal=FAIL errors=" + "; ".join(errors), file=sys.stderr)
         return 1
-    print("RESULT economics_proposal=DRAFT_BLOCKED blockers=" + "; ".join(result["blockers"]))
+    print("RESULT economics_proposal=OWNER_APPROVED_PENDING_SIGNATURE_BLOCKED blockers=" + "; ".join(result["blockers"]))
     return 0 if args.allow_draft else 2
 
 
