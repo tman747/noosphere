@@ -26,14 +26,15 @@ fn hex(bytes: &[u8]) -> String {
 fn profile_metrics(claim: &str) {
     let report = required(audit_local_reference(), "local profile audit");
     println!(
-        "{{\"claim\":\"{claim}\",\"profile_id\":\"{}\",\"tokenizer_root\":\"{}\",\"matmul_instances\":{},\"semantic_op_families\":{},\"schedule_mismatches\":{},\"cobatch_mismatches\":{},\"invalid_tokenizer_bytes_rejected\":{}}}",
+        "{{\"claim\":\"{claim}\",\"profile_id\":\"{}\",\"tokenizer_root\":\"{}\",\"matmul_instances\":{},\"semantic_op_families\":{},\"schedule_mismatches\":{},\"cobatch_mismatches\":{},\"invalid_tokenizer_bytes_rejected\":{},\"contract_mutations_rejected\":{}}}",
         hex(&report.profile_id),
         hex(&report.tokenizer_root),
         report.matmul_instances,
         report.semantic_op_families,
         report.schedule_mismatches,
         report.cobatch_mismatches,
-        report.invalid_tokenizer_bytes_rejected
+        report.invalid_tokenizer_bytes_rejected,
+        report.contract_mutations_rejected
     );
 }
 

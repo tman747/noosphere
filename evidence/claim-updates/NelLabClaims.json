@@ -5,7 +5,7 @@
       "packages": ["noos-nel"],
       "command": "python tools/gates/run_nel_lab_claim.py --claim N-PROFILE",
       "rollback_command": "python tools/gates/run_nel_lab_claim.py --claim N-PROFILE --rollback-check",
-      "notes": "PARTIAL. The frozen mini W8A8 vector now has a complete local reference identity including a rejecting byte tokenizer; all 17 semantic op families execute, every recorded GEMM agrees with an independently ordered column-stream accumulator in forward and reverse-inner schedules, invalid tokenizer bytes reject, and identical work is co-batch invariant. This remains mini shape. The registered Qwen2.5-0.5B tokenizer/model, preregistered accuracy tolerance, two independently authored CPU implementations, certified AMD and NVIDIA kernels, and >=10^9 clean cross-vendor instances remain external."
+      "notes": "PARTIAL. The frozen mini W8A8 vector now has an explicit immutable local contract committing numeric profile, rejecting byte tokenizer, arithmetic/overflow/rounding/saturation semantics, decoding/tie semantics, and all frozen dimensions; deterministic falsifiers mutate every committed root and dimension and reject. All 17 semantic op families execute, every recorded GEMM agrees with an independently ordered column-stream accumulator in forward and reverse-inner schedules, invalid tokenizer bytes reject, and identical work is co-batch invariant. This remains mini shape. The registered Qwen2.5-0.5B tokenizer/model, preregistered accuracy tolerance, two independently authored CPU implementations, certified AMD and NVIDIA kernels, and >=10^9 clean cross-vendor instances remain external."
     },
     "E-NEL-01": {
       "local_implementation_state": "PARTIAL",

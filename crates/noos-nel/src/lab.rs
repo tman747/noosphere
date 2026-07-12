@@ -47,6 +47,7 @@ pub enum LabError {
     QualityToleranceExceeded,
     LabelLaundering,
     InvalidArtifact,
+    ProfileContractMismatch,
     InvalidShardGeometry,
     Unavailable,
     PoisonedCheckpoint,
@@ -91,17 +92,71 @@ impl MiniTokenizer {
     }
 }
 
+/// Immutable identity of the complete local W8A8 profile contract. The numeric profile root
+/// commits LUTs, scales and tensor shapes; the additional roots make tokenizer, overflow,
+/// rounding, saturation, tie-breaking and decoding semantics explicit admission inputs rather
+/// than assumptions inherited from an implementation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FrozenProfileContract {
+    pub numeric_profile_id: Hash32,
+    pub tokenizer_root: Hash32,
+    pub arithmetic_semantics_root: Hash32,
+    pub decoding_semantics_root: Hash32,
+    pub shape: [u32; 7],
+}
+
+impl FrozenProfileContract {
+    #[must_use]
+    pub fn canonical_local() -> Self {
+        Self {
+            numeric_profile_id: mini_profile_id(),
+            tokenizer_root: MiniTokenizer::root(),
+            arithmetic_semantics_root: domain_hash(
+                "NOOS/NEL/PROFILE/ARITHMETIC-SEMANTICS/V1",
+                b"i8-weights;i8-activations;i64-checked-accumulator;add-positive-half-then-arithmetic-right-shift;negative-ties-toward-positive-infinity;saturate-i8;integer-rmsnorm;lut-silu;lut-softmax;integer-rope",
+            ),
+            decoding_semantics_root: domain_hash(
+                "NOOS/NEL/PROFILE/DECODING-SEMANTICS/V1",
+                b"greedy;lowest-token-id-wins-ties;reject-noncanonical-tokenizer-bytes",
+            ),
+            shape: [
+                HIDDEN as u32,
+                LAYERS as u32,
+                QKV_DIM as u32,
+                MLP as u32,
+                VOCAB as u32,
+                OPS_PER_LAYER as u32,
+                1,
+            ],
+        }
+    }
+
+    #[must_use]
+    pub fn commitment(&self) -> Hash32 {
+        let mut body = Vec::new();
+        body.extend(self.numeric_profile_id);
+        body.extend(self.tokenizer_root);
+        body.extend(self.arithmetic_semantics_root);
+        body.extend(self.decoding_semantics_root);
+        for dimension in self.shape {
+            body.extend(dimension.to_le_bytes());
+        }
+        domain_hash("NOOS/NEL/PROFILE/LOCAL-CONTRACT/V1", &body)
+    }
+
+    pub fn validate_local(&self) -> Result<(), LabError> {
+        if self == &Self::canonical_local() {
+            Ok(())
+        } else {
+            Err(LabError::ProfileContractMismatch)
+        }
+    }
+}
+
 /// Identity of the complete local reference profile.
 #[must_use]
 pub fn local_reference_profile_id() -> Hash32 {
-    let mut body = Vec::new();
-    body.extend(mini_profile_id());
-    body.extend(MiniTokenizer::root());
-    body.extend((OPS_PER_LAYER).to_le_bytes());
-    body.extend((HIDDEN as u32).to_le_bytes());
-    body.extend((MLP as u32).to_le_bytes());
-    body.extend((QKV_DIM as u32).to_le_bytes());
-    domain_hash("NOOS/NEL/PROFILE/LOCAL-REFERENCE/V1", &body)
+    FrozenProfileContract::canonical_local().commitment()
 }
 
 fn resolve_b(model: &MiniModel, record: &MatMulRecord) -> Result<Vec<i64>, NelError> {
@@ -162,6 +217,7 @@ pub struct ConformanceReport {
     pub schedule_mismatches: u64,
     pub cobatch_mismatches: u64,
     pub invalid_tokenizer_bytes_rejected: bool,
+    pub contract_mutations_rejected: bool,
 }
 
 /// Exercise the complete local op family, two reduction schedules, tokenizer
@@ -203,14 +259,36 @@ pub fn audit_local_reference() -> Result<ConformanceReport, NelError> {
             left.logits != right.logits || left.op_payloads != right.op_payloads
         })
         .count() as u64;
+    let canonical_contract = FrozenProfileContract::canonical_local();
+    canonical_contract.validate_local().map_err(|_| NelError::InvalidCount)?;
+    let mut mutations = Vec::new();
+    for replacement in [[90; 32], [91; 32], [92; 32], [93; 32]] {
+        let mut mutation = canonical_contract.clone();
+        match mutations.len() {
+            0 => mutation.numeric_profile_id = replacement,
+            1 => mutation.tokenizer_root = replacement,
+            2 => mutation.arithmetic_semantics_root = replacement,
+            _ => mutation.decoding_semantics_root = replacement,
+        }
+        mutations.push(mutation);
+    }
+    for index in 0..canonical_contract.shape.len() {
+        let mut mutation = canonical_contract.clone();
+        mutation.shape[index] = mutation.shape[index].saturating_add(1);
+        mutations.push(mutation);
+    }
+    let contract_mutations_rejected = mutations
+        .iter()
+        .all(|mutation| mutation.validate_local() == Err(LabError::ProfileContractMismatch));
     Ok(ConformanceReport {
-        profile_id: local_reference_profile_id(),
+        profile_id: canonical_contract.commitment(),
         tokenizer_root: MiniTokenizer::root(),
         matmul_instances,
         semantic_op_families: families.len() as u32,
         schedule_mismatches,
         cobatch_mismatches,
         invalid_tokenizer_bytes_rejected: MiniTokenizer::decode(&[VOCAB as u8]).is_err(),
+        contract_mutations_rejected,
     })
 }
 
@@ -1001,6 +1079,7 @@ mod tests {
         assert_eq!(report.schedule_mismatches, 0);
         assert_eq!(report.cobatch_mismatches, 0);
         assert!(report.invalid_tokenizer_bytes_rejected);
+        assert!(report.contract_mutations_rejected);
         assert_ne!(report.profile_id, mini_profile_id());
     }
 

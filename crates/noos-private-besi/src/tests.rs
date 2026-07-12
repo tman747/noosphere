@@ -277,3 +277,147 @@ fn sanitized_default_result_has_no_prompt_token_logit_or_hidden_fields() {
         assert!(!fields.contains(forbidden));
     }
 }
+
+fn trust_policy() -> BesiTrustPolicy {
+    BesiTrustPolicy {
+        executor_identities: [h(10), h(11)],
+        channel_key_roots: [h(12), h(13)],
+        adjudicator_key: SigningKey::from_bytes(&h(55)).verifying_key().to_bytes(),
+        model_hash: h(2),
+        numeric_profile: h(3),
+        non_collusion_assumed: true,
+    }
+}
+
+#[test]
+fn private_lane_trust_boundary_is_explicit_and_source_bound() {
+    let policy = trust_policy();
+    assert_eq!(policy.validate(), Ok(()));
+    assert_ne!(policy.commitment(), [0; 32]);
+    let mut mutations = Vec::new();
+    mutations.push(BesiTrustPolicy {
+        executor_identities: [h(10), h(10)],
+        ..policy.clone()
+    });
+    mutations.push(BesiTrustPolicy {
+        channel_key_roots: [h(12), h(12)],
+        ..policy.clone()
+    });
+    mutations.push(BesiTrustPolicy {
+        non_collusion_assumed: false,
+        ..policy.clone()
+    });
+    mutations.push(BesiTrustPolicy {
+        adjudicator_key: [0; 32],
+        ..policy
+    });
+    assert!(mutations
+        .iter()
+        .all(|mutation| mutation.validate() == Err(BesiError::TrustPolicy)));
+}
+
+#[test]
+fn one_executor_view_exposes_bucket_not_true_activation_rows() {
+    let policy = trust_policy();
+    let first = public_executor_view(&policy, &ctx(), h(10), h(12), 4096).unwrap();
+    let second = public_executor_view(&policy, &ctx(), h(10), h(12), 4096).unwrap();
+    assert_eq!(first, second);
+    assert_eq!(first.public_rows, PADDING_BUCKET as u32);
+    let mut exact_rows = ctx();
+    exact_rows.rows = 4;
+    assert_eq!(
+        public_executor_view(&policy, &exact_rows, h(10), h(12), 4096),
+        Err(BesiError::TrustPolicy)
+    );
+    let mut unknown_party = ctx();
+    unknown_party.party = 2;
+    assert_eq!(
+        public_executor_view(&policy, &unknown_party, h(10), h(12), 4096),
+        Err(BesiError::TrustPolicy)
+    );
+    assert_eq!(
+        public_executor_view(&policy, &ctx(), h(99), h(12), 4096),
+        Err(BesiError::TrustPolicy)
+    );
+    let mut wrong_model = ctx();
+    wrong_model.model_hash = h(99);
+    assert_eq!(
+        public_executor_view(&policy, &wrong_model, h(10), h(12), 4096),
+        Err(BesiError::TrustPolicy)
+    );
+}
+
+fn active_recovery(receipt: &AdjudicationReceipt) -> PrivateJobRecovery {
+    PrivateJobRecovery::new(
+        &trust_policy(),
+        receipt.job_id,
+        receipt.ordered_response_ciphertext_commitments,
+        receipt.output_commitment,
+        receipt.private_witness_proof_root,
+        receipt.epoch,
+    )
+    .unwrap()
+}
+
+#[test]
+fn recovery_moves_escrow_only_on_fully_bound_registered_adjudication() {
+    let (receipt, key) = signed_receipt();
+    let mut recovery = active_recovery(&receipt);
+    recovery
+        .apply_adjudication(&receipt, &key, &mut BTreeSet::new())
+        .unwrap();
+    assert_eq!(recovery.state, PrivateJobState::Settled);
+    assert_eq!(
+        recovery.apply_adjudication(&receipt, &key, &mut BTreeSet::new()),
+        Err(BesiError::InvalidTransition)
+    );
+
+    let mut rebound = active_recovery(&receipt);
+    rebound.output_commitment = h(99);
+    assert_eq!(
+        rebound.apply_adjudication(&receipt, &key, &mut BTreeSet::new()),
+        Err(BesiError::Context)
+    );
+    assert_eq!(rebound.state, PrivateJobState::Active);
+    let attacker = SigningKey::from_bytes(&h(54));
+    let mut forged = receipt.clone();
+    forged.signature = attacker.sign(&forged.message()).to_bytes();
+    let mut protected = active_recovery(&receipt);
+    assert_eq!(
+        protected.apply_adjudication(
+            &forged,
+            &attacker.verifying_key(),
+            &mut BTreeSet::new()
+        ),
+        Err(BesiError::TrustPolicy)
+    );
+    assert_eq!(protected.state, PrivateJobState::Active);
+
+    let mut frozen = active_recovery(&receipt);
+    frozen.freeze().unwrap();
+    assert_eq!(frozen.state, PrivateJobState::Frozen);
+    assert_eq!(
+        frozen.apply_adjudication(&receipt, &key, &mut BTreeSet::new()),
+        Err(BesiError::InvalidTransition)
+    );
+}
+
+#[test]
+fn authenticated_abort_refunds_and_cannot_be_replayed() {
+    let signing = SigningKey::from_bytes(&h(55));
+    let (mut receipt, key) = signed_receipt();
+    receipt.verdict = Verdict::AbortRefund;
+    receipt.signature = signing.sign(&receipt.message()).to_bytes();
+    let mut recovery = active_recovery(&receipt);
+    let mut used = BTreeSet::new();
+    recovery
+        .apply_adjudication(&receipt, &key, &mut used)
+        .unwrap();
+    assert_eq!(recovery.state, PrivateJobState::Refunded);
+    let mut replay_target = active_recovery(&receipt);
+    assert_eq!(
+        replay_target.apply_adjudication(&receipt, &key, &mut used),
+        Err(BesiError::Replay)
+    );
+    assert_eq!(replay_target.state, PrivateJobState::Active);
+}

@@ -51,6 +51,8 @@ pub enum BesiError {
     Epoch,
     AssuranceSubstitution,
     NonCanonical,
+    TrustPolicy,
+    InvalidTransition,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -446,6 +448,198 @@ impl AdjudicationReceipt {
         key.verify(&self.message(), &sig)
             .map_err(|_| BesiError::Signature)?;
         used.insert((self.epoch, self.nonce));
+        Ok(())
+    }
+}
+
+/// Explicit trust boundary for the split prototype. `non_collusion_assumed` is a declared
+/// prerequisite, not evidence that the two registered executors are independent.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BesiTrustPolicy {
+    pub executor_identities: [[u8; 32]; 2],
+    pub channel_key_roots: [[u8; 32]; 2],
+    pub adjudicator_key: [u8; 32],
+    pub model_hash: [u8; 32],
+    pub numeric_profile: [u8; 32],
+    pub non_collusion_assumed: bool,
+}
+
+impl BesiTrustPolicy {
+    pub fn validate(&self) -> Result<(), BesiError> {
+        let required = [
+            self.executor_identities[0],
+            self.executor_identities[1],
+            self.channel_key_roots[0],
+            self.channel_key_roots[1],
+            self.adjudicator_key,
+            self.model_hash,
+            self.numeric_profile,
+        ];
+        if !self.non_collusion_assumed
+            || required.contains(&[0; 32])
+            || self.executor_identities[0] == self.executor_identities[1]
+            || self.channel_key_roots[0] == self.channel_key_roots[1]
+        {
+            return Err(BesiError::TrustPolicy);
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn commitment(&self) -> [u8; 32] {
+        let mut body = b"NOOS/BESI/TRUST-POLICY/V1".to_vec();
+        for value in [
+            self.executor_identities[0],
+            self.executor_identities[1],
+            self.channel_key_roots[0],
+            self.channel_key_roots[1],
+            self.adjudicator_key,
+            self.model_hash,
+            self.numeric_profile,
+        ] {
+            body.extend(value);
+        }
+        body.push(u8::from(self.non_collusion_assumed));
+        *blake3::hash(&body).as_bytes()
+    }
+}
+
+/// The complete in-bound metadata visible to one remote executor. The true activation row count
+/// is deliberately absent; admitted requests expose exactly the public 128-row bucket.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PublicExecutorView {
+    pub party: u8,
+    pub request_id: [u8; 32],
+    pub model_hash: [u8; 32],
+    pub numeric_profile: [u8; 32],
+    pub tensor_id: [u8; 32],
+    pub public_rows: u32,
+    pub cols: u32,
+    pub chunk: u32,
+    pub block_order: u32,
+    pub key_epoch: u64,
+    pub direction: Direction,
+    pub ciphertext_bytes: usize,
+}
+
+pub fn public_executor_view(
+    policy: &BesiTrustPolicy,
+    context: &ChannelContext,
+    authenticated_executor_identity: [u8; 32],
+    authenticated_channel_key_root: [u8; 32],
+    ciphertext_bytes: usize,
+) -> Result<PublicExecutorView, BesiError> {
+    policy.validate()?;
+    let party = usize::from(context.party);
+    if party >= policy.executor_identities.len()
+        || context.rows != PADDING_BUCKET as u32
+        || ciphertext_bytes == 0
+        || context.model_hash != policy.model_hash
+        || context.numeric_profile != policy.numeric_profile
+        || authenticated_executor_identity != policy.executor_identities[party]
+        || authenticated_channel_key_root != policy.channel_key_roots[party]
+    {
+        return Err(BesiError::TrustPolicy);
+    }
+    Ok(PublicExecutorView {
+        party: context.party,
+        request_id: context.request_id,
+        model_hash: context.model_hash,
+        numeric_profile: context.numeric_profile,
+        tensor_id: context.tensor_id,
+        public_rows: context.rows,
+        cols: context.cols,
+        chunk: context.chunk,
+        block_order: context.block_order,
+        key_epoch: context.key_epoch,
+        direction: context.direction,
+        ciphertext_bytes,
+    })
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PrivateJobState {
+    Active,
+    Settled,
+    Refunded,
+    Frozen,
+}
+
+/// Fail-closed recovery contract for private escrow. Only a fully bound, registered adjudication
+/// can leave `Active`; a local freeze refunds nothing and cannot later be overwritten.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PrivateJobRecovery {
+    pub job_id: [u8; 32],
+    pub ordered_response_ciphertext_commitments: [[u8; 32]; 2],
+    pub output_commitment: [u8; 32],
+    pub private_witness_proof_root: [u8; 32],
+    pub epoch: u64,
+    trust_policy_commitment: [u8; 32],
+    adjudicator_key: [u8; 32],
+    pub state: PrivateJobState,
+}
+
+impl PrivateJobRecovery {
+    pub fn new(
+        policy: &BesiTrustPolicy,
+        job_id: [u8; 32],
+        ordered_response_ciphertext_commitments: [[u8; 32]; 2],
+        output_commitment: [u8; 32],
+        private_witness_proof_root: [u8; 32],
+        epoch: u64,
+    ) -> Result<Self, BesiError> {
+        policy.validate()?;
+        Ok(Self {
+            job_id,
+            ordered_response_ciphertext_commitments,
+            output_commitment,
+            private_witness_proof_root,
+            epoch,
+            state: PrivateJobState::Active,
+            trust_policy_commitment: policy.commitment(),
+            adjudicator_key: policy.adjudicator_key,
+        })
+    }
+
+    #[must_use]
+    pub fn trust_policy_commitment(&self) -> [u8; 32] {
+        self.trust_policy_commitment
+    }
+
+    pub fn apply_adjudication(
+        &mut self,
+        receipt: &AdjudicationReceipt,
+        key: &VerifyingKey,
+        used: &mut BTreeSet<(u64, u64)>,
+    ) -> Result<(), BesiError> {
+        if self.state != PrivateJobState::Active {
+            return Err(BesiError::InvalidTransition);
+        }
+        if key.to_bytes() != self.adjudicator_key {
+            return Err(BesiError::TrustPolicy);
+        }
+        if receipt.job_id != self.job_id
+            || receipt.ordered_response_ciphertext_commitments
+                != self.ordered_response_ciphertext_commitments
+            || receipt.output_commitment != self.output_commitment
+            || receipt.private_witness_proof_root != self.private_witness_proof_root
+        {
+            return Err(BesiError::Context);
+        }
+        receipt.verify(key, self.epoch, used)?;
+        self.state = if receipt.verdict == Verdict::AbortRefund {
+            PrivateJobState::Refunded
+        } else {
+            PrivateJobState::Settled
+        };
+        Ok(())
+    }
+
+    pub fn freeze(&mut self) -> Result<(), BesiError> {
+        if self.state != PrivateJobState::Active {
+            return Err(BesiError::InvalidTransition);
+        }
+        self.state = PrivateJobState::Frozen;
         Ok(())
     }
 }

@@ -96,6 +96,7 @@ def validate_local(claim: str, metrics: dict[str, object]) -> None:
         require(metrics.get("schedule_mismatches") == 0, "schedule mismatch")
         require(metrics.get("cobatch_mismatches") == 0, "co-batch mismatch")
         require(metrics.get("invalid_tokenizer_bytes_rejected") is True, "invalid tokenizer accepted")
+        require(metrics.get("contract_mutations_rejected") is True, "profile contract mutation accepted")
     elif claim == "E-NEL-02":
         require(metrics.get("fixture_only") is True, "accuracy fixture provenance lost")
         require(metrics.get("registered_tasks") == metrics.get("reported_tasks") == 3, "task suppression")
