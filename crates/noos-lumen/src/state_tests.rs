@@ -641,7 +641,7 @@ fn supply_invariant_holds_under_seeded_random_traffic() {
         let note_total: u128 = live_notes.iter().map(|(_, a)| *a).sum();
         let balance_total = ledger.balance(&PAYER, &NOOS_ASSET);
         assert_eq!(
-            genesis_funding + ledger.total_minted(),
+            genesis_funding + ledger.emission_minted(),
             note_total + balance_total + fees_burned,
             "supply conservation violated at step {step}"
         );
@@ -722,7 +722,7 @@ fn emission_follows_schedule_and_never_recreates_missed_heights() {
         .apply_emission(1, &PROPOSER, &WITNESS_POOL, &TREASURY)
         .unwrap();
     assert!(!d.is_empty());
-    assert_eq!(ledger.total_minted(), e1);
+    assert_eq!(ledger.emission_minted(), e1);
 
     // Same height twice: rejected, nothing minted.
     let before = ledger.roots();
@@ -730,13 +730,13 @@ fn emission_follows_schedule_and_never_recreates_missed_heights() {
         .apply_emission(1, &PROPOSER, &WITNESS_POOL, &TREASURY)
         .is_err());
     assert_roots_eq(&before, &ledger.roots());
-    assert_eq!(ledger.total_minted(), e1);
+    assert_eq!(ledger.emission_minted(), e1);
 
     // Skip to height 5: heights 2-4 are FORFEIT, only E_5 mints.
     ledger
         .apply_emission(5, &PROPOSER, &WITNESS_POOL, &TREASURY)
         .unwrap();
-    assert_eq!(ledger.total_minted(), e1 + e5);
+    assert_eq!(ledger.emission_minted(), e1 + e5);
     assert_eq!(ledger.last_emission_height(), 5);
 
     // Going back rejects.
@@ -772,7 +772,7 @@ fn emission_past_terminal_height_is_zero_and_unknown_recipient_rejects() {
             &TREASURY,
         )
         .unwrap();
-    assert_eq!(ledger.total_minted(), 0);
+    assert_eq!(ledger.emission_minted(), 0);
 }
 
 #[test]

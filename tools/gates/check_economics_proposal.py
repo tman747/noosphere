@@ -100,7 +100,7 @@ def exhaustive_rounding_tests(doc: dict, rows: list[emission.RangeRow]) -> dict:
 
 def exhaustive_no_recreated_tests(rows: list[emission.RangeRow]) -> dict:
     # Exhaust every attempt sequence of length 0..6 over heights 0..8. The
-    # abstract state is exactly Lumen's last_emission_height + total_minted.
+    # abstract state is exactly Lumen's last_emission_height + emission_minted.
     attempts = range(9)
     sequences = 0
     for length in range(7):

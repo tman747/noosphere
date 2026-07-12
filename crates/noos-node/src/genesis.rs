@@ -909,7 +909,7 @@ mod production_proposal_refusal_tests {
         );
         assert_eq!(
             super::hex32_for_test(built.genesis_hash),
-            "0fa745c6c1b32f5984212935f50bc3143ae9fde8f1f49c35ef789dfb3573cdef"
+            "989340dfa04e2285d9e038dc45c87d56bb3d65ad96dac3d3411d1cf34a9c3214"
         );
     }
 }

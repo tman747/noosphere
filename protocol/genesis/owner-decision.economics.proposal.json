@@ -19,7 +19,7 @@
       "constants_key": "ground.mainnet_max_future_drift_ms",
       "current_marker": "OWNER_BLOCKED",
       "proposal": "PENDING_E_WAN_01",
-      "reason": "Registry E-WAN-01 is NOT_STARTED, UNMEASURED, and locally MISSING. Selecting 12000, 18000, or 30000 ms would fabricate evidence."
+      "reason": "Registry E-WAN-01 is PARTIAL and UNMEASURED: local deterministic coverage exists, but the required external WAN measurement does not. Selecting 12000, 18000, or 30000 ms would fabricate evidence."
     },
     {
       "odr_id": "ODR-ECON-001",

@@ -1427,6 +1427,8 @@ def verify_dkg_core_transcript(
         "core_root": root,
         "group_public_key_g1_hex": group_hex,
         "participant_set_root": participant_root,
+        "chain_id": descriptor["chain_id"],
+        "exact_revision": descriptor["exact_revision"],
         "active_participants": [p["participant_id"] for p in active],
         "excluded_participants": sorted(excluded),
         "threshold": threshold,
@@ -2125,6 +2127,8 @@ def build_canonical_production_genesis(
         raise AuthorizationError("canonical builder exact revision mismatch")
     if sha256(canonical_json(params)) != freeze.get("canonical_parameters_sha256"):
         raise AuthorizationError("canonical builder parameters do not match signed freeze source")
+    if dkg.get("chain_id") != freeze.get("chain_id") or dkg.get("exact_revision") != freeze.get("exact_revision"):
+        raise AuthorizationError("canonical builder DKG context does not match signed freeze")
     genesis_time = _uint(genesis_time_ms, 64, "genesis time")
     emission_blob, emission_root, scheduled = canonical_emission_table(params, emission_rows)
     allocation_blob, allocation_root, genesis_issued, entries = canonical_allocation_list(
@@ -2250,12 +2254,14 @@ def build_canonical_production_genesis(
         "params_root": _smt_root(params_leaves).hex(),
     }
     final_body = {
-        "version": 1,
+        "version": 2,
         "parameter_manifest_hash": freeze["parameter_manifest_hash"],
         "genesis_time_ms": genesis_time,
         "dkg_suite_id": 1,
         "dkg_group_pubkey_hex": group_key.hex(),
         "dkg_participant_set_root": witness_root.hex(),
+        "dkg_holder_set_root": dkg["holder_set_root"],
+        "dkg_root": dkg["dkg_root"],
         "genesis_witness_set_root": witness_root.hex(),
         "genesis_state_roots": roots,
         "is_test_fixture": bool(test_mode),

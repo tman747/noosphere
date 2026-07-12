@@ -128,7 +128,7 @@ fn e2e_happy_path_finality_and_restart_recovery() {
     let alice_before = core
         .ledger()
         .balance(&alice, &noos_lumen::state::NOOS_ASSET);
-    let minted_before = core.ledger().total_minted();
+    let minted_before = core.ledger().emission_minted();
     drop(core);
 
     // Restart: replay from the durable store only.
@@ -147,7 +147,7 @@ fn e2e_happy_path_finality_and_restart_recovery() {
             .balance(&alice, &noos_lumen::state::NOOS_ASSET),
         alice_before
     );
-    assert_eq!(restarted.ledger().total_minted(), minted_before);
+    assert_eq!(restarted.ledger().emission_minted(), minted_before);
     assert_eq!(
         restarted.view.tx_status(&txid1),
         ViewLookup::Found(TxStatus::Settled {

@@ -33,7 +33,7 @@ median_time_past_blocks = 11
 witness_membership_lookback_epochs = 2
 pulse_target_spacing_seconds = 6
 pulse_half_life_seconds = 3600
-# E-WAN-01 is NOT_STARTED/UNMEASURED. No candidate is evidence-supported.
+# E-WAN-01 is PARTIAL/UNMEASURED. No candidate has the required external evidence.
 max_future_drift_ms = "PENDING_E_WAN_01"
 max_future_drift_candidates_ms = [12000, 18000, 30000]
 max_future_drift_selection_rule = "smallest candidate passing E-WAN-01; no pass means mainnet remains blocked"

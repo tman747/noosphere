@@ -844,7 +844,7 @@ class FinalGenesisTests(AuthorizationFixtures, unittest.TestCase):
             pa.derive_final_identity(self.freeze, anchor, dkg, supplied, test_mode=True)
 
     def test_mutated_allocation_emission_dkg_and_params_are_rejected(self):
-        transcript = pa.finalize_dkg_transcript(*self.dkg_material(), self.keyring, self.freeze, test_mode=True)
+        transcript = self.finalized_dkg(self.dkg_material())
         dkg = pa.verify_dkg_transcript(transcript, self.keyring, self.freeze, test_mode=True)
         baseline = pa.build_canonical_production_genesis(
             self.params, self.freeze, dkg, self.allocation, self.emission_rows,
@@ -891,8 +891,13 @@ class FinalGenesisTests(AuthorizationFixtures, unittest.TestCase):
         freeze["parameter_manifest_hash"] = pa.domain_hash(b"NOOS/GENESIS/PARAMS/V1", canonical).hex()
         freeze["chain_id"] = pa.domain_hash(b"NOOS/CHAIN/V1", bytes.fromhex(freeze["parameter_manifest_hash"])).hex()
         freeze["canonical_parameters_sha256"] = pa.sha256(pa.canonical_json(params))
-        transcript = pa.finalize_dkg_transcript(*self.dkg_material(), self.keyring, self.freeze, test_mode=True)
-        dkg = pa.verify_dkg_transcript(transcript, self.keyring, self.freeze, test_mode=True)
+        original_freeze = self.freeze
+        self.freeze = freeze
+        try:
+            transcript = self.finalized_dkg(self.dkg_material())
+            dkg = pa.verify_dkg_transcript(transcript, self.keyring, freeze, test_mode=True)
+        finally:
+            self.freeze = original_freeze
         with self.assertRaisesRegex(pa.AuthorizationError, "exceeds max supply"):
             pa.build_canonical_production_genesis(
                 params, freeze, dkg, self.allocation, self.emission_rows,

@@ -377,13 +377,6 @@ impl LumenLedger {
         self.emission_minted
     }
 
-    /// Backwards-compatible emission-only accessor. New consensus code should
-    /// use [`Self::emission_minted`] or [`Self::total_issued`] explicitly.
-    #[must_use]
-    pub fn total_minted(&self) -> u128 {
-        self.emission_minted
-    }
-
     /// Total NOOS ever issued: genesis allocation plus scheduled emission.
     #[must_use]
     pub fn total_issued(&self) -> u128 {
