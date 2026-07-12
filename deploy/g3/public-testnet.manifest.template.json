@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "manifest_kind": "noos-g3-public-duration",
   "manifest_state": "TEMPLATE_NOT_STARTED",
   "network": {
@@ -26,6 +26,14 @@
     "simulated_time_accepted": false,
     "test_keys_accepted": false,
     "promotion_effect": "NONE"
+  },
+  "timestamp_policy": {
+    "system": "opentimestamps-bitcoin",
+    "bitcoin_network": "mainnet",
+    "opentimestamps_client_version": "0.7.2",
+    "minimum_confirmations": 6,
+    "maximum_anchor_delay_seconds": 172800,
+    "maximum_negative_block_time_tolerance_seconds": 7200
   },
   "operators": [
     {

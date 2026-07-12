@@ -32,6 +32,8 @@ services:
     volumes:
       - ${NOOS_G3_MANIFEST:?active manifest required}:/evidence/manifest.json:ro
       - ${NOOS_G3_LEDGER:?append-only ledger required}:/evidence/checkpoints.ndjson:ro
+    environment:
+      G3_BITCOIN_RPC_URL: ${G3_BITCOIN_RPC_URL:?verifier-controlled Bitcoin Core RPC URL required}
     command: ["verify", "--manifest", "/evidence/manifest.json", "--ledger", "/evidence/checkpoints.ndjson", "--live"]
     restart: "no"
 volumes:

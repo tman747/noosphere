@@ -5,6 +5,8 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 RUN useradd --system --home /var/lib/noos-g3 --shell /usr/sbin/nologin noos-g3
 WORKDIR /opt/noos-g3
+COPY tools/g3/requirements.lock /opt/noos-g3/requirements.lock
+RUN python -m pip install --no-cache-dir --requirement /opt/noos-g3/requirements.lock
 COPY tools/g3/public_duration.py /usr/local/bin/noos-g3-duration
 RUN chmod 0555 /usr/local/bin/noos-g3-duration
 USER noos-g3

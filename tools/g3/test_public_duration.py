@@ -5,10 +5,12 @@ import base64
 import copy
 import datetime as dt
 import importlib.util
+import io
 import json
 import subprocess
 import tempfile
 import unittest
+from argparse import Namespace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -55,11 +57,11 @@ class PublicDurationTests(unittest.TestCase):
         self.now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
         G3.validate_manifest(self.manifest)
 
-    def checkpoint(self, sequence: int, observed: dt.datetime, previous: dict | None = None, *, ai_enabled: bool = True) -> dict:
+    def checkpoint(self, sequence: int, observed: dt.datetime, previous: dict | None = None, *, ai_enabled: bool = True, published: dt.datetime | None = None) -> dict:
         observed_text = G3.format_utc(observed)
         start_text = G3.format_utc(observed - dt.timedelta(days=1))
         checkpoint = {
-            "schema_version": 1,
+            "schema_version": 2,
             "record_kind": "noos-g3-daily-checkpoint",
             "network_id": self.manifest["network"]["network_id"],
             "manifest_sha256": G3.manifest_hash(self.manifest),
@@ -102,6 +104,7 @@ class PublicDurationTests(unittest.TestCase):
             ],
             "drill_observations": [],
             "signatures": [],
+            "external_timestamp_receipt": None,
         }
         digest = G3.payload_hash(checkpoint)
         for operator_id in ("operator-a", "operator-b"):
@@ -116,7 +119,70 @@ class PublicDurationTests(unittest.TestCase):
                 "signed_at_utc": signed_at,
                 "signature_base64": base64.b64encode(raw).decode("ascii"),
             })
+        publication_text = G3.format_utc(published or (observed + dt.timedelta(minutes=10)))
+        checkpoint["external_timestamp_receipt"] = {
+            "receipt_version": 1,
+            "system": "TEST_ONLY-deterministic",
+            "commitment_sha256": G3.timestamp_commitment(checkpoint),
+            "publication_time_utc": publication_text,
+            "proof_sha256": G3.test_receipt_proof(checkpoint, publication_text),
+        }
         return checkpoint
+
+    def ots_receipt(self, checkpoint: dict, *, height: int = 800000) -> dict:
+        from opentimestamps.core.notary import BitcoinBlockHeaderAttestation
+        from opentimestamps.core.op import OpSHA256
+        from opentimestamps.core.serialize import StreamSerializationContext
+        from opentimestamps.core.timestamp import DetachedTimestampFile, Timestamp
+
+        commitment = G3.timestamp_commitment(checkpoint)
+        detached = DetachedTimestampFile(OpSHA256(), Timestamp(bytes.fromhex(commitment)))
+        detached.timestamp.attestations.add(BitcoinBlockHeaderAttestation(height))
+        output = io.BytesIO()
+        detached.serialize(StreamSerializationContext(output))
+        return {
+            "receipt_version": 1,
+            "system": "opentimestamps-bitcoin",
+            "bitcoin_network": "mainnet",
+            "commitment_sha256": commitment,
+            "proof_base64": base64.b64encode(output.getvalue()).decode("ascii"),
+        }
+
+    def active_manifest(self) -> dict:
+        manifest = copy.deepcopy(self.manifest)
+        manifest["manifest_state"] = "ACTIVE"
+        for operator in manifest["operators"]:
+            operator["key_usage"] = "production-evidence"
+        release_path = self.tmp / "active-release-manifest.json"
+        release = {
+            "release": {"protocol_version": "v1", "api_version": "v1"},
+            "source": {"repo_revision": manifest["release_binding"]["exact_revision"]},
+            "identity": {
+                "chain_id": manifest["network"]["chain_id"],
+                "genesis_hash": manifest["network"]["genesis_hash"],
+            },
+        }
+        release_path.write_text(json.dumps(release), encoding="utf-8")
+        manifest["release_binding"]["release_manifest_path"] = str(release_path)
+        manifest["release_binding"]["release_manifest_sha256"] = G3.sha256_file(release_path)
+        digest = G3.manifest_signature_payload_hash(manifest)
+        for operator_id in ("operator-a", "operator-b"):
+            signed_at = G3.format_utc(self.now)
+            raw = G3.sign_ed25519(
+                self.keys[operator_id][0],
+                G3.signature_message(digest, operator_id, signed_at, "exact-revision-manifest"),
+            )
+            operator = next(item for item in manifest["operators"] if item["operator_id"] == operator_id)
+            manifest["manifest_signatures"].append({
+                "operator_id": operator_id,
+                "key_id": operator["key_id"],
+                "algorithm": "ed25519",
+                "payload_sha256": digest,
+                "signed_at_utc": signed_at,
+                "signature_base64": base64.b64encode(raw).decode("ascii"),
+            })
+        G3.validate_manifest(manifest)
+        return manifest
 
     def assert_rejected(self, checkpoint: dict, previous: dict | None, needle: str) -> None:
         with self.assertRaisesRegex(G3.EvidenceError, needle):
@@ -133,6 +199,135 @@ class PublicDurationTests(unittest.TestCase):
         second = self.checkpoint(1, self.now, first)
         G3.verify_checkpoint(self.manifest, first, None, now=self.now)
         G3.verify_checkpoint(self.manifest, second, first, now=self.now)
+
+    def test_valid_fixture_duration_comes_from_receipt_times(self) -> None:
+        first = self.checkpoint(0, self.now - dt.timedelta(days=2), published=self.now - dt.timedelta(days=2, minutes=-20))
+        second = self.checkpoint(1, self.now - dt.timedelta(days=1), first, published=self.now - dt.timedelta(days=1, minutes=-20))
+        third = self.checkpoint(2, self.now, second, published=self.now + dt.timedelta(minutes=20))
+        result = G3.verify_evidence(self.manifest, [first, second, third], now=self.now)
+        self.assertEqual(result["status"], "IN_PROGRESS")
+        self.assertEqual(result["qualifying_real_days"], 2.0)
+        self.assertTrue(any("TEST_ONLY" in blocker for blocker in result["blockers"]))
+
+    def test_retrospective_90_day_chain_first_anchored_now_is_rejected(self) -> None:
+        backdated = self.checkpoint(0, self.now - dt.timedelta(days=90), published=self.now)
+        self.assert_rejected(backdated, None, "publication time is too late")
+
+    def test_fresh_append_without_external_receipt_is_rejected(self) -> None:
+        checkpoint = self.checkpoint(0, self.now)
+        checkpoint["external_timestamp_receipt"] = None
+        manifest_path = self.tmp / "fixture-manifest.json"
+        checkpoint_path = self.tmp / "unstamped-checkpoint.json"
+        ledger_path = self.tmp / "unstamped-ledger.ndjson"
+        manifest_path.write_text(json.dumps(self.manifest), encoding="utf-8")
+        checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+        with self.assertRaisesRegex(G3.EvidenceError, "external publication-time receipt"):
+            G3.append_checkpoint(Namespace(
+                manifest=manifest_path, checkpoint=checkpoint_path, ledger=ledger_path,
+                bitcoin_rpc_url="http://127.0.0.1:8332",
+            ))
+
+    def test_receipt_replay_across_checkpoint_is_rejected(self) -> None:
+        first = self.checkpoint(0, self.now - dt.timedelta(days=1))
+        second = self.checkpoint(1, self.now, first)
+        second["external_timestamp_receipt"] = copy.deepcopy(first["external_timestamp_receipt"])
+        self.assert_rejected(second, first, "receipt|binding")
+
+        changed_manifest = copy.deepcopy(self.manifest)
+        changed_manifest["manifest_signatures"].append({"different": "signer-set"})
+        with self.assertRaisesRegex(G3.EvidenceError, "manifest/revision binding"):
+            G3.verify_checkpoint(changed_manifest, first, None, now=self.now)
+
+        reordered_signers = copy.deepcopy(first)
+        reordered_signers["signatures"].reverse()
+        self.assertNotEqual(G3.timestamp_commitment(first), G3.timestamp_commitment(reordered_signers))
+
+    def test_wall_and_external_anchor_divergence_is_rejected(self) -> None:
+        divergent = self.checkpoint(0, self.now - dt.timedelta(days=3), published=self.now)
+        self.assert_rejected(divergent, None, "publication time is too late")
+
+    def test_active_offline_verification_can_never_complete(self) -> None:
+        active = self.active_manifest()
+        original = self.manifest
+        try:
+            self.manifest = active
+            checkpoint = self.checkpoint(0, self.now)
+        finally:
+            self.manifest = original
+        checkpoint["external_timestamp_receipt"] = self.ots_receipt(checkpoint)
+        result = G3.verify_evidence(active, [checkpoint], now=self.now, live_trust=False)
+        self.assertEqual(result["status"], "IN_PROGRESS")
+        self.assertEqual(result["qualifying_real_days"], 0)
+        self.assertTrue(any("live Bitcoin-mainnet trust-root" in blocker for blocker in result["blockers"]))
+
+    def test_production_receipt_rejects_testnet_unconfirmed_and_offline_trust(self) -> None:
+        checkpoint = self.checkpoint(0, self.now)
+        active_stub = copy.deepcopy(self.manifest)
+        active_stub["manifest_state"] = "ACTIVE"
+        with self.assertRaisesRegex(G3.EvidenceError, "fields mismatch"):
+            G3.verify_external_receipt(active_stub, checkpoint, live_trust=False, bitcoin_rpc=None)
+        checkpoint["external_timestamp_receipt"] = self.ots_receipt(checkpoint)
+
+        testnet = copy.deepcopy(checkpoint)
+        testnet["external_timestamp_receipt"]["bitcoin_network"] = "testnet"
+        with self.assertRaisesRegex(G3.EvidenceError, "network binding"):
+            G3.verify_external_receipt(active_stub, testnet, live_trust=False, bitcoin_rpc=None)
+
+        from opentimestamps.core.notary import PendingAttestation
+        from opentimestamps.core.op import OpSHA256
+        from opentimestamps.core.serialize import StreamSerializationContext
+        from opentimestamps.core.timestamp import DetachedTimestampFile, Timestamp
+        pending = DetachedTimestampFile(OpSHA256(), Timestamp(bytes.fromhex(G3.timestamp_commitment(checkpoint))))
+        pending.timestamp.attestations.add(PendingAttestation("https://calendar.example.test"))
+        pending_bytes = io.BytesIO(); pending.serialize(StreamSerializationContext(pending_bytes))
+        unconfirmed = copy.deepcopy(checkpoint)
+        unconfirmed["external_timestamp_receipt"]["proof_base64"] = base64.b64encode(pending_bytes.getvalue()).decode("ascii")
+        with self.assertRaisesRegex(G3.EvidenceError, "unconfirmed"):
+            G3.verify_external_receipt(active_stub, unconfirmed, live_trust=False, bitcoin_rpc=None)
+
+        offline = G3.verify_external_receipt(active_stub, checkpoint, live_trust=False, bitcoin_rpc=None)
+        self.assertIsNone(offline["publication_time"])
+        self.assertFalse(offline["trusted"])
+        with self.assertRaisesRegex(G3.EvidenceError, "verifier-controlled Bitcoin Core"):
+            G3.verify_external_receipt(active_stub, checkpoint, live_trust=True, bitcoin_rpc=None)
+
+        commitment_bytes = bytes.fromhex(G3.timestamp_commitment(checkpoint))
+        publication_unix = int((self.now + dt.timedelta(minutes=10)).timestamp())
+
+        class FixtureBitcoinRPC:
+            def verify_mainnet(self) -> int:
+                return 800005
+
+            def active_block_header(self, height: int, tip_height: int) -> tuple[object, int]:
+                header = type("Header", (), {})()
+                header.hashMerkleRoot = commitment_bytes
+                header.nTime = publication_unix
+                return header, tip_height - height + 1
+
+        live = G3.verify_external_receipt(
+            active_stub, checkpoint, live_trust=True, bitcoin_rpc=FixtureBitcoinRPC()
+        )
+        self.assertTrue(live["trusted"])
+        self.assertEqual(live["publication_time"], dt.datetime.fromtimestamp(publication_unix, tz=dt.timezone.utc))
+
+        class UnderconfirmedBitcoinRPC(FixtureBitcoinRPC):
+            def active_block_header(self, height: int, tip_height: int) -> tuple[object, int]:
+                header, _ = super().active_block_header(height, tip_height)
+                return header, 5
+
+        with self.assertRaisesRegex(G3.EvidenceError, "fewer than 6"):
+            G3.verify_external_receipt(
+                active_stub, checkpoint, live_trust=True, bitcoin_rpc=UnderconfirmedBitcoinRPC()
+            )
+
+        class UntrustedBitcoinRPC(FixtureBitcoinRPC):
+            def verify_mainnet(self) -> int:
+                raise G3.EvidenceError("Bitcoin Core mainnet genesis trust root mismatch")
+
+        with self.assertRaisesRegex(G3.EvidenceError, "trust root mismatch"):
+            G3.verify_external_receipt(
+                active_stub, checkpoint, live_trust=True, bitcoin_rpc=UntrustedBitcoinRPC()
+            )
 
     def test_rejects_revision_change_and_hash_chain_rewrite(self) -> None:
         first = self.checkpoint(0, self.now - dt.timedelta(days=1))

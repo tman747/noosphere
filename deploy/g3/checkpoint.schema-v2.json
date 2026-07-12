@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://noosphere.example/schemas/g3/checkpoint-v2.json",
+  "title": "NOOS G3 externally timestamped daily checkpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_kind",
+    "network_id",
+    "manifest_sha256",
+    "exact_revision",
+    "sequence",
+    "previous_checkpoint_sha256",
+    "wall_clock",
+    "lane_observations",
+    "operator_observations",
+    "drill_observations",
+    "signatures",
+    "external_timestamp_receipt"
+  ],
+  "properties": {
+    "schema_version": {"const": 2},
+    "record_kind": {"const": "noos-g3-daily-checkpoint"},
+    "network_id": {"type": "string", "minLength": 1},
+    "manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "exact_revision": {"type": "string", "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$"},
+    "sequence": {"type": "integer", "minimum": 0},
+    "previous_checkpoint_sha256": {"$ref": "#/$defs/sha256"},
+    "wall_clock": {"type": "object"},
+    "lane_observations": {"type": "array", "minItems": 1},
+    "operator_observations": {"type": "array", "minItems": 3},
+    "drill_observations": {"type": "array"},
+    "signatures": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operator_id", "key_id", "algorithm", "payload_sha256", "signed_at_utc", "signature_base64"],
+        "properties": {
+          "operator_id": {"type": "string"},
+          "key_id": {"type": "string"},
+          "algorithm": {"const": "ed25519"},
+          "payload_sha256": {"$ref": "#/$defs/sha256"},
+          "signed_at_utc": {"type": "string", "format": "date-time"},
+          "signature_base64": {"type": "string", "contentEncoding": "base64"}
+        }
+      }
+    },
+    "external_timestamp_receipt": {
+      "oneOf": [
+        {"type": "null", "description": "Allowed only before stamp-checkpoint; never appendable evidence."},
+        {"$ref": "#/$defs/opentimestampsReceipt"},
+        {"$ref": "#/$defs/testOnlyReceipt"}
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "opentimestampsReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt_version", "system", "bitcoin_network", "commitment_sha256", "proof_base64"],
+      "properties": {
+        "receipt_version": {"const": 1},
+        "system": {"const": "opentimestamps-bitcoin"},
+        "bitcoin_network": {"const": "mainnet"},
+        "commitment_sha256": {"$ref": "#/$defs/sha256"},
+        "proof_base64": {"type": "string", "contentEncoding": "base64"}
+      }
+    },
+    "testOnlyReceipt": {
+      "description": "Accepted only with manifest_state TEST_FIXTURE_NOT_EVIDENCE and never qualifying.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt_version", "system", "commitment_sha256", "publication_time_utc", "proof_sha256"],
+      "properties": {
+        "receipt_version": {"const": 1},
+        "system": {"const": "TEST_ONLY-deterministic"},
+        "commitment_sha256": {"$ref": "#/$defs/sha256"},
+        "publication_time_utc": {"type": "string", "format": "date-time"},
+        "proof_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

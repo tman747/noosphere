@@ -25,6 +25,14 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+      - name: Install pinned OpenTimestamps verifier
+        run: python -m pip install --requirement tools/g3/requirements.lock
+      - name: Compile verifier
+        run: python -m py_compile tools/g3/public_duration.py tools/g3/test_public_duration.py
+      - name: Validate G3 JSON documents
+        run: >-
+          python -m json.tool deploy/g3/public-testnet.manifest.template.json >/dev/null
+          && python -m json.tool deploy/g3/checkpoint.schema-v2.json >/dev/null
       - name: Run adversarial verifier tests
         run: python -m unittest -v tools/g3/test_public_duration.py
       - name: Confirm the checked-in template is not started
@@ -34,6 +42,8 @@ jobs:
           --ledger evidence/g3/checkpoints.ndjson
       - name: Verify only the externally supplied public record
         if: ${{ hashFiles('evidence/g3/active-manifest.json') != '' && hashFiles('evidence/g3/checkpoints.ndjson') != '' }}
+        env:
+          G3_BITCOIN_RPC_URL: ${{ secrets.G3_BITCOIN_RPC_URL }}
         run: >-
           python tools/g3/public_duration.py verify --live
           --manifest evidence/g3/active-manifest.json
