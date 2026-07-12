@@ -417,7 +417,7 @@ pub fn tx_sign(
     let seed = from_hex(seed_hex)?;
     let spending = derive_authority(&seed, Purpose::Sign, account, index)?.into_spending_key()?;
     let txid = lumen_txid(&tx);
-    let signature = spending.sign(&gate, &txid)?;
+    let signature = spending.sign_lumen_transaction(&gate, &txid)?;
     let witnesses = TransactionWitnessesV1 {
         intents: BoundedList::new(vec![SignedIntentV1 {
             tx_commitment: txid,

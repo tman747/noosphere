@@ -36,4 +36,4 @@ Keystore v1 uses PBKDF2-HMAC-SHA-256 with exactly 200,000 rounds, a random 16-by
 
 Note selection orders candidates by `(amount, note_id)`, accumulates with checked `u128`, and creates change exactly as `selected_total - amount - fee`. Fees are the checked dot product of the six resource quantities and unit prices. RPC TLS requires both the configured DNS name and an allowed SHA-256 SPKI pin.
 
-Signatures cover `NOOS/WALLET/SIGN/V1 || chain_id || genesis_hash || api_version_le || transaction_body`.
+Wallet-local, non-consensus authorization envelopes cover `NOOS/WALLET/SIGN/V1 || chain_id || genesis_hash || api_version_le || body`. Canonical Lumen `SignedIntentV1` witnesses instead cover `NOOS/SIG/TX/V1 || txid`, matching the registered D-SIG-TX domain; the canonical `TransactionV1` txid already commits its `chain_id`, and the wallet's live identity gate must succeed before this signature is reachable.

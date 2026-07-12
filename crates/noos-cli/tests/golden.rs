@@ -257,8 +257,8 @@ fn tx_sign_produces_the_frozen_deterministic_signature() {
     let out = noos_cli::tx_sign(tx_hex, SEED, 0, 0, &h(0x11), &h(0x22), 0, &[]).unwrap();
 
     // Independent reconstruction: the signature must ed25519-verify over
-    // SIGNING_DOMAIN || chain_id || genesis_hash || api_version_le || txid
-    // under the verifying key derived from the FROZEN vector secret
+    // the consensus D-SIG-TX prefix || txid under the verifying key derived
+    // from the FROZEN vector secret
     // (sign-a0-i0 uses this exact seed/account/index).
     let doc = vectors("protocol/vectors/wallet/derivation-v1.json");
     let case = doc["cases"]
@@ -277,10 +277,7 @@ fn tx_sign_produces_the_frozen_deterministic_signature() {
         to_hex(&signing.verifying_key().to_bytes())
     );
     let mut message = Vec::new();
-    message.extend_from_slice(noos_wallet_signing_domain());
-    message.extend_from_slice(&[0x11; 32]);
-    message.extend_from_slice(&[0x22; 32]);
-    message.extend_from_slice(&1u16.to_le_bytes());
+    message.extend_from_slice(noos_wallet::LUMEN_TX_SIGNING_DOMAIN);
     message.extend_from_slice(&from_hex(out["txid"].as_str().unwrap()).unwrap());
     let signature = ed25519_dalek::Signature::from_bytes(
         &from_hex(out["signature"].as_str().unwrap())
@@ -326,10 +323,6 @@ fn tx_sign_produces_the_frozen_deterministic_signature() {
         to_hex(&witnesses.intents.as_slice()[0].tx_commitment),
         out["txid"].as_str().unwrap()
     );
-}
-
-fn noos_wallet_signing_domain() -> &'static [u8] {
-    noos_wallet::SIGNING_DOMAIN
 }
 
 // ---------------------------------------------------------------------------

@@ -31,8 +31,28 @@ mod commands {
     }
 
     #[tauri::command]
-    pub fn build_and_sign_cmd(req: ops::SignRequest) -> Result<ops::SignResponse, String> {
-        ops::build_and_sign(&req).map_err(code)
+    pub fn chain_profiles_cmd() -> Result<Vec<ops::ChainProfile>, String> {
+        ops::chain_profiles().map_err(code)
+    }
+
+    #[tauri::command]
+    pub async fn check_chain_status_cmd(
+        profile_id: String,
+    ) -> Result<ops::ChainStatusResponse, String> {
+        tauri::async_runtime::spawn_blocking(move || ops::check_status(&profile_id))
+            .await
+            .map_err(code)?
+            .map_err(code)
+    }
+
+    #[tauri::command]
+    pub async fn submit_transaction_cmd(
+        req: ops::SubmitRequest,
+    ) -> Result<ops::SubmitResponse, String> {
+        tauri::async_runtime::spawn_blocking(move || ops::submit(&req))
+            .await
+            .map_err(code)?
+            .map_err(code)
     }
 
     /// Verify an update manifest. The updater key comes from the explicit
@@ -65,7 +85,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::derive_authority_cmd,
             commands::validate_address_cmd,
-            commands::build_and_sign_cmd,
+            commands::chain_profiles_cmd,
+            commands::check_chain_status_cmd,
+            commands::submit_transaction_cmd,
             commands::verify_update_manifest_cmd,
         ])
         .run(tauri::generate_context!())
@@ -429,111 +451,15 @@ mod tests {
         assert!(manifest::updater_key_from_hex(&"A".repeat(64)).is_err());
     }
 
-    fn identity(api_version: u16) -> ops::IdentityHex {
-        ops::IdentityHex {
-            chain_id: "a".repeat(64),
-            genesis_hash: "b".repeat(64),
-            api_version,
-        }
-    }
-
-    fn sign_request() -> ops::SignRequest {
-        let unit = ops::ResourcesReq {
-            bytes: "1".into(),
-            grain_steps: "1".into(),
-            proof_units: "0".into(),
-            state_reads: "0".into(),
-            state_writes: "0".into(),
-            blob_bytes: "0".into(),
-        };
-        ops::SignRequest {
-            seed_hex: "42".repeat(64),
-            account: 0,
-            index: 0,
-            expected: identity(1),
-            actual: identity(1),
-            notes: vec![
-                ops::NoteReq {
-                    id: "11".repeat(32),
-                    amount: "600".into(),
-                },
-                ops::NoteReq {
-                    id: "22".repeat(32),
-                    amount: "500".into(),
-                },
-            ],
-            amount: "700".into(),
-            resources: ops::ResourcesReq {
-                bytes: "100".into(),
-                grain_steps: "10".into(),
-                ..unit.clone()
-            },
-            prices: unit,
-        }
-    }
-
     #[test]
-    fn transaction_build_and_sign_produces_a_verifiable_submission() {
-        let req = sign_request();
-        let res = ops::build_and_sign(&req).unwrap();
-        // fee = 100*1 + 10*1 = 110; needs 810 -> both notes; change 290.
-        assert_eq!(res.fee, "110");
-        assert_eq!(res.change, "290");
-        assert_eq!(res.inputs.len(), 2);
-        // Independent verification: rebuild the exact signed message.
-        let vk_bytes: [u8; 32] = hex::decode(&res.verifying_key).unwrap().try_into().unwrap();
-        let vk = VerifyingKey::from_bytes(&vk_bytes).unwrap();
-        let sig_bytes: [u8; 64] = hex::decode(&res.signature).unwrap().try_into().unwrap();
-        let sig = ed25519_dalek::Signature::from_bytes(&sig_bytes);
-        let body = hex::decode(&res.body).unwrap();
-        let mut msg = Vec::new();
-        msg.extend_from_slice(noos_wallet::SIGNING_DOMAIN);
-        msg.extend_from_slice(&[0xaa; 32]);
-        msg.extend_from_slice(&[0xbb; 32]);
-        msg.extend_from_slice(&1u16.to_le_bytes());
-        msg.extend_from_slice(&body);
-        vk.verify_strict(&msg, &sig).unwrap();
-        // Falsifier: one flipped body byte must not verify.
-        let mut forged = msg.clone();
-        let last = forged.len() - 1;
-        forged[last] ^= 1;
-        assert!(vk.verify_strict(&forged, &sig).is_err());
-        // Determinism: same request, same txid.
-        assert_eq!(ops::build_and_sign(&req).unwrap().txid, res.txid);
-    }
-
-    #[test]
-    fn transaction_signing_fails_closed_on_identity_and_funds() {
-        // Wrong chain identity: the gate refuses before any signing.
-        let mut wrong_chain = sign_request();
-        wrong_chain.actual.chain_id = "c".repeat(64);
-        assert_eq!(
-            ops::build_and_sign(&wrong_chain).unwrap_err().to_string(),
-            "wrong_protocol_identity"
-        );
-        // API version skew.
-        let mut skew = sign_request();
-        skew.actual.api_version = 2;
-        assert_eq!(
-            ops::build_and_sign(&skew).unwrap_err().to_string(),
-            "api_version_mismatch"
-        );
-        // Insufficient funds for amount + fee.
-        let mut poor = sign_request();
-        poor.amount = "100000".into();
-        assert_eq!(
-            ops::build_and_sign(&poor).unwrap_err().to_string(),
-            "insufficient funds"
-        );
-        // Non-canonical amount encodings are rejected, not coerced.
-        for bad in ["", "0700", "7.5", "-1", "1e3"] {
-            let mut malformed = sign_request();
-            malformed.amount = bad.into();
-            assert_eq!(
-                ops::build_and_sign(&malformed).unwrap_err().to_string(),
-                "invalid_request",
-                "accepted malformed amount {bad:?}"
-            );
-        }
+    fn configured_chain_profile_is_concrete_and_identity_bound() {
+        let profiles = ops::chain_profiles().unwrap();
+        assert_eq!(profiles.len(), 1);
+        let profile = &profiles[0];
+        assert_eq!(profile.chain_id.len(), 64);
+        assert_eq!(profile.genesis_hash.len(), 64);
+        assert_eq!(profile.api_version, "v1");
+        assert!(profile.api_base_url.starts_with("http://127.0.0.1:"));
+        assert!(!profile.api_base_url.contains("example"));
     }
 }

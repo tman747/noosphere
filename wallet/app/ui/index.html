@@ -15,16 +15,15 @@
   <main id="main">
     <section id="identity" aria-labelledby="identity-h">
       <h2 id="identity-h">Chain identity gate</h2>
-      <p>Every signing operation requires this handshake first. Values come from your node's <code>/api/v1/status</code>.</p>
-      <label>Expected chain id <input id="expected-chain" size="64" spellcheck="false" placeholder="lowercase 64-hex" /></label>
-      <label>Expected genesis hash <input id="expected-genesis" size="64" spellcheck="false" placeholder="lowercase 64-hex" /></label>
-      <label>Node-reported chain id <input id="actual-chain" size="64" spellcheck="false" /></label>
-      <label>Node-reported genesis hash <input id="actual-genesis" size="64" spellcheck="false" /></label>
+      <p>The selected profile fixes the expected chain, genesis, API version, and public API origin. Live <code>/api/status</code> is fetched and verified before signing and again before submission.</p>
+      <label>Configured chain <select id="chain-profile"></select></label>
+      <button id="refresh-status-btn" type="button">Check live chain</button>
+      <output id="profile-out" for="chain-profile refresh-status-btn" role="status" aria-live="polite"></output>
     </section>
 
     <section id="derivation" aria-labelledby="derivation-h">
       <h2 id="derivation-h">Key derivation</h2>
-      <p>Purpose-separated authorities derived by the <code>noos-wallet</code> core inside the shell. Secrets never reach this page.</p>
+      <p>Purpose-separated authorities are derived by the <code>noos-wallet</code> core inside the shell. The seed stays inside the local desktop app, and derived private keys are never returned to the page.</p>
       <label>Seed (hex) <input id="seed" type="password" spellcheck="false" autocomplete="off" /></label>
       <label>Purpose
         <select id="purpose">
@@ -51,16 +50,13 @@
     </section>
 
     <section id="transaction" aria-labelledby="transaction-h">
-      <h2 id="transaction-h">Build &amp; sign transaction</h2>
-      <p>Note selection, fee planning, construction, and signing run in the shell against the verified chain identity.</p>
-      <label>Notes (JSON array of {"id","amount"}) <textarea id="notes" rows="4" spellcheck="false">[]</textarea></label>
-      <label>Amount <input id="amount" spellcheck="false" placeholder="base-10" /></label>
-      <label>Tx bytes <input id="res-bytes" value="0" spellcheck="false" /></label>
-      <label>Grain steps <input id="res-steps" value="0" spellcheck="false" /></label>
-      <label>Price per byte <input id="price-bytes" value="0" spellcheck="false" /></label>
-      <label>Price per step <input id="price-steps" value="0" spellcheck="false" /></label>
-      <button id="sign-btn" type="button">Build &amp; sign</button>
-      <output id="sign-out" for="sign-btn"></output>
+      <h2 id="transaction-h">Build, sign &amp; submit transaction</h2>
+      <p>This wallet supports complete note-transfer specs with one purpose-separated fee-payer account. Provide every field listed below; the shell supplies the profile chain id and fixed format version, computes the witness root and txid, fetches each input note, checks conservation/expiry/resource bytes, then emits canonical Lumen transaction and witness bytes.</p>
+      <p>Required JSON fields: <code>expiry_height</code>, <code>fee_payer</code>, <code>fee_authorization</code> (must be null), all six <code>resource_limits</code>, <code>note_inputs</code>, one matching <code>account_inputs</code> entry, <code>object_access_list</code> (empty), <code>actions</code> (empty), complete <code>outputs</code>, <code>evidence_refs</code> (empty), and one <code>lock_reveals</code> entry per note input. Integer values use canonical base-10 strings.</p>
+      <label>Transaction spec <textarea id="transaction-spec" rows="18" spellcheck="false" autocomplete="off"></textarea></label>
+      <label>Signer scope <input id="signer-scope" type="number" min="0" max="255" value="0" /></label>
+      <button id="submit-btn" type="button">Verify, sign &amp; submit</button>
+      <output id="submit-out" for="submit-btn" role="status" aria-live="polite"></output>
     </section>
 
     <section id="update" aria-labelledby="update-h">

@@ -41,6 +41,11 @@ input, select, textarea {
   border-radius: 4px;
   font-family: ui-monospace, Consolas, monospace;
 }
+textarea { resize: vertical; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 button {
   margin-top: 0.75rem;
   padding: 0.45rem 1.1rem;
@@ -50,8 +55,10 @@ button {
   border-radius: 4px;
   font-weight: 600;
   cursor: pointer;
+  transition: transform 160ms ease, opacity 160ms ease;
 }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
+button:active:not(:disabled) { transform: translateY(1px) scale(0.99); }
 output {
   display: block;
   margin-top: 0.75rem;
@@ -66,4 +73,5 @@ output {
 output:empty { display: none; }
 output.ok { border-left: 3px solid var(--ok); }
 output.err { border-left: 3px solid var(--err); }
+output.pending { border-left: 3px solid var(--accent); color: var(--muted); }
 footer p { font-size: 0.8rem; }

@@ -1,0 +1,14 @@
+{
+  "schema": "noos-wallet-chain-profiles-v1",
+  "profiles": [
+    {
+      "id": "local-live-devnet",
+      "label": "Local live devnet",
+      "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+      "genesis_hash": "5f3a3157ba208d1e2d81c6b930f0c6c0e2d7196fb64f719decf751460bd7e4d8",
+      "api_version": "v1",
+      "api_base_url": "http://127.0.0.1:18080",
+      "max_freshness_ms": "15000"
+    }
+  ]
+}

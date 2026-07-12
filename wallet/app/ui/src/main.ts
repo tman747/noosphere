@@ -4,6 +4,7 @@
 // (address checksum, manifest verification) and are mirrored by node tests.
 import { validateAddress, displayGroups, AddressError } from "../core/address.mjs";
 import { verifyUpdateManifest, normalizeRuntime } from "../core/manifest.mjs";
+import { formatSubmissionResult } from "../core/submission.mjs";
 
 type Invoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
 
@@ -14,15 +15,14 @@ interface DeriveResponse {
   verifying_key: string | null;
 }
 
-interface SignResponse {
-  amount: string;
-  fee: string;
-  change: string;
-  inputs: string[];
-  body: string;
-  signature: string;
-  verifying_key: string;
-  txid: string;
+interface ChainProfile {
+  id: string;
+  label: string;
+  chain_id: string;
+  genesis_hash: string;
+  api_version: string;
+  api_base_url: string;
+  max_freshness_ms: string;
 }
 
 function findInvoke(): Invoke | null {
@@ -52,6 +52,11 @@ function show(out: HTMLOutputElement, ok: boolean, text: string): void {
   out.className = ok ? "ok" : "err";
 }
 
+function showPending(out: HTMLOutputElement, text: string): void {
+  out.textContent = text;
+  out.className = "pending";
+}
+
 function errorCode(e: unknown): string {
   if (e instanceof AddressError) return e.code;
   if (e && typeof e === "object" && "code" in e && typeof e.code === "string") return e.code;
@@ -64,29 +69,77 @@ function isDeriveResponse(v: unknown): v is DeriveResponse {
   return !!v && typeof v === "object" && "path" in v && "public_id" in v;
 }
 
-function isSignResponse(v: unknown): v is SignResponse {
-  return !!v && typeof v === "object" && "txid" in v && "signature" in v;
+function isChainProfile(v: unknown): v is ChainProfile {
+  return !!v && typeof v === "object"
+    && "id" in v && typeof v.id === "string"
+    && "chain_id" in v && typeof v.chain_id === "string"
+    && "genesis_hash" in v && typeof v.genesis_hash === "string"
+    && "api_base_url" in v && typeof v.api_base_url === "string";
 }
 
 const invoke = findInvoke();
-const HASH64 = /^[0-9a-f]{64}$/;
-
 const status = el("shell-status", HTMLParagraphElement);
 status.textContent = invoke
   ? "Desktop shell connected: derivation and signing available."
-  : "Browser preview: address and manifest checks only. Derivation and signing require the desktop shell.";
+  : "Browser preview: address checks only. Derivation, submission, and identity-bound manifest checks require the desktop shell.";
 
-const expectedChain = el("expected-chain", HTMLInputElement);
-const expectedGenesis = el("expected-genesis", HTMLInputElement);
-const actualChain = el("actual-chain", HTMLInputElement);
-const actualGenesis = el("actual-genesis", HTMLInputElement);
+const profileSelect = el("chain-profile", HTMLSelectElement);
+const profileOut = el("profile-out", HTMLOutputElement);
+const refreshStatusBtn = el("refresh-status-btn", HTMLButtonElement);
+let profiles: ChainProfile[] = [];
+let activeProfile: ChainProfile | null = null;
 
-function identity(chain: HTMLInputElement, genesis: HTMLInputElement): { chain_id: string; genesis_hash: string; api_version: number } {
-  if (!HASH64.test(chain.value) || !HASH64.test(genesis.value)) {
-    throw new Error("invalid_expected_identity");
-  }
-  return { chain_id: chain.value, genesis_hash: genesis.value, api_version: 1 };
+function expectedIdentity(): { chain_id: string; genesis_hash: string } {
+  if (!activeProfile) throw new Error("chain_profile_unavailable");
+  return { chain_id: activeProfile.chain_id, genesis_hash: activeProfile.genesis_hash };
 }
+
+function renderProfile(): void {
+  activeProfile = profiles.find((profile) => profile.id === profileSelect.value) ?? null;
+  if (!activeProfile) {
+    show(profileOut, false, "chain_profile_unavailable");
+    return;
+  }
+  show(profileOut, true, [
+    `chain id: ${activeProfile.chain_id}`,
+    `genesis: ${activeProfile.genesis_hash}`,
+    `public API: ${activeProfile.api_base_url}`,
+    `maximum status age: ${activeProfile.max_freshness_ms} ms`,
+  ].join("\n"));
+}
+
+profileSelect.addEventListener("change", renderProfile);
+refreshStatusBtn.disabled = true;
+refreshStatusBtn.addEventListener("click", () => {
+  void (async () => {
+    if (!invoke || !activeProfile) return;
+    refreshStatusBtn.disabled = true;
+    refreshStatusBtn.setAttribute("aria-busy", "true");
+    showPending(profileOut, "Checking the configured public API identity…");
+    try {
+      const response = await invoke("check_chain_status_cmd", { profileId: activeProfile.id });
+      if (!response || typeof response !== "object"
+        || !("unsafe_height" in response) || typeof response.unsafe_height !== "string"
+        || !("next_output_birth_height" in response) || typeof response.next_output_birth_height !== "string"
+        || !("freshness_ms" in response) || typeof response.freshness_ms !== "string") {
+        throw new Error("malformed_status");
+      }
+      show(profileOut, true, [
+        `chain id: ${activeProfile.chain_id}`,
+        `genesis: ${activeProfile.genesis_hash}`,
+        `public API: ${activeProfile.api_base_url}`,
+        `unsafe height: ${response.unsafe_height}`,
+        `required output birth height now: ${response.next_output_birth_height}`,
+        `status age: ${response.freshness_ms} ms`,
+      ].join("\n"));
+    } catch (e) {
+      show(profileOut, false, errorCode(e));
+    } finally {
+      refreshStatusBtn.disabled = false;
+      refreshStatusBtn.removeAttribute("aria-busy");
+    }
+  })();
+});
 
 // --- Derivation ---------------------------------------------------------
 const purpose = el("purpose", HTMLSelectElement);
@@ -147,49 +200,31 @@ addressBtn.addEventListener("click", () => {
 });
 
 // --- Transaction --------------------------------------------------------
-interface NoteInput { id: string; amount: string }
-function parseNotes(raw: string): NoteInput[] {
-  const parsed: unknown = JSON.parse(raw);
-  if (!Array.isArray(parsed)) throw new Error("invalid_notes");
-  return parsed.map((item: unknown): NoteInput => {
-    if (!item || typeof item !== "object" || !("id" in item) || !("amount" in item)) throw new Error("invalid_notes");
-    const { id, amount } = item;
-    if (typeof id !== "string" || typeof amount !== "string") throw new Error("invalid_notes");
-    return { id, amount };
-  });
-}
-
-const signBtn = el("sign-btn", HTMLButtonElement);
-const signOut = el("sign-out", HTMLOutputElement);
-signBtn.disabled = !invoke;
-signBtn.addEventListener("click", () => {
+const submitBtn = el("submit-btn", HTMLButtonElement);
+const submitOut = el("submit-out", HTMLOutputElement);
+submitBtn.disabled = true;
+submitBtn.addEventListener("click", () => {
   void (async () => {
-    if (!invoke) return;
+    if (!invoke || !activeProfile) return;
+    submitBtn.disabled = true;
+    submitBtn.setAttribute("aria-busy", "true");
+    showPending(submitOut, "Checking live identity and note funds before local signing…");
     try {
-      const zero = { proof_units: "0", state_reads: "0", state_writes: "0", blob_bytes: "0" };
       const req = {
+        profile_id: activeProfile.id,
         seed_hex: el("seed", HTMLInputElement).value,
         account: Number(el("account", HTMLInputElement).value),
         index: Number(el("index", HTMLInputElement).value),
-        expected: identity(expectedChain, expectedGenesis),
-        actual: identity(actualChain, actualGenesis),
-        notes: parseNotes(el("notes", HTMLTextAreaElement).value),
-        amount: el("amount", HTMLInputElement).value,
-        resources: { bytes: el("res-bytes", HTMLInputElement).value, grain_steps: el("res-steps", HTMLInputElement).value, ...zero },
-        prices: { bytes: el("price-bytes", HTMLInputElement).value, grain_steps: el("price-steps", HTMLInputElement).value, ...zero },
+        signer_scope: Number(el("signer-scope", HTMLInputElement).value),
+        transaction_spec: el("transaction-spec", HTMLTextAreaElement).value,
       };
-      const res = await invoke("build_and_sign_cmd", { req });
-      if (!isSignResponse(res)) throw new Error("malformed_shell_response");
-      const lines = [
-        `txid: ${res.txid}`,
-        `amount: ${res.amount}  fee: ${res.fee}  change: ${res.change}`,
-        `inputs: ${res.inputs.join(", ")}`,
-        `verifying key: ${res.verifying_key}`,
-        `signature: ${res.signature}`,
-      ];
-      show(signOut, true, lines.join("\n"));
+      const res = await invoke("submit_transaction_cmd", { req });
+      show(submitOut, true, formatSubmissionResult(res));
     } catch (e) {
-      show(signOut, false, errorCode(e));
+      show(submitOut, false, errorCode(e));
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.removeAttribute("aria-busy");
     }
   })();
 });
@@ -197,12 +232,13 @@ signBtn.addEventListener("click", () => {
 // --- Update manifest ----------------------------------------------------
 const manifestBtn = el("manifest-btn", HTMLButtonElement);
 const manifestOut = el("manifest-out", HTMLOutputElement);
+manifestBtn.disabled = true;
 manifestBtn.addEventListener("click", () => {
   void (async () => {
     try {
       const manifestRaw = el("manifest", HTMLTextAreaElement).value;
       const manifest: unknown = JSON.parse(manifestRaw);
-      const expected = identity(expectedChain, expectedGenesis);
+      const expected = expectedIdentity();
       const hostPlatform = navigator.userAgent.includes("Windows") ? "windows"
         : navigator.userAgent.includes("Mac") ? "macos" : "linux";
       const runtime = normalizeRuntime(hostPlatform, "x86_64", el("channel", HTMLSelectElement).value);
@@ -224,3 +260,30 @@ manifestBtn.addEventListener("click", () => {
     }
   })();
 });
+
+void (async () => {
+  if (!invoke) return;
+  showPending(profileOut, "Loading configured chain profile…");
+  try {
+    const result = await invoke("chain_profiles_cmd");
+    if (!Array.isArray(result) || result.length === 0 || !result.every(isChainProfile)) {
+      throw new Error("chain_profile_unavailable");
+    }
+    profiles = result;
+    profileSelect.replaceChildren(...profiles.map((profile) => {
+      const option = document.createElement("option");
+      option.value = profile.id;
+      option.textContent = profile.label;
+      return option;
+    }));
+    renderProfile();
+    refreshStatusBtn.disabled = false;
+    submitBtn.disabled = false;
+    manifestBtn.disabled = false;
+  } catch (e) {
+    show(profileOut, false, errorCode(e));
+    refreshStatusBtn.disabled = true;
+    submitBtn.disabled = true;
+    manifestBtn.disabled = true;
+  }
+})();

@@ -34,7 +34,7 @@ export async function build(outDir = join(uiRoot, "dist")) {
 
   // Shared cores: manifest.mjs imports the product identity module from
   // wallet/; vendor it beside the cores and retarget that one specifier.
-  for (const name of ["derivation.mjs", "address.mjs", "manifest.mjs"]) {
+  for (const name of ["derivation.mjs", "address.mjs", "manifest.mjs", "submission.mjs"]) {
     const source = await readFile(join(uiRoot, "core", name), "utf8");
     await writeFile(
       join(out, "core", name),

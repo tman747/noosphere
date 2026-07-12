@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { deriveSecret, derivationPath, pathHex, pathBytes, WalletDerivationError } from "./app/ui/core/derivation.mjs";
 import { validateAddress, encodeAddress, displayGroups, AddressError } from "./app/ui/core/address.mjs";
 import { verifyUpdateManifest, normalizeRuntime, signingBytes, PLATFORMS, ARCHES } from "./app/ui/core/manifest.mjs";
+import { formatSubmissionResult } from "./app/ui/core/submission.mjs";
 import { PRODUCT } from "./identity.mjs";
 import { build } from "./app/build.mjs";
 
@@ -168,6 +169,21 @@ test("wallet app manifest falsifiers reject every forgery class", async () => {
   assert.throws(() => normalizeRuntime("beos", "x64", "stable"), /wrong_update_target/);
 });
 
+test("wallet UI renders only upstream protocol txid and accepted settlement state", () => {
+  const txid = "a".repeat(64);
+  assert.equal(formatSubmissionResult({ txid, state: "MEMPOOL", ignored: "not rendered" }), `txid: ${txid}\nstatus: MEMPOOL`);
+  for (const response of [
+    { txid, state: "REJECTED" },
+    { txid, state: "REVERTED" },
+    { txid: "A".repeat(64), state: "MEMPOOL" },
+    { txid, state: "accepted" },
+    { state: "MEMPOOL" },
+    "network_failure",
+  ]) {
+    assert.throws(() => formatSubmissionResult(response), /submission_rejected|malformed_submit_response/);
+  }
+});
+
 // --- Build: npm-free dist is complete and self-contained -----------------
 test("wallet app build produces a self-contained dist without type syntax", async () => {
   const outDir = join(walletRoot, "app", "ui", "dist");
@@ -178,7 +194,7 @@ test("wallet app build produces a self-contained dist without type syntax", asyn
   assert.ok(!mainJs.includes('"../core/'), "no source-layout imports may survive");
   const manifestCore = await readFile(join(outDir, "core", "manifest.mjs"), "utf8");
   assert.match(manifestCore, /"\.\/identity\.mjs"/, "identity import must be vendored");
-  for (const file of ["index.html", "styles.css", "core/identity.mjs", "core/derivation.mjs", "core/address.mjs"]) {
+  for (const file of ["index.html", "styles.css", "core/identity.mjs", "core/derivation.mjs", "core/address.mjs", "core/submission.mjs"]) {
     await assert.doesNotReject(access(join(outDir, file)), `dist missing ${file}`);
   }
   // The vendored dist modules must actually load and agree with the source.

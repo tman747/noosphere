@@ -27,6 +27,11 @@ pub const PURPOSE_RECOVERY: u32 = 5;
 pub const WALLET_SALT: &[u8] = b"NOOS/HKDF/WALLET/SALT/V1";
 pub const WALLET_INFO: &[u8] = b"NOOS/HKDF/WALLET/V1";
 pub const SIGNING_DOMAIN: &[u8] = b"NOOS/WALLET/SIGN/V1";
+/// Consensus Ed25519 domain for a Lumen `SignedIntentV1` transaction intent.
+///
+/// The wallet identity gate still runs before this signature is reachable;
+/// the transaction's `chain_id` is already committed by its canonical txid.
+pub const LUMEN_TX_SIGNING_DOMAIN: &[u8] = b"NOOS/SIG/TX/V1";
 const KEYSTORE_AAD: &[u8] = b"NOOS/WALLET/KEYSTORE/V1";
 const KEYSTORE_ROUNDS: u32 = 200_000;
 
@@ -194,6 +199,22 @@ impl SpendingKey {
         msg.extend_from_slice(&id.genesis_hash);
         msg.extend_from_slice(&id.api_version.to_le_bytes());
         msg.extend_from_slice(body);
+        Ok(self.0.sign(&msg).to_bytes())
+    }
+
+    /// Sign a canonical Lumen transaction id for `SignedIntentV1`.
+    ///
+    /// This is deliberately separate from [`Self::sign`], whose wallet-local
+    /// envelope binds genesis and API version for non-consensus wallet data.
+    pub fn sign_lumen_transaction(
+        &self,
+        gate: &IdentityGate,
+        txid: &Hash32,
+    ) -> Result<[u8; 64], WalletError> {
+        gate.require()?;
+        let mut msg = Vec::with_capacity(LUMEN_TX_SIGNING_DOMAIN.len().saturating_add(txid.len()));
+        msg.extend_from_slice(LUMEN_TX_SIGNING_DOMAIN);
+        msg.extend_from_slice(txid);
         Ok(self.0.sign(&msg).to_bytes())
     }
 }
@@ -660,6 +681,29 @@ mod tests {
         let mut other = IdentityGate::new(identity(2));
         other.verify(identity(2)).unwrap();
         assert_ne!(a, key.sign(&other, b"tx").unwrap());
+    }
+
+    #[test]
+    fn lumen_signing_uses_the_consensus_transaction_domain() {
+        let key = derive_authority(&[3; 64], Purpose::Sign, 0, 0)
+            .unwrap()
+            .into_spending_key()
+            .unwrap();
+        let txid = [9; 32];
+        let locked = IdentityGate::new(identity(1));
+        assert_eq!(
+            key.sign_lumen_transaction(&locked, &txid),
+            Err(WalletError::HandshakeRequired)
+        );
+        let signature = ed25519_dalek::Signature::from_bytes(
+            &key.sign_lumen_transaction(&gate(), &txid).unwrap(),
+        );
+        let mut message = Vec::from(LUMEN_TX_SIGNING_DOMAIN);
+        message.extend_from_slice(&txid);
+        key.0
+            .verifying_key()
+            .verify_strict(&message, &signature)
+            .unwrap();
     }
     #[test]
     fn tls_requires_name_and_pin() {
