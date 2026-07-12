@@ -1,5 +1,6 @@
 param(
-    [string]$NetworkRoot = "C:\tmp\mindchain-lan-proof"
+    [string]$NetworkRoot = "C:\tmp\mindchain-lan-proof",
+    [switch]$CheckOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,6 +36,13 @@ $LocalAddresses = Get-NetIPAddress -AddressFamily IPv4 -AddressState Preferred -
     Select-Object -ExpandProperty IPAddress
 if ($ExpectedHost -notin $LocalAddresses) {
     throw "This invitation release expects host IP $ExpectedHost, but this PC currently has: $($LocalAddresses -join ', '). Reserve $ExpectedHost in the router or rebuild the invitations for the current address."
+}
+if ($CheckOnly) {
+    Write-Host "MindChain invitation host prerequisites are present." -ForegroundColor Green
+    Write-Host "Host address: $ExpectedHost"
+    Write-Host "Node binary: $NodeBinary"
+    Write-Host "Indexer binary: $IndexerBinary"
+    exit 0
 }
 
 $IsAdministrator = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
