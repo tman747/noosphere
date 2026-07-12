@@ -154,6 +154,47 @@ impl IssuanceParamsV1 {
         Ok(total)
     }
 
+    /// Exact schedule amount strictly after `height`. This is used when a
+    /// delayed governance update replaces the curve: already emitted supply
+    /// plus every still-reachable amount under the candidate curve must fit
+    /// the candidate cap.
+    pub fn total_scheduled_after(&self, height: u64) -> Result<u128, IssuanceError> {
+        if height >= self.terminal_height {
+            return Ok(0);
+        }
+        let mut current = height.checked_add(1).ok_or(IssuanceError::Overflow)?;
+        let mut total = 0u128;
+        while current <= self.terminal_height {
+            let era = current
+                .checked_sub(1)
+                .ok_or(IssuanceError::Overflow)?
+                .checked_div(self.era_length)
+                .ok_or(IssuanceError::Overflow)?;
+            let next_era_start = era
+                .checked_add(1)
+                .and_then(|value| value.checked_mul(self.era_length))
+                .and_then(|value| value.checked_add(1));
+            let end = next_era_start
+                .and_then(|value| value.checked_sub(1))
+                .unwrap_or(u64::MAX)
+                .min(self.terminal_height);
+            let count = u128::from(
+                end.checked_sub(current)
+                    .and_then(|value| value.checked_add(1))
+                    .ok_or(IssuanceError::Overflow)?,
+            );
+            let amount = self.era_emission(era)?;
+            total = total
+                .checked_add(amount.checked_mul(count).ok_or(IssuanceError::Overflow)?)
+                .ok_or(IssuanceError::Overflow)?;
+            current = match end.checked_add(1) {
+                Some(value) => value,
+                None => break,
+            };
+        }
+        Ok(total)
+    }
+
     /// Valueless NOOS_TEST fixture (plan §2.5): NOT production tokenomics.
     /// 10^12 micro initial, halving every 100_000 heights, terminal at
     /// 2_000_000, cap comfortably above the exact scheduled total.
@@ -280,6 +321,9 @@ mod tests {
         assert_eq!(p.emission_at(4).unwrap(), 3);
         assert_eq!(p.emission_at(5).unwrap(), 0);
         assert_eq!(p.total_scheduled().unwrap(), 24);
+        assert_eq!(p.total_scheduled_after(0).unwrap(), 24);
+        assert_eq!(p.total_scheduled_after(2).unwrap(), 10);
+        assert_eq!(p.total_scheduled_after(4).unwrap(), 0);
     }
 
     #[test]

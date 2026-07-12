@@ -151,16 +151,21 @@ fn identity_mismatch_is_rejected_at_handshake() {
     a.set_now(GENESIS_TIME_MS + 6000).expect("clock");
     a.produce_block().expect("produce 1");
 
-    // Same protocol code, different genesis parameter => different manifest
-    // hash => different chain_id => ChainIdentity handshake mismatch.
+    // Same manifest/chain_id, different accepted account allocation. The
+    // state-bound genesis_hash must make ChainIdentity reject the handshake.
     let mut foreign_spec = spec();
-    foreign_spec.params.faucet_allocation_micro += 1;
+    foreign_spec.extra_accounts.push(([0x77; 32], 1));
     let c = supervisor::start(networked_config(0xC2, vec![addr_a]), foreign_spec, dir_c)
         .expect("start c");
-    assert_ne!(
+    assert_eq!(
         status(&a).chain_id,
         status(&c).chain_id,
-        "parameter change must change the chain identity"
+        "the parameter manifest is intentionally identical"
+    );
+    assert_ne!(
+        status(&a).genesis_hash,
+        status(&c).genesis_hash,
+        "different genesis accounts must change advertised identity"
     );
 
     // C must never import A's chain across the rejected handshake: its head

@@ -9,7 +9,8 @@
 //! * [`GenesisParameterManifestV1`] — the canonical fixed-width manifest
 //!   whose hash (under `D-GENESIS-PARAMS`) derives `chain_id` (under
 //!   `D-CHAIN-ID`), then `genesis_hash` (under `D-GENESIS-FINAL` with the
-//!   devnet zero Bitcoin anchor and the fixture DKG root). A JSON/TOML map
+//!   devnet zero Bitcoin anchor, fixture DKG root, canonical allocation
+//!   commitment, and every constructed Lumen state root). A JSON/TOML map
 //!   serialization is never hashed (identity-v1.md §4).
 //! * [`GenesisSpec::build`] — the genesis ledger (valueless `NOOS_TEST`
 //!   faucet + fixture authority/recipient accounts), genesis block header,
@@ -324,6 +325,11 @@ impl DevnetParams {
         if self.token_decimals != 6 {
             return Err(NodeError::Config("token.decimals must be 6".into()));
         }
+        if self.chain_name.is_empty() || self.chain_name.as_bytes().len() > 64 {
+            return Err(NodeError::Config(
+                "chain_name must contain 1..=64 UTF-8 bytes".into(),
+            ));
+        }
         // Fixture-refusal law: nodes MUST refuse is_test_fixture material
         // on a network where is_test_network = false.
         if !self.is_test_network
@@ -392,14 +398,22 @@ define_object! {
 }
 
 define_object! {
-    /// Canonical final genesis body (identity-v1.md §4): binds the manifest
-    /// hash plus the two post-freeze scalars; the Bitcoin anchor and DKG
-    /// root enter the `genesis_hash` preimage beside it, never inside it.
+    /// Canonical devnet final genesis body: binds the manifest hash, the two
+    /// post-freeze scalars, the complete account allocation commitment, and
+    /// every Lumen state root. The Bitcoin anchor and DKG root enter the
+    /// `genesis_hash` preimage beside it, never inside it.
     pub struct FinalGenesisBodyV1 {
         version: 1;
         1 => manifest_hash: [u8; 32],
         2 => genesis_time_ms: u64,
         3 => initial_ground_target: [u8; 32],
+        4 => allocation_root: [u8; 32],
+        5 => notes_root: [u8; 32],
+        6 => nullifiers_root: [u8; 32],
+        7 => accounts_root: [u8; 32],
+        8 => objects_root: [u8; 32],
+        9 => receipts_root: [u8; 32],
+        10 => params_root: [u8; 32],
     }
 }
 
@@ -444,12 +458,14 @@ impl GenesisSpec {
         }
     }
 
-    #[must_use]
-    pub fn manifest(&self) -> GenesisParameterManifestV1 {
+    pub fn manifest(&self) -> Result<GenesisParameterManifestV1, NodeError> {
         let p = &self.params;
-        GenesisParameterManifestV1 {
+        let chain_name = BoundedBytes::new(p.chain_name.as_bytes().to_vec()).ok_or_else(|| {
+            NodeError::Config("chain_name must contain at most 64 UTF-8 bytes".into())
+        })?;
+        Ok(GenesisParameterManifestV1 {
             schema_version: p.schema_version,
-            chain_name: BoundedBytes::new(p.chain_name.as_bytes().to_vec()).unwrap_or_default(),
+            chain_name,
             is_test_network: u8::from(p.is_test_network),
             token_decimals: p.token_decimals,
             slot_seconds: p.slot_seconds,
@@ -472,14 +488,14 @@ impl GenesisSpec {
             faucet_cooldown_seconds: p.faucet_cooldown_seconds,
             dkg_participants: p.dkg_participants,
             dkg_threshold: p.dkg_threshold,
-        }
+        })
     }
 
     /// `chain_id = H(D-CHAIN-ID || H(D-GENESIS-PARAMS || canonical manifest))`.
     pub fn chain_id(&self) -> Result<Hash32, NodeError> {
         let manifest_hash = hash_domain(
             DomainId::GenesisParams,
-            &[&self.manifest().encode_canonical()],
+            &[&self.manifest()?.encode_canonical()],
         )
         .map_err(|_| NodeError::Crypto)?;
         Ok(hash_domain(DomainId::ChainId, &[manifest_hash.as_bytes()])
@@ -507,16 +523,29 @@ impl GenesisSpec {
     /// dkg_root || canonical(FinalGenesisBodyV1))`; the devnet Bitcoin
     /// anchor is the zero hash (test network, identity-v1.md §4).
     pub fn genesis_hash(&self) -> Result<Hash32, NodeError> {
+        let ledger = self.build_ledger()?;
+        self.genesis_hash_for_ledger(&ledger)
+    }
+
+    fn genesis_hash_for_ledger(&self, ledger: &LumenLedger) -> Result<Hash32, NodeError> {
         let chain_id = self.chain_id()?;
         let manifest_hash = hash_domain(
             DomainId::GenesisParams,
-            &[&self.manifest().encode_canonical()],
+            &[&self.manifest()?.encode_canonical()],
         )
         .map_err(|_| NodeError::Crypto)?;
+        let roots = ledger.roots();
         let body = FinalGenesisBodyV1 {
             manifest_hash: *manifest_hash.as_bytes(),
             genesis_time_ms: self.genesis_time_ms,
             initial_ground_target: self.initial_ground_target.to_le_bytes(),
+            allocation_root: self.allocation_root()?,
+            notes_root: roots.notes_root,
+            nullifiers_root: roots.nullifiers_root,
+            accounts_root: roots.accounts_root,
+            objects_root: roots.objects_root,
+            receipts_root: roots.receipts_root,
+            params_root: roots.params_root,
         };
         let bitcoin_anchor = [0_u8; 32];
         Ok(hash_domain(
@@ -545,14 +574,14 @@ impl GenesisSpec {
         }
     }
 
-    /// Installs the genesis ledger: NOOS_TEST fee/issuance fixtures, the
-    /// faucet account (id = fixture Ed25519 pubkey bytes; auth_descriptor =
-    /// the same pubkey, verified by the node's Ed25519 suite), fixture
-    /// authority and emission-recipient accounts, and the disabled-control
-    /// records.
-    #[must_use]
-    pub fn build_ledger(&self) -> LumenLedger {
-        let mut ledger = LumenLedger::new();
+    fn canonical_accounts(&self) -> Result<Vec<(AccountV1, Vec<(Hash32, u128)>)>, NodeError> {
+        if !self.extra_accounts.is_empty() && !self.params.is_test_network {
+            return Err(NodeError::Config(
+                "extra fixture accounts are a test-network-only mechanism \
+                 (is_test_network = false)"
+                    .into(),
+            ));
+        }
         let faucet = Self::fixture_account(self.params.faucet_pubkey, &self.params.faucet_pubkey);
         let mut accounts = vec![
             (
@@ -576,18 +605,65 @@ impl GenesisSpec {
             };
             accounts.push((Self::fixture_account(*id, id), balances));
         }
+        accounts.sort_by_key(|(account, _)| account.account_id);
+        if accounts
+            .windows(2)
+            .any(|pair| pair[0].0.account_id == pair[1].0.account_id)
+        {
+            return Err(NodeError::Config(
+                "genesis accounts must have unique canonical account IDs".into(),
+            ));
+        }
+        Ok(accounts)
+    }
+
+    /// Canonical allocation commitment: sorted account id followed by its
+    /// checked NOOS balance. Zero-balance fixture accounts are included so
+    /// the commitment describes the complete accepted account set.
+    fn allocation_root(&self) -> Result<Hash32, NodeError> {
+        let accounts = self.canonical_accounts()?;
+        let count = u32::try_from(accounts.len())
+            .map_err(|_| NodeError::Config("too many genesis accounts".into()))?;
+        let capacity = accounts
+            .len()
+            .checked_mul(48)
+            .and_then(|n| n.checked_add(4))
+            .ok_or_else(|| NodeError::Config("genesis allocation encoding overflow".into()))?;
+        let mut canonical = Vec::with_capacity(capacity);
+        canonical.extend_from_slice(&count.to_le_bytes());
+        for (account, balances) in accounts {
+            canonical.extend_from_slice(&account.account_id);
+            let amount = balances
+                .iter()
+                .find_map(|(asset, amount)| (*asset == NOOS_ASSET).then_some(*amount))
+                .unwrap_or(0);
+            canonical.extend_from_slice(&amount.to_le_bytes());
+        }
+        Ok(*blake3::hash(&canonical).as_bytes())
+    }
+
+    /// Installs the genesis ledger: NOOS_TEST fee/issuance fixtures, the
+    /// faucet account (id = fixture Ed25519 pubkey bytes; auth_descriptor =
+    /// the same pubkey, verified by the node's Ed25519 suite), fixture
+    /// authority and emission-recipient accounts, and the disabled-control
+    /// records.
+    pub fn build_ledger(&self) -> Result<LumenLedger, NodeError> {
+        let mut ledger = LumenLedger::new();
+        let accounts = self.canonical_accounts()?;
         let controls: Vec<(&str, bool)> = CONTROL_NAMES.iter().map(|n| (*n, false)).collect();
-        ledger.install_genesis(&GenesisConfig {
-            fee_params: FeeParamsV1::testnet_fixture(),
-            fee_state: FeeStateV1::testnet_fixture(),
-            issuance: IssuanceParamsV1::testnet_fixture(),
-            shares: EmissionSharesV1::testnet_fixture(),
-            controls: &controls,
-            accounts: &accounts,
-            gov_authority: GOV_AUTHORITY_ACCOUNT,
-            emergency_authority: EMERGENCY_AUTHORITY_ACCOUNT,
-        });
         ledger
+            .install_genesis(&GenesisConfig {
+                fee_params: FeeParamsV1::testnet_fixture(),
+                fee_state: FeeStateV1::testnet_fixture(),
+                issuance: IssuanceParamsV1::testnet_fixture(),
+                shares: EmissionSharesV1::testnet_fixture(),
+                controls: &controls,
+                accounts: &accounts,
+                gov_authority: GOV_AUTHORITY_ACCOUNT,
+                emergency_authority: EMERGENCY_AUTHORITY_ACCOUNT,
+            })
+            .map_err(|error| NodeError::Config(format!("invalid genesis ledger: {error:?}")))?;
+        Ok(ledger)
     }
 
     /// Builds the complete genesis: ledger, header, body, mined ticket.
@@ -596,21 +672,19 @@ impl GenesisSpec {
     /// [`NodeError::Config`] on fixture-law violations; [`NodeError::Crypto`]
     /// only on registry misuse (build defect).
     pub fn build(&self) -> Result<BuiltGenesis, NodeError> {
-        if !self.extra_accounts.is_empty() && !self.params.is_test_network {
-            return Err(NodeError::Config(
-                "extra fixture accounts are a test-network-only mechanism \
-                 (is_test_network = false)"
-                    .into(),
-            ));
-        }
         let chain_id = self.chain_id()?;
-        let genesis_hash = self.genesis_hash()?;
-        let ledger = self.build_ledger();
+        let ledger = self.build_ledger()?;
+        let genesis_hash = self.genesis_hash_for_ledger(&ledger)?;
         let roots = ledger.roots();
 
         let proposer_secret =
             BlsSecretKey::from_seed(DEVNET_PROPOSER_SEED).map_err(|_| NodeError::Crypto)?;
         let proposer_key = Bytes48(proposer_secret.public_key().into_bytes());
+        let fee_prices = FeeStateV1::testnet_fixture().prices();
+        let price = |value: u128| {
+            u64::try_from(value)
+                .map_err(|_| NodeError::Config("genesis fee price exceeds u64".into()))
+        };
 
         // Genesis body: no transactions, no certificates. The ticket starts
         // as the canonical zero placeholder (roots::zero_ticket) so the DA
@@ -656,13 +730,12 @@ impl GenesisSpec {
             loom_credit: 0,
             gas_used: ResourceVectorV1::default(),
             base_prices: {
-                let p = FeeStateV1::testnet_fixture().prices();
                 ResourcePriceVectorV1 {
-                    p_bytes: u64::try_from(p[0]).unwrap_or(u64::MAX),
-                    p_grain_steps: u64::try_from(p[1]).unwrap_or(u64::MAX),
-                    p_proof_units: u64::try_from(p[2]).unwrap_or(u64::MAX),
-                    p_state_word_epochs: u64::try_from(p[3]).unwrap_or(u64::MAX),
-                    p_blob_bytes: u64::try_from(p[4]).unwrap_or(u64::MAX),
+                    p_bytes: price(fee_prices[0])?,
+                    p_grain_steps: price(fee_prices[1])?,
+                    p_proof_units: price(fee_prices[2])?,
+                    p_state_word_epochs: price(fee_prices[3])?,
+                    p_blob_bytes: price(fee_prices[4])?,
                 }
             },
             proposer_signature: Bytes96([0; 96]),
@@ -764,7 +837,12 @@ pub fn mine_ticket(
 
 #[cfg(test)]
 mod production_proposal_refusal_tests {
-    use super::DevnetParams;
+    use super::{DevnetParams, GenesisSpec};
+
+    const DEVNET: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../protocol/genesis/devnet-parameters.toml"
+    ));
 
     /// The only node parameter loader is deliberately devnet-only. Keep an
     /// executable regression proving that a filled-but-unsigned owner proposal
@@ -781,4 +859,62 @@ mod production_proposal_refusal_tests {
             "an unsigned owner proposal must never load as node parameters"
         );
     }
+
+    #[test]
+    fn chain_names_are_bounded_and_distinct_names_are_distinct_chains() {
+        let overlong = DEVNET.replace("noos-devnet-1", &"x".repeat(65));
+        assert!(DevnetParams::parse(&overlong).is_err());
+
+        let first = GenesisSpec::devnet(DevnetParams::parse(DEVNET).unwrap(), 1_760_000_000_000);
+        let renamed = DEVNET.replace("noos-devnet-1", "noos-devnet-2");
+        let second = GenesisSpec::devnet(DevnetParams::parse(&renamed).unwrap(), 1_760_000_000_000);
+        assert_ne!(first.chain_id().unwrap(), second.chain_id().unwrap());
+        assert_ne!(
+            first.genesis_hash().unwrap(),
+            second.genesis_hash().unwrap()
+        );
+    }
+
+    #[test]
+    fn extra_account_set_is_canonical_and_bound_to_genesis_identity() {
+        let params = DevnetParams::parse(DEVNET).unwrap();
+        let mut first = GenesisSpec::devnet(params.clone(), 1_760_000_000_000);
+        first.extra_accounts = vec![([0x71; 32], 7), ([0x72; 32], 8)];
+        let mut reordered = GenesisSpec::devnet(params.clone(), 1_760_000_000_000);
+        reordered.extra_accounts = vec![([0x72; 32], 8), ([0x71; 32], 7)];
+        let mut changed = GenesisSpec::devnet(params, 1_760_000_000_000);
+        changed.extra_accounts = vec![([0x71; 32], 7), ([0x72; 32], 9)];
+
+        let first_built = first.build().unwrap();
+        let reordered_built = reordered.build().unwrap();
+        let changed_built = changed.build().unwrap();
+        assert_eq!(first_built.chain_id, changed_built.chain_id);
+        assert_eq!(first_built.genesis_hash, reordered_built.genesis_hash);
+        assert_eq!(first_built.ledger.roots(), reordered_built.ledger.roots());
+        assert_ne!(first_built.genesis_hash, changed_built.genesis_hash);
+        assert_ne!(first_built.ledger.roots(), changed_built.ledger.roots());
+
+        let mut duplicate = first;
+        duplicate.extra_accounts.push(([0x71; 32], 10));
+        assert!(duplicate.build().is_err());
+    }
+
+    #[test]
+    fn devnet_identity_vector_is_stable_after_state_binding() {
+        let spec = GenesisSpec::devnet(DevnetParams::parse(DEVNET).unwrap(), 1_760_000_000_000);
+        let built = spec.build().unwrap();
+        assert_eq!(
+            super::hex32_for_test(built.chain_id),
+            "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b"
+        );
+        assert_eq!(
+            super::hex32_for_test(built.genesis_hash),
+            "0fa745c6c1b32f5984212935f50bc3143ae9fde8f1f49c35ef789dfb3573cdef"
+        );
+    }
+}
+
+#[cfg(test)]
+fn hex32_for_test(value: Hash32) -> String {
+    value.iter().map(|byte| format!("{byte:02x}")).collect()
 }

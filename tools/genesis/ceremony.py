@@ -155,6 +155,10 @@ class DerivedIdentity:
 
 def derive_identity(p: dict, genesis_time_ms: int = DEVNET_GENESIS_TIME_MS,
                     bitcoin_anchor: bytes = DEVNET_BITCOIN_ANCHOR) -> DerivedIdentity:
+    from production_authorization import (
+        _account_bytes, _noos_object, _param_key, _param_record, _smt_root,
+    )
+
     canon = canonical_manifest(p)
     manifest_hash = domain_hash(b"NOOS/GENESIS/PARAMS/V1", canon)
     chain_id = domain_hash(b"NOOS/CHAIN/V1", manifest_hash)
@@ -168,11 +172,66 @@ def derive_identity(p: dict, genesis_time_ms: int = DEVNET_GENESIS_TIME_MS,
         _le(p["dkg.participants"], 4),
         _le(p["dkg.threshold"], 4),
     )
+    faucet = bytes.fromhex(str(p["faucet.account_pubkey_ed25519_hex"]))
+    accounts = [
+        (faucet, faucet, int(p["faucet.allocation_micro_noos_test"])),
+        (bytes([0xA1]) * 32, b"", 0), (bytes([0xA2]) * 32, b"", 0),
+        (bytes([0xA3]) * 32, b"", 0), (bytes([0xB0]) * 32, b"", 0),
+        (bytes([0xE0]) * 32, b"", 0),
+    ]
+    account_leaves = {}
+    allocation_bytes = bytearray(_le(len(accounts), 4))
+    for account_id, auth, amount in sorted(accounts):
+        balances = {bytes(32): _le(amount, 16)} if amount else {}
+        balance_root = _smt_root(balances)
+        account_leaves[account_id] = _account_bytes(
+            account_id, auth, balance_root, bytes(32),
+        )
+        allocation_bytes += account_id + _le(amount, 16)
+    import blake3
+    allocation_root = blake3.blake3(bytes(allocation_bytes)).digest()
+
+    def obj(fields: list[tuple[int, bytes]]) -> bytes:
+        return _noos_object(tuple(fields))
+
+    fee_params = obj([
+        (1, _le(1, 16)), (2, _le(1_000_000, 16)), (3, _le(125_000, 4)),
+        (4, _le(1_048_576, 8)), (5, _le(100_000_000, 8)),
+        (6, _le(100_000, 8)), (7, _le(1_000_000, 8)),
+        (8, _le(4_194_304, 8)), (9, _le(1_000, 16)), (10, _le(16, 8)),
+    ])
+    fee_state = obj([(i + 1, _le(value, 16)) for i, value in enumerate((1, 1, 10, 2, 1))])
+    issuance = obj([
+        (1, _le(250_000_000_000_000_000, 16)),
+        (2, _le(1_000_000_000_000, 16)), (3, _le(100_000, 8)),
+        (4, _le(1, 4)), (5, _le(2, 4)), (6, _le(2_000_000, 8)),
+    ])
+    shares = obj([(1, _le(500_000, 4)), (2, _le(350_000, 4)), (3, _le(150_000, 4))])
+    params = {
+        _param_key("noos.params.gov-auth.v1"): _param_record(bytes([0xB0]) * 32),
+        _param_key("noos.params.emrg-auth.v1"): _param_record(bytes([0xE0]) * 32),
+        _param_key("noos.params.fees.v1"): _param_record(fee_params),
+        _param_key("noos.params.feestate.v1"): _param_record(fee_state),
+        _param_key("noos.params.issuance.v1"): _param_record(issuance),
+        _param_key("noos.params.shares.v1"): _param_record(shares),
+    }
+    for control in (
+        "work_loom_credit", "work_loom_weightcap", "witness_proofpower",
+        "neural_lane", "reflex_lane", "umbra_suite", "dream_lane", "class_gate_budget",
+    ):
+        params[_param_key(f"noos.control.{control}")] = _param_record(obj([(1, b"\x00")]))
+    empty = _smt_root({})
+    roots = (
+        empty, empty, _smt_root(account_leaves), empty, empty, _smt_root(params),
+    )
     body = bytearray()
     body += _le(1, 2)
     body += _le(1, 2) + manifest_hash
     body += _le(2, 2) + _le(genesis_time_ms, 8)
     body += _le(3, 2) + DEVNET_INITIAL_GROUND_TARGET
+    body += _le(4, 2) + allocation_root
+    for tag, root in enumerate(roots, 5):
+        body += _le(tag, 2) + root
     genesis_hash = domain_hash(
         b"NOOS/GENESIS/FINAL/V1", chain_id, bitcoin_anchor, dkg_root, bytes(body)
     )

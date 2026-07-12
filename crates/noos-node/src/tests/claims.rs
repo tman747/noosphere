@@ -54,7 +54,7 @@ fn claim_e_base_unknown_fields_fail_closed_on_the_production_wire() {
 fn claim_e_blackout_all_optional_controls_off_keeps_base_live() {
     let spec = spec();
     assert_eq!(
-        spec.manifest().controls_bits,
+        spec.manifest().expect("valid manifest").controls_bits,
         0,
         "every optional lane is disabled"
     );

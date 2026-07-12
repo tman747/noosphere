@@ -277,6 +277,17 @@ pub enum EmissionError {
     Overflow,
 }
 
+/// Fail-closed genesis installation errors. Genesis is validated in full
+/// before any state is written so a rejected configuration leaves an empty
+/// ledger unchanged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GenesisError {
+    DuplicateAccount,
+    DuplicateBalance,
+    InvalidIssuance,
+    Overflow,
+}
+
 // ---------------------------------------------------------------------------
 // Overlay
 // ---------------------------------------------------------------------------
@@ -326,8 +337,11 @@ pub struct LumenLedger {
     /// account_id -> (asset_id -> amount) sub-tree backing
     /// `AccountV1.liquid_balances_root`.
     balances: BTreeMap<Hash32, Smt>,
-    /// Cumulative minted supply (checked against the issuance cap).
-    total_minted: u128,
+    /// NOOS present in the unique genesis account allocation set.
+    genesis_issued: u128,
+    /// Cumulative schedule emission after genesis. This is deliberately
+    /// separate from `genesis_issued`; the cap applies to their checked sum.
+    emission_minted: u128,
     /// Last height whose emission was minted; skipped heights are NEVER
     /// recreated (arch §13.2).
     last_emission_height: u64,
@@ -353,8 +367,29 @@ impl LumenLedger {
     }
 
     #[must_use]
+    pub fn genesis_issued(&self) -> u128 {
+        self.genesis_issued
+    }
+
+    /// Emission-only amount minted after genesis.
+    #[must_use]
+    pub fn emission_minted(&self) -> u128 {
+        self.emission_minted
+    }
+
+    /// Backwards-compatible emission-only accessor. New consensus code should
+    /// use [`Self::emission_minted`] or [`Self::total_issued`] explicitly.
+    #[must_use]
     pub fn total_minted(&self) -> u128 {
-        self.total_minted
+        self.emission_minted
+    }
+
+    /// Total NOOS ever issued: genesis allocation plus scheduled emission.
+    #[must_use]
+    pub fn total_issued(&self) -> u128 {
+        self.genesis_issued
+            .checked_add(self.emission_minted)
+            .expect("issued-supply invariant")
     }
 
     #[must_use]
@@ -437,11 +472,68 @@ impl LumenLedger {
         self.param_current(PARAM_SHARES)
     }
 
+    fn issuance_fits_issued_supply(&self, issuance: &IssuanceParamsV1) -> bool {
+        let Ok(scheduled) = issuance.total_scheduled() else {
+            return false;
+        };
+        let Ok(remaining) = issuance.total_scheduled_after(self.last_emission_height) else {
+            return false;
+        };
+        issuance.validate().is_ok()
+            && issuance.max_supply >= self.total_issued()
+            && self
+                .genesis_issued
+                .checked_add(scheduled)
+                .is_some_and(|maximum| maximum <= issuance.max_supply)
+            && self
+                .total_issued()
+                .checked_add(remaining)
+                .is_some_and(|maximum| maximum <= issuance.max_supply)
+    }
+
     // -- genesis ------------------------------------------------------------
 
     /// Install a genesis params set and initial accounts. Direct writes: this
     /// is the only path that seeds state outside a transaction.
-    pub fn install_genesis(&mut self, config: &GenesisConfig<'_>) {
+    pub fn install_genesis(&mut self, config: &GenesisConfig<'_>) -> Result<(), GenesisError> {
+        config
+            .issuance
+            .validate()
+            .map_err(|_| GenesisError::InvalidIssuance)?;
+        config
+            .shares
+            .validate()
+            .map_err(|_| GenesisError::InvalidIssuance)?;
+
+        let mut seen_accounts = std::collections::BTreeSet::new();
+        let mut genesis_issued = 0u128;
+        for (account, balances) in config.accounts {
+            if !seen_accounts.insert(account.account_id) {
+                return Err(GenesisError::DuplicateAccount);
+            }
+            let mut seen_assets = std::collections::BTreeSet::new();
+            for (asset, amount) in balances {
+                if !seen_assets.insert(*asset) {
+                    return Err(GenesisError::DuplicateBalance);
+                }
+                if *asset == NOOS_ASSET {
+                    genesis_issued = genesis_issued
+                        .checked_add(*amount)
+                        .ok_or(GenesisError::Overflow)?;
+                }
+            }
+        }
+        let scheduled = config
+            .issuance
+            .total_scheduled()
+            .map_err(|_| GenesisError::Overflow)?;
+        let maximum_issuance = genesis_issued
+            .checked_add(scheduled)
+            .ok_or(GenesisError::Overflow)?;
+        if maximum_issuance > config.issuance.max_supply {
+            return Err(GenesisError::InvalidIssuance);
+        }
+
         self.write_param_direct(PARAM_GOV_AUTHORITY, &config.gov_authority);
         self.write_param_direct(PARAM_EMERGENCY_AUTHORITY, &config.emergency_authority);
         let fee_params = &config.fee_params;
@@ -473,6 +565,10 @@ impl LumenLedger {
             self.accounts
                 .insert(acct.account_id, acct.encode_canonical());
         }
+        self.genesis_issued = genesis_issued;
+        self.emission_minted = 0;
+        self.last_emission_height = 0;
+        Ok(())
     }
 
     fn write_param_direct(&mut self, name: &str, value: &[u8]) {
@@ -520,11 +616,15 @@ impl LumenLedger {
                 return Err(EmissionError::UnknownRecipient);
             }
         }
-        let new_total = self
-            .total_minted
+        let new_emission_minted = self
+            .emission_minted
             .checked_add(emission)
             .ok_or(EmissionError::Overflow)?;
-        if new_total > issuance.max_supply {
+        let new_total_issued = self
+            .genesis_issued
+            .checked_add(new_emission_minted)
+            .ok_or(EmissionError::Overflow)?;
+        if new_total_issued > issuance.max_supply {
             return Err(EmissionError::Overflow);
         }
         // Aggregate aliases before touching state (the same account may fill
@@ -559,7 +659,7 @@ impl LumenLedger {
         for (id, next) in next_balances {
             self.set_balance_direct(&id, &NOOS_ASSET, next, &mut delta);
         }
-        self.total_minted = new_total;
+        self.emission_minted = new_emission_minted;
         self.last_emission_height = height;
         Ok(StateDelta::from_map(delta))
     }
@@ -632,6 +732,26 @@ impl LumenLedger {
                 continue;
             };
             if pending.activation_height <= height {
+                if *key == param_key(PARAM_ISSUANCE) {
+                    let Ok(candidate) =
+                        IssuanceParamsV1::decode_canonical(pending.value.as_slice())
+                    else {
+                        continue;
+                    };
+                    if !self.issuance_fits_issued_supply(&candidate) {
+                        continue;
+                    }
+                }
+                if *key == param_key(PARAM_SHARES) {
+                    let Ok(candidate) =
+                        EmissionSharesV1::decode_canonical(pending.value.as_slice())
+                    else {
+                        continue;
+                    };
+                    if candidate.validate().is_err() {
+                        continue;
+                    }
+                }
                 let promoted = ParamRecordV1 {
                     current: pending.value.clone(),
                     pending: crate::objects::OptionalObject(None),
@@ -927,7 +1047,7 @@ impl LumenLedger {
                 ActionV1::GovernanceParamUpdate {
                     param_key: key,
                     activation_height,
-                    ..
+                    new_value,
                 } => {
                     if !gov_ok() {
                         return Err(RejectReason::GovernanceDenied);
@@ -937,6 +1057,20 @@ impl LumenLedger {
                     // rotate only through this same delayed path.
                     if key_has_prefix(key, CONTROL_PREFIX) {
                         return Err(RejectReason::GovernanceDenied);
+                    }
+                    if *key == param_key(PARAM_ISSUANCE) {
+                        let candidate = IssuanceParamsV1::decode_canonical(new_value.as_slice())
+                            .map_err(|_| RejectReason::GovernanceDenied)?;
+                        if !self.issuance_fits_issued_supply(&candidate) {
+                            return Err(RejectReason::GovernanceDenied);
+                        }
+                    }
+                    if *key == param_key(PARAM_SHARES) {
+                        let candidate = EmissionSharesV1::decode_canonical(new_value.as_slice())
+                            .map_err(|_| RejectReason::GovernanceDenied)?;
+                        candidate
+                            .validate()
+                            .map_err(|_| RejectReason::GovernanceDenied)?;
                     }
                     let min = ctx
                         .height

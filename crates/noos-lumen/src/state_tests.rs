@@ -21,8 +21,8 @@ use crate::objects::{
     OptionalObject, ResourceVector, SignedIntentV1, TransactionV1, TransactionWitnessesV1,
 };
 use crate::state::{
-    param_key, ApplyOutcome, BlockContext, FailCode, GenesisConfig, LumenLedger, LumenRoots,
-    RejectReason, StateDelta, TreeId, CONTROL_PREFIX, NOOS_ASSET,
+    param_key, ApplyOutcome, BlockContext, FailCode, GenesisConfig, GenesisError, LumenLedger,
+    LumenRoots, RejectReason, StateDelta, TreeId, CONTROL_PREFIX, NOOS_ASSET, PARAM_ISSUANCE,
 };
 use crate::test_util::SplitMix64;
 use crate::Hash32;
@@ -127,16 +127,18 @@ fn genesis() -> LumenLedger {
         (account(WITNESS_POOL), vec![]),
         (account(TREASURY), vec![]),
     ];
-    ledger.install_genesis(&GenesisConfig {
-        fee_params: FeeParamsV1::testnet_fixture(),
-        fee_state: FeeStateV1::testnet_fixture(),
-        issuance: IssuanceParamsV1::testnet_fixture(),
-        shares: EmissionSharesV1::testnet_fixture(),
-        controls: &[("neural_lane", false), ("dream_lane", false)],
-        accounts: &accounts,
-        gov_authority: GOV,
-        emergency_authority: EMERGENCY,
-    });
+    ledger
+        .install_genesis(&GenesisConfig {
+            fee_params: FeeParamsV1::testnet_fixture(),
+            fee_state: FeeStateV1::testnet_fixture(),
+            issuance: IssuanceParamsV1::testnet_fixture(),
+            shares: EmissionSharesV1::testnet_fixture(),
+            controls: &[("neural_lane", false), ("dream_lane", false)],
+            accounts: &accounts,
+            gov_authority: GOV,
+            emergency_authority: EMERGENCY,
+        })
+        .expect("valid test genesis");
     ledger
 }
 
@@ -773,6 +775,85 @@ fn emission_past_terminal_height_is_zero_and_unknown_recipient_rejects() {
     assert_eq!(ledger.total_minted(), 0);
 }
 
+#[test]
+fn genesis_supply_is_checked_for_duplicates_overflow_and_full_schedule() {
+    let base = account(PAYER);
+    let shares = EmissionSharesV1::testnet_fixture();
+    let fees = FeeParamsV1::testnet_fixture();
+    let fee_state = FeeStateV1::testnet_fixture();
+    let issuance = IssuanceParamsV1 {
+        max_supply: 10,
+        initial_per_height: 10,
+        era_length: 1,
+        decay_numerator: 1,
+        decay_denominator: 2,
+        terminal_height: 1,
+    };
+    let install = |accounts: &[(AccountV1, Vec<(Hash32, u128)>)], issuance| {
+        let mut ledger = LumenLedger::new();
+        ledger.install_genesis(&GenesisConfig {
+            fee_params: fees.clone(),
+            fee_state: fee_state.clone(),
+            issuance,
+            shares: shares.clone(),
+            controls: &[],
+            accounts,
+            gov_authority: GOV,
+            emergency_authority: EMERGENCY,
+        })
+    };
+
+    let over_cap = [(base.clone(), vec![(NOOS_ASSET, 1)])];
+    assert_eq!(
+        install(&over_cap, issuance.clone()),
+        Err(GenesisError::InvalidIssuance),
+        "genesis allocation plus the full schedule must fit the cap"
+    );
+
+    let duplicate = [
+        (base.clone(), vec![(NOOS_ASSET, 1)]),
+        (base.clone(), vec![(NOOS_ASSET, 1)]),
+    ];
+    let mut no_emission = issuance.clone();
+    no_emission.initial_per_height = 0;
+    assert_eq!(
+        install(&duplicate, no_emission.clone()),
+        Err(GenesisError::DuplicateAccount)
+    );
+
+    let overflow = [
+        (base.clone(), vec![(NOOS_ASSET, u128::MAX)]),
+        (account(GOV), vec![(NOOS_ASSET, 1)]),
+    ];
+    no_emission.max_supply = u128::MAX;
+    assert_eq!(install(&overflow, no_emission), Err(GenesisError::Overflow));
+}
+
+#[test]
+fn issued_supply_is_explicit_and_deterministic_under_replay() {
+    let mut first = genesis();
+    let mut replay = genesis();
+    assert_eq!(first.genesis_issued(), 1_000_000_000);
+    assert_eq!(first.emission_minted(), 0);
+    assert_eq!(first.total_issued(), first.genesis_issued());
+    for height in [1, 5, 12] {
+        first
+            .apply_emission(height, &PROPOSER, &WITNESS_POOL, &TREASURY)
+            .unwrap();
+        replay
+            .apply_emission(height, &PROPOSER, &WITNESS_POOL, &TREASURY)
+            .unwrap();
+    }
+    assert_eq!(first, replay);
+    assert_eq!(
+        first.total_issued(),
+        first
+            .genesis_issued()
+            .checked_add(first.emission_minted())
+            .unwrap()
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Governance and emergency limits
 // ---------------------------------------------------------------------------
@@ -829,6 +910,70 @@ fn governance_requires_authority_delay_and_cannot_touch_controls() {
     // At activation: promoted.
     let d = ledger.activate_pending_params(100);
     assert!(!d.is_empty());
+}
+
+#[test]
+fn governance_cannot_lower_cap_below_issued_or_enable_genesis_schedule_overflow() {
+    let mut ledger = genesis();
+    ledger
+        .apply_emission(1, &PROPOSER, &WITNESS_POOL, &TREASURY)
+        .unwrap();
+    let mut below_issued = IssuanceParamsV1::testnet_fixture();
+    below_issued.initial_per_height = 0;
+    below_issued.max_supply = ledger.total_issued() - 1;
+    let update = ActionV1::GovernanceParamUpdate {
+        param_key: param_key(PARAM_ISSUANCE),
+        new_value: BoundedBytes::new(below_issued.encode_canonical()).unwrap(),
+        activation_height: 200_000,
+    };
+    let (txb, witb, _) = build_tx(2, vec![], vec![PAYER, GOV], vec![update], vec![]);
+    assert_eq!(
+        ledger
+            .apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll)
+            .unwrap_err(),
+        RejectReason::GovernanceDenied
+    );
+
+    let mut schedule_overflow = IssuanceParamsV1::testnet_fixture();
+    schedule_overflow.max_supply = schedule_overflow.total_scheduled().unwrap();
+    let update = ActionV1::GovernanceParamUpdate {
+        param_key: param_key(PARAM_ISSUANCE),
+        new_value: BoundedBytes::new(schedule_overflow.encode_canonical()).unwrap(),
+        activation_height: 200_000,
+    };
+    let (txb, witb, _) = build_tx(2, vec![], vec![PAYER, GOV], vec![update], vec![]);
+    assert_eq!(
+        ledger
+            .apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll)
+            .unwrap_err(),
+        RejectReason::GovernanceDenied
+    );
+}
+
+#[test]
+fn issuance_update_is_rechecked_against_supply_at_activation() {
+    let mut ledger = genesis();
+    let mut candidate = IssuanceParamsV1::testnet_fixture();
+    candidate.initial_per_height = 1;
+    candidate.max_supply = ledger
+        .genesis_issued()
+        .checked_add(candidate.total_scheduled().unwrap())
+        .unwrap();
+    let update = ActionV1::GovernanceParamUpdate {
+        param_key: param_key(PARAM_ISSUANCE),
+        new_value: BoundedBytes::new(candidate.encode_canonical()).unwrap(),
+        activation_height: 100,
+    };
+    let (txb, witb, _) = build_tx(2, vec![], vec![PAYER, GOV], vec![update], vec![]);
+    assert!(ledger
+        .apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll)
+        .is_ok());
+
+    ledger
+        .apply_emission(50, &PROPOSER, &WITNESS_POOL, &TREASURY)
+        .unwrap();
+    assert!(ledger.activate_pending_params(100).is_empty());
+    assert_ne!(ledger.issuance_params().unwrap(), candidate);
 }
 
 #[test]

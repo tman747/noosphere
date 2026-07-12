@@ -15,6 +15,7 @@ library calls with ``test_mode=True``; the CLI has no production bypass.
 from __future__ import annotations
 
 import argparse
+import csv
 import datetime as dt
 import hashlib
 import json
@@ -629,6 +630,7 @@ def build_freeze_manifest(
         "kind": "noosphere-canonical-parameter-freeze-v1",
         "exact_revision": revision,
         "source_parameters_sha256": file_sha256(params_path),
+        "canonical_parameters_sha256": sha256(canonical_json(params)),
         "canonical_encoding": "GenesisParameterManifestV1/spec-v1-fixed-order-little-endian",
         "canonical_manifest_bytes_hex": canonical.hex(),
         "parameter_manifest_hash": manifest_hash,
@@ -671,6 +673,8 @@ def verify_mainnet_params_binding(
         raise AuthorizationError("mainnet parameter canonical bytes do not match signed freeze")
     if file_sha256(params_path) != freeze.get("source_parameters_sha256"):
         raise AuthorizationError("mainnet parameter source bytes do not match signed freeze")
+    if sha256(canonical_json(params)) != freeze.get("canonical_parameters_sha256"):
+        raise AuthorizationError("mainnet parameter semantics do not match signed freeze")
 
 
 # ---------------------------------------------------------------------------
@@ -1748,6 +1752,315 @@ def verify_dkg_transcript(
 # Final genesis rebuild/freeze and cutover authorization
 # ---------------------------------------------------------------------------
 
+GENESIS_BLOCK_DOMAIN = b"NOOS/PRODUCTION/GENESIS-BLOCK/V1"
+SMT_LEAF_DOMAIN = b"NOOS/SMT/LEAF/V1"
+SMT_NODE_DOMAIN = b"NOOS/SMT/NODE/V1"
+BECH32M_CONST = 0x2BC830A3
+BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+ALLOCATION_CATEGORIES = (
+    "COMMUNITY_TREASURY", "ECOSYSTEM_PUBLIC_GOODS", "PUBLIC_OPERATOR_BOOTSTRAP",
+    "PROTOCOL_CONTRIBUTORS", "PUBLIC_DISTRIBUTION_AND_ACCESS",
+)
+
+
+@dataclass(frozen=True)
+class CanonicalProductionGenesis:
+    final_body: dict[str, Any]
+    canonical_final_body: bytes
+    ledger_snapshot_bytes: bytes
+    genesis_block_bytes: bytes
+    allocation_root: str
+    emission_root: str
+    scheduled_issuance: int
+    genesis_issued: int
+
+
+def _bech32_polymod(values: Sequence[int]) -> int:
+    generators = (0x3B6A57B2, 0x26508E6D, 0x1EA119FA, 0x3D4233DD, 0x2A1462B3)
+    check = 1
+    for value in values:
+        top = check >> 25
+        check = ((check & 0x1FFFFFF) << 5) ^ value
+        for index, generator in enumerate(generators):
+            if (top >> index) & 1:
+                check ^= generator
+    return check
+
+
+def _bech32_hrp_expand(hrp: str) -> list[int]:
+    return [ord(char) >> 5 for char in hrp] + [0] + [ord(char) & 31 for char in hrp]
+
+
+def decode_canonical_noos_address(address: Any) -> bytes:
+    if not isinstance(address, str) or not address or address != address.lower() or len(address) > 90:
+        raise AuthorizationError("allocation address must be canonical lowercase Bech32m")
+    separator = address.rfind("1")
+    if separator != 4 or address[:separator] != "noos" or len(address) - separator - 1 < 7:
+        raise AuthorizationError("allocation address must use exact noos HRP")
+    try:
+        data = [BECH32_CHARSET.index(char) for char in address[separator + 1:]]
+    except ValueError as exc:
+        raise AuthorizationError("allocation address contains non-Bech32 character") from exc
+    if _bech32_polymod(_bech32_hrp_expand("noos") + data) != BECH32M_CONST:
+        raise AuthorizationError("allocation address checksum is not Bech32m")
+    payload5 = data[:-6]
+    accumulator = 0
+    bits = 0
+    output = bytearray()
+    for value in payload5:
+        accumulator = (accumulator << 5) | value
+        bits += 5
+        while bits >= 8:
+            bits -= 8
+            output.append((accumulator >> bits) & 0xFF)
+    if bits >= 5 or ((accumulator << (8 - bits)) & 0xFF) != 0:
+        raise AuthorizationError("allocation address has noncanonical padding")
+    if not output:
+        raise AuthorizationError("allocation address payload is empty")
+    return bytes(output)
+
+
+def _noos_object(fields: Sequence[tuple[int, bytes]]) -> bytes:
+    out = bytearray((1).to_bytes(2, "little"))
+    for tag, value in fields:
+        out += tag.to_bytes(2, "little") + value
+    return bytes(out)
+
+
+def _bounded(value: bytes, maximum: int, context: str) -> bytes:
+    if len(value) > maximum:
+        raise AuthorizationError(f"{context}: exceeds {maximum} bytes")
+    return len(value).to_bytes(4, "little") + value
+
+
+def _smt_empty_roots() -> list[bytes]:
+    roots = [domain_hash(SMT_LEAF_DOMAIN)]
+    for _ in range(256):
+        roots.append(domain_hash(SMT_NODE_DOMAIN, roots[-1], roots[-1]))
+    return roots
+
+
+def _smt_root(leaves: Mapping[bytes, bytes]) -> bytes:
+    empty = _smt_empty_roots()
+    ordered = sorted(leaves.items())
+
+    def root(entries: Sequence[tuple[bytes, bytes]], depth: int) -> bytes:
+        if not entries:
+            return empty[256 - depth]
+        if depth == 256:
+            if len(entries) != 1:
+                raise AuthorizationError("duplicate SMT key")
+            return domain_hash(SMT_LEAF_DOMAIN, entries[0][0], entries[0][1])
+        byte_index, bit_index = divmod(depth, 8)
+        split = 0
+        while split < len(entries) and not ((entries[split][0][byte_index] >> (7 - bit_index)) & 1):
+            split += 1
+        return domain_hash(SMT_NODE_DOMAIN, root(entries[:split], depth + 1), root(entries[split:], depth + 1))
+
+    if any(len(key) != 32 for key in leaves):
+        raise AuthorizationError("SMT keys must be exactly 32 bytes")
+    return root(ordered, 0)
+
+
+def _param_key(name: str) -> bytes:
+    raw = name.encode("ascii")
+    if len(raw) > 32:
+        raise AuthorizationError(f"parameter key too long: {name}")
+    return raw + bytes(32 - len(raw))
+
+
+def _param_record(current: bytes) -> bytes:
+    return _noos_object(((1, _bounded(current, 4096, "parameter value")), (2, b"\x00")))
+
+
+def _account_bytes(account_id: bytes, auth: bytes, balance_root: bytes, metadata: bytes) -> bytes:
+    return _noos_object((
+        (1, account_id), (2, _bounded(auth, 1024, "account auth descriptor")),
+        (3, (0).to_bytes(8, "little")), (4, balance_root), (5, bytes(32)),
+        (6, metadata), (7, bytes(32)),
+    ))
+
+
+def canonical_emission_table(params: Mapping[str, Any], rows: Sequence[Mapping[str, Any]]) -> tuple[bytes, str, int]:
+    emission = params["emission"]
+    terminal = _uint(emission.get("emission_terminal_height"), 64, "emission terminal")
+    if not isinstance(rows, Sequence) or not rows:
+        raise AuthorizationError("emission table must contain at least one range")
+    canonical = bytearray(b"NOOS/EMISSION/RANGE-TABLE/V1")
+    canonical += (1).to_bytes(4, "little") + terminal.to_bytes(8, "little")
+    canonical += len(rows).to_bytes(4, "little")
+    previous = 0
+    scheduled = 0
+    expected_emission = emission.get("initial_per_height_micro_noos")
+    era_length = emission.get("era_length_heights")
+    numerator = emission.get("decay_numerator")
+    denominator = emission.get("decay_denominator")
+    for index, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            raise AuthorizationError("emission range entry malformed")
+        require_exact_keys(row, {"start_height", "end_height", "emission_micro_noos"}, "emission range")
+        start = _uint(row["start_height"], 64, "emission start")
+        end = _uint(row["end_height"], 64, "emission end")
+        amount = _uint(row["emission_micro_noos"], 128, "emission amount")
+        if start != previous + 1 or end < start or end > terminal:
+            raise AuthorizationError("emission ranges must be ordered, contiguous, and within terminal height")
+        if None not in (expected_emission, era_length, numerator, denominator):
+            if amount != expected_emission:
+                raise AuthorizationError("emission table differs from signed integer curve")
+            expected_end = min(start + _uint(era_length, 64, "emission era length") - 1, terminal)
+            if end != expected_end:
+                raise AuthorizationError("emission range differs from signed era length")
+            denominator_u = _uint(denominator, 32, "emission decay denominator")
+            if denominator_u == 0:
+                raise AuthorizationError("emission decay denominator is zero")
+            expected_emission = amount * _uint(numerator, 32, "emission decay numerator") // denominator_u
+        count = end - start + 1
+        scheduled += count * amount
+        if scheduled >= 1 << 128:
+            raise AuthorizationError("scheduled issuance overflows u128")
+        canonical += start.to_bytes(8, "little") + end.to_bytes(8, "little") + amount.to_bytes(16, "little")
+        previous = end
+    if previous != terminal:
+        raise AuthorizationError("emission table does not cover the signed terminal height")
+    root = blake3(bytes(canonical)).hexdigest()
+    if root != emission.get("emission_table_root"):
+        raise AuthorizationError("computed emission table root mismatch")
+    limit = emission.get("scheduled_emission_limit_micro_noos")
+    if limit is not None and scheduled > _uint(limit, 128, "scheduled emission limit"):
+        raise AuthorizationError("scheduled issuance exceeds signed limit")
+    return bytes(canonical), root, scheduled
+
+
+def read_emission_rows(path: Path) -> list[dict[str, int]]:
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            expected = ["start_height", "end_height", "emission_micro_noos"]
+            if reader.fieldnames != expected:
+                raise AuthorizationError("emission CSV header is noncanonical")
+            rows = []
+            for row in reader:
+                if set(row) != set(expected):
+                    raise AuthorizationError("emission CSV row is noncanonical")
+                try:
+                    rows.append({key: int(row[key]) for key in expected})
+                except (TypeError, ValueError) as exc:
+                    raise AuthorizationError("emission CSV contains a non-integer") from exc
+            return rows
+    except OSError as exc:
+        raise AuthorizationError(f"emission table read failed: {exc}") from exc
+
+
+def canonical_allocation_list(params: Mapping[str, Any], allocation: Mapping[str, Any], *, test_mode: bool = False) -> tuple[bytes, str, int, list[dict[str, Any]]]:
+    require_non_fixture(allocation, "allocation list", test_mode=test_mode)
+    expected_top = {"schema_version", "list_kind", "status", "signature_status", "address_law_id", "expected_total_micro_noos", "categories", "entries", "allocations_root", "review"}
+    actual_top = set(allocation) - {"$schema", "is_test_fixture"}
+    if actual_top != expected_top:
+        raise AuthorizationError("allocation list fields do not match canonical schema")
+    if allocation.get("schema_version") != 1 or allocation.get("list_kind") != "NOOS_MAINNET_GENESIS_ALLOCATION_PROPOSAL":
+        raise AuthorizationError("allocation list version/kind mismatch")
+    if allocation.get("status") != "OWNER_APPROVED" or allocation.get("signature_status") != "SIGNED":
+        raise AuthorizationError("allocation list is not owner-approved and signed")
+    if allocation.get("address_law_id") != "noos-bech32m-v1":
+        raise AuthorizationError("allocation address law mismatch")
+    if not test_mode:
+        raise AuthorizationError(
+            "NOOS address version/type/payload layout remains OWNER_BLOCKED; production allocations cannot load"
+        )
+    review = allocation.get("review")
+    if not isinstance(review, Mapping) or review.get("owner_approved") is not True or review.get("independent_economist") in (None, "NOT_REVIEWED") or review.get("counsel") in (None, "NOT_REVIEWED"):
+        raise AuthorizationError("allocation review is incomplete")
+    categories = allocation.get("categories")
+    if not isinstance(categories, list) or len(categories) != len(ALLOCATION_CATEGORIES):
+        raise AuthorizationError("allocation categories are incomplete")
+    envelopes: dict[str, int] = {}
+    for category in categories:
+        if not isinstance(category, Mapping):
+            raise AuthorizationError("allocation category malformed")
+        require_exact_keys(category, {"category_id", "amount_micro_noos", "share_of_max_supply_bp"}, "allocation category")
+        category_id = category.get("category_id")
+        if category_id not in ALLOCATION_CATEGORIES or category_id in envelopes:
+            raise AuthorizationError("allocation category duplicate or unknown")
+        amount = _uint(category.get("amount_micro_noos"), 128, "allocation category amount")
+        basis_points = _uint(category.get("share_of_max_supply_bp"), 16, "allocation category share")
+        if amount == 0 or basis_points == 0:
+            raise AuthorizationError("allocation category amount/share must be nonzero")
+        envelopes[category_id] = amount
+    if set(envelopes) != set(ALLOCATION_CATEGORIES):
+        raise AuthorizationError("allocation category set mismatch")
+    entries = allocation.get("entries")
+    if not isinstance(entries, list) or not entries:
+        raise AuthorizationError("allocation recipient entries remain OWNER_BLOCKED")
+    canonical_entries: list[dict[str, Any]] = []
+    seen_addresses: set[str] = set()
+    seen_accounts: set[str] = set()
+    seen_ids: set[str] = set()
+    totals = {category: 0 for category in ALLOCATION_CATEGORIES}
+    terminal = params["emission"]["emission_terminal_height"]
+    for entry in entries:
+        if not isinstance(entry, Mapping):
+            raise AuthorizationError("allocation entry malformed")
+        require_exact_keys(entry, {"entry_id", "category_id", "recipient_address", "account_id_hex", "auth_descriptor_hex", "amount_micro_noos", "unlock_height", "memo"}, "allocation entry")
+        entry_id = entry.get("entry_id")
+        if not isinstance(entry_id, str) or not re.fullmatch(r"[A-Z0-9_-]{1,64}", entry_id) or entry_id in seen_ids:
+            raise AuthorizationError("allocation entry ID invalid or duplicate")
+        address = entry.get("recipient_address")
+        payload = decode_canonical_noos_address(address)
+        account_id = require_hash(entry.get("account_id_hex"), "allocation account ID")
+        try:
+            auth = bytes.fromhex(entry.get("auth_descriptor_hex", ""))
+        except (TypeError, ValueError) as exc:
+            raise AuthorizationError("allocation auth descriptor is invalid hex") from exc
+        if not auth or len(auth) > 1024:
+            raise AuthorizationError("allocation auth descriptor must contain 1..1024 bytes")
+        if address in seen_addresses or account_id in seen_accounts:
+            raise AuthorizationError("allocation address/account ID duplicate")
+        category = entry.get("category_id")
+        if category not in envelopes:
+            raise AuthorizationError("allocation entry category unknown")
+        amount = _uint(entry.get("amount_micro_noos"), 128, "allocation amount")
+        unlock = _uint(entry.get("unlock_height"), 64, "allocation unlock height")
+        memo = entry.get("memo")
+        if amount == 0 or unlock > terminal or not isinstance(memo, str) or len(memo.encode("utf-8")) > 256:
+            raise AuthorizationError("allocation amount/vesting/memo invalid")
+        if unlock != 0:
+            raise AuthorizationError("nonzero genesis vesting has no consensus runtime record: OWNER_BLOCKED")
+        totals[category] += amount
+        if totals[category] >= 1 << 128:
+            raise AuthorizationError("allocation category total overflows u128")
+        seen_ids.add(entry_id); seen_addresses.add(address); seen_accounts.add(account_id)
+        canonical_entries.append({
+            "entry_id": entry_id, "category_id": category, "recipient_address": address,
+            "address_payload_hex": payload.hex(), "account_id_hex": account_id,
+            "auth_descriptor_hex": auth.hex(), "amount_micro_noos": amount,
+            "unlock_height": unlock, "memo": memo,
+        })
+    if totals != envelopes:
+        raise AuthorizationError("allocation entries do not exactly fill category envelopes")
+    canonical_entries.sort(key=lambda entry: (entry["account_id_hex"], entry["entry_id"]))
+    canonical = bytearray((1).to_bytes(2, "little") + len(canonical_entries).to_bytes(4, "little"))
+    for entry in canonical_entries:
+        for text_key, maximum in (("entry_id", 64), ("category_id", 64), ("recipient_address", 90)):
+            canonical += _bounded(entry[text_key].encode("utf-8"), maximum, f"allocation {text_key}")
+        canonical += bytes.fromhex(entry["account_id_hex"])
+        canonical += _bounded(bytes.fromhex(entry["auth_descriptor_hex"]), 1024, "allocation auth")
+        canonical += entry["amount_micro_noos"].to_bytes(16, "little")
+        canonical += entry["unlock_height"].to_bytes(8, "little")
+        canonical += _bounded(entry["memo"].encode("utf-8"), 256, "allocation memo")
+    root = blake3(bytes(canonical)).hexdigest()
+    if root != allocation.get("allocations_root") or root != params.get("allocations", {}).get("allocations_root"):
+        raise AuthorizationError("computed allocation root mismatch")
+    total = sum(totals.values())
+    if total != _uint(allocation.get("expected_total_micro_noos"), 128, "allocation expected total"):
+        raise AuthorizationError("allocation expected total mismatch")
+    configured_total = params.get("allocations", {}).get("expected_total_micro_noos")
+    if configured_total is not None and total != _uint(configured_total, 128, "signed allocation total"):
+        raise AuthorizationError("allocation total differs from signed parameters")
+    ceiling = params["emission"].get("genesis_allocation_limit_micro_noos")
+    if ceiling is None or total > _uint(ceiling, 128, "genesis allocation limit"):
+        raise AuthorizationError("allocation total exceeds or lacks signed ceiling")
+    return bytes(canonical), root, total, canonical_entries
+
 FINAL_BODY_KEYS = {
     "version", "parameter_manifest_hash", "genesis_time_ms", "dkg_suite_id",
     "dkg_group_pubkey_hex", "dkg_participant_set_root", "dkg_holder_set_root", "dkg_root",
@@ -1791,11 +2104,199 @@ def canonical_final_genesis_body(body: Mapping[str, Any], freeze: Mapping[str, A
     return bytes(out)
 
 
+def build_canonical_production_genesis(
+    params: Mapping[str, Any], freeze: Mapping[str, Any], dkg: Mapping[str, Any],
+    allocation: Mapping[str, Any], emission_rows: Sequence[Mapping[str, Any]],
+    genesis_time_ms: int, *, expected_body: Mapping[str, Any] | None = None,
+    test_mode: bool = False,
+) -> CanonicalProductionGenesis:
+    """Construct the sole canonical production ledger/body path.
+
+    Every externally supplied root is treated as a comparison target.  The
+    returned roots and bytes are derived from validated allocation, emission,
+    parameter and DKG inputs; no caller-provided state root is incorporated.
+    """
+    manifest = canonical_mainnet_manifest(params, test_mode=test_mode)
+    if manifest.hex() != freeze.get("canonical_manifest_bytes_hex"):
+        raise AuthorizationError("canonical builder parameters do not match signed freeze")
+    if domain_hash(b"NOOS/GENESIS/PARAMS/V1", manifest).hex() != freeze.get("parameter_manifest_hash"):
+        raise AuthorizationError("canonical builder manifest hash mismatch")
+    if params.get("authorization", {}).get("exact_revision") != freeze.get("exact_revision"):
+        raise AuthorizationError("canonical builder exact revision mismatch")
+    if sha256(canonical_json(params)) != freeze.get("canonical_parameters_sha256"):
+        raise AuthorizationError("canonical builder parameters do not match signed freeze source")
+    genesis_time = _uint(genesis_time_ms, 64, "genesis time")
+    emission_blob, emission_root, scheduled = canonical_emission_table(params, emission_rows)
+    allocation_blob, allocation_root, genesis_issued, entries = canonical_allocation_list(
+        params, allocation, test_mode=test_mode,
+    )
+    maximum = _uint(params["emission"]["max_supply_micro_noos"], 128, "maximum supply")
+    if genesis_issued + scheduled > maximum:
+        raise AuthorizationError("genesis allocation plus maximum scheduled issuance exceeds max supply")
+
+    genesis_accounts = params.get("genesis_accounts")
+    required_roles = ("governance", "emergency", "ground_recipient", "witness_recipient", "treasury_recipient")
+    if not isinstance(genesis_accounts, Mapping) or set(genesis_accounts) != set(required_roles):
+        raise AuthorizationError("signed genesis system accounts are missing: OWNER_BLOCKED")
+    accounts: dict[bytes, tuple[bytes, int]] = {}
+    for entry in entries:
+        account_id = bytes.fromhex(entry["account_id_hex"])
+        accounts[account_id] = (bytes.fromhex(entry["auth_descriptor_hex"]), entry["amount_micro_noos"])
+    system_ids: dict[str, bytes] = {}
+    for role in required_roles:
+        record = genesis_accounts[role]
+        if not isinstance(record, Mapping) or set(record) != {"account_id_hex", "auth_descriptor_hex"}:
+            raise AuthorizationError(f"genesis system account {role} malformed")
+        account_id = _hex32(record["account_id_hex"], f"genesis account {role}")
+        try:
+            auth = bytes.fromhex(record["auth_descriptor_hex"])
+        except (TypeError, ValueError) as exc:
+            raise AuthorizationError(f"genesis account {role} auth invalid") from exc
+        if len(auth) > 1024:
+            raise AuthorizationError(f"genesis account {role} auth too long")
+        if account_id in system_ids.values():
+            raise AuthorizationError("genesis system account IDs must be unique")
+        if account_id in accounts and accounts[account_id][0] != auth:
+            raise AuthorizationError("genesis allocation/system auth descriptor mismatch")
+        prior = accounts.get(account_id, (auth, 0))[1]
+        accounts[account_id] = (auth, prior)
+        system_ids[role] = account_id
+
+    balance_roots: dict[bytes, bytes] = {}
+    account_leaves: dict[bytes, bytes] = {}
+    for account_id, (auth, amount) in sorted(accounts.items()):
+        balance_leaves = {bytes(32): amount.to_bytes(16, "little")} if amount else {}
+        balance_root = _smt_root(balance_leaves)
+        balance_roots[account_id] = balance_root
+        account_leaves[account_id] = _account_bytes(account_id, auth, balance_root, bytes(32))
+
+    fees = params.get("fees")
+    if not isinstance(fees, Mapping):
+        raise AuthorizationError("signed fee parameters are missing")
+    initial_prices = fees.get("initial_prices_micro_noos")
+    if not isinstance(initial_prices, list) or len(initial_prices) != 5:
+        raise AuthorizationError("signed initial fee prices must contain five entries")
+    fee_params = _noos_object((
+        (1, _le(fees.get("min_price_micro_noos_per_unit"), 16, "fee min price")),
+        (2, _le(fees.get("max_price_micro_noos_per_unit"), 16, "fee max price")),
+        (3, _le(fees.get("max_change_ppm_per_block"), 4, "fee max change")),
+        (4, _le(fees.get("capacity_b_canonical_bytes"), 8, "fee capacity B")),
+        (5, _le(fees.get("capacity_g_grain_steps"), 8, "fee capacity G")),
+        (6, _le(fees.get("capacity_v_proof_units"), 8, "fee capacity V")),
+        (7, _le(fees.get("capacity_r_state_word_epochs"), 8, "fee capacity R")),
+        (8, _le(fees.get("capacity_d_blob_bytes"), 8, "fee capacity D")),
+        (9, _le(fees.get("failure_fee_micro_noos"), 16, "failure fee")),
+        (10, _le(fees.get("parameter_activation_delay_heights"), 8, "parameter activation delay")),
+    ))
+    fee_state = _noos_object(tuple(
+        (index + 1, _le(value, 16, f"initial fee price {index}"))
+        for index, value in enumerate(initial_prices)
+    ))
+    emission = params["emission"]
+    issuance = _noos_object((
+        (1, _le(maximum, 16, "maximum supply")),
+        (2, _le(emission.get("initial_per_height_micro_noos"), 16, "initial emission")),
+        (3, _le(emission.get("era_length_heights"), 8, "emission era length")),
+        (4, _le(emission.get("decay_numerator"), 4, "emission decay numerator")),
+        (5, _le(emission.get("decay_denominator"), 4, "emission decay denominator")),
+        (6, _le(emission.get("emission_terminal_height"), 8, "emission terminal")),
+    ))
+    shares = _noos_object((
+        (1, _le(emission.get("recipient_share_ground_bp") * 100, 4, "ground emission share ppm")),
+        (2, _le(emission.get("recipient_share_witness_bp") * 100, 4, "witness emission share ppm")),
+        (3, _le(emission.get("recipient_share_treasury_bp") * 100, 4, "treasury emission share ppm")),
+    ))
+    witness_root = _hex32(dkg.get("participant_set_root"), "DKG participant set root")
+    group_key_hex = dkg.get("group_public_key_g1_hex")
+    try:
+        group_key = bytes.fromhex(group_key_hex)
+    except (TypeError, ValueError) as exc:
+        raise AuthorizationError("DKG group key invalid") from exc
+    if not group_key or len(group_key) > 192:
+        raise AuthorizationError("DKG group key length invalid")
+
+    params_leaves: dict[bytes, bytes] = {
+        _param_key("noos.params.gov-auth.v1"): _param_record(system_ids["governance"]),
+        _param_key("noos.params.emrg-auth.v1"): _param_record(system_ids["emergency"]),
+        _param_key("noos.params.fees.v1"): _param_record(fee_params),
+        _param_key("noos.params.feestate.v1"): _param_record(fee_state),
+        _param_key("noos.params.issuance.v1"): _param_record(issuance),
+        _param_key("noos.params.shares.v1"): _param_record(shares),
+        _param_key("noos.genesis.alloc-root.v1"): _param_record(bytes.fromhex(allocation_root)),
+        _param_key("noos.genesis.emit-root.v1"): _param_record(bytes.fromhex(emission_root)),
+        _param_key("noos.genesis.dkg-key.v1"): _param_record(group_key),
+        _param_key("noos.genesis.witness.v1"): _param_record(witness_root),
+    }
+    for name, value in ZERO_CONTROLS.items():
+        enabled = bool(value)
+        control = _noos_object(((1, bytes([int(enabled)])),))
+        short = {
+            "work_loom_credit_enabled": "work_loom_credit",
+            "work_loom_weight_cap": "work_loom_weightcap",
+            "witness_proofpower_bonus_enabled": "witness_proofpower",
+            "neural_lane_enabled": "neural_lane", "reflex_lane_enabled": "reflex_lane",
+            "umbra_suite_enabled": "umbra_suite", "dream_lane_enabled": "dream_lane",
+            "class_gate_irreversible_budget": "class_gate_budget",
+        }[name]
+        params_leaves[_param_key(f"noos.control.{short}")] = _param_record(control)
+
+    empty_root = _smt_root({}).hex()
+    roots = {
+        "notes_root": empty_root,
+        "nullifiers_root": empty_root,
+        "accounts_root": _smt_root(account_leaves).hex(),
+        "objects_root": empty_root,
+        "receipts_root": empty_root,
+        "params_root": _smt_root(params_leaves).hex(),
+    }
+    final_body = {
+        "version": 1,
+        "parameter_manifest_hash": freeze["parameter_manifest_hash"],
+        "genesis_time_ms": genesis_time,
+        "dkg_suite_id": 1,
+        "dkg_group_pubkey_hex": group_key.hex(),
+        "dkg_participant_set_root": witness_root.hex(),
+        "genesis_witness_set_root": witness_root.hex(),
+        "genesis_state_roots": roots,
+        "is_test_fixture": bool(test_mode),
+    }
+    canonical_body = canonical_final_genesis_body(final_body, freeze, dkg, test_mode=test_mode)
+    if expected_body is not None and canonical_json(expected_body) != canonical_json(final_body):
+        raise AuthorizationError("supplied final body/root target does not match canonical builder output")
+
+    ledger = bytearray((1).to_bytes(2, "little"))
+    ledger += len(account_leaves).to_bytes(4, "little")
+    for account_id, value in sorted(account_leaves.items()):
+        ledger += account_id + _bounded(value, 4096, "canonical account")
+        ledger += balance_roots[account_id]
+    ledger += len(params_leaves).to_bytes(4, "little")
+    for key, value in sorted(params_leaves.items()):
+        ledger += key + _bounded(value, 8192, "canonical parameter record")
+    ledger += genesis_issued.to_bytes(16, "little") + (0).to_bytes(16, "little")
+    ledger += allocation_blob + emission_blob
+    block = bytearray(GENESIS_BLOCK_DOMAIN)
+    block += bytes.fromhex(freeze["chain_id"]) + canonical_body + bytes(40)
+    block += bytes.fromhex(dkg["dkg_root"]) + witness_root + _bounded(bytes(ledger), 1 << 24, "genesis ledger snapshot")
+    return CanonicalProductionGenesis(
+        final_body=final_body,
+        canonical_final_body=canonical_body,
+        ledger_snapshot_bytes=bytes(ledger),
+        genesis_block_bytes=bytes(block),
+        allocation_root=allocation_root,
+        emission_root=emission_root,
+        scheduled_issuance=scheduled,
+        genesis_issued=genesis_issued,
+    )
+
+
 def derive_final_identity(
     freeze: Mapping[str, Any], anchor_summary: Mapping[str, Any], dkg_summary: Mapping[str, Any],
-    body: Mapping[str, Any], *, test_mode: bool = False,
+    built: CanonicalProductionGenesis, *, test_mode: bool = False,
 ) -> dict[str, Any]:
-    canonical = canonical_final_genesis_body(body, freeze, dkg_summary, test_mode=test_mode)
+    if not isinstance(built, CanonicalProductionGenesis):
+        raise AuthorizationError("final identity requires canonical builder output")
+    body = built.final_body
+    canonical = built.canonical_final_body
     if not test_mode:
         genesis_time = dt.datetime.fromtimestamp(body["genesis_time_ms"] / 1000, dt.timezone.utc)
         anchor_observed = parse_utc(anchor_summary.get("observed_at_utc"), "anchor observed_at_utc")
@@ -1811,6 +2312,12 @@ def derive_final_identity(
         "genesis_hash": genesis_hash,
         "canonical_final_body_bytes_hex": canonical.hex(),
         "bitcoin_anchor_bytes_hex": anchor.hex(),
+        "ledger_snapshot_sha256": sha256(built.ledger_snapshot_bytes),
+        "genesis_block_sha256": sha256(built.genesis_block_bytes),
+        "allocation_root": built.allocation_root,
+        "emission_root": built.emission_root,
+        "genesis_issued": built.genesis_issued,
+        "scheduled_issuance": built.scheduled_issuance,
     }
 
 
@@ -1827,11 +2334,16 @@ def make_rebuild_record(
         "participant_id": participant_id,
         "chain_id": identity["chain_id"],
         "genesis_hash": identity["genesis_hash"],
+        "canonical_final_body_bytes_sha256": sha256(bytes.fromhex(identity["canonical_final_body_bytes_hex"])),
+        "ledger_snapshot_sha256": identity["ledger_snapshot_sha256"],
+        "genesis_block_sha256": identity["genesis_block_sha256"],
+        "allocation_root": identity["allocation_root"],
+        "emission_root": identity["emission_root"],
         "freeze_file_sha256": file_sha256(freeze_file),
         "anchor_file_sha256": file_sha256(anchor_file),
         "dkg_transcript_file_sha256": file_sha256(transcript_file),
         "final_body_file_sha256": file_sha256(body_file),
-        "rebuild_method": "independent deterministic re-encoding and domain-hash derivation",
+        "rebuild_method": "canonical production ledger and genesis-block construction from signed frozen inputs",
         "assurance_limit": "The signature records a role-authorized rebuild; tooling does not establish that the participant is an independent human.",
         "is_test_fixture": False,
     }
@@ -1841,8 +2353,17 @@ def verify_rebuild_record(
     record: Mapping[str, Any], signatures: Mapping[str, Any], identity: Mapping[str, Any],
     keyring: Mapping[str, RoleKey], exact_revision: str,
 ) -> None:
-    if record.get("chain_id") != identity.get("chain_id") or record.get("genesis_hash") != identity.get("genesis_hash"):
-        raise AuthorizationError("independent rebuild record identity mismatch")
+    expected = {
+        "chain_id": identity.get("chain_id"), "genesis_hash": identity.get("genesis_hash"),
+        "canonical_final_body_bytes_sha256": sha256(bytes.fromhex(identity["canonical_final_body_bytes_hex"])),
+        "ledger_snapshot_sha256": identity.get("ledger_snapshot_sha256"),
+        "genesis_block_sha256": identity.get("genesis_block_sha256"),
+        "allocation_root": identity.get("allocation_root"), "emission_root": identity.get("emission_root"),
+        "exact_revision": exact_revision,
+    }
+    for key, value in expected.items():
+        if record.get(key) != value:
+            raise AuthorizationError(f"independent rebuild record identity mismatch: {key}")
     verify_detached_signatures(
         canonical_json(record), signatures, DOMAIN_REBUILD, exact_revision,
         ("independent-genesis-rebuilder",), keyring,
@@ -1866,6 +2387,11 @@ def make_final_freeze_bundle(
         "dkg_root": transcript.get("dkg_root"),
         "dkg_holder_set_root": transcript.get("holder_set_root"),
         "role_keyring_sha256": file_sha256(role_keyring_file),
+        "canonical_final_body_bytes_sha256": sha256(bytes.fromhex(identity["canonical_final_body_bytes_hex"])),
+        "ledger_snapshot_sha256": identity["ledger_snapshot_sha256"],
+        "genesis_block_sha256": identity["genesis_block_sha256"],
+        "allocation_root": identity["allocation_root"],
+        "emission_root": identity["emission_root"],
         "parameter_freeze_file_sha256": file_sha256(freeze_file),
         "parameter_freeze_signatures_sha256": file_sha256(freeze_signatures_file),
         "quiet_week_publication_file_sha256": file_sha256(publication_file),
@@ -1971,6 +2497,14 @@ def _load_keys_for_revision(keyring_path: Path, revision: str) -> dict[str, Role
     if doc["exact_revision"] != revision:
         raise AuthorizationError("keyring revision mismatch")
     return keys
+
+
+def _bound_input_path(params: Mapping[str, Any], section: str, key: str) -> Path:
+    value = params.get(section, {}).get(key)
+    if not isinstance(value, str) or not value:
+        raise AuthorizationError(f"signed parameters do not bind {section}.{key}")
+    path = Path(value)
+    return path if path.is_absolute() else ROOT / path
 
 
 def command_freeze(args: argparse.Namespace) -> None:
@@ -2240,7 +2774,13 @@ def command_rebuild(args: argparse.Namespace) -> None:
         raise AuthorizationError("signed DKG descriptor does not match owner parameter participant/threshold choices")
     body = read_json(Path(args.final_body))
     verify_dkg_publication_sequence(transcript, publication, genesis_time_ms=body.get("genesis_time_ms"))
-    identity = derive_final_identity(freeze, anchor, dkg, body)
+    allocation = read_json(_bound_input_path(params, "allocations", "allocation_list_path"))
+    emission_rows = read_emission_rows(_bound_input_path(params, "emission", "emission_table_path"))
+    built = build_canonical_production_genesis(
+        params, freeze, dkg, allocation, emission_rows, body.get("genesis_time_ms"),
+        expected_body=body,
+    )
+    identity = derive_final_identity(freeze, anchor, dkg, built)
     role = keyring.get("independent-genesis-rebuilder")
     if role is None:
         raise AuthorizationError("independent-genesis-rebuilder role absent from keyring")
@@ -2284,7 +2824,13 @@ def command_freeze_final(args: argparse.Namespace) -> None:
         raise AuthorizationError("signed DKG descriptor does not match owner parameter participant/threshold choices")
     body_path = Path(args.final_body); body = read_json(body_path)
     verify_dkg_publication_sequence(transcript, publication, genesis_time_ms=body.get("genesis_time_ms"))
-    identity = derive_final_identity(freeze, anchor, dkg, body)
+    allocation = read_json(_bound_input_path(params, "allocations", "allocation_list_path"))
+    emission_rows = read_emission_rows(_bound_input_path(params, "emission", "emission_table_path"))
+    built = build_canonical_production_genesis(
+        params, freeze, dkg, allocation, emission_rows, body.get("genesis_time_ms"),
+        expected_body=body,
+    )
+    identity = derive_final_identity(freeze, anchor, dkg, built)
     rebuild_path = Path(args.rebuild_record); rebuild = read_json(rebuild_path)
     verify_rebuild_record(
         rebuild, read_json(Path(args.rebuild_signatures)), identity, keyring, revision

@@ -12,6 +12,7 @@ name = "noosd"
 path = "src/bin/noosd.rs"
 
 [dependencies]
+blake3 = "1"
 getrandom = "0.2"
 noos-braid = { path = "../noos-braid" }
 noos-contracts = { path = "../noos-contracts" }

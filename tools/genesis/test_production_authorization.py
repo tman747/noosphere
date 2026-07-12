@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from blake3 import blake3
 HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
@@ -17,6 +18,42 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 
 REVISION = "1" * 40
+
+
+def bech32m(payload: bytes) -> str:
+    values = []
+    accumulator = 0
+    bits = 0
+    for byte in payload:
+        accumulator = (accumulator << 8) | byte
+        bits += 8
+        while bits >= 5:
+            bits -= 5
+            values.append((accumulator >> bits) & 31)
+    if bits:
+        values.append((accumulator << (5 - bits)) & 31)
+    polymod_input = pa._bech32_hrp_expand("noos") + values + [0] * 6
+    check = pa._bech32_polymod(polymod_input) ^ pa.BECH32M_CONST
+    checksum = [(check >> (5 * (5 - index))) & 31 for index in range(6)]
+    return "noos1" + "".join(pa.BECH32_CHARSET[value] for value in values + checksum)
+
+
+def allocation_root(entries):
+    ordered = sorted(entries, key=lambda entry: (entry["account_id_hex"], entry["entry_id"]))
+    out = bytearray((1).to_bytes(2, "little") + len(ordered).to_bytes(4, "little"))
+    for entry in ordered:
+        for key, maximum in (("entry_id", 64), ("category_id", 64), ("recipient_address", 90)):
+            raw = entry[key].encode()
+            assert len(raw) <= maximum
+            out += len(raw).to_bytes(4, "little") + raw
+        out += bytes.fromhex(entry["account_id_hex"])
+        auth = bytes.fromhex(entry["auth_descriptor_hex"])
+        out += len(auth).to_bytes(4, "little") + auth
+        out += entry["amount_micro_noos"].to_bytes(16, "little")
+        out += entry["unlock_height"].to_bytes(8, "little")
+        memo = entry["memo"].encode()
+        out += len(memo).to_bytes(4, "little") + memo
+    return blake3(bytes(out)).hexdigest()
 
 
 class AuthorizationFixtures:
@@ -50,15 +87,46 @@ class AuthorizationFixtures:
             "controls": dict(pa.ZERO_CONTROLS),
             "emission": {
                 "max_supply_micro_noos": 1_000_000,
-                "emission_terminal_height": 10_000,
-                "emission_table_root": "2" * 64,
+                "genesis_allocation_limit_micro_noos": 100,
+                "scheduled_emission_limit_micro_noos": 500,
+                "initial_per_height_micro_noos": 50,
+                "era_length_heights": 10,
+                "decay_numerator": 1,
+                "decay_denominator": 2,
+                "emission_terminal_height": 10,
+                "emission_table_path": "test-emission.csv",
+                "emission_table_root": "0" * 64,
                 "recipient_share_ground_bp": 5000,
                 "recipient_share_witness_bp": 3000,
                 "recipient_share_treasury_bp": 2000,
                 "rounding_rule_id": 1,
                 "fee_disposition_id": 1,
             },
-            "allocations": {"allocations_root": "3" * 64},
+            "fees": {
+                "min_price_micro_noos_per_unit": 1,
+                "max_price_micro_noos_per_unit": 1_000_000,
+                "initial_prices_micro_noos": [1, 1, 10, 2, 1],
+                "max_change_ppm_per_block": 125_000,
+                "capacity_b_canonical_bytes": 1_048_576,
+                "capacity_g_grain_steps": 100_000_000,
+                "capacity_v_proof_units": 100_000,
+                "capacity_r_state_word_epochs": 1_000_000,
+                "capacity_d_blob_bytes": 4_194_304,
+                "failure_fee_micro_noos": 1_000,
+                "parameter_activation_delay_heights": 16,
+            },
+            "allocations": {
+                "allocations_root": "0" * 64,
+                "allocation_list_path": "test-allocations.json",
+                "expected_total_micro_noos": 100,
+            },
+            "genesis_accounts": {
+                role: {"account_id_hex": f"{value:02x}" * 32, "auth_descriptor_hex": f"{value:02x}"}
+                for role, value in zip(
+                    ("governance", "emergency", "ground_recipient", "witness_recipient", "treasury_recipient"),
+                    range(0xA1, 0xA6),
+                )
+            },
             "commitments": {
                 "claim_registry_root": "4" * 64,
                 "conformance_vector_root": "5" * 64,
@@ -72,6 +140,36 @@ class AuthorizationFixtures:
             },
             "signatures": {"record_path": "owner/freeze.signatures.json", "required_roles": list(pa.FREEZE_ROLES)},
         }
+        self.emission_rows = [{"start_height": 1, "end_height": 10, "emission_micro_noos": 50}]
+        emission_blob = (
+            b"NOOS/EMISSION/RANGE-TABLE/V1" + (1).to_bytes(4, "little")
+            + (10).to_bytes(8, "little") + (1).to_bytes(4, "little")
+            + (1).to_bytes(8, "little") + (10).to_bytes(8, "little") + (50).to_bytes(16, "little")
+        )
+        self.params["emission"]["emission_table_root"] = blake3(emission_blob).hexdigest()
+        categories = [
+            {"category_id": category, "amount_micro_noos": 20, "share_of_max_supply_bp": 20}
+            for category in pa.ALLOCATION_CATEGORIES
+        ]
+        entries = []
+        for index, category in enumerate(pa.ALLOCATION_CATEGORIES, 1):
+            entries.append({
+                "entry_id": f"ENTRY_{index}", "category_id": category,
+                "recipient_address": bech32m(bytes([index, 0x55])),
+                "account_id_hex": f"{index:02x}" * 32,
+                "auth_descriptor_hex": f"{index:02x}", "amount_micro_noos": 20,
+                "unlock_height": 0, "memo": "test fixture",
+            })
+        root = allocation_root(entries)
+        self.params["allocations"]["allocations_root"] = root
+        self.allocation = {
+            "schema_version": 1, "list_kind": "NOOS_MAINNET_GENESIS_ALLOCATION_PROPOSAL",
+            "status": "OWNER_APPROVED", "signature_status": "SIGNED",
+            "address_law_id": "noos-bech32m-v1", "expected_total_micro_noos": 100,
+            "categories": categories, "entries": entries, "allocations_root": root,
+            "review": {"owner_approved": True, "independent_economist": "APPROVED", "counsel": "APPROVED"},
+            "is_test_fixture": True,
+        }
         canonical = pa.canonical_mainnet_manifest(self.params, test_mode=True)
         manifest_hash = pa.domain_hash(b"NOOS/GENESIS/PARAMS/V1", canonical).hex()
         self.freeze = {
@@ -81,6 +179,7 @@ class AuthorizationFixtures:
             "canonical_manifest_bytes_hex": canonical.hex(),
             "parameter_manifest_hash": manifest_hash,
             "chain_id": pa.domain_hash(b"NOOS/CHAIN/V1", bytes.fromhex(manifest_hash)).hex(),
+            "canonical_parameters_sha256": pa.sha256(pa.canonical_json(self.params)),
             "is_test_fixture": True,
         }
         self.freeze_signatures = self.sign(self.freeze, pa.DOMAIN_FREEZE, pa.FREEZE_ROLES)
@@ -260,6 +359,12 @@ class ParameterAndSignatureTests(AuthorizationFixtures, unittest.TestCase):
         devnet_bond["witness_ring"]["min_bond_micro_noos"] = 1_000_000_000_000
         with self.assertRaisesRegex(pa.AuthorizationError, "devnet bond fixture"):
             pa.canonical_mainnet_manifest(devnet_bond)
+
+    def test_unresolved_address_layout_keeps_production_builder_owner_blocked(self):
+        allocation = copy.deepcopy(self.allocation)
+        allocation.pop("is_test_fixture")
+        with self.assertRaisesRegex(pa.AuthorizationError, "address version/type/payload layout remains OWNER_BLOCKED"):
+            pa.canonical_allocation_list(self.params, allocation)
 
     def test_stale_revision_missing_role_invalid_signature_and_hash_mismatch(self):
         stale = copy.deepcopy(self.freeze_signatures); stale["exact_revision"] = "2" * 40
@@ -709,37 +814,90 @@ class CutoverTests(AuthorizationFixtures, unittest.TestCase):
 
 
 class FinalGenesisTests(AuthorizationFixtures, unittest.TestCase):
-    def test_final_genesis_rebuild_is_deterministic_and_binds_every_root(self):
+    def test_final_genesis_rebuild_is_deterministic_and_rejects_supplied_roots(self):
         material = self.dkg_material()
         transcript = self.finalized_dkg(material)
         dkg = pa.verify_dkg_transcript(transcript, self.keyring, self.freeze, test_mode=True)
         anchor = {"height": 900_000, "block_hash_internal_hex": "8" * 64}
-        body = {
-            "version": 2,
-            "parameter_manifest_hash": self.freeze["parameter_manifest_hash"],
-            "genesis_time_ms": 1_900_000_000_000,
-            "dkg_suite_id": 1,
-            "dkg_group_pubkey_hex": dkg["group_public_key_g1_hex"],
-            "dkg_participant_set_root": dkg["participant_set_root"],
-            "dkg_holder_set_root": dkg["holder_set_root"],
-            "dkg_root": dkg["dkg_root"],
-            "genesis_witness_set_root": "9" * 64,
-            "genesis_state_roots": {
-                "notes_root": "a" * 64,
-                "nullifiers_root": "b" * 64,
-                "accounts_root": "c" * 64,
-                "objects_root": "d" * 64,
-                "receipts_root": "e" * 64,
-                "params_root": "f" * 64,
-            },
-            "is_test_fixture": True,
-        }
-        first = pa.derive_final_identity(self.freeze, anchor, dkg, body, test_mode=True)
-        second = pa.derive_final_identity(self.freeze, anchor, dkg, body, test_mode=True)
+        first_build = pa.build_canonical_production_genesis(
+            self.params, self.freeze, dkg, self.allocation, self.emission_rows,
+            1_900_000_000_000, test_mode=True,
+        )
+        second_build = pa.build_canonical_production_genesis(
+            self.params, self.freeze, dkg, self.allocation, self.emission_rows,
+            1_900_000_000_000, expected_body=first_build.final_body, test_mode=True,
+        )
+        self.assertEqual(first_build.ledger_snapshot_bytes, second_build.ledger_snapshot_bytes)
+        self.assertEqual(first_build.genesis_block_bytes, second_build.genesis_block_bytes)
+        first = pa.derive_final_identity(self.freeze, anchor, dkg, first_build, test_mode=True)
+        second = pa.derive_final_identity(self.freeze, anchor, dkg, second_build, test_mode=True)
         self.assertEqual(first, second)
-        mutated = copy.deepcopy(body); mutated["genesis_state_roots"]["accounts_root"] = "0" * 64
-        changed = pa.derive_final_identity(self.freeze, anchor, dkg, mutated, test_mode=True)
-        self.assertNotEqual(first["genesis_hash"], changed["genesis_hash"])
+
+        supplied = copy.deepcopy(first_build.final_body)
+        supplied["genesis_state_roots"]["accounts_root"] = "0" * 64
+        with self.assertRaisesRegex(pa.AuthorizationError, "supplied final body/root target"):
+            pa.build_canonical_production_genesis(
+                self.params, self.freeze, dkg, self.allocation, self.emission_rows,
+                1_900_000_000_000, expected_body=supplied, test_mode=True,
+            )
+        with self.assertRaisesRegex(pa.AuthorizationError, "canonical builder output"):
+            pa.derive_final_identity(self.freeze, anchor, dkg, supplied, test_mode=True)
+
+    def test_mutated_allocation_emission_dkg_and_params_are_rejected(self):
+        transcript = pa.finalize_dkg_transcript(*self.dkg_material(), self.keyring, self.freeze, test_mode=True)
+        dkg = pa.verify_dkg_transcript(transcript, self.keyring, self.freeze, test_mode=True)
+        baseline = pa.build_canonical_production_genesis(
+            self.params, self.freeze, dkg, self.allocation, self.emission_rows,
+            1_900_000_000_000, test_mode=True,
+        )
+
+        allocation = copy.deepcopy(self.allocation)
+        allocation["entries"][0]["amount_micro_noos"] += 1
+        with self.assertRaises(pa.AuthorizationError):
+            pa.build_canonical_production_genesis(
+                self.params, self.freeze, dkg, allocation, self.emission_rows,
+                1_900_000_000_000, expected_body=baseline.final_body, test_mode=True,
+            )
+        rows = copy.deepcopy(self.emission_rows); rows[0]["emission_micro_noos"] += 1
+        with self.assertRaises(pa.AuthorizationError):
+            pa.build_canonical_production_genesis(
+                self.params, self.freeze, dkg, self.allocation, rows,
+                1_900_000_000_000, expected_body=baseline.final_body, test_mode=True,
+            )
+        changed_dkg = copy.deepcopy(dkg); changed_dkg["participant_set_root"] = "0" * 64
+        with self.assertRaises(pa.AuthorizationError):
+            pa.build_canonical_production_genesis(
+                self.params, self.freeze, changed_dkg, self.allocation, self.emission_rows,
+                1_900_000_000_000, expected_body=baseline.final_body, test_mode=True,
+            )
+        params = copy.deepcopy(self.params); params["fees"]["failure_fee_micro_noos"] += 1
+        with self.assertRaisesRegex(pa.AuthorizationError, "signed freeze"):
+            pa.build_canonical_production_genesis(
+                params, self.freeze, dkg, self.allocation, self.emission_rows,
+                1_900_000_000_000, expected_body=baseline.final_body, test_mode=True,
+            )
+
+    def test_duplicate_allocation_and_supply_overflow_reject(self):
+        duplicate = copy.deepcopy(self.allocation)
+        duplicate["entries"][1]["recipient_address"] = duplicate["entries"][0]["recipient_address"]
+        with self.assertRaisesRegex(pa.AuthorizationError, "duplicate"):
+            pa.canonical_allocation_list(self.params, duplicate, test_mode=True)
+
+        params = copy.deepcopy(self.params)
+        params["emission"]["max_supply_micro_noos"] = 599
+        canonical = pa.canonical_mainnet_manifest(params, test_mode=True)
+        freeze = copy.deepcopy(self.freeze)
+        freeze["canonical_manifest_bytes_hex"] = canonical.hex()
+        freeze["parameter_manifest_hash"] = pa.domain_hash(b"NOOS/GENESIS/PARAMS/V1", canonical).hex()
+        freeze["chain_id"] = pa.domain_hash(b"NOOS/CHAIN/V1", bytes.fromhex(freeze["parameter_manifest_hash"])).hex()
+        freeze["canonical_parameters_sha256"] = pa.sha256(pa.canonical_json(params))
+        transcript = pa.finalize_dkg_transcript(*self.dkg_material(), self.keyring, self.freeze, test_mode=True)
+        dkg = pa.verify_dkg_transcript(transcript, self.keyring, self.freeze, test_mode=True)
+        with self.assertRaisesRegex(pa.AuthorizationError, "exceeds max supply"):
+            pa.build_canonical_production_genesis(
+                params, freeze, dkg, self.allocation, self.emission_rows,
+                1_900_000_000_000, test_mode=True,
+            )
 
 
 if __name__ == "__main__":

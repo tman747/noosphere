@@ -3399,6 +3399,7 @@ dependencies = [
 name = "noos-node"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "getrandom 0.2.17",
  "noos-braid",
  "noos-codec",
