@@ -45,14 +45,30 @@ def post(base: str, envelope: dict, retry_seconds: float = 120) -> dict:
             raise RuntimeError(f"submission HTTP {exc.code}: {detail}") from exc
 
 def tx_record(base: str, txid: str) -> dict | None:
+    root = base.rstrip("/")
     try:
-        with urllib.request.urlopen(base.rstrip("/") + f"/api/v1/transactions/{txid}", timeout=5) as response:
+        with urllib.request.urlopen(root + f"/api/v1/transactions/{txid}", timeout=5) as response:
             value = json.load(response)
         return value if isinstance(value, dict) else None
+    except urllib.error.HTTPError as exc:
+        if exc.code != 404:
+            raise
+    try:
+        with urllib.request.urlopen(root + f"/api/v1/receipts/{txid}", timeout=5) as response:
+            receipt = json.load(response)
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
             return None
         raise
+    state = receipt.get("state") if isinstance(receipt, dict) else None
+    if not isinstance(state, dict) or "status_code" not in state:
+        return None
+    return {
+        "txid": txid,
+        "state": "INCLUDED" if int(state["status_code"]) == 0 else "REJECTED",
+        "inclusion": {"height": int(state["settled_height"])},
+        "receipt": receipt.get("receipt"),
+    }
 
 
 def percentile(values: list[float], q: float) -> float:

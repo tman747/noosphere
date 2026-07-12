@@ -96,6 +96,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "platform-evidence/${{ matrix.platform }}/wallet"
+          suffix=""
+          if [[ "${{ runner.os }}" == "Windows" ]]; then suffix=".exe"; fi
+          mkdir -p "platform-evidence/${{ matrix.platform }}/bin"
+          for name in noosd noos-indexer noos-cli; do
+            cp "target/release/${name}${suffix}" "platform-evidence/${{ matrix.platform }}/bin/"
+          done
           if [[ -d wallet/app/src-tauri/target/release/bundle ]]; then
             cp -R wallet/app/src-tauri/target/release/bundle/. "platform-evidence/${{ matrix.platform }}/wallet/"
           fi
