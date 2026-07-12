@@ -24,6 +24,7 @@ pub enum RefreshError {
     NoiseOverflow,
     MissingProof,
     ProofForged,
+    PlaintextMismatch,
     CommitMismatch,
     EpochNotMonotone,
     RightsMismatch,
@@ -517,6 +518,35 @@ impl RefreshVerifierState {
         self.high_epoch_by_job.insert(proof.job_id, proof.epoch_to);
         Ok(())
     }
+    /// Deterministic local execution checker for the refresh relation.
+    ///
+    /// In addition to the public audit-tag checks in [`Self::verify`], this
+    /// backend re-opens both negative-control ciphertexts with the pinned
+    /// master secret and checks exact plaintext continuity and the committed
+    /// plaintext digest. It is deliberately non-zero-knowledge and is not an
+    /// independent verifier family, but prevents a holder of the symmetric
+    /// audit key from manufacturing a locally accepted discontinuous refresh.
+    pub fn verify_executed(
+        &mut self,
+        master: &Hash32,
+        audit_key: &AuditKey,
+        ct_from: &Ciphertext,
+        ct_to: &Ciphertext,
+        context: &RefreshContext,
+        proof: Option<&RefreshProof>,
+        now: u64,
+    ) -> Result<(), RefreshError> {
+        context.validate()?;
+        let proof = proof.ok_or(RefreshError::MissingProof)?;
+        let from_message = decrypt(&derive_key(master, ct_from.key_epoch), ct_from)?;
+        let to_message = decrypt(&derive_key(master, ct_to.key_epoch), ct_to)?;
+        if from_message != to_message
+            || proof.plaintext_digest != plaintext_digest(from_message, context)
+        {
+            return Err(RefreshError::PlaintextMismatch);
+        }
+        self.verify(audit_key, ct_from, ct_to, context, Some(proof), now)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -579,7 +609,15 @@ mod tests {
         let (ct_to, proof) = dispatch_refresh(&MASTER, &audit, &ct, &ctx, 2).unwrap();
         let mut verifier = RefreshVerifierState::default();
         assert_eq!(
-            verifier.verify(&audit, &ct, &ct_to, &ctx, Some(&proof), 105),
+            verifier.verify_executed(
+                &MASTER,
+                &audit,
+                &ct,
+                &ct_to,
+                &ctx,
+                Some(&proof),
+                105
+            ),
             Ok(())
         );
         assert_eq!(decrypt(&derive_key(&MASTER, 1), &ct_to), Ok(123_456));
@@ -587,6 +625,45 @@ mod tests {
         assert!(!boundary.complete_zero_knowledge_prover);
         assert_eq!(boundary.independent_verifier_families, 1);
         assert!(!boundary.suite_registered);
+    }
+
+    #[test]
+    fn execution_checker_rejects_discontinuity_signed_by_audit_key_holder() {
+        let audit = audit();
+        let ct_from = fresh(7, 0, 1);
+        let context = context(13, 14, 100);
+        let (honest_to, mut forged) =
+            dispatch_refresh(&MASTER, &audit, &ct_from, &context, 2).unwrap();
+        let discontinuous_to = fresh(8, 1, 3);
+        assert_ne!(honest_to, discontinuous_to);
+        forged.ct_to_commit = commit_ciphertext(&discontinuous_to);
+        forged.continuity_tag = continuity_tag(&audit, &forged).unwrap();
+
+        // The public symmetric-tag precursor cannot defend against its own
+        // audit-key holder. The pinned execution backend must.
+        assert_eq!(
+            RefreshVerifierState::default().verify(
+                &audit,
+                &ct_from,
+                &discontinuous_to,
+                &context,
+                Some(&forged),
+                105
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            RefreshVerifierState::default().verify_executed(
+                &MASTER,
+                &audit,
+                &ct_from,
+                &discontinuous_to,
+                &context,
+                Some(&forged),
+                105
+            ),
+            Err(RefreshError::PlaintextMismatch)
+        );
     }
 
     #[test]

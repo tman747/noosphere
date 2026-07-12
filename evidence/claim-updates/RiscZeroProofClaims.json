@@ -33,7 +33,7 @@
       "packages": ["noos-jet"],
       "command": "python tools/gates/run_risc0_proof_claim.py --claim S-GPU-COMMIT",
       "rollback_command": "python tools/gates/run_risc0_proof_claim.py --claim S-GPU-COMMIT --rollback-check",
-      "notes": "PARTIAL only. The canonical CPU/reference commitment mechanics now separate stable ArtifactId from challenge-bound WorkCommit and bind profile id, trace root, and versioned fused-relation id; every mutation invalidates the declaration. No GPU result is relabeled as this reference path. The exact frozen threshold remains external: no GPU implementation/root corpus, imperfect-tree and partial-chunk GPU campaign, compiler/race matrix, transfer-integrated end-to-end advantage, or independent pinned H100 latency/energy reproduction exists on this AMD workstation. Rollback is the canonical CPU/reference commitment."
+      "notes": "PARTIAL only. The canonical CPU/reference commitment mechanics separate stable ArtifactId from challenge-bound WorkCommit and bind profile id, trace root, and versioned fused-relation id. The reference Merkle relation now domain-separates indexed leaves, paired nodes, unpaired right-edge nodes, and the final root; it binds total length, chunk size, and leaf count, including empty inputs, imperfect trees, and short final chunks. Falsifiers reject padding, chunk-geometry, ordering, and declaration mutations. No GPU result is relabeled as this reference path. The exact frozen threshold remains external: no GPU implementation/root corpus, compiler/race matrix, transfer-integrated end-to-end advantage, or independent pinned H100 latency/energy reproduction exists on this AMD workstation. Rollback is the canonical CPU/reference commitment."
     }
   }
 }

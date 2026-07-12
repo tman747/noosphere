@@ -9,7 +9,8 @@ use core::cell::Cell;
 use noos_grain::{encode_noun, eval, eval_with_jets, GrainTrap, JetHook, Meter, Noun};
 
 use crate::architecture::{
-    artifact_id, work_commit, CommitmentDeclaration, CommitmentError, ProofArchitectureManifest,
+    artifact_id, cpu_commitment_root, work_commit, CommitmentDeclaration, CommitmentError,
+    ProofArchitectureManifest,
 };
 #[cfg(feature = "risc0")]
 use crate::cert::JetId;
@@ -823,6 +824,29 @@ fn cpu_commitment_reference_binds_artifact_challenge_profile_and_fused_relation(
     assert_ne!(
         artifact_id(b"canonical tensor bytes"),
         artifact_id(b"canonical tensor bytes\0")
+    );
+}
+
+#[test]
+fn cpu_commitment_root_handles_partial_chunks_and_imperfect_trees_exactly() {
+    let bytes = b"eleven-byte";
+    let root = cpu_commitment_root(bytes, 4).unwrap();
+    assert_eq!(root, cpu_commitment_root(bytes, 4).unwrap());
+
+    // The final three-byte chunk is length-bound rather than zero padded.
+    let mut padded = bytes.to_vec();
+    padded.push(0);
+    assert_ne!(root, cpu_commitment_root(&padded, 4).unwrap());
+    // Chunk geometry and ordering are part of the relation.
+    assert_ne!(root, cpu_commitment_root(bytes, 3).unwrap());
+    let mut reordered = bytes.to_vec();
+    reordered.rotate_left(4);
+    assert_ne!(root, cpu_commitment_root(&reordered, 4).unwrap());
+    // Empty input has one explicit empty leaf, and zero-sized chunks reject.
+    assert!(cpu_commitment_root(&[], 4).is_ok());
+    assert_eq!(
+        cpu_commitment_root(bytes, 0),
+        Err(CommitmentError::InvalidChunkSize)
     );
 }
 

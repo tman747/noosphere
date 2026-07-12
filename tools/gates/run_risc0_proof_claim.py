@@ -51,7 +51,8 @@ CLAIMS = {
     },
     "S-GPU-COMMIT": {
         "tests": [
-            "tests::cpu_commitment_reference_binds_artifact_challenge_profile_and_fused_relation"
+            "tests::cpu_commitment_reference_binds_artifact_challenge_profile_and_fused_relation",
+            "tests::cpu_commitment_root_handles_partial_chunks_and_imperfect_trees_exactly",
         ],
         "limitations": [
             "Only the canonical CPU/reference commitment relation is exercised; no GPU root, imperfect-tree GPU corpus, transfer-integrated benchmark, or independent pinned H100 latency/energy reproduction exists.",
@@ -64,6 +65,16 @@ SOURCES = [
     "Cargo.toml",
     "Cargo.lock",
     "crates/noos-jet/Cargo.toml",
+    "rust-toolchain.toml",
+    "crates/noos-grain/Cargo.toml",
+    "crates/noos-grain/src/bytes.rs",
+    "crates/noos-grain/src/eval.rs",
+    "crates/noos-grain/src/lib.rs",
+    "crates/noos-grain/src/noun.rs",
+    "crates/noos-jet/src/cert.rs",
+    "crates/noos-jet/src/corpus.rs",
+    "crates/noos-jet/src/jets.rs",
+    "crates/noos-jet/src/registry.rs",
     "crates/noos-jet/src/architecture.rs",
     "crates/noos-jet/src/lib.rs",
     "crates/noos-jet/src/proof.rs",
