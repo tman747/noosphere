@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -18,6 +17,11 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/gates"))
 import repro_build
+
+BUILDER_PROFILES = {
+    "local-builder": "local-single-builder-control-plane",
+    "github-hosted-owner-smoke": "github-actions-owner-controlled-smoke-control-plane",
+}
 
 
 def cargo_packages() -> list[dict[str, str]]:
@@ -40,22 +44,7 @@ def cargo_packages() -> list[dict[str, str]]:
 
 
 def go_modules(env: dict[str, str]) -> list[dict[str, str]]:
-    completed = subprocess.run(
-        ["go", "list", "-mod=readonly", "-m", "-json", "all"],
-        cwd=ROOT / "go", env=env, check=True, text=True, capture_output=True,
-    )
-    decoder = json.JSONDecoder()
-    text = completed.stdout
-    offset = 0
-    modules: list[dict[str, str]] = []
-    while offset < len(text):
-        while offset < len(text) and text[offset].isspace():
-            offset += 1
-        if offset == len(text):
-            break
-        value, offset = decoder.raw_decode(text, offset)
-        modules.append({"path": value["Path"], "version": value.get("Version", "workspace")})
-    return sorted(modules, key=lambda module: (module["path"], module["version"]))
+    return repro_build.go_modules(env)
 
 
 def deterministic_uuid(payload: bytes) -> str:
@@ -63,7 +52,26 @@ def deterministic_uuid(payload: bytes) -> str:
     return f"urn:uuid:{digest[:8]}-{digest[8:12]}-4{digest[13:16]}-8{digest[17:20]}-{digest[20:32]}"
 
 
-def create_bundle(target: str, out: Path, version: str, *, smoke: bool, revision: str | None = None) -> dict[str, Any]:
+def candidate_boundary(smoke: bool, builder_profile: str) -> dict[str, Any]:
+    if builder_profile not in BUILDER_PROFILES:
+        raise repro_build.AssuranceError(f"unknown builder profile {builder_profile!r}")
+    if builder_profile == "github-hosted-owner-smoke" and not smoke:
+        raise repro_build.AssuranceError("GitHub-hosted owner candidates must remain --smoke")
+    return {
+        "candidate_status": "SMOKE_ONLY" if smoke else "CANDIDATE_ONLY",
+        "evidence_class": "public-candidate-smoke-not-independent-reproduction" if smoke else "candidate-not-independent-reproduction",
+        "control_plane": BUILDER_PROFILES[builder_profile],
+        "independent_builder_evidence": False,
+        "external_builder_gate": "EXTERNAL_BLOCKED",
+        "promotion_effect": "NONE",
+        "promotion_ledger_mutation": "PROHIBITED",
+    }
+
+
+def create_bundle(
+    target: str, out: Path, version: str, *, smoke: bool,
+    revision: str | None = None, builder_profile: str = "local-builder",
+) -> dict[str, Any]:
     out = repro_build.safe_repository_output(out)
     if out.exists():
         for child in out.iterdir():
@@ -75,7 +83,9 @@ def create_bundle(target: str, out: Path, version: str, *, smoke: bool, revision
     out.mkdir(parents=True, exist_ok=True)
     details = repro_build.build_target(target, out, revision=revision, smoke=smoke)
     identity = details["source"]
-    env = repro_build.deterministic_environment(ROOT, out / ".metadata-target", target, identity["source_date_epoch"])
+    boundary = candidate_boundary(smoke, builder_profile)
+    metadata_target = out / ".metadata-target"
+    env = repro_build.deterministic_environment(ROOT, metadata_target, target, identity["source_date_epoch"])
     binary_hashes = details["binary_hashes"]
 
     components: list[dict[str, Any]] = [
@@ -91,7 +101,12 @@ def create_bundle(target: str, out: Path, version: str, *, smoke: bool, revision
         if "checksum" in package:
             component["hashes"] = [{"alg": "SHA-256", "content": package["checksum"]}]
         components.append(component)
-    for module in go_modules(env):
+    try:
+        modules = go_modules(env)
+    finally:
+        if metadata_target.exists():
+            shutil.rmtree(metadata_target)
+    for module in modules:
         components.append({
             "type": "library", "name": module["path"], "version": module["version"],
             "purl": f"pkg:golang/{module['path']}@{module['version']}",
@@ -118,17 +133,27 @@ def create_bundle(target: str, out: Path, version: str, *, smoke: bool, revision
                     "sourceDateEpoch": identity["source_date_epoch"],
                     "pathRemap": "/workspace/noosphere",
                     "postBuildNormalization": "forbidden-and-not-performed",
+                    "toolchainProvenance": {
+                        "installed": details["installed_toolchain_provenance"],
+                        "windows": details["windows_toolchain_provenance"],
+                    },
                 },
                 "resolvedDependencies": [
                     {"uri": "git+https://github.com/mindchain/noosphere", "digest": {"gitCommit": identity["revision"], "gitTree": identity["tree"]}},
                     {"uri": "Cargo.lock", "digest": {"sha256": repro_build.sha256_file(ROOT / "Cargo.lock")}},
+                    {"uri": "go/go.mod", "digest": {"sha256": repro_build.sha256_file(ROOT / "go/go.mod")}},
                     {"uri": "go/go.sum", "digest": {"sha256": repro_build.sha256_file(ROOT / "go/go.sum")}},
                     {"uri": "protocol/release/repro-toolchains-v1.json", "digest": {"sha256": repro_build.sha256_file(repro_build.TOOLCHAINS)}},
                 ],
             },
             "runDetails": {
-                "builder": {"id": "github-actions-candidate-single-control-plane" if not smoke else "local-same-machine-smoke"},
-                "metadata": {"independentBuilderEvidence": False, "evidenceClass": "smoke-only"},
+                "builder": {"id": boundary["control_plane"]},
+                "metadata": {
+                    "candidateStatus": boundary["candidate_status"],
+                    "independentBuilderEvidence": False,
+                    "evidenceClass": boundary["evidence_class"],
+                    "promotionEffect": "NONE",
+                },
             },
         },
     }
@@ -144,21 +169,26 @@ def create_bundle(target: str, out: Path, version: str, *, smoke: bool, revision
     (out / "SHA256SUMS").write_text(checksums, encoding="ascii", newline="\n")
     manifest = {
         "schema": "noos/repro-candidate-bundle/v1",
-        "evidence_class": "public-candidate-smoke-not-independent-reproduction",
+        **boundary,
         "release_version": version,
         "target": target,
         "source": identity,
         "toolchain_lock_sha256": repro_build.sha256_file(repro_build.TOOLCHAINS),
+        "toolchain_provenance": {
+            "installed": details["installed_toolchain_provenance"],
+            "windows": details["windows_toolchain_provenance"],
+        },
         "files": covered,
         "checksums_sha256": repro_build.sha256_file(out / "SHA256SUMS"),
-        "external_builder_gate": "EXTERNAL_BLOCKED",
-        "promotion_ledger_mutation": "PROHIBITED",
     }
     (out / "bundle-manifest.json").write_bytes(repro_build.canonical_json(manifest))
     request = {
         "schema": "noos/external-attestation-request/v1",
         "not_an_attestation": True,
         "not_a_signature": True,
+        "candidate_status": boundary["candidate_status"],
+        "promotion_effect": "NONE",
+        "external_builder_gate": "EXTERNAL_BLOCKED",
         "target": target,
         "source_revision": identity["revision"],
         "source_tree": identity["tree"],
@@ -177,10 +207,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--version", default="0.1.0-dev")
     parser.add_argument("--revision")
     parser.add_argument("--smoke", action="store_true", help="permit unsigned policy locally; bundle remains smoke-only")
+    parser.add_argument("--builder-profile", choices=sorted(BUILDER_PROFILES), default="local-builder")
     args = parser.parse_args(argv)
     try:
-        result = create_bundle(args.target, ROOT / args.out, args.version, smoke=args.smoke, revision=args.revision)
-    except (repro_build.AssuranceError, OSError, subprocess.CalledProcessError) as exc:
+        result = create_bundle(
+            args.target, ROOT / args.out, args.version, smoke=args.smoke,
+            revision=args.revision, builder_profile=args.builder_profile,
+        )
+    except (repro_build.AssuranceError, OSError) as exc:
         print(f"RESULT generate_release=FAIL reason={exc}", file=sys.stderr)
         return 1
     print(f"RESULT generate_release={'SMOKE_ONLY' if args.smoke else 'CANDIDATE_ONLY'} target={args.target} files={len(result['files'])} out={args.out}")

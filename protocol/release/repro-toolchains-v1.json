@@ -19,6 +19,8 @@
     "dependencies_offline_during_build": true,
     "go_buildvcs": false,
     "go_cache": "target-local disposable cache",
+    "go_module_acquisition": "go mod download all from go/ before offline phase",
+    "go_module_root": "go",
     "go_mod": "readonly",
     "go_trimpath": true,
     "locale": "C.UTF-8",
@@ -26,7 +28,8 @@
     "post_build_normalization": "forbidden",
     "source_date_epoch": "git_commit_timestamp",
     "timezone": "UTC",
-    "windows_linker": "rust-lld from the pinned rustc toolchain"
+    "windows_linker": "rust-lld from the pinned rustc toolchain",
+    "windows_toolchain_resolution": "explicit roots validated against exact locked MSVC/SDK versions"
   },
   "targets": {
     "windows-x86_64": {
@@ -34,8 +37,12 @@
       "rust_target": "x86_64-pc-windows-msvc",
       "goos": "windows",
       "goarch": "amd64",
-      "msvc_tools_version": "14.35.32215",
-      "windows_sdk_version": "10.0.22000.0",
+      "msvc_tools_version": "14.44.35207",
+      "msvc_binary_file_version": "14.44.35228.0",
+      "msvc_component": "Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64",
+      "windows_sdk_version": "10.0.26100.0",
+      "windows_sdk_rc_file_version": "10.0.26100.8249",
+      "windows_sdk_component": "Microsoft.VisualStudio.Component.Windows11SDK.26100",
       "native_required": true
     },
     "linux-x86_64": {

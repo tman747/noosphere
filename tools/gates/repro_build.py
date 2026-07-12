@@ -19,7 +19,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Mapping
 
 try:
     import tomllib
@@ -30,6 +30,7 @@ ROOT = Path(__file__).resolve().parents[2]
 POLICY = ROOT / "protocol/release/repro-policy-v1.toml"
 POLICY_SIGNATURES = ROOT / "protocol/release/repro-policy-v1.signatures.json"
 TOOLCHAINS = ROOT / "protocol/release/repro-toolchains-v1.json"
+GO_MODULE = ROOT / "go"
 REQUIRED_TARGETS = {"windows-x86_64", "linux-x86_64", "linux-aarch64"}
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 TARGETS = {
@@ -86,8 +87,19 @@ def load_json(path: Path) -> dict[str, Any]:
     return value
 
 
+def _command_failure(exc: subprocess.CalledProcessError, cwd: Path) -> AssuranceError:
+    stderr = (exc.stderr or "").strip() if isinstance(exc.stderr, str) else ""
+    stdout = (exc.stdout or "").strip() if isinstance(exc.stdout, str) else ""
+    detail = stderr or stdout or "no stdout/stderr captured"
+    rendered = subprocess.list2cmdline([str(part) for part in exc.cmd]) if isinstance(exc.cmd, (list, tuple)) else str(exc.cmd)
+    return AssuranceError(f"command failed (exit {exc.returncode}, cwd={cwd}): {rendered}; stderr={detail}")
+
+
 def command(args: list[str], *, cwd: Path = ROOT, env: dict[str, str] | None = None) -> str:
-    completed = subprocess.run(args, cwd=cwd, env=env, check=True, text=True, capture_output=True)
+    try:
+        completed = subprocess.run(args, cwd=cwd, env=env, check=True, text=True, capture_output=True)
+    except subprocess.CalledProcessError as exc:
+        raise _command_failure(exc, cwd) from exc
     return completed.stdout.strip()
 
 
@@ -155,20 +167,36 @@ def _version_line(args: list[str]) -> str:
     return command(args).splitlines()[0]
 
 
-def verify_installed_toolchains(lock: dict[str, Any]) -> list[str]:
+def installed_toolchain_provenance() -> dict[str, dict[str, str]]:
+    observed: dict[str, dict[str, str]] = {}
+    for name, args in (
+        ("rustc", ["rustc", "--version"]),
+        ("cargo", ["cargo", "--version"]),
+        ("go", ["go", "version"]),
+    ):
+        executable = shutil.which(args[0])
+        if executable is None:
+            raise AssuranceError(f"required toolchain executable is not on PATH: {args[0]}")
+        resolved = Path(executable).resolve()
+        observed[name] = {
+            "path": str(resolved),
+            "sha256": sha256_file(resolved),
+            "version_output": _version_line(args),
+        }
+    return observed
+
+
+def verify_installed_toolchains(lock: dict[str, Any], observed: dict[str, dict[str, str]]) -> list[str]:
     errors: list[str] = []
     expected = lock["toolchains"]
-    observed = {
-        "rustc": _version_line(["rustc", "--version"]),
-        "cargo": _version_line(["cargo", "--version"]),
-        "go": _version_line(["go", "version"]),
-    }
     for name in ("rustc", "cargo"):
-        if observed[name] != expected[name]["version_output"]:
-            errors.append(f"{name} mismatch: expected {expected[name]['version_output']!r}, got {observed[name]!r}")
+        actual = observed[name]["version_output"]
+        if actual != expected[name]["version_output"]:
+            errors.append(f"{name} mismatch: expected {expected[name]['version_output']!r}, got {actual!r}")
     expected_go_prefix = f"go version go{expected['go']['version']} "
-    if not observed["go"].startswith(expected_go_prefix):
-        errors.append(f"go mismatch: expected {expected_go_prefix!r} with a host suffix, got {observed['go']!r}")
+    actual_go = observed["go"]["version_output"]
+    if not actual_go.startswith(expected_go_prefix):
+        errors.append(f"go mismatch: expected {expected_go_prefix!r} with a host suffix, got {actual_go!r}")
     return errors
 
 
@@ -180,7 +208,143 @@ def locked_toolchain_identities(lock: dict[str, Any]) -> dict[str, str]:
     }
 
 
-def deterministic_environment(root: Path, target_dir: Path, target: str, epoch: int) -> dict[str, str]:
+def _required_environment(environ: Mapping[str, str], names: tuple[str, ...]) -> dict[str, str]:
+    missing = [name for name in names if not environ.get(name)]
+    if missing:
+        raise AssuranceError(f"explicit Windows toolchain environment missing: {missing}")
+    return {name: environ[name] for name in names}
+
+
+def windows_file_version(path: Path) -> str:
+    """Read a Windows PE fixed file version without trusting command output."""
+    if os.name != "nt":
+        raise AssuranceError("Windows PE version validation requires a Windows host")
+    import ctypes
+    from ctypes import wintypes
+
+    class FixedFileInfo(ctypes.Structure):
+        _fields_ = [
+            ("signature", wintypes.DWORD), ("struct_version", wintypes.DWORD),
+            ("file_version_ms", wintypes.DWORD), ("file_version_ls", wintypes.DWORD),
+            ("product_version_ms", wintypes.DWORD), ("product_version_ls", wintypes.DWORD),
+            ("file_flags_mask", wintypes.DWORD), ("file_flags", wintypes.DWORD),
+            ("file_os", wintypes.DWORD), ("file_type", wintypes.DWORD),
+            ("file_subtype", wintypes.DWORD), ("file_date_ms", wintypes.DWORD),
+            ("file_date_ls", wintypes.DWORD),
+        ]
+
+    size = ctypes.windll.version.GetFileVersionInfoSizeW(str(path), None)
+    if not size:
+        raise AssuranceError(f"Windows binary has no readable file version: {path}")
+    buffer = ctypes.create_string_buffer(size)
+    if not ctypes.windll.version.GetFileVersionInfoW(str(path), 0, size, buffer):
+        raise AssuranceError(f"cannot read Windows file version: {path}")
+    pointer = ctypes.c_void_p()
+    length = wintypes.UINT()
+    if not ctypes.windll.version.VerQueryValueW(buffer, "\\", ctypes.byref(pointer), ctypes.byref(length)):
+        raise AssuranceError(f"Windows file version record missing: {path}")
+    info = ctypes.cast(pointer, ctypes.POINTER(FixedFileInfo)).contents
+    if info.signature != 0xFEEF04BD:
+        raise AssuranceError(f"Windows file version signature invalid: {path}")
+    return ".".join(str(value) for value in (
+        info.file_version_ms >> 16, info.file_version_ms & 0xFFFF,
+        info.file_version_ls >> 16, info.file_version_ls & 0xFFFF,
+    ))
+
+
+def resolve_windows_toolchain(
+    lock: dict[str, Any], environ: Mapping[str, str] | None = None,
+    *, file_version_reader: Callable[[Path], str] = windows_file_version,
+) -> dict[str, Any]:
+    """Validate an explicitly discovered Windows toolchain against the lock.
+
+    CI and independent builders discover their own installation roots.  This
+    function accepts no path aliases or implicit machine-local fallbacks.
+    """
+    environ = os.environ if environ is None else environ
+    values = _required_environment(environ, (
+        "NOOS_MSVC_ROOT", "NOOS_MSVC_TOOLS_VERSION",
+        "NOOS_WINDOWS_SDK_ROOT", "NOOS_WINDOWS_SDK_VERSION",
+    ))
+    expected = lock["targets"]["windows-x86_64"]
+    for env_name, lock_name in (
+        ("NOOS_MSVC_TOOLS_VERSION", "msvc_tools_version"),
+        ("NOOS_WINDOWS_SDK_VERSION", "windows_sdk_version"),
+    ):
+        if values[env_name] != expected.get(lock_name):
+            raise AssuranceError(
+                f"{env_name} mismatch: expected {expected.get(lock_name)!r}, got {values[env_name]!r}"
+            )
+
+    msvc_root = Path(values["NOOS_MSVC_ROOT"]).resolve()
+    sdk_root = Path(values["NOOS_WINDOWS_SDK_ROOT"]).resolve()
+    if msvc_root.name != expected["msvc_tools_version"]:
+        raise AssuranceError(
+            f"MSVC root does not end in locked version {expected['msvc_tools_version']!r}: {msvc_root}"
+        )
+    sdk_version = expected["windows_sdk_version"]
+    msvc_bin = msvc_root / "bin" / "Hostx64" / "x64"
+    sdk_bin = sdk_root / "bin" / sdk_version / "x64"
+    library_paths = [
+        msvc_root / "lib" / "x64",
+        sdk_root / "Lib" / sdk_version / "ucrt" / "x64",
+        sdk_root / "Lib" / sdk_version / "um" / "x64",
+    ]
+    sdk_include = sdk_root / "Include" / sdk_version
+    include_paths = [
+        msvc_root / "include", sdk_include / "ucrt", sdk_include / "shared",
+        sdk_include / "um", sdk_include / "winrt",
+    ]
+    binaries = {
+        "cl.exe": msvc_bin / "cl.exe",
+        "link.exe": msvc_bin / "link.exe",
+        "rc.exe": sdk_bin / "rc.exe",
+    }
+    required_files = {
+        **binaries,
+        "ucrt.lib": library_paths[1] / "ucrt.lib",
+        "kernel32.lib": library_paths[2] / "kernel32.lib",
+    }
+    missing_dirs = [str(path) for path in (*library_paths, msvc_bin, sdk_bin, *include_paths) if not path.is_dir()]
+    missing_files = [str(path) for path in required_files.values() if not path.is_file()]
+    if missing_dirs or missing_files:
+        raise AssuranceError(
+            f"locked Windows toolchain incomplete: missing_directories={missing_dirs}; missing_files={missing_files}"
+        )
+    binary_file_versions = {name: file_version_reader(path) for name, path in sorted(binaries.items())}
+    expected_versions = {
+        "cl.exe": expected["msvc_binary_file_version"],
+        "link.exe": expected["msvc_binary_file_version"],
+        "rc.exe": expected["windows_sdk_rc_file_version"],
+    }
+    if binary_file_versions != expected_versions:
+        raise AssuranceError(
+            f"Windows toolchain binary version mismatch: expected {expected_versions}, got {binary_file_versions}"
+        )
+    return {
+        "msvc_tools_version": expected["msvc_tools_version"],
+        "msvc_component": expected["msvc_component"],
+        "windows_sdk_version": sdk_version,
+        "windows_sdk_component": expected["windows_sdk_component"],
+        "msvc_root": str(msvc_root),
+        "windows_sdk_root": str(sdk_root),
+        "binary_paths": {name: str(path.resolve()) for name, path in sorted(binaries.items())},
+        "binary_file_versions": binary_file_versions,
+        "binary_sha256": {name: sha256_file(path) for name, path in sorted(binaries.items())},
+        "_library_paths": library_paths,
+        "_binary_paths": [msvc_bin, sdk_bin],
+        "_include_paths": include_paths,
+    }
+
+
+def windows_toolchain_provenance(resolved: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in resolved.items() if not key.startswith("_")}
+
+
+def deterministic_environment(
+    root: Path, target_dir: Path, target: str, epoch: int,
+    *, windows_toolchain: dict[str, Any] | None = None,
+) -> dict[str, str]:
     """Create a small deterministic environment; timestamp normalization is pre-build only."""
     keep = ("PATH", "SystemRoot", "COMSPEC", "PATHEXT", "TEMP", "TMP", "HOME", "USERPROFILE", "CARGO_HOME", "RUSTUP_HOME")
     env = {key: os.environ[key] for key in keep if key in os.environ}
@@ -207,45 +371,25 @@ def deterministic_environment(root: Path, target_dir: Path, target: str, epoch: 
     })
     rustflags = [f"--remap-path-prefix={root}=/workspace/noosphere", "-C", "debuginfo=0"]
     if target == "windows-x86_64":
-        windows = load_toolchains()["targets"][target]
-        msvc_version = windows.get("msvc_tools_version")
-        sdk_version = windows.get("windows_sdk_version")
-        if not isinstance(msvc_version, str) or not isinstance(sdk_version, str):
-            raise AssuranceError("Windows target lacks pinned MSVC/SDK versions")
-        vs_root = Path("C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools")
-        msvc_root = vs_root / "VC" / "Tools" / "MSVC" / msvc_version
-        sdk_root = Path("C:/Program Files (x86)/Windows Kits/10")
-        msvc_lib = msvc_root / "lib" / "x64"
-        sdk_lib = sdk_root / "Lib" / sdk_version
-        library_paths = [msvc_lib, sdk_lib / "ucrt" / "x64", sdk_lib / "um" / "x64"]
-        binary_paths = [msvc_root / "bin" / "Hostx64" / "x64", sdk_root / "bin" / sdk_version / "x64"]
-        sdk_include = sdk_root / "Include" / sdk_version
-        include_paths = [
-            msvc_root / "include",
-            sdk_include / "ucrt",
-            sdk_include / "shared",
-            sdk_include / "um",
-            sdk_include / "winrt",
-        ]
-        missing = [
-            str(path)
-            for path in (*library_paths, *binary_paths, *include_paths)
-            if not path.is_dir()
-        ]
-        if missing:
-            raise AssuranceError(f"pinned Windows toolchain directories missing: {missing}")
-        env["LIB"] = os.pathsep.join(str(path) for path in library_paths)
-        env["INCLUDE"] = os.pathsep.join(str(path) for path in include_paths)
-        env["PATH"] = os.pathsep.join([*(str(path) for path in binary_paths), env.get("PATH", "")])
-        env["VCINSTALLDIR"] = str(vs_root / "VC") + os.sep
+        windows_toolchain = windows_toolchain or resolve_windows_toolchain(load_toolchains())
+        msvc_root = Path(windows_toolchain["msvc_root"])
+        sdk_root = Path(windows_toolchain["windows_sdk_root"])
+        env["LIB"] = os.pathsep.join(str(path) for path in windows_toolchain["_library_paths"])
+        env["INCLUDE"] = os.pathsep.join(str(path) for path in windows_toolchain["_include_paths"])
+        env["PATH"] = os.pathsep.join([*(str(path) for path in windows_toolchain["_binary_paths"]), env.get("PATH", "")])
+        env["VCINSTALLDIR"] = str(msvc_root.parents[2]) + os.sep
         env["VCToolsInstallDir"] = str(msvc_root) + os.sep
-        env["VCToolsVersion"] = msvc_version
+        env["VCToolsVersion"] = windows_toolchain["msvc_tools_version"]
+        env["UniversalCRTSdkDir"] = str(sdk_root) + os.sep
+        env["UCRTVersion"] = windows_toolchain["windows_sdk_version"]
         env["WindowsSdkDir"] = str(sdk_root) + os.sep
-        env["WindowsSDKVersion"] = sdk_version + os.sep
+        env["WindowsSDKVersion"] = windows_toolchain["windows_sdk_version"] + os.sep
         rust_sysroot = Path(command(["rustc", "--print", "sysroot"]).strip())
         rust_lld = rust_sysroot / "lib" / "rustlib" / "x86_64-pc-windows-msvc" / "bin" / "rust-lld.exe"
         if not rust_lld.is_file():
             raise AssuranceError(f"pinned Rust linker missing: {rust_lld}")
+        windows_toolchain["rust_linker_path"] = str(rust_lld.resolve())
+        windows_toolchain["rust_linker_sha256"] = sha256_file(rust_lld)
         env["CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER"] = str(rust_lld)
         rustflags.extend(["-C", "link-arg=/Brepro", "-C", "link-arg=/PDBALTPATH:noos-transition.pdb"])
     # Unit-separator encoding preserves path arguments even when an external
@@ -254,16 +398,40 @@ def deterministic_environment(root: Path, target_dir: Path, target: str, epoch: 
     return env
 
 
+def go_modules(env: dict[str, str]) -> list[dict[str, str]]:
+    """Read the complete, already-downloaded module graph without network access."""
+    args = ["go", "list", "-mod=readonly", "-m", "-json", "all"]
+    try:
+        completed = subprocess.run(
+            args, cwd=GO_MODULE, env=env, check=True, text=True, capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise _command_failure(exc, GO_MODULE) from exc
+    decoder = json.JSONDecoder()
+    text = completed.stdout
+    offset = 0
+    modules: list[dict[str, str]] = []
+    while offset < len(text):
+        while offset < len(text) and text[offset].isspace():
+            offset += 1
+        if offset == len(text):
+            break
+        value, offset = decoder.raw_decode(text, offset)
+        modules.append({"path": value["Path"], "version": value.get("Version", "workspace")})
+    return sorted(modules, key=lambda module: (module["path"], module["version"]))
+
+
 def build_target(target: str, out: Path, *, revision: str | None = None, smoke: bool = False) -> dict[str, Any]:
     if target not in TARGETS:
         raise AssuranceError(f"unsupported target {target!r}")
     cfg = TARGETS[target]
     host_os, host_arch = _host()
-    if host_os != cfg["os"] or (cfg.get("native") and host_arch != cfg["arch"]):
+    if host_os != cfg["os"] or host_arch != cfg["arch"]:
         raise AssuranceError(f"{target} requires a native {cfg['os']}/{cfg['arch']} runner; observed {host_os}/{host_arch}")
     identity = source_identity(revision)
     locks = load_toolchains()
-    toolchain_errors = verify_installed_toolchains(locks)
+    installed_toolchains = installed_toolchain_provenance()
+    toolchain_errors = verify_installed_toolchains(locks, installed_toolchains)
     policy_errors = verify_policy_signatures()
     if toolchain_errors or (policy_errors and not smoke):
         raise AssuranceError("; ".join(toolchain_errors + ([] if smoke else policy_errors)))
@@ -271,13 +439,17 @@ def build_target(target: str, out: Path, *, revision: str | None = None, smoke: 
     out = safe_repository_output(out)
     out.mkdir(parents=True, exist_ok=True)
     target_dir = out / ".cargo-target"
-    env = deterministic_environment(ROOT, target_dir, target, identity["source_date_epoch"])
+    windows_toolchain = resolve_windows_toolchain(locks) if target == "windows-x86_64" else None
+    env = deterministic_environment(
+        ROOT, target_dir, target, identity["source_date_epoch"], windows_toolchain=windows_toolchain,
+    )
+    subprocess.run(["go", "mod", "verify"], cwd=GO_MODULE, env=env, check=True)
+    module_count = len(go_modules(env))
     subprocess.run(
         ["cargo", "build", "--locked", "--offline", "--frozen", "--release", "--target", cfg["rust"],
          "-p", "noos-lumen", "--bin", "noos-transition"],
         cwd=ROOT, env=env, check=True,
     )
-    subprocess.run(["go", "mod", "verify"], cwd=ROOT / "go", env=env, check=True)
     suffix = cfg["suffix"]
     rust_output = target_dir / cfg["rust"] / "release" / f"noos-transition{suffix}"
     artifacts = out / "artifacts"
@@ -286,7 +458,7 @@ def build_target(target: str, out: Path, *, revision: str | None = None, smoke: 
     for name, package in (("noos-transition-go", "./cmd/noos-transition"), ("noos-verify", "./cmd/noos-verify")):
         destination = artifacts / f"{name}{suffix}"
         destination.unlink(missing_ok=True)
-        subprocess.run(["go", "build", "-o", str(destination), package], cwd=ROOT / "go", env=env, check=True)
+        subprocess.run(["go", "build", "-o", str(destination), package], cwd=GO_MODULE, env=env, check=True)
 
     binary_hashes = {f"artifacts/{path.name}": sha256_file(path) for path in sorted(artifacts.iterdir()) if path.is_file()}
     result = {
@@ -297,7 +469,20 @@ def build_target(target: str, out: Path, *, revision: str | None = None, smoke: 
         "source": identity,
         "toolchain_lock_sha256": sha256_file(TOOLCHAINS),
         "toolchains": locked_toolchain_identities(locks),
-        "dependency_locks": {"Cargo.lock": sha256_file(ROOT / "Cargo.lock"), "go/go.sum": sha256_file(ROOT / "go/go.sum")},
+        "installed_toolchain_provenance": installed_toolchains,
+        "windows_toolchain_provenance": windows_toolchain_provenance(windows_toolchain) if windows_toolchain else None,
+        "dependency_locks": {
+            "Cargo.lock": sha256_file(ROOT / "Cargo.lock"),
+            "go/go.mod": sha256_file(GO_MODULE / "go.mod"),
+            "go/go.sum": sha256_file(GO_MODULE / "go.sum"),
+        },
+        "go_module_provenance": {
+            "module_root": "go",
+            "locked_download_command": "go mod download all",
+            "offline_list_command": "go list -mod=readonly -m -json all",
+            "offline_graph_verified": True,
+            "module_count": module_count,
+        },
         "deterministic_environment": locks["deterministic_environment"],
         "post_build_normalization": "forbidden-and-not-performed",
         "offline_build": True,
@@ -490,7 +675,8 @@ def main(argv: list[str] | None = None) -> int:
     build.add_argument("--target", choices=sorted(REQUIRED_TARGETS), required=True)
     build.add_argument("--out", required=True)
     build.add_argument("--revision")
-    build.add_argument("--smoke", action="store_true", help="allow unsigned policy/toolchain mismatch; output is smoke-only")
+    build.add_argument("--smoke", action="store_true", help="allow unsigned policy only; toolchain mismatches still fail and output is smoke-only")
+    sub.add_parser("validate-windows-toolchain", help="validate explicit NOOS_MSVC/SDK roots against the lock")
     verify = sub.add_parser("verify-attestations", help="verify an external two-builder attestation quorum")
     verify.add_argument("--attestations", required=True)
     verify.add_argument("--trusted-builders", required=True)
@@ -498,6 +684,11 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--out", required=True)
     args = parser.parse_args(argv)
     try:
+        if args.command == "validate-windows-toolchain":
+            resolved = resolve_windows_toolchain(load_toolchains())
+            print(canonical_json(windows_toolchain_provenance(resolved)).decode("utf-8"), end="")
+            print("RESULT windows_toolchain=VALID")
+            return 0
         if args.command == "build":
             result = build_target(args.target, ROOT / args.out, revision=args.revision, smoke=args.smoke)
             print(f"RESULT repro_build={'SMOKE_ONLY' if args.smoke else 'CANDIDATE_BUILT'} target={args.target} binaries={len(result['binary_hashes'])}")

@@ -45,14 +45,65 @@ jobs:
           go-version: "1.25.4"
           cache: false
 
-      - name: Install pinned Rust toolchain and acquire locked dependencies
+      - name: Discover and validate locked Windows toolchain
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $lock = Get-Content -Raw 'protocol/release/repro-toolchains-v1.json' | ConvertFrom-Json
+          $target = $lock.targets.'windows-x86_64'
+          $vswhereCommand = Get-Command vswhere.exe -ErrorAction SilentlyContinue
+          if ($null -ne $vswhereCommand) {
+            $vswhere = $vswhereCommand.Source
+          } else {
+            $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          }
+          if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
+            throw "vswhere.exe was not found: $vswhere"
+          }
+          $installationRoots = @(
+            @(& $vswhere -latest -products '*' -requires $target.msvc_component $target.windows_sdk_component -property installationPath) |
+              Where-Object { $_ }
+          )
+          if ($LASTEXITCODE -ne 0 -or $installationRoots.Count -ne 1) {
+            throw "expected one Visual Studio instance with locked components; found $($installationRoots.Count)"
+          }
+          $sdkRoot = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows Kits\Installed Roots').KitsRoot10
+          if (-not $sdkRoot) {
+            throw 'Windows KitsRoot10 registry value is missing'
+          }
+          $values = [ordered]@{
+            NOOS_MSVC_ROOT = Join-Path $installationRoots[0] "VC\Tools\MSVC\$($target.msvc_tools_version)"
+            NOOS_MSVC_TOOLS_VERSION = $target.msvc_tools_version
+            NOOS_WINDOWS_SDK_ROOT = $sdkRoot
+            NOOS_WINDOWS_SDK_VERSION = $target.windows_sdk_version
+          }
+          foreach ($entry in $values.GetEnumerator()) {
+            Set-Item -Path "Env:$($entry.Key)" -Value $entry.Value
+            "$($entry.Key)=$($entry.Value)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+          python tools/gates/repro_build.py validate-windows-toolchain
+
+      - name: Install pinned Rust toolchain and acquire locked Cargo dependencies
         shell: bash
         run: |
           set -euo pipefail
           rustup toolchain install 1.96.1 --profile minimal --target "${{ matrix.rust_target }}"
           rustup default 1.96.1
           cargo fetch --locked --target "${{ matrix.rust_target }}"
-          (cd go && go mod download && go mod verify)
+
+      - name: Acquire complete locked Go module graph
+        shell: bash
+        working-directory: go
+        env:
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+        run: |
+          set -euo pipefail
+          go mod download all
+          git diff --exit-code -- go.mod go.sum
+          GOPROXY=off GOSUMDB=off go mod verify
+          GOPROXY=off GOSUMDB=off go list -mod=readonly -m all >/dev/null
 
       - name: Build offline deterministic candidate bundle
         shell: bash
@@ -64,6 +115,7 @@ jobs:
             --out "release/candidates/${{ matrix.target }}" \
             --version "$version" \
             --revision "$GITHUB_SHA" \
+            --builder-profile github-hosted-owner-smoke \
             --smoke
 
       - name: Publish public candidate artifact
@@ -83,6 +135,6 @@ jobs:
       - name: Record workflow boundary
         shell: bash
         run: |
-          echo "Candidate artifacts are downloadable smoke evidence."
+          echo "Candidate artifacts are SMOKE_ONLY downloadable evidence with promotion effect NONE."
           echo "This workflow has one repository control plane and cannot satisfy the two-external-builder gate."
           echo "No promotion or registry state is changed."

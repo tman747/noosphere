@@ -7,7 +7,9 @@ Status: **PREPRODUCTION / EXTERNAL_BLOCKED.** This tooling does not change
 
 `tools/gates/generate_release.py` builds one native target with the exact Rust and Go
 versions in `protocol/release/repro-toolchains-v1.json`. Cargo and Go dependencies are
-acquired before the build, then the build executes with locked/read-only dependency
+acquired before the build (`go mod download all` runs from the `go/` module so the SBOM
+module graph is present and the committed `go.sum` locks that complete graph), then the
+build executes with locked/read-only dependency
 resolution and network access disabled through Cargo/Go settings. The deterministic
 environment binds `SOURCE_DATE_EPOCH` to the source commit timestamp, fixes locale and
 timezone, remaps source paths, disables incremental/debug/build-VCS variance, and performs
@@ -18,12 +20,23 @@ Each candidate bundle contains binaries, exact SHA-256 checksums, a CycloneDX SB
 SLSA-v1/in-toto provenance, build details, and an unsigned attestation request. GitHub
 Actions publishes bundles for Windows x86_64, Linux x86_64, and native Linux aarch64.
 All jobs are controlled by one repository identity, so those artifacts are explicitly
+`SMOKE_ONLY`, have promotion effect `NONE`, remain `EXTERNAL_BLOCKED`, and are classified
 `public-candidate-smoke-not-independent-reproduction`.
+
+The Windows job uses `vswhere` plus the Windows Kits registry to discover installation
+roots, requires the exact locked Visual Studio component, MSVC tools version, Windows SDK
+component, and SDK version, then exports explicit `NOOS_MSVC_*` and `NOOS_WINDOWS_SDK_*`
+values. Release generation accepts no implicit BuildTools path or version alias. Local or
+external Windows builders may use different canonical installation roots by supplying the
+same four explicit variables; mismatched versions or incomplete roots fail closed. The
+canonical paths, versions, and SHA-256 hashes of `cl.exe`, `link.exe`, and `rc.exe` are
+recorded alongside the pinned `rust-lld` path/hash in build details, bundle manifests,
+and in-toto provenance.
 
 Local example (the frozen policy is currently unsigned, so only smoke mode is allowed):
 
 ```text
-python tools/gates/generate_release.py --target windows-x86_64 --out release/candidates/windows-x86_64 --revision <40-hex-commit> --smoke
+python tools/gates/generate_release.py --target windows-x86_64 --out release/candidates/windows-x86_64 --revision <40-hex-commit> --builder-profile local-builder --smoke
 ```
 
 ## External attestations
