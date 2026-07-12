@@ -1,0 +1,32 @@
+{
+  "schema": "noos/macos-node-release-evidence/v1",
+  "workflow_run": "https://github.com/tman747/noosphere/actions/runs/29201765042",
+  "commit": "4ad87c421465fea6aaee6b505a22365f94e90368",
+  "artifact": "mindchain-macos-node-4ad87c421465fea6aaee6b505a22365f94e90368",
+  "artifact_digest": "sha256:067d66f8e024004503ad5be407d11cf964569beaeb0a5f249db51a6fec6a93f9",
+  "platform": "macOS-14.8.7-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "checks": [
+    "native release build",
+    "noosd --version",
+    "noosd --help exposes --devnet-witness",
+    "macOS onboarding zsh syntax",
+    "LAN manifest initialization"
+  ],
+  "binaries": [
+    {
+      "file": "noos-cli",
+      "sha256": "56a63346c24d88231dbca584e9c23c57cb9675470225cf0ac6d79e4fe05c63c6"
+    },
+    {
+      "file": "noos-indexer",
+      "sha256": "d52c8ba47d2d0df8c7699d14d73bd778dc7e64cf69fcd9a082d063cf803068ba"
+    },
+    {
+      "file": "noosd",
+      "sha256": "57b914bd2cafda62aa9d79e1b93759701a3bfd39c8f30591382d9f1f0d617045"
+    }
+  ],
+  "code_signing": "unsigned",
+  "notarization": "not notarized; Apple Developer ID credentials were not available"
+}
