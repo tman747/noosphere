@@ -154,6 +154,10 @@ pub struct ConformanceRun {
     pub profile_root: Hash32,
     pub model_root: Hash32,
     pub device_roots: BTreeMap<Hash32, Hash32>,
+    /// Vendor identities represented by the measured devices.
+    pub vendor_roots: BTreeSet<Hash32>,
+    /// Architecture identities represented by the measured devices.
+    pub architecture_roots: BTreeSet<Hash32>,
     pub operator_instances: u64,
     pub boundary_mismatches: u64,
     pub fp16_control_diverged: bool,
@@ -169,6 +173,10 @@ impl ConformanceRun {
             || self.model_root == [0; 32]
             || self.device_roots.len() < 2
             || self.device_roots.values().any(|root| *root == [0; 32])
+            || self.vendor_roots.len() < 2
+            || self.architecture_roots.len() < 2
+            || self.vendor_roots.contains(&[0; 32])
+            || self.architecture_roots.contains(&[0; 32])
             || self.operator_instances == 0
         {
             return Err(LifecycleError::IncompleteConformance);
@@ -195,6 +203,8 @@ impl ConformanceRun {
     pub fn external_threshold_met(&self) -> bool {
         self.operator_instances >= 1_000_000_000
             && self.device_roots.len() >= 3
+            && self.vendor_roots.len() >= 3
+            && self.architecture_roots.len() >= 3
             && self.validate_local_precursor().is_ok()
     }
 }
@@ -536,6 +546,8 @@ mod tests {
             profile_root: h(1),
             model_root: h(2),
             device_roots: BTreeMap::from([(h(3), h(4)), (h(5), h(6)), (h(7), h(8))]),
+            vendor_roots: BTreeSet::from([h(9), h(10), h(11)]),
+            architecture_roots: BTreeSet::from([h(12), h(13), h(14)]),
             operator_instances: 10_000,
             boundary_mismatches: 0,
             fp16_control_diverged: true,
@@ -546,6 +558,13 @@ mod tests {
         };
         assert!(run.validate_local_precursor().is_ok());
         assert!(!run.external_threshold_met());
+        let vendors = run.vendor_roots.clone();
+        run.vendor_roots = BTreeSet::from([h(9)]);
+        assert_eq!(
+            run.validate_local_precursor(),
+            Err(LifecycleError::IncompleteConformance)
+        );
+        run.vendor_roots = vendors;
         run.boundary_mismatches = 1;
         assert_eq!(
             run.validate_local_precursor(),

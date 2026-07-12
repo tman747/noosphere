@@ -5,7 +5,7 @@
       "packages": ["noos-hearth", "noos-workerd"],
       "command": "python tools/gates/run_hearth_claim.py --claim H-HEARTH",
       "rollback_command": "python tools/gates/run_hearth_claim.py --claim H-HEARTH --rollback-check",
-      "notes": "Local precursor: five-state FORMING/ATTESTING/ACTIVE/DEGRADED/RETIRED lifecycle with bond, generation, re-attestation, challenge-window, custody-handoff gates; exhaustive optimal contiguous whole-layer partitioner under memory/bandwidth constraints; generation/layer/byte-bound integer boundary commitments; conformance evaluator separates any mismatch, powerless FP16 control, >2x performance, and <70% partition quality. PARTIAL: no real NVIDIA/AMD/CPU corpus and no >=10^9 measured operator campaign."
+      "notes": "Local precursor: five-state FORMING/ATTESTING/ACTIVE/DEGRADED/RETIRED lifecycle with bond, generation, re-attestation, challenge-window, custody-handoff gates; exhaustive optimal contiguous whole-layer partitioner under memory/bandwidth constraints; generation/layer/byte-bound integer boundary commitments; conformance evaluator requires independently identified vendor and architecture diversity and separates any mismatch, powerless FP16 control, >2x performance, and <70% partition quality. PARTIAL: no real NVIDIA/AMD/CPU corpus and no >=10^9 measured operator campaign."
     },
     "H-FEDERATE": {
       "local_implementation_state": "PARTIAL",
