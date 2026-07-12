@@ -10,7 +10,7 @@ $ExpectedHashes = @{
     3 = "99df34ce319d68063e153451403db826030efb707aa52f654784c29b7a656908"
 }
 $FileName = "MindChain-Windows-Witness-$WitnessIndex.zip"
-$BundleUrl = "https://github.com/tman747/noosphere/releases/download/mindchain-lan-devnet-v1/$FileName"
+$BundleUrl = "https://github.com/tman747/noosphere/releases/download/mindchain-lan-devnet-v2/$FileName"
 $ExpectedSha256 = $ExpectedHashes[$WitnessIndex]
 $Work = Join-Path $env:TEMP ("MindChain-Join-" + [guid]::NewGuid().ToString("N"))
 $Archive = Join-Path $Work $FileName

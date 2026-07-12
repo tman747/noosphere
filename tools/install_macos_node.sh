@@ -8,7 +8,7 @@ case "$WITNESS_INDEX" in
   3) EXPECTED_SHA256="82b7cdbee475cad0b2b108ceb4243aed48d70659952361092c528a5490c230ec" ;;
   *) print -u2 "Witness index must be 1, 2, or 3."; exit 2 ;;
 esac
-BUNDLE_URL="https://github.com/tman747/noosphere/releases/download/mindchain-lan-devnet-v1/MindChain-macOS-ARM64-Witness-${WITNESS_INDEX}.zip"
+BUNDLE_URL="https://github.com/tman747/noosphere/releases/download/mindchain-lan-devnet-v2/MindChain-macOS-ARM64-Witness-${WITNESS_INDEX}.zip"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   print -u2 "This installer must be run on a Mac."
