@@ -37,20 +37,20 @@ SOURCES = (
     PREREQUISITES,
     "protocol/vectors/nel/forward-w8a8-v1.json",
     "tools/gates/run_nel_lab_claim.py",
+    "tools/gates/test_nel_lab_claim.py",
 )
 HANDSHAKE_ARTIFACTS = {
     "silu": Path("C:/tmp/nel-real-inference/runs/silu_clip.json"),
     "second": Path("C:/tmp/nel-real-inference/runs/second_impl.json"),
     "divergence": Path("C:/tmp/nel-real-inference/runs/divergence_probe.json"),
 }
+HANDSHAKE_SHA256 = {
+    "silu": "5072ab8ab32a65d74ec6c69f4135109c80197c34896d5ceaf6db9a6562f6b626",
+    "second": "b9b09de7abeaf474f5eb61482209d4c9096b2502a729872e705dd36eae6ee3f1",
+    "divergence": "4912dba51d2f0b32143331518064b65463444c3049b4e2f3869d174397f4dfe2",
+}
 
 
-def file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def harness(claim: str) -> dict[str, object]:
@@ -103,9 +103,12 @@ def validate_local(claim: str, metrics: dict[str, object]) -> None:
         require(metrics.get("schema_passed") is True, "accuracy schema fixture failed")
         require(metrics.get("real_0_5b_hidden_suite") is False, "fabricated hidden-suite evidence")
     elif claim == "E-NEL-03":
+        require(metrics.get("fixture_only") is True, "latency fixture provenance lost")
         require(metrics.get("lifecycle_sealed") is True, "latency lifecycle did not seal")
         require(metrics.get("all_surfaces_soft") is True, "SOFT label laundering")
         require(metrics.get("control_clusters") == 3, "fixture cluster coverage mismatch")
+        require(int(metrics.get("p95_ms", 5_000)) < 2_000, "local p95 threshold failed")
+        require(int(metrics.get("p99_ms", 5_000)) < 5_000, "local p99 threshold failed")
         require(metrics.get("drops") == metrics.get("refunds") == 1, "drop/refund mismatch")
         require(metrics.get("public_experiment") is False, "fabricated public latency evidence")
     elif claim == "E-NEL-04":
@@ -148,9 +151,15 @@ def validate_handshake() -> dict[str, object]:
     missing = [str(path) for path in HANDSHAKE_ARTIFACTS.values() if not path.is_file()]
     if missing:
         return {"available": False, "missing": missing}
+    snapshots = {
+        name: path.read_bytes() for name, path in sorted(HANDSHAKE_ARTIFACTS.items())
+    }
+    actual_sha256 = {
+        name: hashlib.sha256(content).hexdigest() for name, content in snapshots.items()
+    }
+    require(actual_sha256 == HANDSHAKE_SHA256, "handshake artifact digest mismatch")
     documents = {
-        name: json.loads(path.read_text(encoding="utf-8"))
-        for name, path in HANDSHAKE_ARTIFACTS.items()
+        name: json.loads(content) for name, content in snapshots.items()
     }
     silu = documents["silu"]
     second = documents["second"]
@@ -170,9 +179,7 @@ def validate_handshake() -> dict[str, object]:
     require(divergence["vulkan_cross_check"]["integer_matches_vulkan_16_of_16"] is True, "Vulkan sequence mismatch")
     return {
         "available": True,
-        "artifact_sha256": {
-            name: file_sha256(path) for name, path in sorted(HANDSHAKE_ARTIFACTS.items())
-        },
+        "artifact_sha256": actual_sha256,
         "layers": second["layers"],
         "digests_equal": second["digests_equal"],
         "final_logits_equal": second["final_logits_equal"],
