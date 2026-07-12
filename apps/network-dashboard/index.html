@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f7f2e5">
+  <title>MindChain Network Instruments</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css?v=2">
+</head>
+<body>
+  <aside class="rail" aria-label="Dashboard navigation">
+    <a class="brand" href="#overview" aria-label="MindChain overview"><span class="brand-mark">M</span><span class="brand-word">MINDCHAIN</span></a>
+    <nav id="nav">
+      <a href="#overview" data-route="overview"><span class="nav-index">01</span><span>Overview</span></a>
+      <a href="#consensus" data-route="consensus"><span class="nav-index">02</span><span>Consensus</span></a>
+      <a href="#compute" data-route="compute"><span class="nav-index">03</span><span>Compute</span></a>
+      <a href="#nodes" data-route="nodes"><span class="nav-index">04</span><span>Nodes</span></a>
+    </nav>
+    <div class="rail-foot"><span id="rail-pulse" class="pulse"></span><span id="rail-state">CONNECTING</span></div>
+  </aside>
+  <main>
+    <div id="app" aria-live="polite"><div class="boot"><span class="spinner"></span>ESTABLISHING INSTRUMENT FEED</div></div>
+  </main>
+  <footer class="mobile-tabs" aria-label="Dashboard navigation">
+    <a href="#overview" data-route="overview"><b>01</b>OVERVIEW</a>
+    <a href="#consensus" data-route="consensus"><b>02</b>CONSENSUS</a>
+    <a href="#compute" data-route="compute"><b>03</b>COMPUTE</a>
+    <a href="#nodes" data-route="nodes"><b>04</b>NODES</a>
+  </footer>
+  <script src="/app.js?v=2" defer></script>
+</body>
+</html>

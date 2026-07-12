@@ -61,7 +61,8 @@ if (-not $IsAdministrator) {
 $FirewallRules = @(
     @{ Name = "MindChain-P2P-UDP-21701"; Protocol = "UDP"; Port = 21701 },
     @{ Name = "MindChain-API-TCP-21080"; Protocol = "TCP"; Port = 21080 },
-    @{ Name = "MindChain-Compute-TCP-18110"; Protocol = "TCP"; Port = 18110 }
+    @{ Name = "MindChain-Compute-TCP-18110"; Protocol = "TCP"; Port = 18110 },
+    @{ Name = "MindChain-Dashboard-TCP-18120"; Protocol = "TCP"; Port = 18120 }
 )
 foreach ($rule in $FirewallRules) {
     if (-not (Get-NetFirewallRule -DisplayName $rule.Name -ErrorAction SilentlyContinue)) {
@@ -164,7 +165,41 @@ if (-not $MarketReady) {
     Write-Warning "The validator is online, but the optional compute market did not start."
 }
 
+$DashboardReady = $false
+try {
+    $DashboardHealth = Invoke-RestMethod -Uri "http://127.0.0.1:18120/api/health" -TimeoutSec 2
+    $DashboardReady = ($DashboardHealth.schema -eq "noos/network-dashboard-health/v1")
+} catch {
+    $DashboardReady = $false
+}
+if (-not $DashboardReady) {
+    $DashboardArgs = @(
+        (Join-Path $Repo "tools\network_dashboard.py"),
+        "--operator-node", "http://127.0.0.1:21632",
+        "--operator-secret", $OperatorSecret,
+        "--indexer", "http://127.0.0.1:21080",
+        "--compute", "http://127.0.0.1:18110",
+        "--database", (Join-Path $NetworkRoot "network-dashboard.sqlite3"),
+        "--listen", "0.0.0.0:18120"
+    )
+    Start-Process python -WorkingDirectory $Repo -ArgumentList $DashboardArgs -WindowStyle Minimized
+    $DashboardDeadline = (Get-Date).AddSeconds(15)
+    do {
+        Start-Sleep -Milliseconds 300
+        try {
+            $DashboardHealth = Invoke-RestMethod -Uri "http://127.0.0.1:18120/api/health" -TimeoutSec 2
+            $DashboardReady = ($DashboardHealth.schema -eq "noos/network-dashboard-health/v1")
+        } catch {
+            $DashboardReady = $false
+        }
+    } until ($DashboardReady -or (Get-Date) -ge $DashboardDeadline)
+}
+if (-not $DashboardReady) {
+    Write-Warning "The validator is online, but the network dashboard did not start."
+}
+
 Write-Host "MindChain invitation host is online." -ForegroundColor Green
 Write-Host "Validator: $ExpectedHost UDP 21701"
 Write-Host "Public API: http://${ExpectedHost}:21080"
+Write-Host "Network dashboards: http://${ExpectedHost}:18120"
 Write-Host "Keep this PC awake and connected while invited nodes are running."
