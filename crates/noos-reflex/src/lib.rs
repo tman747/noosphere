@@ -197,18 +197,38 @@ impl ReflexAccumulator {
 pub struct ContradictionProof {
     pub left: Tick,
     pub right: Tick,
+    pub left_events: Vec<SettlementEvent>,
+    pub right_events: Vec<SettlementEvent>,
 }
-
 impl ContradictionProof {
     pub fn verify(&self) -> Result<Hash32, ReflexError> {
         self.left.verify_signature()?;
         self.right.verify_signature()?;
-        if self.left.leader_key != self.right.leader_key
+        if self.left.event_count as usize != self.left_events.len()
+            || self.right.event_count as usize != self.right_events.len()
+            || self.left.tx_root != event_tx_root(&self.left_events)
+            || self.right.tx_root != event_tx_root(&self.right_events)
+            || self.left.receipt_root != event_receipt_root(&self.left_events)
+            || self.right.receipt_root != event_receipt_root(&self.right_events)
+            || self.left.leader_key != self.right.leader_key
             || self.left.bond_id != self.right.bond_id
             || self.left.slot != self.right.slot
             || self.left.sequence != self.right.sequence
             || self.left.digest() == self.right.digest()
         {
+            return Err(ReflexError::NotContradiction);
+        }
+        let mut left_promises = BTreeSet::new();
+        let mut right_promises = BTreeSet::new();
+        if self.left_events.iter().any(|event| {
+            event.promise_id == [0; 32]
+                || event.beneficiary == [0; 32]
+                || !left_promises.insert(event.promise_id)
+        }) || self.right_events.iter().any(|event| {
+            event.promise_id == [0; 32]
+                || event.beneficiary == [0; 32]
+                || !right_promises.insert(event.promise_id)
+        }) {
             return Err(ReflexError::NotContradiction);
         }
         let mut pair = [self.left.digest(), self.right.digest()];
@@ -217,6 +237,33 @@ impl ContradictionProof {
             b"NOOS/A-REFLEX/CONTRADICTION/V2",
             &[&pair[0], &pair[1]],
         ))
+    }
+
+    fn promised_liabilities(&self) -> Result<BTreeMap<Hash32, u128>, ReflexError> {
+        let mut promises = BTreeMap::<Hash32, SettlementEvent>::new();
+        for event in self.left_events.iter().chain(&self.right_events) {
+            match promises.entry(event.promise_id) {
+                std::collections::btree_map::Entry::Vacant(entry) => {
+                    entry.insert(event.clone());
+                }
+                std::collections::btree_map::Entry::Occupied(mut entry) => {
+                    if entry.get().beneficiary != event.beneficiary {
+                        return Err(ReflexError::CompensationMismatch);
+                    }
+                    if event.liability > entry.get().liability {
+                        entry.get_mut().liability = event.liability;
+                    }
+                }
+            }
+        }
+        let mut by_beneficiary = BTreeMap::<Hash32, u128>::new();
+        for event in promises.values() {
+            let total = by_beneficiary.entry(event.beneficiary).or_default();
+            *total = total
+                .checked_add(event.liability)
+                .ok_or(ReflexError::Arithmetic)?;
+        }
+        Ok(by_beneficiary)
     }
 }
 
@@ -286,6 +333,7 @@ impl CanonicalAnchor {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SettlementEvent {
     pub promise_id: Hash32,
+    pub beneficiary: Hash32,
     pub action_root: Hash32,
     pub receipt_root: Hash32,
     pub gas: u64,
@@ -299,6 +347,7 @@ pub fn event_tx_root(events: &[SettlementEvent]) -> Hash32 {
     hasher.update(&(events.len() as u64).to_le_bytes());
     for event in events {
         hasher.update(&event.promise_id);
+        hasher.update(&event.beneficiary);
         hasher.update(&event.action_root);
         hasher.update(&event.gas.to_le_bytes());
         hasher.update(&event.liability.to_le_bytes());
@@ -531,11 +580,26 @@ impl ReflexLifecycle {
         victims: &[VictimClaim],
     ) -> Result<u128, ReflexError> {
         let proof_id = proof.verify()?;
+        let promised_liabilities = proof.promised_liabilities()?;
         if self.settled_proofs.contains(&proof_id) {
             return Err(ReflexError::PromiseReplay);
         }
         if self.bond_leaders.get(&proof.left.bond_id) != Some(&proof.left.leader_key) {
             return Err(ReflexError::Leader);
+        }
+        let mut claimed_liabilities = BTreeMap::new();
+        for victim in victims {
+            if victim.account == [0; 32]
+                || victim.amount == 0
+                || claimed_liabilities
+                    .insert(victim.account, victim.amount)
+                    .is_some()
+            {
+                return Err(ReflexError::CompensationMismatch);
+            }
+        }
+        if claimed_liabilities != promised_liabilities {
+            return Err(ReflexError::CompensationMismatch);
         }
         let total = victims.iter().try_fold(0_u128, |sum, victim| {
             sum.checked_add(victim.amount)
@@ -543,16 +607,26 @@ impl ReflexLifecycle {
         })?;
         let bond = self
             .bonds
-            .get_mut(&proof.left.bond_id)
+            .get(&proof.left.bond_id)
+            .copied()
             .ok_or(ReflexError::Leader)?;
-        *bond = bond
+        let remaining_bond = bond
             .checked_sub(total)
             .ok_or(ReflexError::InsufficientBond)?;
+        let mut resulting_balances = Vec::with_capacity(victims.len());
         for victim in victims {
-            let balance = self.compensation.entry(victim.account).or_default();
-            *balance = balance
+            let resulting = self
+                .compensation
+                .get(&victim.account)
+                .copied()
+                .unwrap_or(0)
                 .checked_add(victim.amount)
                 .ok_or(ReflexError::Arithmetic)?;
+            resulting_balances.push((victim.account, resulting));
+        }
+        self.bonds.insert(proof.left.bond_id, remaining_bond);
+        for (account, balance) in resulting_balances {
+            self.compensation.insert(account, balance);
         }
         self.settled_proofs.insert(proof_id);
         Ok(total)
@@ -667,6 +741,8 @@ pub enum ReflexError {
     ClassGate(ClassGateDenial),
     #[error("bond cannot compensate every victim")]
     InsufficientBond,
+    #[error("victim claims do not exactly cover the disclosed promise liabilities")]
+    CompensationMismatch,
     #[error("integer arithmetic overflow")]
     Arithmetic,
     #[error("Reflex lane rolled back to canonical blocks only")]
@@ -689,6 +765,7 @@ mod tests {
         SettlementEvent {
             promise_id: h(id),
             action_root: h(id.wrapping_add(20)),
+            beneficiary: h(id.wrapping_add(60)),
             receipt_root: h(id.wrapping_add(40)),
             gas,
             liability,
@@ -929,16 +1006,17 @@ mod tests {
         let proof = ContradictionProof {
             left: signed(&key, 1, 0, 100, [0; 32], h(9), &left_events, 5),
             right: signed(&key, 1, 0, 100, [0; 32], h(9), &right_events, 5),
+            left_events: left_events.clone(),
+            right_events: right_events.clone(),
         };
-        let proof_id = proof.verify().unwrap();
-        assert_ne!(proof_id, [0; 32]);
+        assert_ne!(proof.verify().unwrap(), [0; 32]);
         let victims = vec![
             VictimClaim {
-                account: h(30),
+                account: left_events[0].beneficiary,
                 amount: 4,
             },
             VictimClaim {
-                account: h(31),
+                account: right_events[0].beneficiary,
                 amount: 6,
             },
         ];
@@ -947,11 +1025,93 @@ mod tests {
             10
         );
         assert_eq!(lifecycle.bond_balance(h(9)), 90);
-        assert_eq!(lifecycle.compensation_balance(h(30)), 4);
-        assert_eq!(lifecycle.compensation_balance(h(31)), 6);
+        assert_eq!(lifecycle.compensation_balance(left_events[0].beneficiary), 4);
+        assert_eq!(lifecycle.compensation_balance(right_events[0].beneficiary), 6);
         assert_eq!(
             lifecycle.settle_contradiction(&proof, &victims),
             Err(ReflexError::PromiseReplay)
+        );
+    }
+
+    #[test]
+    fn contradiction_compensation_falsifiers_reject_without_partial_mutation() {
+        let key = SigningKey::from_bytes(&h(7));
+        let left_events = vec![event(1, 5, 4)];
+        let right_events = vec![event(2, 5, 6)];
+        let proof = ContradictionProof {
+            left: signed(&key, 1, 0, 100, [0; 32], h(9), &left_events, 5),
+            right: signed(&key, 1, 0, 100, [0; 32], h(9), &right_events, 5),
+            left_events: left_events.clone(),
+            right_events: right_events.clone(),
+        };
+        let mut lifecycle = ReflexLifecycle::new_lab();
+        lifecycle
+            .register_leader(registration(&key, 1, 9, 100))
+            .unwrap();
+        let underpaid = [VictimClaim {
+            account: left_events[0].beneficiary,
+            amount: 9,
+        }];
+        assert_eq!(
+            lifecycle.settle_contradiction(&proof, &underpaid),
+            Err(ReflexError::CompensationMismatch)
+        );
+        assert_eq!(lifecycle.bond_balance(h(9)), 100);
+        assert_eq!(lifecycle.compensation_balance(left_events[0].beneficiary), 0);
+
+        let duplicate = [
+            VictimClaim {
+                account: left_events[0].beneficiary,
+                amount: 4,
+            },
+            VictimClaim {
+                account: left_events[0].beneficiary,
+                amount: 6,
+            },
+        ];
+        assert_eq!(
+            lifecycle.settle_contradiction(&proof, &duplicate),
+            Err(ReflexError::CompensationMismatch)
+        );
+        assert_eq!(lifecycle.bond_balance(h(9)), 100);
+
+        let mut bad_disclosure = proof;
+        bad_disclosure.left_events[0].liability = 5;
+        assert_eq!(bad_disclosure.verify(), Err(ReflexError::NotContradiction));
+
+        let shared = event(3, 1, 2);
+        let extra = event(4, 1, 3);
+        let overlapping = ContradictionProof {
+            left: signed(&key, 1, 0, 100, [0; 32], h(9), std::slice::from_ref(&shared), 1),
+            right: signed(
+                &key,
+                1,
+                0,
+                100,
+                [0; 32],
+                h(9),
+                &[shared.clone(), extra.clone()],
+                2,
+            ),
+            left_events: vec![shared.clone()],
+            right_events: vec![shared.clone(), extra.clone()],
+        };
+        assert!(overlapping.verify().is_ok());
+        let overlap_victims = [
+            VictimClaim {
+                account: shared.beneficiary,
+                amount: shared.liability,
+            },
+            VictimClaim {
+                account: extra.beneficiary,
+                amount: extra.liability,
+            },
+        ];
+        assert_eq!(
+            lifecycle
+                .settle_contradiction(&overlapping, &overlap_victims)
+                .unwrap(),
+            5
         );
     }
 

@@ -319,10 +319,75 @@ impl TrainingStepWitness {
             .verify(LeafRole::InputGradient, self.gy_root)?;
         self.weight_gradient
             .verify(LeafRole::WeightGradient, self.gy_root)?;
-        if self.forward.artifact.c32 != self.inference.artifact.c32 {
+        let inference = &self.inference.artifact;
+        let forward = &self.forward.artifact;
+        let input_gradient = &self.input_gradient.artifact;
+        let weight_gradient = &self.weight_gradient.artifact;
+        if inference.rows == 0
+            || inference.inner == 0
+            || inference.columns == 0
+            || (inference.rows, inference.inner, inference.columns)
+                != (forward.rows, forward.inner, forward.columns)
+            || inference.left != forward.left
+            || inference.right != forward.right
+            || inference.c32 != forward.c32
+            || (input_gradient.rows, input_gradient.inner, input_gradient.columns)
+                != (forward.rows, forward.columns, forward.inner)
+            || (weight_gradient.rows, weight_gradient.inner, weight_gradient.columns)
+                != (forward.inner, forward.rows, forward.columns)
+            || input_gradient.left != weight_gradient.right
+            || hash_i8(b"NOOS/E-IDENT-02/GY/V1", &input_gradient.left) != self.gy_root
+            || !is_transpose(
+                &forward.right,
+                forward.inner,
+                forward.columns,
+                &input_gradient.right,
+            )
+            || !is_transpose(
+                &forward.left,
+                forward.rows,
+                forward.inner,
+                &weight_gradient.left,
+            )
+        {
             return Err(IdentityError::LeafSubstitution);
         }
-        if !self.census.phase_sum_is_exact() || self.census.ratio_bps() > 35_000 {
+        let forward_macs = macs(forward.rows, forward.inner, forward.columns)?;
+        let expected = PhaseCensus {
+            forward_macs,
+            input_gradient_macs: macs(
+                input_gradient.rows,
+                input_gradient.inner,
+                input_gradient.columns,
+            )?,
+            weight_gradient_macs: macs(
+                weight_gradient.rows,
+                weight_gradient.inner,
+                weight_gradient.columns,
+            )?,
+            training_total_macs: forward_macs
+                .checked_add(macs(
+                    input_gradient.rows,
+                    input_gradient.inner,
+                    input_gradient.columns,
+                )?)
+                .and_then(|sum| {
+                    sum.checked_add(
+                        macs(
+                            weight_gradient.rows,
+                            weight_gradient.inner,
+                            weight_gradient.columns,
+                        )
+                        .ok()?,
+                    )
+                })
+                .ok_or(IdentityError::CostOverflow)?,
+            inference_macs: macs(inference.rows, inference.inner, inference.columns)?,
+        };
+        if self.census != expected
+            || !self.census.phase_sum_is_exact()
+            || self.census.ratio_bps() > 35_000
+        {
             return Err(IdentityError::CostEnvelope);
         }
         Ok(())
@@ -347,7 +412,7 @@ impl PentagonSpanWitness {
     ) -> Result<Self, IdentityError> {
         artifact.verify()?;
         training.verify()?;
-        if escrow_id == [0; 32] || artifact.c32_root() != training.forward.artifact.c32_root() {
+        if escrow_id == [0; 32] || artifact.root() != training.forward.artifact.root() {
             return Err(IdentityError::AdjointSubstitution);
         }
         let mut witness = Self {
@@ -369,7 +434,7 @@ impl PentagonSpanWitness {
     pub fn verify(&self) -> Result<(), IdentityError> {
         self.artifact.verify()?;
         self.training.verify()?;
-        if self.artifact.c32_root() != self.training.forward.artifact.c32_root() {
+        if self.artifact.root() != self.training.forward.artifact.root() {
             return Err(IdentityError::AdjointSubstitution);
         }
         if self.compute_root() != self.witness_root {
@@ -701,6 +766,22 @@ fn leaf_transcript_root(
         &[&[role as u8], &span_id, &gy_root, &artifact_root],
     )
 }
+fn is_transpose(
+    input: &[i8],
+    rows: usize,
+    columns: usize,
+    candidate: &[i8],
+) -> bool {
+    if input.len() != rows.saturating_mul(columns) || candidate.len() != input.len() {
+        return false;
+    }
+    (0..rows).all(|row| {
+        (0..columns).all(|column| {
+            input[row * columns + column] == candidate[column * rows + row]
+        })
+    })
+}
+
 
 fn transpose(input: &[i8], rows: usize, columns: usize) -> Result<Vec<i8>, IdentityError> {
     if input.len() != rows.saturating_mul(columns) {
@@ -919,6 +1000,47 @@ mod tests {
     }
 
     #[test]
+    fn dimensions_inputs_and_cost_census_are_immutable_parts_of_the_shared_identity() {
+        let honest = training(32, 16, 24);
+
+        let mut dimension_substitution = honest.clone();
+        dimension_substitution.input_gradient.artifact.rows = 16;
+        dimension_substitution.input_gradient.artifact.inner = 32;
+        assert!(dimension_substitution.verify().is_err());
+
+        let mut same_output_different_input = training(2, 2, 2);
+        same_output_different_input.inference.artifact.left[0] =
+            same_output_different_input.inference.artifact.left[0].wrapping_add(1);
+        same_output_different_input.inference.artifact.right.fill(0);
+        same_output_different_input.forward.artifact.right.fill(0);
+        assert!(same_output_different_input.verify().is_err());
+
+        let mut forged_census = honest;
+        forged_census.census.forward_macs -= 1;
+        forged_census.census.training_total_macs -= 1;
+        assert_eq!(forged_census.verify(), Err(IdentityError::CostEnvelope));
+        let alternate = TrainingStepWitness::execute(
+            values(32 * 16, 9),
+            values(16 * 24, 10),
+            values(32 * 24, 3),
+            32,
+            16,
+            24,
+            params(),
+        )
+        .unwrap();
+        let mut transplanted = forged_census.clone();
+        transplanted.census.forward_macs += 1;
+        transplanted.census.training_total_macs += 1;
+        transplanted.input_gradient = alternate.input_gradient;
+        assert_eq!(
+            transplanted.verify(),
+            Err(IdentityError::LeafSubstitution)
+        );
+
+    }
+
+    #[test]
     fn one_witness_emits_five_products_and_each_is_independently_disableable() {
         let witness = witness();
         let chain = [12; 32];
@@ -957,6 +1079,42 @@ mod tests {
             assert_eq!(delivery.receipts.len(), 4);
             assert!(!delivery.receipts.contains_key(&disabled));
         }
+    }
+
+    #[test]
+    fn equal_c32_from_a_different_span_is_not_the_one_shared_witness() {
+        let step = training(2, 2, 2);
+        let mut substituted = step.forward.artifact.clone();
+        substituted.left.fill(0);
+        substituted.right.fill(0);
+        substituted.c32.fill(0);
+        substituted.c8.fill(0);
+        substituted.root = substituted.compute_root();
+        let mut alternate_training = step;
+        alternate_training.forward.artifact = substituted.clone();
+        alternate_training.inference.artifact = substituted.clone();
+        alternate_training.census = PhaseCensus {
+            forward_macs: 8,
+            input_gradient_macs: 8,
+            weight_gradient_macs: 8,
+            training_total_macs: 24,
+            inference_macs: 8,
+        };
+        assert!(PentagonSpanWitness::bind(
+            SpanArtifact::execute(
+                vec![0; 4],
+                vec![1; 4],
+                2,
+                2,
+                2,
+                params(),
+            )
+            .unwrap(),
+            token_state(alternate_training.forward.transcript_root()),
+            alternate_training,
+            [11; 32],
+        )
+        .is_err());
     }
 
     #[test]
