@@ -37,10 +37,50 @@ def transaction_spec(profile: dict, signer: str, height: int, action: dict) -> d
     }
 
 
+def live_status(profile: dict) -> dict:
+    node = profile.get("_operator_node")
+    token = profile.get("_operator_token")
+    if not isinstance(node, str) or not isinstance(token, str):
+        return checked_status(profile)
+    origin = node if node.startswith(("http://", "https://")) else f"http://{node}"
+    request = urllib.request.Request(
+        origin.rstrip("/") + "/status",
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+    )
+    with urllib.request.urlopen(request, timeout=5) as response:
+        value = json.load(response)
+    if not isinstance(value, dict):
+        raise RuntimeError("operator status returned malformed JSON")
+    if value.get("chain_id") != profile["chain_id"] or value.get("genesis_hash") != profile["genesis_hash"]:
+        raise RuntimeError("operator status returned the wrong protocol identity")
+    return value
+
+
+def settlement_record(profile: dict, txid: str) -> dict | None:
+    try:
+        return api_json(str(profile["api_base_url"]), f"/api/v1/transactions/{txid}")
+    except SystemExit as error:
+        if "HTTP Error 404" not in str(error):
+            raise
+    try:
+        receipt = api_json(str(profile["api_base_url"]), f"/api/v1/receipts/{txid}")
+    except SystemExit as error:
+        if "HTTP Error 404" in str(error):
+            return None
+        raise
+    state = receipt.get("state") if isinstance(receipt, dict) else None
+    if not isinstance(state, dict) or "status_code" not in state:
+        return None
+    return {
+        "state": "INCLUDED" if int(state["status_code"]) == 0 else "REJECTED",
+        "receipt": receipt,
+    }
+
+
 def submit_action(profile: dict, seed: str, account: int, index: int, action: dict, wait: float = 90) -> dict:
     exe = cargo_binary("noos-cli")
     signer = str(derive(exe, seed, account, index)["verifying_key"])
-    status = checked_status(profile)
+    status = live_status(profile)
     spec = transaction_spec(profile, signer, int(status["unsafe_head"]["height"]), action)
     built = cli_json(exe, "tx", "build", "--spec", json.dumps(spec, separators=(",", ":")))
     signed = cli_json(exe, "tx", "sign", "--tx", str(built["tx"]), "--seed", seed,
@@ -55,13 +95,10 @@ def submit_action(profile: dict, seed: str, account: int, index: int, action: di
         raise RuntimeError("transaction submission returned a mismatched txid")
     deadline = time.monotonic() + wait
     while time.monotonic() < deadline:
-        try:
-            record = api_json(str(profile["api_base_url"]), f"/api/v1/transactions/{txid}")
-        except SystemExit as error:
-            if "HTTP Error 404" in str(error):
-                time.sleep(0.25)
-                continue
-            raise
+        record = settlement_record(profile, txid)
+        if record is None:
+            time.sleep(0.25)
+            continue
         if record.get("state") in {"INCLUDED", "JUSTIFIED", "FINALIZED"}:
             return {"txid": txid, "built": built, "state": record["state"]}
         if record.get("state") in {"REJECTED", "REVERTED"}:

@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from compute_worker import compute_root, submit_action  # noqa: E402
+from compute_worker import compute_root, live_status, submit_action  # noqa: E402
 from wallet_transfer import api_json, cargo_binary, derive, load_profile, read_seed  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +57,8 @@ class Market:
         self.lock = threading.Lock()
 
     def chain(self, path: str) -> dict:
+        if path == "/api/status":
+            return live_status(self.profile)
         return api_json(str(self.profile["api_base_url"]), path)
 
     def create_jobs(self, value: dict) -> dict:
@@ -241,7 +243,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         path = urllib.parse.urlsplit(self.path).path
         try:
-            if path == "/api/config":
+            if path == "/api/health":
+                self.reply(200, {"ok": True, "version": "0.2", "operator_head": bool(self.market.profile.get("_operator_node"))})
+            elif path == "/api/config":
                 self.reply(200, {"requester": self.market.requester,
                                  "chain_id": self.market.profile["chain_id"],
                                  "api_base_url": self.market.profile["api_base_url"]})
@@ -285,6 +289,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply(404, {"error": "not_found"})
         except (ValueError, KeyError, json.JSONDecodeError) as exc:
             self.reply(400, {"error": "invalid_request", "detail": str(exc)})
+        except SystemExit as exc:
+            self.reply(503, {"error": "unavailable", "detail": str(exc)})
         except Exception as exc:
             self.reply(503, {"error": "unavailable", "detail": str(exc)})
 
@@ -301,12 +307,27 @@ def main() -> int:
     parser.add_argument("--listen", default="0.0.0.0:18110")
     parser.add_argument("--database", default=str(Path.home() / ".mindchain-compute-market.sqlite3"))
     parser.add_argument("--admin-token-file", required=True)
+    parser.add_argument("--operator-node")
+    parser.add_argument("--operator-token-file")
     args = parser.parse_args()
     token = Path(args.admin_token_file).read_text(encoding="utf-8").strip()
     if len(token) < 24:
         raise SystemExit("admin token must contain at least 24 characters")
-    market = Market(load_profile(args.profile), read_seed(args.seed_file), args.account, args.index,
-                    Path(args.database), token)
+    profile = load_profile(args.profile)
+    if bool(args.operator_node) != bool(args.operator_token_file):
+        raise SystemExit("--operator-node and --operator-token-file must be supplied together")
+    if args.operator_node:
+        encoded_token = Path(args.operator_token_file).read_text(encoding="utf-8").strip()
+        try:
+            token_value = json.loads(encoded_token)
+            operator_token = str(token_value["rpc_token"])
+        except (json.JSONDecodeError, KeyError, TypeError):
+            operator_token = encoded_token
+        if len(operator_token) < 24:
+            raise SystemExit("operator token must contain at least 24 characters")
+        profile["_operator_node"] = args.operator_node
+        profile["_operator_token"] = operator_token
+    market = Market(profile, read_seed(args.seed_file), args.account, args.index, Path(args.database), token)
     host, port_text = args.listen.rsplit(":", 1)
     server = ThreadingHTTPServer((host, int(port_text)), Handler)
     server.market = market  # type: ignore[attr-defined]

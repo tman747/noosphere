@@ -121,7 +121,20 @@ if (-not $ApiReady) {
 $MarketSeed = "C:\tmp\mindchain-owner.seed"
 $MarketToken = "C:\tmp\mindchain-admin.token"
 $MarketDatabase = "C:\tmp\mindchain-compute-live.sqlite3"
-$MarketReady = $null -ne (Get-NetTCPConnection -LocalPort 18110 -State Listen -ErrorAction SilentlyContinue)
+$MarketReady = $false
+$MarketListener = Get-NetTCPConnection -LocalPort 18110 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($MarketListener) {
+    try {
+        $MarketHealth = Invoke-RestMethod -Uri "http://127.0.0.1:18110/api/health" -TimeoutSec 2
+        $MarketReady = ($MarketHealth.version -eq "0.2" -and $MarketHealth.operator_head -eq $true)
+    } catch {
+        $MarketReady = $false
+    }
+    if (-not $MarketReady) {
+        Stop-Process -Id $MarketListener.OwningProcess -Force
+        Start-Sleep -Seconds 1
+    }
+}
 if (-not $MarketReady -and (Test-Path -LiteralPath $MarketSeed) -and (Test-Path -LiteralPath $MarketToken)) {
     $Deadline = (Get-Date).AddSeconds(30)
     do {
@@ -139,7 +152,9 @@ if (-not $MarketReady -and (Test-Path -LiteralPath $MarketSeed) -and (Test-Path 
             "--seed-file", $MarketSeed,
             "--listen", "0.0.0.0:18110",
             "--database", $MarketDatabase,
-            "--admin-token-file", $MarketToken
+            "--admin-token-file", $MarketToken,
+            "--operator-node", "127.0.0.1:21632",
+            "--operator-token-file", $OperatorSecret
         )
         Start-Process python -WorkingDirectory $Repo -ArgumentList $MarketArgs -WindowStyle Minimized
         $MarketReady = $true
