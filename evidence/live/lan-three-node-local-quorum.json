@@ -1,0 +1,32 @@
+{
+  "schema": "noos/lan-quorum-evidence/v1",
+  "observed_unix_ms": 1783874500908,
+  "environment": "three independent noosd processes on one Windows host using loopback QUIC",
+  "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+  "genesis_hash": "1a8f3a7265ba6cf172bcc6940989447aae32a2d085f5650b0ebe751268857e52",
+  "justified": {
+    "epoch": 1,
+    "hash": "d3396f59c83cc3c671de485b9d8fc4a6e54293b61e0127e64b7fe19b258257d0"
+  },
+  "nodes": [
+    {
+      "role": "producer-witness-0",
+      "operator_port": 24632,
+      "observer": false,
+      "sampled_height": 279
+    },
+    {
+      "role": "observer-witness-1",
+      "operator_port": 24633,
+      "observer": true,
+      "sampled_height": 280
+    },
+    {
+      "role": "observer-witness-2",
+      "operator_port": 24634,
+      "observer": true,
+      "sampled_height": 281
+    }
+  ],
+  "caveat": "This proves the three-process LAN topology and gossiped 3-of-4 fixture quorum, not deployment on three physical machines or a WAN."
+}
