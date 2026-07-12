@@ -17,7 +17,14 @@ from experimental_gate import (
     require_disabled_controls,
 )
 
-CLAIMS = ("S-CHORUS", "S-DREAM", "S-DREAM-LANE", "E-DREAM-02")
+CLAIMS = (
+    "S-ACCESS",
+    "S-CHORUS",
+    "S-DREAM",
+    "S-DREAM-LANE",
+    "S-GLOBAL-ORGANISM",
+    "E-DREAM-02",
+)
 DREAM_ARTIFACT_ROOT = Path("C:/tmp/dream-lane")
 PREMIUMS = (0, 271, 542, 813, 1084)
 EVENTS = 100_000
@@ -109,10 +116,14 @@ def load_dream_sweep() -> dict[str, object]:
 
 
 def rollback_check(claim: str) -> int:
-    package = "noos-chorus" if claim == "S-CHORUS" else "noos-reflex"
+    package = {
+        "S-ACCESS": "noos-loam",
+        "S-CHORUS": "noos-chorus",
+        "S-GLOBAL-ORGANISM": "noos-swarm",
+    }.get(claim, "noos-reflex")
     cargo_test([package])
     continuity = base_continuity()
-    if claim != "S-CHORUS":
+    if claim in {"S-DREAM", "S-DREAM-LANE", "E-DREAM-02"}:
         require_disabled_controls(["dream_lane_enabled"])
     if not continuity["ordinary_base_live"] or not continuity["rollback_verified"]:
         raise SystemExit("ordinary-base rollback continuity failed")
@@ -148,6 +159,66 @@ def main() -> int:
                 "Software signatures are a local identity/profile-binding precursor, not hardware attestation.",
                 "No phone p95, 20 MB, battery, attrition, or real 10x Sybil influence result is claimed.",
                 "Chorus output is advisory with zero proposal/finality weight and zero slashing.",
+            ],
+        )
+        return 0
+
+    if args.claim == "S-ACCESS":
+        local = cargo_test(["noos-loam"])
+        emit(
+            gate="access-recovery",
+            claims=[args.claim],
+            result="EXTERNAL_BLOCKED",
+            expected="EXTERNAL_BLOCKED",
+            checks=[
+                evidence_check("local-access-falsifiers", "falsifier", True, local),
+                evidence_check(
+                    "independent-operator-threshold",
+                    "external_requirement",
+                    False,
+                    "requires a partition drill across at least three independently operated recovery and artifact paths",
+                ),
+            ],
+            sources=[
+                "crates/noos-loam/Cargo.toml",
+                "crates/noos-loam/src/lib.rs",
+                "crates/noos-loam/src/access.rs",
+                "tools/gates/run_dream_chorus_claim.py",
+            ],
+            limitations=[
+                "The manifest rejects repeated declared failure domains, repeated operators, missing path kinds, ambiguous content, and two-domain outages.",
+                "Fixture operator identifiers are declarations, not evidence of independently operated providers.",
+                "Inference remains typed off-consensus and no network-scale continuity result is claimed.",
+            ],
+        )
+        return 0
+
+    if args.claim == "S-GLOBAL-ORGANISM":
+        local = cargo_test(["noos-swarm"])
+        emit(
+            gate="global-organism-g0",
+            claims=[args.claim],
+            result="EXTERNAL_BLOCKED",
+            expected="EXTERNAL_BLOCKED",
+            checks=[
+                evidence_check("finite-component-falsifiers", "falsifier", True, local),
+                evidence_check(
+                    "global-observables-threshold",
+                    "external_requirement",
+                    False,
+                    "no production threshold or preregistered global resilience, control, continuity, rights, and benefit observables exist",
+                ),
+            ],
+            sources=[
+                "crates/noos-swarm/Cargo.toml",
+                "crates/noos-swarm/src/lib.rs",
+                "crates/noos-swarm/src/organism.rs",
+                "tools/gates/run_dream_chorus_claim.py",
+            ],
+            limitations=[
+                "Finite component aggregation explicitly returns establishes_global_organism=false.",
+                "Component fixtures are not planet-scale, independently operated, or production evidence.",
+                "The aggregate has zero proposal and finality weight and remains at G0.",
             ],
         )
         return 0

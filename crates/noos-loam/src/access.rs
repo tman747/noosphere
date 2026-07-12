@@ -341,4 +341,25 @@ mod tests {
         zero_provider.recovery_paths[0].provider = Some([0; 32]);
         assert_ne!(none_id, zero_provider.derive_id());
     }
+    #[test]
+    fn cloned_operator_and_missing_recovery_kind_fail_closed() {
+        let mut cloned_operator = manifest();
+        cloned_operator.recovery_paths[1].provider = Some(h(77));
+        cloned_operator.recovery_paths[2].provider = Some(h(77));
+        cloned_operator.artifact_replicas[1].provider = Some(h(88));
+        cloned_operator.artifact_replicas[2].provider = Some(h(88));
+        cloned_operator.manifest_id = cloned_operator.derive_id();
+        assert_eq!(
+            cloned_operator.validate(),
+            Err(AccessError::InsufficientIndependentPaths)
+        );
+
+        let mut missing_kind = manifest();
+        missing_kind.recovery_paths[2].kind = RecoveryPathKind::ThresholdRecovery;
+        missing_kind.manifest_id = missing_kind.derive_id();
+        assert_eq!(
+            missing_kind.validate(),
+            Err(AccessError::InsufficientIndependentPaths)
+        );
+    }
 }
