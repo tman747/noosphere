@@ -29,6 +29,7 @@ CLAIMS = {
             "tests::forged_equivalence_root_is_rejected_even_with_recomputed_digest",
             "tests::divergent_native_cannot_certify_and_cannot_be_admitted",
             "tests::risc0_builder_rejects_uncertified_jet_and_image_substitution",
+            "tests::risc0_verifier_policy_rejects_noncanonical_image_and_arity_substitution",
         ],
         "limitations": [
             "No proof-assistant universal equivalence certificate, emitted-binary translation validation, second independent checker, or 10^8-case campaign is claimed.",

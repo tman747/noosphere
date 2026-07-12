@@ -899,6 +899,7 @@ fn risc0_guest_execution_matches_host_rv32_and_interpreted_fallback() {
             noos_jet_risc0_shared::ProofInput::decode(&input.canonical_guest_input()).unwrap();
         let guest_claim = decoded.execute().unwrap();
         assert_eq!(&guest_claim, &input.request().claim);
+        assert_eq!(guest_claim.leaf_count, 1);
         let host = execute(&image, &[leaf], RV32_MAX_STEPS).unwrap();
         assert_eq!(
             (guest_claim.status, guest_claim.value, guest_claim.steps),
@@ -917,6 +918,37 @@ fn risc0_guest_execution_matches_host_rv32_and_interpreted_fallback() {
 
 #[cfg(feature = "risc0")]
 #[test]
+fn risc0_verifier_policy_rejects_noncanonical_image_and_arity_substitution() {
+    let (registry, input, _, _) = certified_inc_risc0_input(&[41]);
+    let verifier = crate::risc0::Risc0Verifier::new(&registry, risc0_context());
+    assert_eq!(verifier.validate_request(input.request()), Ok(()));
+
+    let mut image_substitution = input.request().clone();
+    image_substitution.claim.rv32_image_id = lower(&c2(a(1), a(42)), 1).unwrap().image_id();
+    assert_eq!(
+        verifier.validate_request(&image_substitution),
+        Err(crate::risc0::Risc0Error::ImageSubstitution)
+    );
+
+    for invalid_leaf_count in [0, crate::rv32::MAX_LEAVES + 1] {
+        let mut invalid_arity = input.request().clone();
+        invalid_arity.claim.leaf_count = invalid_leaf_count;
+        assert_eq!(
+            verifier.validate_request(&invalid_arity),
+            Err(crate::risc0::Risc0Error::InputArity)
+        );
+    }
+
+    let mut arity_substitution = input.request().clone();
+    arity_substitution.claim.leaf_count = 2;
+    assert_eq!(
+        verifier.validate_request(&arity_substitution),
+        Err(crate::risc0::Risc0Error::ImageSubstitution)
+    );
+}
+
+#[cfg(feature = "risc0")]
+#[test]
 fn real_risc0_cpu_receipt_verifies_and_all_binding_falsifiers_reject() {
     let (registry, input, _, _) = certified_inc_risc0_input(&[41]);
     let verifier = crate::risc0::Risc0Verifier::new(&registry, risc0_context());
@@ -931,10 +963,17 @@ fn real_risc0_cpu_receipt_verifies_and_all_binding_falsifiers_reject() {
     );
 
     let mut image_substitution = request.clone();
-    image_substitution.claim.rv32_image_id[0] ^= 1;
+    image_substitution.claim.rv32_image_id = lower(&c2(a(1), a(42)), 1).unwrap().image_id();
     assert_eq!(
-        verifier.verify(&image_substitution, &receipt),
-        Err(crate::risc0::Risc0Error::JournalMismatch)
+        verifier.verify(&image_substitution, &tampered_receipt),
+        Err(crate::risc0::Risc0Error::ImageSubstitution)
+    );
+
+    let mut arity_substitution = request.clone();
+    arity_substitution.claim.leaf_count = 0;
+    assert_eq!(
+        verifier.verify(&arity_substitution, &tampered_receipt),
+        Err(crate::risc0::Risc0Error::InputArity)
     );
 
     let mut journal_splice = request.clone();

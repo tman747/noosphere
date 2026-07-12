@@ -57,6 +57,11 @@ def check_risc0_case(case: dict, label: str, errors: list[str]) -> None:
         for value in leaves
     ):
         errors.append(f"{label}: 'leaves' must be a non-empty array of unsigned 64-bit integers")
+    leaf_count = case.get("leaf_count")
+    if not isinstance(leaf_count, int) or isinstance(leaf_count, bool) or not 1 <= leaf_count <= 24:
+        errors.append(f"{label}: 'leaf_count' must be an integer in 1..=24")
+    elif isinstance(leaves, list) and leaf_count != len(leaves):
+        errors.append(f"{label}: 'leaf_count' must match the number of leaves")
     for field in ("status", "value", "steps"):
         value = case.get(field)
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
@@ -116,6 +121,8 @@ def check_file(path: Path) -> list[str]:
                     f" (got {raw[:40]!r}{'...' if len(raw) > 40 else ''})"
                 )
     if schema == RISC0_SCHEMA:
+        if doc.get("claim_version") != 2:
+            errors.append("'claim_version' must be 2")
         if doc.get("receipt_kind") not in {"composite", "succinct"}:
             errors.append("'receipt_kind' must be composite or succinct")
         words = doc.get("method_id_words")

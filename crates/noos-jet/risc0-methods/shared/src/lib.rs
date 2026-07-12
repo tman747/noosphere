@@ -6,7 +6,7 @@ extern crate alloc;
 use alloc::{collections::BTreeMap, vec::Vec};
 
 pub const PROOF_INPUT_VERSION: u32 = 1;
-pub const PROOF_CLAIM_VERSION: u32 = 1;
+pub const PROOF_CLAIM_VERSION: u32 = 2;
 pub const RV32_ABI_VERSION: u32 = 1;
 pub const SUBJECT_BASE: u32 = 0x0001_0000;
 pub const STACK_TOP: u32 = 0x0002_0000;
@@ -15,7 +15,7 @@ pub const MAX_IMAGE_WORDS: u32 = 16_384;
 pub const MAX_STEPS: u64 = 1_000_000;
 
 const INPUT_MAGIC: &[u8; 8] = b"NOOSR0I1";
-const CLAIM_MAGIC: &[u8; 8] = b"NOOSR0J1";
+const CLAIM_MAGIC: &[u8; 8] = b"NOOSR0J2";
 const CTX_IMAGE: &[u8] = b"noosphere.jet.rv32.image.v1";
 const CTX_INPUT: &[u8] = b"noosphere.jet.rv32.input.v1";
 const CTX_JOURNAL: &[u8] = b"noosphere.jet.rv32.journal.v1";
@@ -61,6 +61,7 @@ pub struct ProofClaim {
     pub semantics_hash: [u8; 32],
     pub cert_digest: [u8; 32],
     pub rv32_image_id: [u8; 32],
+    pub leaf_count: u32,
     pub input_commit: [u8; 32],
     pub journal_commit: [u8; 32],
     pub status: u32,
@@ -179,6 +180,7 @@ impl ProofInput {
             semantics_hash: self.semantics_hash,
             cert_digest: self.cert_digest,
             rv32_image_id: self.rv32_image_id,
+            leaf_count: self.leaf_count,
             input_commit: input_commit(&self.leaves),
             journal_commit,
             status: exit.status,
@@ -199,6 +201,7 @@ impl ProofClaim {
         out.extend_from_slice(&self.semantics_hash);
         out.extend_from_slice(&self.cert_digest);
         out.extend_from_slice(&self.rv32_image_id);
+        put_u32(&mut out, self.leaf_count);
         out.extend_from_slice(&self.input_commit);
         out.extend_from_slice(&self.journal_commit);
         put_u32(&mut out, self.status);
@@ -448,5 +451,34 @@ mod tests {
         let mut trailing = bytes;
         trailing.push(0);
         assert_eq!(ProofInput::decode(&trailing), Err(Error::MalformedInput));
+    }
+
+    #[test]
+    fn claim_v2_canonically_binds_leaf_count() {
+        let claim = ProofClaim {
+            context: ProofContext {
+                chain_id: [1; 32],
+                domain: [2; 32],
+                profile_id: [3; 32],
+            },
+            jet_id: [4; 32],
+            semantics_hash: [5; 32],
+            cert_digest: [6; 32],
+            rv32_image_id: [7; 32],
+            leaf_count: 1,
+            input_commit: [8; 32],
+            journal_commit: [9; 32],
+            status: 10,
+            value: 11,
+            steps: 12,
+        };
+        let bytes = claim.canonical_bytes();
+        assert_eq!(&bytes[..8], CLAIM_MAGIC);
+        assert_eq!(&bytes[8..12], &PROOF_CLAIM_VERSION.to_le_bytes());
+        assert_eq!(&bytes[236..240], &claim.leaf_count.to_le_bytes());
+
+        let mut other_arity = claim;
+        other_arity.leaf_count = 2;
+        assert_ne!(bytes, other_arity.canonical_bytes());
     }
 }

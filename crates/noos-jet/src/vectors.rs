@@ -509,7 +509,8 @@ pub fn risc0_json() -> String {
     let input_digest = blake3::hash(&guest_input);
     let claim_digest = blake3::hash(&claim_bytes);
     format!(
-        "{{\"schema\":\"noos/jet/risc0-proof-v1\",\"sdk_version\":\"3.0.5\",\"guest_build\":\"risc0-guest-builder-r0.1.88.0\",\"receipt_kind\":\"composite\",\"method_id_words\":[{method_words}],\"guest_elf_blake3\":\"{}\",\"cases\":[{{\"name\":\"certified_inc_41\",\"kind\":\"positive\",\"chain_id\":\"{}\",\"domain\":\"{}\",\"profile_id\":\"{}\",\"jet_id\":\"{}\",\"semantics_hash\":\"{}\",\"cert_digest\":\"{}\",\"rv32_image_id\":\"{}\",\"rv32_image_bytes\":\"{}\",\"leaves\":[41],\"guest_input\":\"{}\",\"guest_input_blake3\":\"{}\",\"journal\":\"{}\",\"journal_blake3\":\"{}\",\"status\":{},\"value\":{},\"steps\":{}}}]}}\n",
+        "{{\"schema\":\"noos/jet/risc0-proof-v1\",\"claim_version\":{},\"sdk_version\":\"3.0.5\",\"guest_build\":\"risc0-guest-builder-r0.1.88.0\",\"receipt_kind\":\"composite\",\"method_id_words\":[{method_words}],\"guest_elf_blake3\":\"{}\",\"cases\":[{{\"name\":\"certified_inc_41\",\"kind\":\"positive\",\"chain_id\":\"{}\",\"domain\":\"{}\",\"profile_id\":\"{}\",\"jet_id\":\"{}\",\"semantics_hash\":\"{}\",\"cert_digest\":\"{}\",\"rv32_image_id\":\"{}\",\"leaf_count\":{},\"rv32_image_bytes\":\"{}\",\"leaves\":[41],\"guest_input\":\"{}\",\"guest_input_blake3\":\"{}\",\"journal\":\"{}\",\"journal_blake3\":\"{}\",\"status\":{},\"value\":{},\"steps\":{}}}]}}\n",
+        noos_jet_risc0_shared::PROOF_CLAIM_VERSION,
         hex(elf_digest.as_bytes()),
         hex(&context.chain_id),
         hex(&context.domain),
@@ -518,6 +519,7 @@ pub fn risc0_json() -> String {
         hex(&input.request().claim.semantics_hash),
         hex(&input.request().claim.cert_digest),
         hex(&input.request().claim.rv32_image_id),
+        input.request().claim.leaf_count,
         hex(&image.bytes()),
         hex(&guest_input),
         hex(input_digest.as_bytes()),

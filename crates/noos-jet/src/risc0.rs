@@ -15,7 +15,7 @@ use risc0_zkvm::{ExecutorEnv, LocalProver, Prover, ProverOpts, Receipt, Verifier
 use crate::cert::JetId;
 use crate::proof::{input_commit, Journal};
 use crate::registry::JetRegistry;
-use crate::rv32::{execute, lower, Rv32Image, Rv32Trap};
+use crate::rv32::{execute, lower, Rv32Image, Rv32Trap, MAX_LEAVES as RV32_MAX_LEAVES};
 
 pub type Risc0ProofContext = ProofContext;
 
@@ -122,6 +122,7 @@ impl Risc0ProofInput {
             semantics_hash: cert.semantics_hash.0,
             cert_digest: cert.digest,
             rv32_image_id: image.image_id(),
+            leaf_count: image.leaf_count,
             input_commit: input_commit(leaves),
             journal_commit: journal.commit(),
             status: exit.status,
@@ -214,6 +215,22 @@ impl<'a> Risc0Verifier<'a> {
         request: &Risc0ProofRequest,
         receipt: &Risc0Receipt,
     ) -> Result<(), Risc0Error> {
+        self.validate_request(request)?;
+        let verifier_context = VerifierContext::default().with_dev_mode(false);
+        receipt
+            .receipt
+            .verify_with_context(&verifier_context, JET_PROOF_ID)
+            .map_err(|_| Risc0Error::ReceiptVerification)?;
+        if receipt.receipt.journal.bytes != request.claim.canonical_bytes() {
+            return Err(Risc0Error::JournalMismatch);
+        }
+        Ok(())
+    }
+
+    /// Fail-closed policy validation performed before receipt verification.
+    /// The admitted certificate formula and claimed arity determine the only
+    /// RV32 image id that may be accepted for this request.
+    pub(crate) fn validate_request(&self, request: &Risc0ProofRequest) -> Result<(), Risc0Error> {
         if request.method_id != JET_PROOF_ID {
             return Err(Risc0Error::MethodImageMismatch);
         }
@@ -230,13 +247,15 @@ impl<'a> Risc0Verifier<'a> {
         {
             return Err(Risc0Error::CertificateMismatch);
         }
-        let verifier_context = VerifierContext::default().with_dev_mode(false);
-        receipt
-            .receipt
-            .verify_with_context(&verifier_context, JET_PROOF_ID)
-            .map_err(|_| Risc0Error::ReceiptVerification)?;
-        if receipt.receipt.journal.bytes != request.claim.canonical_bytes() {
-            return Err(Risc0Error::JournalMismatch);
+        if request.claim.leaf_count == 0 || request.claim.leaf_count > RV32_MAX_LEAVES {
+            return Err(Risc0Error::InputArity);
+        }
+        let formula =
+            decode_formula(&cert.formula).map_err(|_| Risc0Error::MalformedCertifiedFormula)?;
+        let expected =
+            lower(&formula, request.claim.leaf_count).map_err(|_| Risc0Error::ImageSubstitution)?;
+        if expected.image_id() != request.claim.rv32_image_id {
+            return Err(Risc0Error::ImageSubstitution);
         }
         Ok(())
     }
