@@ -54,7 +54,7 @@ LIMITATIONS = {
         "Attribution thresholds are measured on deterministic synthetic ground truth; the score is advisory and has zero consensus weight.",
     ],
     "S-ACCESS": [
-        "The three paths are declared local fixture domains, not evidence from three independent production providers.",
+        "Provider and failure-domain identifiers are source-bound declarations; the exhaustive two-domain fixture is not evidence from three independently controlled production paths.",
     ],
     "I-AGENT": [
         "The composed drill and its lineage/quarantine dependencies are lab fixtures, not a production phone mesh or settlement deployment.",
