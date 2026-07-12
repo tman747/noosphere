@@ -58,10 +58,13 @@ DOMAIN_BITCOIN_ANCHOR = "NOOS/GENESIS/BITCOIN-ANCHOR/V1"
 DOMAIN_DKG_DESCRIPTOR = "NOOS/DKG/DESCRIPTOR/V1"
 DOMAIN_DKG_RECORD = "NOOS/DKG/RECORD/V1"
 DOMAIN_REBUILD = "NOOS/GENESIS/REBUILD/V1"
-DOMAIN_FINAL_FREEZE = "NOOS/GENESIS/FINAL-FREEZE/V1"
-DOMAIN_CUTOVER = "NOOS/CUTOVER/AUTHORIZATION/V1"
-DOMAIN_DKG_TRANSCRIPT = b"NOOS/DKG/TRANSCRIPT/V1"
+DOMAIN_FINAL_FREEZE = "NOOS/GENESIS/FINAL-FREEZE/V2"
+DOMAIN_CUTOVER = "NOOS/CUTOVER/AUTHORIZATION/V2"
+DOMAIN_DKG_CORE = b"NOOS/DKG/CORE/V2"
+DOMAIN_DKG_TRANSCRIPT = b"NOOS/DKG/TRANSCRIPT/V2"
 DOMAIN_DKG_PARTICIPANTS = b"NOOS/DKG/PARTICIPANTS/V1"
+DOMAIN_DKG_POSSESSION = b"NOOS/DKG/POSSESSION/V1"
+BLS_DKG_POSSESSION_DST = b"NOOS-BLS-DKG-POSSESSION-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_"
 
 FREEZE_ROLES = ("release-owner", "independent-build-reviewer")
 FINAL_ROLES = ("release-owner", "independent-build-reviewer", "independent-genesis-rebuilder")
@@ -893,6 +896,13 @@ def _bls_imports():
     return G1_to_pubkey, pubkey_to_G1, G1, Z1, add, curve_order, multiply, normalize
 
 
+def _dkg_possession_bls():
+    from py_ecc.bls import G2ProofOfPossession
+    class DkgPossessionBLS(G2ProofOfPossession):
+        DST = BLS_DKG_POSSESSION_DST
+    return DkgPossessionBLS
+
+
 def validate_dkg_descriptor(
     descriptor: Mapping[str, Any],
     signatures: Mapping[str, Any],
@@ -957,7 +967,8 @@ def verify_dkg_publication_sequence(
     transcript: Mapping[str, Any], publication: Mapping[str, Any],
     *, genesis_time_ms: int | None = None,
 ) -> None:
-    descriptor = transcript.get("descriptor", {})
+    core = transcript.get("core", {})
+    descriptor = core.get("descriptor", {})
     expected_publication_hash = sha256(canonical_json(publication) + b"\n")
     if descriptor.get("quiet_week_publication_sha256") != expected_publication_hash:
         raise AuthorizationError("DKG descriptor does not bind the signed Quiet Week publication record")
@@ -966,7 +977,7 @@ def verify_dkg_publication_sequence(
     if authorized < quiet_end:
         raise AuthorizationError("DKG descriptor was authorized before Quiet Week completed")
     genesis_time = None if genesis_time_ms is None else dt.datetime.fromtimestamp(genesis_time_ms / 1000, dt.timezone.utc)
-    for record in transcript.get("erasure_confirmations", []):
+    for record in core.get("erasure_confirmations", []):
         payload = record.get("payload", {})
         confirmed = parse_utc(payload.get("confirmed_at_utc"), "DKG erasure confirmed_at_utc")
         if confirmed < authorized:
@@ -1254,7 +1265,7 @@ def dkg_erasure_record(
     return _signed_record(payload, role, private)
 
 
-def verify_dkg_transcript(
+def verify_dkg_core_transcript(
     transcript: Mapping[str, Any],
     keyring: Mapping[str, RoleKey],
     freeze: Mapping[str, Any],
@@ -1264,9 +1275,11 @@ def verify_dkg_transcript(
     require_non_fixture(transcript, "DKG transcript", test_mode=test_mode)
     require_exact_keys(
         transcript,
-        {"schema_version", "kind", "descriptor", "descriptor_signatures", "contributions", "reviews", "exclusions", "erasure_confirmations", "group_public_key_g1_hex", "participant_set_root", "dkg_root", "is_test_fixture"},
-        "DKG transcript",
+        {"schema_version", "kind", "descriptor", "descriptor_signatures", "contributions", "reviews", "exclusions", "erasure_confirmations", "group_public_key_g1_hex", "participant_set_root", "core_root", "is_test_fixture"},
+        "DKG core transcript",
     )
+    if transcript["schema_version"] != 2 or transcript["kind"] != "noosphere-dkg-core-transcript-v2":
+        raise AuthorizationError("DKG core transcript kind/version mismatch")
     descriptor = transcript["descriptor"]
     participants = validate_dkg_descriptor(
         descriptor, transcript["descriptor_signatures"], keyring, freeze, test_mode=test_mode
@@ -1402,12 +1415,12 @@ def verify_dkg_transcript(
     if transcript["participant_set_root"] != participant_root:
         raise AuthorizationError("DKG participant set root mismatch")
     root_input = dict(transcript)
-    root_input.pop("dkg_root", None)
-    root = domain_hash(DOMAIN_DKG_TRANSCRIPT, canonical_json(root_input)).hex()
-    if transcript["dkg_root"] != root:
-        raise AuthorizationError("DKG transcript root mismatch")
+    root_input.pop("core_root", None)
+    root = domain_hash(DOMAIN_DKG_CORE, canonical_json(root_input)).hex()
+    if transcript["core_root"] != root:
+        raise AuthorizationError("DKG core transcript root mismatch")
     return {
-        "dkg_root": root,
+        "core_root": root,
         "group_public_key_g1_hex": group_hex,
         "participant_set_root": participant_root,
         "active_participants": [p["participant_id"] for p in active],
@@ -1416,13 +1429,13 @@ def verify_dkg_transcript(
     }
 
 
-def finalize_dkg_transcript(
+def build_dkg_core_transcript(
     descriptor: Mapping[str, Any], descriptor_signatures: Mapping[str, Any],
     contributions: Sequence[Mapping[str, Any]], reviews: Sequence[Mapping[str, Any]],
     exclusions: Sequence[Mapping[str, Any]], erasures: Sequence[Mapping[str, Any]],
     keyring: Mapping[str, RoleKey], freeze: Mapping[str, Any], *, test_mode: bool = False,
 ) -> dict[str, Any]:
-    """Assemble roots, then run the same verifier used by independent parties."""
+    """Assemble the verified v2 DKG core; this is deliberately not final."""
     # Compute expected group/participant roots from a temporary transcript by
     # reusing the verifier's deterministic rules without trusting caller roots.
     participants = validate_dkg_descriptor(descriptor, descriptor_signatures, keyring, freeze, test_mode=test_mode)
@@ -1443,8 +1456,8 @@ def finalize_dkg_transcript(
         ]),
     ).hex()
     transcript: dict[str, Any] = {
-        "schema_version": 1,
-        "kind": "noosphere-dkg-transcript-v1",
+        "schema_version": 2,
+        "kind": "noosphere-dkg-core-transcript-v2",
         "descriptor": dict(descriptor),
         "descriptor_signatures": dict(descriptor_signatures),
         "contributions": list(contributions),
@@ -1453,31 +1466,48 @@ def finalize_dkg_transcript(
         "erasure_confirmations": list(erasures),
         "group_public_key_g1_hex": G1_to_pubkey(group).hex(),
         "participant_set_root": participant_root,
-        "dkg_root": "",
+        "core_root": "",
         "is_test_fixture": bool(test_mode),
     }
-    root_input = dict(transcript); root_input.pop("dkg_root")
-    transcript["dkg_root"] = domain_hash(DOMAIN_DKG_TRANSCRIPT, canonical_json(root_input)).hex()
-    verify_dkg_transcript(transcript, keyring, freeze, test_mode=test_mode)
+    root_input = dict(transcript); root_input.pop("core_root")
+    transcript["core_root"] = domain_hash(DOMAIN_DKG_CORE, canonical_json(root_input)).hex()
+    verify_dkg_core_transcript(transcript, keyring, freeze, test_mode=test_mode)
     return transcript
 
 
+def dkg_possession_challenge(
+    core_root: str, descriptor: Mapping[str, Any], participant_id: str,
+    participant_index: int, public_share_hex: str,
+) -> bytes:
+    """Frozen message signed with the final BLS secret share."""
+    return domain_hash(
+        DOMAIN_DKG_POSSESSION,
+        bytes.fromhex(descriptor["ceremony_id"]),
+        bytes.fromhex(descriptor["exact_revision"]),
+        bytes.fromhex(descriptor["chain_id"]),
+        bytes.fromhex(core_root),
+        participant_index.to_bytes(4, "little"),
+        participant_id.encode("utf-8"),
+        bytes.fromhex(public_share_hex),
+    )
+
+
 def dkg_finalize_participant_share(
-    transcript: Mapping[str, Any], packet_records: Sequence[Mapping[str, Any]],
+    core_transcript: Mapping[str, Any], packet_records: Sequence[Mapping[str, Any]],
     participant_id: str, keyring: Mapping[str, RoleKey], freeze: Mapping[str, Any],
     participant_role: RoleKey, participant_private: Ed25519PrivateKey,
     *, test_mode: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Combine verified non-excluded dealer packets into one threshold share."""
-    summary = verify_dkg_transcript(transcript, keyring, freeze, test_mode=test_mode)
-    descriptor = transcript["descriptor"]
+    """Combine packets and prove possession of the resulting final share."""
+    summary = verify_dkg_core_transcript(core_transcript, keyring, freeze, test_mode=test_mode)
+    descriptor = core_transcript["descriptor"]
     participant = next((p for p in descriptor["participants"] if p["participant_id"] == participant_id), None)
     if participant is None or participant_role.role != participant["signing_role"]:
         raise AuthorizationError("DKG final share participant/role mismatch")
     active = summary["active_participants"]
     if len(packet_records) != len(active):
         raise AuthorizationError("DKG final share requires exactly one packet from every active dealer")
-    contributions = {r["payload"]["dealer_id"]: r for r in transcript["contributions"]}
+    contributions = {r["payload"]["dealer_id"]: r for r in core_transcript["contributions"]}
     packets: dict[str, Mapping[str, Any]] = {}
     _, pubkey_to_G1, G1, Z1, add, curve_order, multiply, normalize = _bls_imports()
     total = 0
@@ -1507,25 +1537,35 @@ def dkg_finalize_participant_share(
     if not _point_equal(actual, expected, normalize):
         raise AuthorizationError("DKG final secret share does not match aggregate Feldman verification vector")
     from py_ecc.bls.g2_primitives import G1_to_pubkey
+    public_share_hex = G1_to_pubkey(actual).hex()
+    challenge = dkg_possession_challenge(
+        summary["core_root"], descriptor, participant_id, participant["index"], public_share_hex,
+    )
+    possession_bls = _dkg_possession_bls()
+    pop = possession_bls.Sign(total, challenge)
+    if not possession_bls.Verify(bytes.fromhex(public_share_hex), challenge, pop):
+        raise AuthorizationError("DKG final share proof of possession self-check failed")
     public_payload = {
-        "kind": "dkg-final-public-share-v1",
+        "kind": "dkg-final-public-share-v2",
         "ceremony_id": descriptor["ceremony_id"],
         "exact_revision": descriptor["exact_revision"],
         "chain_id": descriptor["chain_id"],
-        "dkg_root": summary["dkg_root"],
+        "core_root": summary["core_root"],
         "participant_id": participant_id,
         "participant_index": participant["index"],
-        "public_share_g1_compressed_hex": G1_to_pubkey(actual).hex(),
+        "public_share_g1_compressed_hex": public_share_hex,
+        "possession_challenge_hex": challenge.hex(),
+        "possession_proof_g2_compressed_hex": pop.hex(),
         "active_dealers": active,
         "is_test_fixture": bool(test_mode),
     }
     secret_state = {
-        "schema_version": 1,
-        "kind": "dkg-final-secret-share-v1",
+        "schema_version": 2,
+        "kind": "dkg-final-secret-share-v2",
         "ceremony_id": descriptor["ceremony_id"],
         "exact_revision": descriptor["exact_revision"],
         "chain_id": descriptor["chain_id"],
-        "dkg_root": summary["dkg_root"],
+        "core_root": summary["core_root"],
         "participant_id": participant_id,
         "participant_index": participant["index"],
         "secret_share_scalar_hex": f"{total:064x}",
@@ -1536,35 +1576,206 @@ def dkg_finalize_participant_share(
     return _signed_record(public_payload, participant_role, participant_private), secret_state
 
 
+FINAL_SHARE_KEYS = {
+    "kind", "ceremony_id", "exact_revision", "chain_id", "core_root",
+    "participant_id", "participant_index", "public_share_g1_compressed_hex",
+    "possession_challenge_hex", "possession_proof_g2_compressed_hex",
+    "active_dealers", "is_test_fixture",
+}
+
+
+def _verify_dkg_final_public_shares(
+    core: Mapping[str, Any], final_public_shares: Sequence[Mapping[str, Any]],
+    keyring: Mapping[str, RoleKey], freeze: Mapping[str, Any], *, test_mode: bool = False,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    summary = verify_dkg_core_transcript(core, keyring, freeze, test_mode=test_mode)
+    descriptor = core["descriptor"]
+    participants = {p["participant_id"]: p for p in descriptor["participants"]}
+    active = summary["active_participants"]
+    contributions = {r["payload"]["dealer_id"]: r["payload"] for r in core["contributions"]}
+    if not isinstance(final_public_shares, list):
+        raise AuthorizationError("DKG final public shares must be a list")
+    if len(final_public_shares) < summary["threshold"]:
+        raise AuthorizationError("DKG possession incomplete: fewer than threshold final share holders")
+    _, pubkey_to_G1, _, Z1, add, curve_order, multiply, normalize = _bls_imports()
+    possession_bls = _dkg_possession_bls()
+    from py_ecc.bls.g2_primitives import G1_to_pubkey
+    verified: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    previous_index = 0
+    for signed in final_public_shares:
+        payload = _verify_signed_record(signed, keyring)
+        require_exact_keys(payload, FINAL_SHARE_KEYS, "DKG final public share")
+        participant_id = payload.get("participant_id")
+        participant = participants.get(participant_id)
+        if participant is None or participant_id not in active:
+            raise AuthorizationError("DKG final share holder is rogue or excluded")
+        if participant_id in seen:
+            raise AuthorizationError("DKG duplicate final share holder")
+        if payload.get("participant_index") != participant["index"]:
+            raise AuthorizationError("DKG final share holder index mismatch")
+        if participant["index"] <= previous_index:
+            raise AuthorizationError("DKG final public shares must be sorted by participant index")
+        previous_index = participant["index"]
+        role = keyring.get(participant["signing_role"])
+        if (
+            role is None or signed.get("signer_role") != participant["signing_role"]
+            or signed.get("key_id") != role.key_id
+        ):
+            raise AuthorizationError("DKG final share signer is not the exact participant role/key")
+        for key, expected in (
+            ("kind", "dkg-final-public-share-v2"),
+            ("ceremony_id", descriptor["ceremony_id"]),
+            ("exact_revision", descriptor["exact_revision"]),
+            ("chain_id", descriptor["chain_id"]),
+            ("core_root", summary["core_root"]),
+            ("active_dealers", active),
+            ("is_test_fixture", bool(test_mode)),
+        ):
+            if payload.get(key) != expected:
+                raise AuthorizationError(f"DKG final share context mismatch at {key}")
+        expected_point = Z1
+        for dealer in active:
+            power = 1
+            for encoded in contributions[dealer]["commitments_g1_compressed_hex"]:
+                expected_point = add(expected_point, multiply(pubkey_to_G1(bytes.fromhex(encoded)), power))
+                power = (power * participant["index"]) % curve_order
+        try:
+            public_bytes = bytes.fromhex(payload["public_share_g1_compressed_hex"])
+            public_point = pubkey_to_G1(public_bytes)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise AuthorizationError("DKG final public share point malformed") from exc
+        if _point_equal(public_point, Z1, normalize):
+            raise AuthorizationError("DKG final public share is point at infinity")
+        if not _point_equal(public_point, expected_point, normalize) or public_bytes != G1_to_pubkey(expected_point):
+            raise AuthorizationError("DKG final public share mismatch against active commitments")
+        challenge = dkg_possession_challenge(
+            summary["core_root"], descriptor, participant_id, participant["index"], public_bytes.hex(),
+        )
+        if payload.get("possession_challenge_hex") != challenge.hex():
+            raise AuthorizationError("DKG final share possession challenge mismatch")
+        try:
+            pop = bytes.fromhex(payload["possession_proof_g2_compressed_hex"])
+        except (ValueError, TypeError, KeyError) as exc:
+            raise AuthorizationError("DKG final share possession proof malformed") from exc
+        if len(pop) != 96 or not possession_bls.Verify(public_bytes, challenge, pop):
+            raise AuthorizationError("DKG final share proof of possession invalid")
+        seen.add(participant_id)
+        verified.append({
+            "participant_id": participant_id,
+            "participant_index": participant["index"],
+            "public_share_g1_compressed_hex": public_bytes.hex(),
+            "possession_proof_g2_compressed_hex": pop.hex(),
+            "record_sha256": sha256(canonical_json(signed)),
+        })
+    if len(verified) < summary["threshold"]:
+        raise AuthorizationError("DKG possession incomplete: fewer than threshold distinct verified holders")
+    return summary, verified
+
+
+def finalize_dkg_transcript(
+    descriptor: Mapping[str, Any], descriptor_signatures: Mapping[str, Any],
+    contributions: Sequence[Mapping[str, Any]], reviews: Sequence[Mapping[str, Any]],
+    exclusions: Sequence[Mapping[str, Any]], erasures: Sequence[Mapping[str, Any]],
+    keyring: Mapping[str, RoleKey], freeze: Mapping[str, Any], *,
+    final_public_shares: Sequence[Mapping[str, Any]] = (), test_mode: bool = False,
+) -> dict[str, Any]:
+    core = build_dkg_core_transcript(
+        descriptor, descriptor_signatures, contributions, reviews, exclusions, erasures,
+        keyring, freeze, test_mode=test_mode,
+    )
+    return finalize_dkg_core_transcript(
+        core, final_public_shares, keyring, freeze, test_mode=test_mode,
+    )
+
+
+def finalize_dkg_core_transcript(
+    core: Mapping[str, Any], final_public_shares: Sequence[Mapping[str, Any]],
+    keyring: Mapping[str, RoleKey], freeze: Mapping[str, Any], *, test_mode: bool = False,
+) -> dict[str, Any]:
+    """Add threshold possession records to an already frozen core transcript."""
+    shares = list(final_public_shares)
+    _, verified = _verify_dkg_final_public_shares(core, shares, keyring, freeze, test_mode=test_mode)
+    holder_set_root = domain_hash(DOMAIN_DKG_POSSESSION, canonical_json(verified)).hex()
+    transcript: dict[str, Any] = {
+        "schema_version": 2,
+        "kind": "noosphere-dkg-transcript-v2",
+        "core": core,
+        "final_public_shares": shares,
+        "holder_set_root": holder_set_root,
+        "dkg_root": "",
+        "is_test_fixture": bool(test_mode),
+    }
+    root_input = dict(transcript); root_input.pop("dkg_root")
+    transcript["dkg_root"] = domain_hash(DOMAIN_DKG_TRANSCRIPT, canonical_json(root_input)).hex()
+    verify_dkg_transcript(transcript, keyring, freeze, test_mode=test_mode)
+    return transcript
+
+
+def verify_dkg_transcript(
+    transcript: Mapping[str, Any], keyring: Mapping[str, RoleKey], freeze: Mapping[str, Any],
+    *, test_mode: bool = False,
+) -> dict[str, Any]:
+    require_non_fixture(transcript, "DKG transcript", test_mode=test_mode)
+    require_exact_keys(
+        transcript,
+        {"schema_version", "kind", "core", "final_public_shares", "holder_set_root", "dkg_root", "is_test_fixture"},
+        "DKG transcript",
+    )
+    if transcript["schema_version"] != 2 or transcript["kind"] != "noosphere-dkg-transcript-v2":
+        raise AuthorizationError("DKG transcript kind/version mismatch")
+    if transcript["is_test_fixture"] != bool(test_mode):
+        raise AuthorizationError("DKG transcript fixture mode mismatch")
+    summary, verified = _verify_dkg_final_public_shares(
+        transcript["core"], transcript["final_public_shares"], keyring, freeze, test_mode=test_mode,
+    )
+    holder_set_root = domain_hash(DOMAIN_DKG_POSSESSION, canonical_json(verified)).hex()
+    if transcript["holder_set_root"] != holder_set_root:
+        raise AuthorizationError("DKG final holder set root mismatch")
+    root_input = dict(transcript); root_input.pop("dkg_root", None)
+    root = domain_hash(DOMAIN_DKG_TRANSCRIPT, canonical_json(root_input)).hex()
+    if transcript["dkg_root"] != root:
+        raise AuthorizationError("DKG final transcript root mismatch")
+    return {
+        **summary,
+        "dkg_root": root,
+        "holder_set_root": holder_set_root,
+        "verified_share_holders": [item["participant_id"] for item in verified],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Final genesis rebuild/freeze and cutover authorization
 # ---------------------------------------------------------------------------
 
 FINAL_BODY_KEYS = {
     "version", "parameter_manifest_hash", "genesis_time_ms", "dkg_suite_id",
-    "dkg_group_pubkey_hex", "dkg_participant_set_root", "genesis_witness_set_root",
+    "dkg_group_pubkey_hex", "dkg_participant_set_root", "dkg_holder_set_root", "dkg_root",
+    "genesis_witness_set_root",
     "genesis_state_roots", "is_test_fixture",
 }
 STATE_ROOT_NAMES = ("notes_root", "nullifiers_root", "accounts_root", "objects_root", "receipts_root", "params_root")
 
 
 def canonical_final_genesis_body(body: Mapping[str, Any], freeze: Mapping[str, Any], dkg: Mapping[str, Any], *, test_mode: bool = False) -> bytes:
-    require_exact_keys(body, FINAL_BODY_KEYS, "FinalGenesisBodyV1 input")
-    require_non_fixture(body, "FinalGenesisBodyV1", test_mode=test_mode)
-    if body["version"] != 1 or body["parameter_manifest_hash"] != freeze["parameter_manifest_hash"]:
-        raise AuthorizationError("FinalGenesisBodyV1 version/manifest hash mismatch")
+    require_exact_keys(body, FINAL_BODY_KEYS, "FinalGenesisBodyV2 input")
+    require_non_fixture(body, "FinalGenesisBodyV2", test_mode=test_mode)
+    if body["version"] != 2 or body["parameter_manifest_hash"] != freeze["parameter_manifest_hash"]:
+        raise AuthorizationError("FinalGenesisBodyV2 version/manifest hash mismatch")
     if _uint(body["dkg_suite_id"], 16, "final.dkg_suite_id") == 0:
-        raise AuthorizationError("FinalGenesisBodyV1 DKG suite ID zero is unregistered")
+        raise AuthorizationError("FinalGenesisBodyV2 DKG suite ID zero is unregistered")
     if body["dkg_participant_set_root"] != dkg["participant_set_root"]:
-        raise AuthorizationError("FinalGenesisBodyV1 DKG participant root mismatch")
+        raise AuthorizationError("FinalGenesisBodyV2 DKG participant root mismatch")
     if body["dkg_group_pubkey_hex"] != dkg["group_public_key_g1_hex"]:
-        raise AuthorizationError("FinalGenesisBodyV1 DKG group key mismatch")
+        raise AuthorizationError("FinalGenesisBodyV2 DKG group key mismatch")
+    if body["dkg_holder_set_root"] != dkg.get("holder_set_root") or body["dkg_root"] != dkg.get("dkg_root"):
+        raise AuthorizationError("FinalGenesisBodyV2 DKG possession/final root mismatch")
     group_key = bytes.fromhex(body["dkg_group_pubkey_hex"])
     if not group_key or len(group_key) > 192:
-        raise AuthorizationError("FinalGenesisBodyV1 DKG group key length invalid")
+        raise AuthorizationError("FinalGenesisBodyV2 DKG group key length invalid")
     roots = body["genesis_state_roots"]
     if not isinstance(roots, dict) or list(roots) != list(STATE_ROOT_NAMES):
-        raise AuthorizationError("FinalGenesisBodyV1 state roots must use frozen insertion order")
+        raise AuthorizationError("FinalGenesisBodyV2 state roots must use frozen insertion order")
     out = bytearray()
     out += _le(body["version"], 2, "final.version")
     out += _hex32(body["parameter_manifest_hash"], "final.parameter_manifest_hash")
@@ -1572,6 +1783,8 @@ def canonical_final_genesis_body(body: Mapping[str, Any], freeze: Mapping[str, A
     out += _le(body["dkg_suite_id"], 2, "final.dkg_suite_id")
     out += len(group_key).to_bytes(4, "little") + group_key
     out += _hex32(body["dkg_participant_set_root"], "final.dkg_participant_set_root")
+    out += _hex32(body["dkg_holder_set_root"], "final.dkg_holder_set_root")
+    out += _hex32(body["dkg_root"], "final.dkg_root")
     out += _hex32(body["genesis_witness_set_root"], "final.genesis_witness_set_root")
     for name in STATE_ROOT_NAMES:
         out += _hex32(roots[name], f"final.genesis_state_roots.{name}")
@@ -1640,15 +1853,19 @@ def make_final_freeze_bundle(
     identity: Mapping[str, Any], freeze_file: Path, freeze_signatures_file: Path,
     publication_file: Path, publication_signatures_file: Path,
     anchor_file: Path, anchor_signatures_file: Path, transcript_file: Path,
-    body_file: Path, rebuild_file: Path, rebuild_signatures_file: Path,
+    body_file: Path, rebuild_file: Path, rebuild_signatures_file: Path, role_keyring_file: Path,
     exact_revision: str,
 ) -> dict[str, Any]:
+    transcript = read_json(transcript_file)
     return {
-        "schema_version": 1,
-        "kind": "noosphere-chain-genesis-freeze-v1",
+        "schema_version": 2,
+        "kind": "noosphere-chain-genesis-freeze-v2",
         "exact_revision": exact_revision,
         "chain_id": identity["chain_id"],
         "genesis_hash": identity["genesis_hash"],
+        "dkg_root": transcript.get("dkg_root"),
+        "dkg_holder_set_root": transcript.get("holder_set_root"),
+        "role_keyring_sha256": file_sha256(role_keyring_file),
         "parameter_freeze_file_sha256": file_sha256(freeze_file),
         "parameter_freeze_signatures_sha256": file_sha256(freeze_signatures_file),
         "quiet_week_publication_file_sha256": file_sha256(publication_file),
@@ -1669,34 +1886,47 @@ def verify_cutover_authorization(
     authorization: Mapping[str, Any], signatures: Mapping[str, Any], keyring: Mapping[str, RoleKey],
     promotion_ledger: Mapping[str, Any], release_manifest: Mapping[str, Any], final_freeze: Mapping[str, Any],
     prepared_cutover: Mapping[str, Any],
-    *, raw_component_hashes: Mapping[str, str] | None = None,
+    *, trusted_role_keyring_sha256: str, raw_component_hashes: Mapping[str, str] | None = None,
+    promotion_root: Path = ROOT, test_mode: bool = False,
 ) -> None:
-    require_non_fixture(authorization, "cutover authorization")
+    require_non_fixture(authorization, "cutover authorization", test_mode=test_mode)
     require_exact_keys(
         authorization,
-        {"schema_version", "kind", "exact_revision", "chain_id", "genesis_hash", "promotion_ledger_sha256", "release_manifest_sha256", "final_freeze_sha256", "prepared_cutover_sha256", "is_test_fixture", "authorization_scope"},
+        {"schema_version", "kind", "exact_revision", "chain_id", "genesis_hash", "promotion_ledger_sha256", "promotion_ledger_root", "role_keyring_sha256", "release_manifest_sha256", "final_freeze_sha256", "prepared_cutover_sha256", "is_test_fixture", "authorization_scope"},
         "cutover authorization",
     )
-    if authorization["schema_version"] != 1 or authorization["kind"] != "noosphere-multiparty-cutover-authorization-v1":
+    if authorization["schema_version"] != 2 or authorization["kind"] != "noosphere-multiparty-cutover-authorization-v2":
         raise AuthorizationError("cutover authorization kind/version mismatch")
     revision = require_revision(authorization["exact_revision"])
     if promotion_ledger.get("protocol_binding", {}).get("revision") != revision:
         raise AuthorizationError("cutover authorization stale against promotion ledger revision")
-    gates = promotion_ledger.get("gates")
-    gate_order = ["G0", "G1", "G2", "G3", "GENESIS", "G4", "G5"]
-    if (
-        not isinstance(gates, list)
-        or [g.get("gate") for g in gates] != gate_order
-        or [g.get("state") for g in gates] != ["PASSED"] * 7
-        or any(not isinstance(g.get("signatures"), list) or not g["signatures"] for g in gates)
-    ):
-        raise AuthorizationError("cutover prohibited: every G0..G5 gate must already be PASSED")
+    gates_path = ROOT / "tools/gates"
+    if str(gates_path) not in sys.path:
+        sys.path.insert(0, str(gates_path))
+    try:
+        from promotion_records import PromotionValidationError, validate_promotion_ledger
+        promotion_summary = validate_promotion_ledger(
+            promotion_ledger, promotion_root, keyring,
+            trusted_role_keyring_sha256=trusted_role_keyring_sha256,
+            expected_revision=revision, expected_chain_id=authorization["chain_id"],
+            expected_genesis_hash=authorization["genesis_hash"], require_all_passed=True,
+            test_mode=test_mode,
+        )
+    except (ImportError, PromotionValidationError) as exc:
+        raise AuthorizationError(str(exc)) from exc
     if promotion_ledger.get("cutover", {}).get("execution_authority") != "SIGNED_G5_ONLY":
         raise AuthorizationError("cutover ledger execution authority mismatch")
     if final_freeze.get("chain_id") != authorization["chain_id"] or final_freeze.get("genesis_hash") != authorization["genesis_hash"]:
         raise AuthorizationError("cutover authorization/final freeze identity mismatch")
     if final_freeze.get("exact_revision") != revision:
         raise AuthorizationError("cutover final freeze revision mismatch")
+    if (
+        final_freeze.get("role_keyring_sha256") != trusted_role_keyring_sha256
+        or authorization["role_keyring_sha256"] != trusted_role_keyring_sha256
+    ):
+        raise AuthorizationError("cutover role keyring is not pinned by final freeze/authorization")
+    if authorization["promotion_ledger_root"] != promotion_summary["ledger_root"]:
+        raise AuthorizationError("cutover complete promotion ledger root mismatch")
     release_identity = release_manifest.get("identity", {})
     if release_identity.get("chain_id") != authorization["chain_id"] or release_identity.get("genesis_hash") != authorization["genesis_hash"]:
         raise AuthorizationError("cutover release manifest identity mismatch")
@@ -1715,6 +1945,8 @@ def verify_cutover_authorization(
     for key, expected in expected_hashes.items():
         if authorization.get(key) != expected:
             raise AuthorizationError(f"cutover authorization component hash mismatch: {key}")
+    if promotion_ledger.get("authorization_binding", {}).get("final_freeze_sha256") != expected_hashes["final_freeze_sha256"]:
+        raise AuthorizationError("promotion ledger does not bind exact final freeze bytes")
     execution = prepared_cutover.get("execution", {})
     if (
         prepared_cutover.get("manifest_state") != "PREPARED_NOT_EXECUTED"
@@ -1930,7 +2162,7 @@ def command_verify_dkg(args: argparse.Namespace) -> None:
     print(json.dumps(summary, sort_keys=True))
 
 
-def command_finalize_dkg(args: argparse.Namespace) -> None:
+def command_build_dkg_core(args: argparse.Namespace) -> None:
     freeze = read_json(Path(args.freeze)); revision = require_revision(freeze.get("exact_revision"))
     keyring = _load_keys_for_revision(Path(args.keyring), revision)
     descriptor = read_json(Path(args.descriptor))
@@ -1950,9 +2182,20 @@ def command_finalize_dkg(args: argparse.Namespace) -> None:
         {"dealer_id": dealer, "complaint_hashes": sorted(hashes)}
         for dealer, hashes in sorted(complaint_hashes.items(), key=lambda item: participant_order.get(item[0], 1 << 30))
     ]
-    transcript = finalize_dkg_transcript(
+    transcript = build_dkg_core_transcript(
         descriptor, descriptor_signatures, contributions, reviews, exclusions,
         erasures, keyring, freeze,
+    )
+    write_new_json(Path(args.out), transcript)
+
+
+def command_finalize_dkg(args: argparse.Namespace) -> None:
+    freeze = read_json(Path(args.freeze)); revision = require_revision(freeze.get("exact_revision"))
+    keyring = _load_keys_for_revision(Path(args.keyring), revision)
+    transcript = finalize_dkg_core_transcript(
+        read_json(Path(args.core)),
+        [read_json(Path(path)) for path in args.final_public_share],
+        keyring, freeze,
     )
     write_new_json(Path(args.out), transcript)
 
@@ -1965,7 +2208,7 @@ def command_finalize_dkg_share(args: argparse.Namespace) -> None:
         raise AuthorizationError("participant role absent from keyring")
     private = load_private_role_key(Path(args.participant_key), role)
     public, secret = dkg_finalize_participant_share(
-        read_json(Path(args.transcript)), [read_json(Path(path)) for path in args.packet],
+        read_json(Path(args.core)), [read_json(Path(path)) for path in args.packet],
         args.participant_id, keyring, freeze, role, private,
     )
     write_new_json(Path(args.public_share_out), public)
@@ -2059,7 +2302,7 @@ def command_freeze_final(args: argparse.Namespace) -> None:
         identity, freeze_path, Path(args.freeze_signatures),
         Path(args.publication), Path(args.publication_signatures),
         anchor_path, Path(args.anchor_signatures), transcript_path, body_path,
-        rebuild_path, Path(args.rebuild_signatures), revision,
+        rebuild_path, Path(args.rebuild_signatures), Path(args.keyring), revision,
     )
     signatures = make_detached_signatures(
         canonical_json(bundle), DOMAIN_FINAL_FREEZE, revision, FINAL_ROLES,
@@ -2087,6 +2330,7 @@ def command_verify_cutover(args: argparse.Namespace) -> None:
         authorization, read_json(Path(args.signatures)), keyring,
         read_json(Path(args.promotion_ledger)), read_json(Path(args.release_manifest)),
         final_freeze, read_json(Path(args.prepared_cutover)),
+        trusted_role_keyring_sha256=file_sha256(Path(args.keyring)),
         raw_component_hashes={key: file_sha256(path) for key, path in component_paths.items()},
     )
     print("CUTOVER_AUTHORIZATION_VALID cryptographic_roles_verified=true human_independence_not_established=true")
@@ -2114,6 +2358,7 @@ def command_sign_cutover(args: argparse.Namespace) -> None:
         authorization, signatures, keyring,
         read_json(Path(args.promotion_ledger)), read_json(Path(args.release_manifest)),
         final_freeze, read_json(Path(args.prepared_cutover)),
+        trusted_role_keyring_sha256=file_sha256(Path(args.keyring)),
         raw_component_hashes={key: file_sha256(path) for key, path in component_paths.items()},
     )
     write_new_json(Path(args.out), signatures)
@@ -2173,14 +2418,18 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("verify-dkg-transcript"); p.set_defaults(func=command_verify_dkg)
     p.add_argument("--transcript", required=True); p.add_argument("--freeze", required=True)
     p.add_argument("--keyring", required=True)
-    p = sub.add_parser("finalize-dkg-transcript"); p.set_defaults(func=command_finalize_dkg)
+    p = sub.add_parser("build-dkg-core"); p.set_defaults(func=command_build_dkg_core)
     p.add_argument("--descriptor", required=True); p.add_argument("--descriptor-signatures", required=True)
     p.add_argument("--freeze", required=True); p.add_argument("--keyring", required=True)
     p.add_argument("--contribution", action="append", required=True)
     p.add_argument("--review", action="append", required=True)
     p.add_argument("--erasure", action="append", required=True); p.add_argument("--out", required=True)
+    p = sub.add_parser("finalize-dkg-transcript"); p.set_defaults(func=command_finalize_dkg)
+    p.add_argument("--core", required=True); p.add_argument("--freeze", required=True)
+    p.add_argument("--keyring", required=True)
+    p.add_argument("--final-public-share", action="append", required=True); p.add_argument("--out", required=True)
     p = sub.add_parser("dkg-finalize-share"); p.set_defaults(func=command_finalize_dkg_share)
-    p.add_argument("--transcript", required=True); p.add_argument("--freeze", required=True)
+    p.add_argument("--core", required=True); p.add_argument("--freeze", required=True)
     p.add_argument("--participant-id", required=True); p.add_argument("--participant-key", required=True)
     p.add_argument("--keyring", required=True); p.add_argument("--packet", action="append", required=True)
     p.add_argument("--public-share-out", required=True); p.add_argument("--private-share-out", required=True)

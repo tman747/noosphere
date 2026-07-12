@@ -45,6 +45,9 @@ Two externally controlled builders must each rebuild all three targets. Each bui
 creates one canonical `noos/repro-build-attestation/v1` payload per target and a separate
 `noos/detached-ed25519-signature/v1` file. Production trust records are supplied out of
 band from external operators using `trusted-repro-builders-template.json` as the shape.
+The completed roster binds the exact source revision, and its SHA-256 trust root must
+arrive independently through the signed freeze/authorization path. A roster submitted
+with attestations cannot nominate its own trusted hash or turn role labels into authority.
 The verifier requires distinct signing keys, operators, control-plane identities, host
 identities, and pinned toolchain installations. Multiple jobs under one CI identity do
 not qualify. An automated job may run a build; automation is not represented as an
@@ -60,7 +63,7 @@ the UTF-8 payload serialized as sorted-key compact JSON plus one LF. It contains
 Verification is read-only:
 
 ```text
-python tools/gates/repro_build.py verify-attestations --attestations <directory> --trusted-builders <external-trust.json> --revision <40-hex-commit> --out <report.json>
+python tools/gates/repro_build.py verify-attestations --attestations <directory> --trusted-builders <external-trust.json> --trusted-builders-sha256 <externally-pinned-64-hex> --revision <40-hex-commit> --out <report.json>
 ```
 
 Even a qualifying report does not mark G4 or G5 passed. It is an input to the separate,

@@ -498,11 +498,20 @@ def build_target(target: str, out: Path, *, revision: str | None = None, smoke: 
 def _trusted_builders(
     path: Path,
     allow_test_keys: bool,
+    externally_pinned_sha256: str,
+    expected_revision: str,
     blockers: list[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
+    if not HEX64.fullmatch(externally_pinned_sha256) or sha256_file(path) != externally_pinned_sha256:
+        raise AssuranceError("trusted builder roster does not match externally supplied trust root")
     trust = load_json(path)
     if trust.get("schema") != "noos/trusted-repro-builders/v1":
         raise AssuranceError("wrong trusted builder schema")
+    if trust.get("exact_revision") != expected_revision:
+        if trust.get("exact_revision") == "OWNER_BLOCKED" and blockers is not None:
+            blockers.append("trusted builder roster exact revision is external/owner blocked")
+        else:
+            raise AssuranceError("trusted builder roster is not bound to exact source revision")
     result: dict[str, dict[str, Any]] = {}
     for record in trust.get("builders", []):
         key_id = record.get("key_id")
@@ -573,6 +582,7 @@ def verify_attestation_set(
     trusted_builders: Path,
     expected_revision: str,
     *,
+    trusted_builders_sha256: str,
     allow_test_keys: bool = False,
 ) -> dict[str, Any]:
     """Verify signatures, bindings, byte equality, and two-builder coverage.
@@ -586,7 +596,9 @@ def verify_attestation_set(
         raise AssuranceError("cryptography package with Ed25519 support is required") from exc
 
     errors: list[str] = []
-    trust = _trusted_builders(trusted_builders, allow_test_keys, errors)
+    trust = _trusted_builders(
+        trusted_builders, allow_test_keys, trusted_builders_sha256, expected_revision, errors,
+    )
     locks = load_toolchains()
     expected_source = source_identity(expected_revision)
     policy_signature_errors = verify_policy_signatures()
@@ -680,6 +692,7 @@ def main(argv: list[str] | None = None) -> int:
     verify = sub.add_parser("verify-attestations", help="verify an external two-builder attestation quorum")
     verify.add_argument("--attestations", required=True)
     verify.add_argument("--trusted-builders", required=True)
+    verify.add_argument("--trusted-builders-sha256", required=True, help="externally supplied pinned roster root")
     verify.add_argument("--revision", required=True)
     verify.add_argument("--out", required=True)
     args = parser.parse_args(argv)
@@ -693,7 +706,10 @@ def main(argv: list[str] | None = None) -> int:
             result = build_target(args.target, ROOT / args.out, revision=args.revision, smoke=args.smoke)
             print(f"RESULT repro_build={'SMOKE_ONLY' if args.smoke else 'CANDIDATE_BUILT'} target={args.target} binaries={len(result['binary_hashes'])}")
             return 0
-        report = verify_attestation_set(Path(args.attestations), Path(args.trusted_builders), args.revision)
+        report = verify_attestation_set(
+            Path(args.attestations), Path(args.trusted_builders), args.revision,
+            trusted_builders_sha256=args.trusted_builders_sha256,
+        )
         out = Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(canonical_json(report))

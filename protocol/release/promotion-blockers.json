@@ -6,6 +6,13 @@
     "protocol_version": "v1", "api_version": "v1", "release_version": "0.0.0-preproduction",
     "revision": "3ed1c845520d2245eb331a28c8302a0721c7a2d4", "chain_id": "OWNER_BLOCKED", "genesis_hash": "OWNER_BLOCKED"
   },
+  "authorization_binding": {
+    "schema_version": 2,
+    "gate_record_domain": "NOOS/PROMOTION/GATE/V2",
+    "role_keyring_sha256": "OWNER_BLOCKED",
+    "final_freeze_sha256": "OWNER_BLOCKED",
+    "ledger_root": "OWNER_BLOCKED"
+  },
   "cutover": {
     "dns_cutover": "PROHIBITED", "execution_authority": "SIGNED_G5_ONLY",
     "prepared_manifest": "deploy/cutover/cutover-manifest-prepared.json", "rollback_target": "OWNER_BLOCKED_STATIC_MAINTENANCE"

@@ -11,7 +11,9 @@ domain_id,kind,context_string,algorithm,consumer,notes
 D-GENESIS-PARAMS,BLAKE3_CONTEXT,NOOS/GENESIS/PARAMS/V1,BLAKE3-256,genesis,SOURCE plan §2.4; parameter_manifest_hash over canonical GenesisParameterManifestV1
 D-CHAIN-ID,BLAKE3_CONTEXT,NOOS/CHAIN/V1,BLAKE3-256,genesis,SOURCE plan §2.4; chain_id = H(ctx || parameter_manifest_hash)
 D-GENESIS-FINAL,BLAKE3_CONTEXT,NOOS/GENESIS/FINAL/V1,BLAKE3-256,genesis,SOURCE plan §2.4; genesis_hash = H(ctx || chain_id || bitcoin_anchor || dkg_root || canonical body)
-D-DKG-TRANSCRIPT,BLAKE3_CONTEXT,NOOS/DKG/TRANSCRIPT/V1,BLAKE3-256,genesis,ASSIGNED; dkg_root = H(ctx || canonical ceremony transcript) per spec/genesis-identity-v1.md §6; pending G0 review
+D-DKG-CORE,BLAKE3_CONTEXT,NOOS/DKG/CORE/V2,BLAKE3-256,genesis,ASSIGNED; acyclic verified Feldman contribution/review/exclusion/erasure core root; possession records excluded
+D-DKG-TRANSCRIPT,BLAKE3_CONTEXT,NOOS/DKG/TRANSCRIPT/V2,BLAKE3-256,genesis,ASSIGNED; final dkg_root binds the v2 core and threshold verified final-share holder records per spec/genesis-identity-v1.md §6; pending G0 review
+D-DKG-POSSESSION,BLAKE3_CONTEXT,NOOS/DKG/POSSESSION/V1,BLAKE3-256,genesis,ASSIGNED; frozen final-secret-share possession challenge and verified holder-set root; BLS proof uses min-pk proof-of-possession verification
 D-NOTE-ID,BLAKE3_CONTEXT,NOOS/NOTE/V1,BLAKE3-256,noos-lumen,SOURCE arch §6.2; note_id = H(ctx || creating_txid || output_index || canonical_note)
 D-GROUND-CHALLENGE,BLAKE3_CONTEXT,NOOS/GROUND/CHALLENGE/V1,BLAKE3-256,noos-consensus,SOURCE arch §4; binds chain_id/parent/target/slot/proposal_commitment/proposer_pubkey
 D-GROUND-TICKET,BLAKE3_KEYED,NOOS/GROUND/TICKET/V1,BLAKE3-256-keyed,noos-consensus,SOURCE arch §4; key = GroundChallenge; input = ctx || nonce_le_u64 || extra_nonce_32
@@ -56,6 +58,7 @@ D-BLS-CERT,BLS_DST,NOOS-BLS-CERT-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_,BLS12-381 G2
 D-BLS-POP,BLS_DST,NOOS-BLS-POP-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_,BLS12-381 G2 min-sig,noos-crypto,NEW DST; proof of possession over the witness public key
 D-BLS-FELDMAN,BLS_DST,NOOS-BLS-FELDMAN-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_,BLS12-381 G2 min-sig,noos-crypto,NEW DST; Feldman commitment verification in DKG share checks
 D-BLS-DKG,BLS_DST,NOOS-BLS-DKG-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_,BLS12-381 G2 min-sig,noos-crypto,NEW DST; DKG transcript/beacon partial signatures; ceremony CSPRNG only (plan §3.2)
+D-BLS-DKG-POSSESSION,BLS_DST,NOOS-BLS-DKG-POSSESSION-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_,BLS12-381 G2 min-pk,genesis,ASSIGNED; final secret-share proof over the D-DKG-POSSESSION challenge; exact public share pairing verification required
 D-BLS-HANDOVER,BLS_DST,NOOS-BLS-HANDOVER-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_,BLS12-381 G2 min-sig,noos-consensus,NEW DST; epoch reconfiguration handover attestation
 D-HKDF-WALLET,HKDF_INFO,NOOS/HKDF/WALLET/V1,HKDF-SHA-256,noos-wallet,hash=SHA-256; salt="NOOS/HKDF/WALLET/SALT/V1"; info=ctx || m/NOOS/1/<sign|view|umbra|agent|recovery>/account/index path bytes (arch §6.2); L=32
 D-HKDF-UMBRA,HKDF_INFO,NOOS/HKDF/UMBRA/V1,HKDF-SHA-256,noos-umbra,hash=SHA-256; salt="NOOS/HKDF/UMBRA/SALT/V1"; info=ctx || suite_id || key_epoch || fiber_id; L=32

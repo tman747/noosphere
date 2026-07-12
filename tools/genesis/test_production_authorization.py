@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import datetime as dt
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -20,7 +21,7 @@ REVISION = "1" * 40
 
 class AuthorizationFixtures:
     def setUp(self) -> None:
-        roles = list(pa.CUTOVER_ROLES) + ["independent-genesis-rebuilder"] + [f"dkg-participant:p{i}" for i in range(1, 4)]
+        roles = list(pa.CUTOVER_ROLES) + ["independent-genesis-rebuilder"] + [f"dkg-participant:p{i}" for i in range(1, 8)]
         roles = list(dict.fromkeys(roles))
         self.private: dict[str, Ed25519PrivateKey] = {}
         self.keyring: dict[str, pa.RoleKey] = {}
@@ -106,10 +107,10 @@ class AuthorizationFixtures:
             "signatures": entries,
         }
 
-    def descriptor(self):
+    def descriptor(self, participant_count=3, threshold=2):
         participants = [
             {"participant_id": f"p{i}", "index": i, "signing_role": f"dkg-participant:p{i}"}
-            for i in range(1, 4)
+            for i in range(1, participant_count + 1)
         ]
         freeze_hash = pa.sha256(pa.canonical_json(self.freeze) + b"\n")
         publication_hash = "2" * 64
@@ -121,7 +122,7 @@ class AuthorizationFixtures:
                 "freeze_manifest_sha256": freeze_hash,
                 "quiet_week_publication_sha256": publication_hash,
                 "authorized_at_utc": authorized_at,
-                "threshold": 2,
+                "threshold": threshold,
                 "participants": participants,
             }),
         ).hex()
@@ -134,29 +135,29 @@ class AuthorizationFixtures:
             "quiet_week_publication_sha256": publication_hash,
             "authorized_at_utc": authorized_at,
             "chain_id": self.freeze["chain_id"],
-            "threshold": 2,
+            "threshold": threshold,
             "participants": participants,
             "is_test_fixture": True,
             "assurance_limit": "test fixture",
         }
         return descriptor, self.sign(descriptor, pa.DOMAIN_DKG_DESCRIPTOR, pa.FREEZE_ROLES)
 
-    def dkg_material(self, bad_dealers=()):
-        descriptor, descriptor_signatures = self.descriptor()
+    def dkg_material(self, bad_dealers=(), participant_count=3, threshold=2):
+        descriptor, descriptor_signatures = self.descriptor(participant_count, threshold)
         contributions = []
         states = {}
-        for i in range(1, 4):
+        for i in range(1, participant_count + 1):
             role_name = f"dkg-participant:p{i}"
             contribution, state = pa.dkg_contribution(
                 descriptor, f"p{i}", self.keyring[role_name], self.private[role_name],
-                coefficients=[10 + i, 20 + i], test_mode=True,
+                coefficients=[10 * degree + i for degree in range(1, threshold + 1)], test_mode=True,
             )
             contributions.append(contribution); states[f"p{i}"] = state
         reviews = []
-        self.last_packets = {f"p{i}": [] for i in range(1, 4)}
+        self.last_packets = {f"p{i}": [] for i in range(1, participant_count + 1)}
         for dealer_index, contribution in enumerate(contributions, 1):
             dealer_id = f"p{dealer_index}"
-            for recipient_index in range(1, 4):
+            for recipient_index in range(1, participant_count + 1):
                 recipient_id = f"p{recipient_index}"
                 dealer_role = self.keyring[f"dkg-participant:{dealer_id}"]
                 packet = pa.dkg_share_packet(
@@ -190,6 +191,38 @@ class AuthorizationFixtures:
             exclusions.append({"dealer_id": dealer, "complaint_hashes": complaint_hashes})
         exclusions.sort(key=lambda e: int(e["dealer_id"][1:]))
         return descriptor, descriptor_signatures, contributions, reviews, exclusions, erasures
+
+    def dkg_core(self, material):
+        return pa.build_dkg_core_transcript(
+            *material, self.keyring, self.freeze, test_mode=True,
+        )
+
+    def possession_records(self, core, holders):
+        active = set(pa.verify_dkg_core_transcript(
+            core, self.keyring, self.freeze, test_mode=True,
+        )["active_participants"])
+        records = []
+        for participant_id in holders:
+            role = self.keyring[f"dkg-participant:{participant_id}"]
+            packets = [
+                packet for packet in self.last_packets[participant_id]
+                if packet["payload"]["dealer_id"] in active
+            ]
+            public, _ = pa.dkg_finalize_participant_share(
+                core, packets, participant_id, self.keyring, self.freeze,
+                role, self.private[role.role], test_mode=True,
+            )
+            records.append(public)
+        return records
+
+    def finalized_dkg(self, material, holders=None):
+        core = self.dkg_core(material)
+        if holders is None:
+            holders = [p["participant_id"] for p in core["descriptor"]["participants"]][:core["descriptor"]["threshold"]]
+        records = self.possession_records(core, holders)
+        return pa.finalize_dkg_core_transcript(
+            core, records, self.keyring, self.freeze, test_mode=True,
+        )
 
     @staticmethod
     def mine_header(previous_internal: bytes, timestamp: int, nonce_seed: int = 0):
@@ -292,20 +325,16 @@ class QuietWeekAndBitcoinTests(AuthorizationFixtures, unittest.TestCase):
 class DkgTests(AuthorizationFixtures, unittest.TestCase):
     def valid_transcript(self):
         material = self.dkg_material()
-        return pa.finalize_dkg_transcript(*material, self.keyring, self.freeze, test_mode=True)
+        return self.finalized_dkg(material)
 
     def test_dealerless_transcript_positive(self):
         transcript = self.valid_transcript()
         summary = pa.verify_dkg_transcript(transcript, self.keyring, self.freeze, test_mode=True)
         self.assertEqual(summary["active_participants"], ["p1", "p2", "p3"])
         self.assertEqual(summary["threshold"], 2)
-        role = self.keyring["dkg-participant:p1"]
-        public, secret = pa.dkg_finalize_participant_share(
-            transcript, self.last_packets["p1"], "p1", self.keyring, self.freeze,
-            role, self.private[role.role], test_mode=True,
-        )
-        self.assertEqual(public["payload"]["participant_id"], "p1")
-        self.assertEqual(len(secret["secret_share_scalar_hex"]), 64)
+        self.assertEqual(summary["verified_share_holders"], ["p1", "p2"])
+        self.assertEqual(transcript["schema_version"], 2)
+        self.assertEqual(transcript["core"]["schema_version"], 2)
 
     def test_threshold_failure(self):
         material = self.dkg_material(bad_dealers=("p1", "p2"))
@@ -436,9 +465,7 @@ class DkgTests(AuthorizationFixtures, unittest.TestCase):
 
     def test_invalid_dealer_signed_share_remains_a_valid_complaint(self):
         material = self.dkg_material(bad_dealers=("p1",))
-        transcript = pa.finalize_dkg_transcript(
-            *material, self.keyring, self.freeze, test_mode=True
-        )
+        transcript = self.finalized_dkg(material, ["p2", "p3"])
         summary = pa.verify_dkg_transcript(
             transcript, self.keyring, self.freeze, test_mode=True
         )
@@ -448,39 +475,152 @@ class DkgTests(AuthorizationFixtures, unittest.TestCase):
     def test_rogue_contribution_transcript_splice_complaint_omission_and_reordering(self):
         transcript = self.valid_transcript()
         rogue = copy.deepcopy(transcript)
-        payload = dict(rogue["contributions"][0]["payload"]); payload["dealer_id"] = "rogue"
+        payload = dict(rogue["core"]["contributions"][0]["payload"]); payload["dealer_id"] = "rogue"
         role = self.keyring["dkg-participant:p1"]
-        rogue["contributions"][0] = pa._signed_record(payload, role, self.private[role.role])
+        rogue["core"]["contributions"][0] = pa._signed_record(payload, role, self.private[role.role])
         with self.assertRaisesRegex(pa.AuthorizationError, "rogue"):
             pa.verify_dkg_transcript(rogue, self.keyring, self.freeze, test_mode=True)
 
         splice = copy.deepcopy(transcript)
-        payload = dict(splice["reviews"][0]["payload"]); payload["ceremony_id"] = "0" * 64
+        payload = dict(splice["core"]["reviews"][0]["payload"]); payload["ceremony_id"] = "0" * 64
         role = self.keyring["dkg-participant:p1"]
-        splice["reviews"][0] = pa._signed_record(payload, role, self.private[role.role])
+        splice["core"]["reviews"][0] = pa._signed_record(payload, role, self.private[role.role])
         with self.assertRaisesRegex(pa.AuthorizationError, "transcript splice"):
             pa.verify_dkg_transcript(splice, self.keyring, self.freeze, test_mode=True)
 
-        omission = copy.deepcopy(transcript); omission["reviews"].pop()
+        omission = copy.deepcopy(transcript); omission["core"]["reviews"].pop()
         with self.assertRaisesRegex(pa.AuthorizationError, "omission"):
             pa.verify_dkg_transcript(omission, self.keyring, self.freeze, test_mode=True)
 
-        reordered = copy.deepcopy(transcript); reordered["contributions"][0], reordered["contributions"][1] = reordered["contributions"][1], reordered["contributions"][0]
+        reordered = copy.deepcopy(transcript); reordered["core"]["contributions"][0], reordered["core"]["contributions"][1] = reordered["core"]["contributions"][1], reordered["core"]["contributions"][0]
         with self.assertRaisesRegex(pa.AuthorizationError, "order"):
             pa.verify_dkg_transcript(reordered, self.keyring, self.freeze, test_mode=True)
+
+    def test_valid_reviews_without_threshold_possession_remain_incomplete(self):
+        material = list(self.dkg_material())
+        fabricated = []
+        for review in material[3]:
+            payload = dict(review["payload"])
+            payload["packet_sha256"] = "0" * 64
+            role = self.keyring[f"dkg-participant:{payload['recipient_id']}"]
+            fabricated.append(pa._signed_record(payload, role, self.private[role.role]))
+        material[3] = fabricated
+        core = self.dkg_core(tuple(material))
+        with self.assertRaisesRegex(pa.AuthorizationError, "fewer than threshold"):
+            pa.finalize_dkg_core_transcript(core, [], self.keyring, self.freeze, test_mode=True)
+
+    def test_final_share_holder_identity_context_and_possession_falsifiers(self):
+        material = self.dkg_material()
+        core = self.dkg_core(material)
+        shares = self.possession_records(core, ["p1", "p2", "p3"])
+        with self.assertRaisesRegex(pa.AuthorizationError, "fewer than threshold"):
+            pa.finalize_dkg_core_transcript(core, shares[:1], self.keyring, self.freeze, test_mode=True)
+        with self.assertRaisesRegex(pa.AuthorizationError, "duplicate"):
+            pa.finalize_dkg_core_transcript(core, [shares[0], shares[0]], self.keyring, self.freeze, test_mode=True)
+
+        def resigned(index, **changes):
+            payload = dict(shares[index]["payload"]); payload.update(changes)
+            role = self.keyring[f"dkg-participant:{payload['participant_id']}"]
+            return pa._signed_record(payload, role, self.private[role.role])
+
+        wrong_role = pa._signed_record(
+            shares[0]["payload"], self.keyring["dkg-participant:p3"], self.private["dkg-participant:p3"],
+        )
+        for bad, pattern in (
+            ([wrong_role, shares[1]], "exact participant role"),
+            ([resigned(0, participant_index=2), shares[1]], "index mismatch"),
+            ([resigned(0, core_root="0" * 64), shares[1]], "core_root"),
+            ([resigned(0, possession_proof_g2_compressed_hex="00" * 96), shares[1]], "proof of possession invalid"),
+            ([resigned(0, public_share_g1_compressed_hex=shares[1]["payload"]["public_share_g1_compressed_hex"]), shares[1]], "public share mismatch"),
+        ):
+            with self.subTest(pattern=pattern), self.assertRaisesRegex(pa.AuthorizationError, pattern):
+                pa.finalize_dkg_core_transcript(core, bad, self.keyring, self.freeze, test_mode=True)
+
+    def test_excluded_holder_rejected_and_valid_five_of_seven_possession(self):
+        excluded_material = self.dkg_material(bad_dealers=("p1",))
+        excluded_core = self.dkg_core(excluded_material)
+        active_shares = self.possession_records(excluded_core, ["p2", "p3"])
+        payload = dict(active_shares[0]["payload"])
+        payload.update(participant_id="p1", participant_index=1)
+        role = self.keyring["dkg-participant:p1"]
+        excluded_holder = pa._signed_record(payload, role, self.private[role.role])
+        with self.assertRaisesRegex(pa.AuthorizationError, "rogue or excluded"):
+            pa.finalize_dkg_core_transcript(
+                excluded_core, [excluded_holder, active_shares[1]], self.keyring, self.freeze, test_mode=True,
+            )
+
+        material = self.dkg_material(participant_count=7, threshold=5)
+        transcript = self.finalized_dkg(material, ["p1", "p2", "p3", "p4", "p5"])
+        summary = pa.verify_dkg_transcript(transcript, self.keyring, self.freeze, test_mode=True)
+        self.assertEqual(summary["verified_share_holders"], ["p1", "p2", "p3", "p4", "p5"])
+        self.assertEqual(summary["threshold"], 5)
 
 
 class CutoverTests(AuthorizationFixtures, unittest.TestCase):
     def cutover_fixture(self):
-        promotion = {
-            "protocol_binding": {"revision": REVISION},
-            "cutover": {"execution_authority": "SIGNED_G5_ONLY"},
-            "gates": [
-                {"gate": name, "state": "PASSED", "signatures": [{"fixture": True}]}
-                for name in ("G0", "G1", "G2", "G3", "GENESIS", "G4", "G5")
-            ],
+        temp = tempfile.TemporaryDirectory(); self.addCleanup(temp.cleanup)
+        root = Path(temp.name)
+        trust_root = "a" * 64
+        final = {
+            "exact_revision": REVISION, "chain_id": self.freeze["chain_id"],
+            "genesis_hash": "7" * 64, "role_keyring_sha256": trust_root,
         }
-        final = {"exact_revision": REVISION, "chain_id": self.freeze["chain_id"], "genesis_hash": "7" * 64}
+        final_hash = pa.sha256(pa.canonical_json(final) + b"\n")
+        requirement_ids = {
+            "G0": ["G0.REGISTRY_SCHEMA", "G0.OWNER_CONSTANTS"],
+            "G1": ["G1.DETERMINISTIC_LAB"], "G2": ["G2.INDEPENDENT_DEVNET"],
+            "G3": ["G3.PUBLIC_DURATION", "G3.A_BRAID_AI_OFF", "G3.EXTERNAL_ASSURANCE"],
+            "GENESIS": ["GENESIS.QUIET_WEEK", "GENESIS.BITCOIN_ANCHOR", "GENESIS.DKG", "GENESIS.MAINNET_ECONOMICS", "GENESIS.REPRO_DEMO"],
+            "G4": ["G4.CANARY_DURATION", "G4.EXIT_AND_FAULT_DRILLS", "G4.HARDWARE_BUILDERS"],
+            "G5": ["G5.EXACT_LOWER_GATES", "G5.CLAIM_COMPLETENESS", "G5.EXTERNAL_REVIEWS", "G5.LIVE_DIVERSITY", "G5.SIGNATURES"],
+        }
+        record_hashes = []
+        gates = []
+        for gate_id, ids in requirement_ids.items():
+            evidence_doc = {
+                "schema": "noos/test-promotion-evidence/v1", "kind": "signed-test-fixture",
+                "gate_id": gate_id, "exact_revision": REVISION, "chain_id": final["chain_id"],
+                "genesis_hash": final["genesis_hash"], "is_test_fixture": True, "verdict": "PASS",
+            }
+            evidence_path = root / f"{gate_id.lower()}.json"
+            evidence_path.write_bytes(pa.canonical_json(evidence_doc))
+            evidence_hash = pa.file_sha256(evidence_path)
+            record = {
+                "schema_version": 2, "kind": "noosphere-promotion-gate-record-v2", "gate_id": gate_id,
+                "exact_revision": REVISION, "chain_id": final["chain_id"], "genesis_hash": final["genesis_hash"],
+                "ordered_prerequisite_record_hashes": list(record_hashes), "requirement_ids": ids,
+                "evidence_artifacts": [{
+                    "requirement_id": requirement_id, "path": evidence_path.name, "sha256": evidence_hash,
+                    "schema": "noos/test-promotion-evidence/v1", "kind": "signed-test-fixture",
+                } for requirement_id in ids],
+                "unresolved": [], "decision": "PASSED", "signer_roles": list(pa.CUTOVER_ROLES),
+                "signer_key_ids": [self.keyring[role].key_id for role in pa.CUTOVER_ROLES],
+                "predecessor_record_hash": record_hashes[-1] if record_hashes else "0" * 64,
+                "predecessor_ledger_root": pa.sha256(b"NOOS/PROMOTION/LEDGER/V2\x00" + pa.canonical_json(record_hashes)),
+                "role_keyring_sha256": trust_root,
+            }
+            raw = pa.canonical_json(record)
+            signatures = [{
+                "role": role, "key_id": self.keyring[role].key_id,
+                "signature_ed25519_hex": self.private[role].sign(b"NOOS/PROMOTION/GATE/V2\x00" + raw).hex(),
+            } for role in pa.CUTOVER_ROLES]
+            record_hashes.append(pa.sha256(raw))
+            gates.append({
+                "gate": gate_id, "state": "PASSED", "requirements": [{
+                    "requirement_id": requirement_id, "status": "SATISFIED", "verdict": "PASS",
+                    "exact_revision": REVISION,
+                } for requirement_id in ids], "unresolved": [],
+                "authorization_record": record, "signatures": signatures,
+            })
+        ledger_root = pa.sha256(b"NOOS/PROMOTION/LEDGER/V2\x00" + pa.canonical_json(record_hashes))
+        promotion = {
+            "protocol_binding": {"revision": REVISION, "chain_id": final["chain_id"], "genesis_hash": final["genesis_hash"]},
+            "authorization_binding": {
+                "schema_version": 2, "gate_record_domain": "NOOS/PROMOTION/GATE/V2",
+                "role_keyring_sha256": trust_root, "final_freeze_sha256": final_hash, "ledger_root": ledger_root,
+            },
+            "cutover": {"execution_authority": "SIGNED_G5_ONLY"}, "gates": gates,
+        }
         release = {"identity": {"chain_id": final["chain_id"], "genesis_hash": final["genesis_hash"]}, "source": {"repo_revision": REVISION}}
         prepared = {
             "manifest_state": "PREPARED_NOT_EXECUTED",
@@ -490,52 +630,99 @@ class CutoverTests(AuthorizationFixtures, unittest.TestCase):
             },
         }
         authorization = {
-            "schema_version": 1,
-            "kind": "noosphere-multiparty-cutover-authorization-v1",
+            "schema_version": 2,
+            "kind": "noosphere-multiparty-cutover-authorization-v2",
             "exact_revision": REVISION,
             "chain_id": final["chain_id"],
             "genesis_hash": final["genesis_hash"],
             "promotion_ledger_sha256": pa.sha256(pa.canonical_json(promotion) + b"\n"),
+            "promotion_ledger_root": ledger_root,
+            "role_keyring_sha256": trust_root,
             "release_manifest_sha256": pa.sha256(pa.canonical_json(release) + b"\n"),
             "final_freeze_sha256": pa.sha256(pa.canonical_json(final) + b"\n"),
             "prepared_cutover_sha256": pa.sha256(pa.canonical_json(prepared) + b"\n"),
-            "is_test_fixture": False,
+            "is_test_fixture": True,
             "authorization_scope": "exact bytes only",
         }
         signatures = self.sign(authorization, pa.DOMAIN_CUTOVER, pa.CUTOVER_ROLES)
-        return authorization, signatures, promotion, release, final, prepared
+        return authorization, signatures, promotion, release, final, prepared, trust_root, root
 
     def test_cutover_multiparty_positive_and_hash_mismatch(self):
         values = self.cutover_fixture()
-        pa.verify_cutover_authorization(values[0], values[1], self.keyring, *values[2:])
+        pa.verify_cutover_authorization(
+            values[0], values[1], self.keyring, *values[2:6],
+            trusted_role_keyring_sha256=values[6], promotion_root=values[7], test_mode=True,
+        )
         bad = copy.deepcopy(values[0]); bad["release_manifest_sha256"] = "0" * 64
         with self.assertRaisesRegex(pa.AuthorizationError, "component hash mismatch"):
-            pa.verify_cutover_authorization(bad, values[1], self.keyring, *values[2:])
+            pa.verify_cutover_authorization(
+                bad, values[1], self.keyring, *values[2:6],
+                trusted_role_keyring_sha256=values[6], promotion_root=values[7], test_mode=True,
+            )
 
     def test_current_blocked_gate_and_missing_cutover_role_refuse(self):
-        authorization, signatures, promotion, release, final, prepared = self.cutover_fixture()
+        authorization, signatures, promotion, release, final, prepared, trust_root, root = self.cutover_fixture()
         promotion["gates"][4]["state"] = "BLOCKED"
-        with self.assertRaisesRegex(pa.AuthorizationError, "every G0..G5"):
-            pa.verify_cutover_authorization(authorization, signatures, self.keyring, promotion, release, final, prepared)
+        with self.assertRaisesRegex(pa.AuthorizationError, "non-PASSED gate"):
+            pa.verify_cutover_authorization(
+                authorization, signatures, self.keyring, promotion, release, final, prepared,
+                trusted_role_keyring_sha256=trust_root, promotion_root=root, test_mode=True,
+            )
         promotion["gates"][4]["state"] = "PASSED"
         signatures["signatures"].pop()
         with self.assertRaisesRegex(pa.AuthorizationError, "missing/extra role"):
-            pa.verify_cutover_authorization(authorization, signatures, self.keyring, promotion, release, final, prepared)
+            pa.verify_cutover_authorization(
+                authorization, signatures, self.keyring, promotion, release, final, prepared,
+                trusted_role_keyring_sha256=trust_root, promotion_root=root, test_mode=True,
+            )
+
+    def test_passed_strings_and_dummy_signature_objects_never_authorize(self):
+        authorization, _, _, release, final, prepared, trust_root, root = self.cutover_fixture()
+        fabricated = {
+            "protocol_binding": {"revision": REVISION, "chain_id": final["chain_id"], "genesis_hash": final["genesis_hash"]},
+            "authorization_binding": {
+                "schema_version": 2, "gate_record_domain": "NOOS/PROMOTION/GATE/V2",
+                "role_keyring_sha256": trust_root,
+                "final_freeze_sha256": pa.sha256(pa.canonical_json(final) + b"\n"),
+                "ledger_root": authorization["promotion_ledger_root"],
+            },
+            "cutover": {"execution_authority": "SIGNED_G5_ONLY"},
+            "gates": [{"gate": gate, "state": "PASSED", "signatures": [{"fixture": True}]} for gate in ("G0", "G1", "G2", "G3", "GENESIS", "G4", "G5")],
+        }
+        authorization = dict(authorization)
+        authorization["promotion_ledger_sha256"] = pa.sha256(pa.canonical_json(fabricated) + b"\n")
+        signatures = self.sign(authorization, pa.DOMAIN_CUTOVER, pa.CUTOVER_ROLES)
+        with self.assertRaisesRegex(pa.AuthorizationError, "authorization record"):
+            pa.verify_cutover_authorization(
+                authorization, signatures, self.keyring, fabricated, release, final, prepared,
+                trusted_role_keyring_sha256=trust_root, promotion_root=root, test_mode=True,
+            )
+
+    def test_signed_gate_file_existence_without_exact_evidence_bytes_fails(self):
+        authorization, signatures, promotion, release, final, prepared, trust_root, root = self.cutover_fixture()
+        (root / "g3.json").write_text('{"schema":"noos/test-promotion-evidence/v1"}', encoding="utf-8")
+        with self.assertRaisesRegex(pa.AuthorizationError, "evidence bytes/hash mismatch"):
+            pa.verify_cutover_authorization(
+                authorization, signatures, self.keyring, promotion, release, final, prepared,
+                trusted_role_keyring_sha256=trust_root, promotion_root=root, test_mode=True,
+            )
 
 
 class FinalGenesisTests(AuthorizationFixtures, unittest.TestCase):
     def test_final_genesis_rebuild_is_deterministic_and_binds_every_root(self):
         material = self.dkg_material()
-        transcript = pa.finalize_dkg_transcript(*material, self.keyring, self.freeze, test_mode=True)
+        transcript = self.finalized_dkg(material)
         dkg = pa.verify_dkg_transcript(transcript, self.keyring, self.freeze, test_mode=True)
         anchor = {"height": 900_000, "block_hash_internal_hex": "8" * 64}
         body = {
-            "version": 1,
+            "version": 2,
             "parameter_manifest_hash": self.freeze["parameter_manifest_hash"],
             "genesis_time_ms": 1_900_000_000_000,
             "dkg_suite_id": 1,
             "dkg_group_pubkey_hex": dkg["group_public_key_g1_hex"],
             "dkg_participant_set_root": dkg["participant_set_root"],
+            "dkg_holder_set_root": dkg["holder_set_root"],
+            "dkg_root": dkg["dkg_root"],
             "genesis_witness_set_root": "9" * 64,
             "genesis_state_roots": {
                 "notes_root": "a" * 64,

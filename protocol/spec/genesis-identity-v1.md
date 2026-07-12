@@ -22,7 +22,7 @@ chain_id                = H("NOOS/CHAIN/V1"          || parameter_manifest_hash)
 genesis_hash            = H("NOOS/GENESIS/FINAL/V1"  || chain_id
                                                      || bitcoin_anchor      (40 bytes, §5)
                                                      || dkg_root            (32 bytes, §6)
-                                                     || canonical(FinalGenesisBodyV1))
+                                                     || canonical(FinalGenesisBodyV2))
 ```
 
 `H` is **BLAKE3-256** over the byte concatenation shown: the exact ASCII bytes of the
@@ -44,7 +44,7 @@ Non-circularity invariants:
 
 1. `GenesisParameterManifestV1` **excludes** the Bitcoin anchor, every DKG artifact, and
    all three derived hashes (`parameter_manifest_hash`, `chain_id`, `genesis_hash`).
-2. `FinalGenesisBodyV1` **excludes** `genesis_hash` (its own digest) and does not repeat
+2. `FinalGenesisBodyV2` **excludes** `genesis_hash` (its own digest) and does not repeat
    `chain_id`, `bitcoin_anchor`, or `dkg_root` as fields — those three are bound by the
    formula prefix, exactly once each.
 3. Any change to a frozen stage-1 parameter **restarts Quiet Week and creates a new
@@ -59,7 +59,7 @@ Per ch08 §4.4 run-of-show, mapped onto the formulas:
 | T−7d | Freeze and publish `GenesisParameterManifestV1` (canonical bytes + the source TOML), claim-registry root, conformance-vector root, software manifest, reference miner. Publish `parameter_manifest_hash` and derived `chain_id`. | Countdown page shows the commitment hashes and nothing else |
 | T−24h | Name the Bitcoin anchor block **the moment it is mined** — it MUST have height/time strictly after the stage-1 freeze publication, giving a verifiable no-earlier-than bound (ch08 §4.4 step 2; Nockchain import). | `bitcoin_anchor` (40 bytes, §5) |
 | T−24h…T+0 | Complete the multi-party DKG under `D-BLS-DKG`/`D-BLS-FELDMAN` (ceremony CSPRNGs only, plan §3.2); publish commitments, shares, and the transcript root. | `dkg_root` (32 bytes, §6) |
-| T+0 | Assemble `FinalGenesisBodyV1`, derive `genesis_hash`, produce the genesis block on stream; independent parties reproduce `genesis_hash` from published inputs (plan §14.5). | Genesis block |
+| T+0 | Assemble `FinalGenesisBodyV2`, derive `genesis_hash`, produce the genesis block on stream; independent parties reproduce `genesis_hash` from published inputs (plan §14.5). | Genesis block |
 
 ## 3. `GenesisParameterManifestV1` — canonical layout
 
@@ -112,22 +112,25 @@ post-freeze artifact. Fields 25–33 with `OWNER_BLOCKED` mainnet values are str
 their widths and order are frozen now; a mainnet manifest cannot be encoded until the
 signed `mainnet-parameters.toml` supplies the values, which is exactly the intended block.
 
-## 4. `FinalGenesisBodyV1` — canonical layout
+## 4. `FinalGenesisBodyV2` — canonical layout
 
 | # | Field | Type / width | Content |
 |---|---|---|---|
-| 1 | `version` | `u16` (2) | `= 1` |
+| 1 | `version` | `u16` (2) | `= 2` |
 | 2 | `parameter_manifest_hash` | `Hash32` (32) | Binds stage 1 (this is the *other* struct's digest; a struct may bind another struct's digest, never its own) |
 | 3 | `genesis_time_ms` | `u64` (8) | Declared genesis timestamp (Unix ms); slot arithmetic origin (ch01 §4.2) |
 | 4 | `dkg_suite_id` | `u16` (2) | Registered BLS suite (crypto-domains-v1.csv `D-BLS-DKG` family) |
 | 5 | `dkg_group_pubkey` | bounded bytes: `u32` len (4) + bytes (≤ 192) | Ceremony threshold group public key (compressed) |
 | 6 | `dkg_participant_set_root` | `Hash32` (32) | Root over the canonical ordered participant/commitment list |
-| 7 | `genesis_witness_set_root` | `Hash32` (32) | Root over the canonical initial Witness Ring candidate snapshot |
-| 8 | `genesis_state_roots` | 6 × `Hash32` (192) | Initial `LumenState` roots in frozen order: `notes_root`, `nullifiers_root`, `accounts_root`, `objects_root`, `receipts_root`, `params_root` (ch01 §6.1) |
+| 7 | `dkg_holder_set_root` | `Hash32` (32) | Sorted threshold-or-greater set of verified final public shares and possession proofs |
+| 8 | `dkg_root` | `Hash32` (32) | Final v2 transcript root; a core root is invalid here |
+| 9 | `genesis_witness_set_root` | `Hash32` (32) | Root over the canonical initial Witness Ring candidate snapshot |
+| 10 | `genesis_state_roots` | 6 × `Hash32` (192) | Initial `LumenState` roots in frozen order: `notes_root`, `nullifiers_root`, `accounts_root`, `objects_root`, `receipts_root`, `params_root` (ch01 §6.1) |
 
 **Explicitly excluded** (normative): `genesis_hash` (own digest), `chain_id`,
-`bitcoin_anchor`, `dkg_root` — the latter three enter the `D-GENESIS-FINAL` preimage via
-the formula prefix only, exactly once, in the order shown in §1. Raw DKG shares and any
+`bitcoin_anchor` — chain and anchor enter the `D-GENESIS-FINAL` formula prefix. The final
+DKG and holder roots are encoded in `FinalGenesisBodyV2`, so a possession-incomplete core
+cannot be substituted at freeze. Raw DKG shares and any
 secret material never appear in any hashed structure (plan §3.2).
 
 ## 5. `bitcoin_anchor` encoding — 40 bytes
@@ -144,10 +147,13 @@ could not have been assembled earlier; it grants Bitcoin no authority over NOOSP
 
 ## 6. `dkg_root` encoding — 32 bytes
 
-`dkg_root` is the BLAKE3-256 root over the canonical DKG ceremony transcript (ordered
-participant commitments, Feldman verification vector, complaint/resolution record, final
-group public key), hashed under the registered domain row `D-DKG-TRANSCRIPT`
-(`NOOS/DKG/TRANSCRIPT/V1`) in `crypto-domains-v1.csv`. Ceremony signatures and share
+The acyclic `core_root` first commits ordered participant commitments, Feldman vectors,
+reviews, complaint/exclusion resolution, erasure attestations, and the group key under
+`D-DKG-CORE`; it is not final. Each active holder then authenticates its independently
+recomputed aggregate public share and BLS proof of possession over the frozen
+ceremony/revision/chain/core/index challenge under `D-DKG-POSSESSION`. `dkg_root` binds
+that core plus the sorted threshold-or-greater holder set under `D-DKG-TRANSCRIPT`
+(`NOOS/DKG/TRANSCRIPT/V2`) in `crypto-domains-v1.csv`. Ceremony signatures and share
 verification use `D-BLS-DKG` / `D-BLS-FELDMAN`. Deterministic dealer fixtures carry
 `is_test_fixture = true` and cannot load on mainnet (plan §3.2;
 `protocol/genesis/devnet-parameters.toml` `[dkg]`).

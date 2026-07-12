@@ -49,14 +49,42 @@
    "kind": "positive",
    "bytes": "",
    "domain_id": "D-DKG-TRANSCRIPT",
-   "hash32": "4a9beefc08d6a5fe05ee5b21537c225df8fe95b75054e4cab810585950cdb7b8"
+   "hash32": "54c89e13c33e68878dd05ad2c15b5e9807de33f6f9d0f8d218f1557fb83f6f43"
   },
   {
    "name": "d-dkg-transcript-payload68",
    "kind": "positive",
    "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
    "domain_id": "D-DKG-TRANSCRIPT",
-   "hash32": "57097d1f13ae1529e926f5877e8f74ce1984574329f3f164185ad87bc8ce96aa"
+   "hash32": "822252af4350d0be3069d9e6dccc066b20962d9932d7bb51c2a91cda33776030"
+  },
+  {
+   "name": "d-dkg-core-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-DKG-CORE",
+   "hash32": "2a9e88b9a95b53128c52d2a9e84415f3c9865f776605064e00e50847e6577403"
+  },
+  {
+   "name": "d-dkg-core-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-DKG-CORE",
+   "hash32": "c0c6688da63887d1e4f52188ab464dae8bf4bcd3d2625e80cac409885c5b9eae"
+  },
+  {
+   "name": "d-dkg-possession-empty",
+   "kind": "positive",
+   "bytes": "",
+   "domain_id": "D-DKG-POSSESSION",
+   "hash32": "0b3f90a3f62db7203fef83bd9716d741391c8cdf56f5838eace485602ce4123f"
+  },
+  {
+   "name": "d-dkg-possession-payload68",
+   "kind": "positive",
+   "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243",
+   "domain_id": "D-DKG-POSSESSION",
+   "hash32": "894e778651381210465e9f32d653a976d1a2a7dd4d9378b6bb95aed89e900677"
   },
   {
    "name": "d-note-id-empty",

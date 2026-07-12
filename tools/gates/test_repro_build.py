@@ -49,7 +49,8 @@ class AttestationFixture:
             self.builders.append((private, trust))
         self.trust_path = root / "trust.json"
         self.trust_path.write_bytes(repro_build.canonical_json({
-            "schema": "noos/trusted-repro-builders/v1", "builders": [builder[1] for builder in self.builders]
+            "schema": "noos/trusted-repro-builders/v1", "exact_revision": REVISION,
+            "builders": [builder[1] for builder in self.builders]
         }))
         self.payloads: dict[tuple[int, str], dict] = {}
         locks = repro_build.load_toolchains()
@@ -95,7 +96,9 @@ class AttestationFixture:
 
     def verify(self, *, allow_test_keys: bool = True) -> dict:
         return repro_build.verify_attestation_set(
-            self.attestations, self.trust_path, REVISION, allow_test_keys=allow_test_keys
+            self.attestations, self.trust_path, REVISION,
+            trusted_builders_sha256=repro_build.sha256_file(self.trust_path),
+            allow_test_keys=allow_test_keys,
         )
 
 
@@ -106,6 +109,7 @@ class ReproBuildMutationTests(unittest.TestCase):
                 Path(directory),
                 repro_build.ROOT / "protocol/release/trusted-repro-builders-template.json",
                 REVISION,
+                trusted_builders_sha256=repro_build.sha256_file(repro_build.ROOT / "protocol/release/trusted-repro-builders-template.json"),
             )
             self.assertEqual(report["verdict"], "EXTERNAL_BLOCKED")
             self.assertTrue(any("external public key is required" in error for error in report["errors"]))
@@ -159,12 +163,22 @@ class ReproBuildMutationTests(unittest.TestCase):
             for payload in fixture.payloads.values():
                 payload["builder"]["control_plane_identity"] = shared
             fixture.trust_path.write_bytes(repro_build.canonical_json({
-                "schema": "noos/trusted-repro-builders/v1", "builders": [builder[1] for builder in fixture.builders]
+                "schema": "noos/trusted-repro-builders/v1", "exact_revision": REVISION,
+                "builders": [builder[1] for builder in fixture.builders]
             }))
             fixture.write_all()
             report = fixture.verify()
             self.assertEqual(report["verdict"], "EXTERNAL_BLOCKED")
             self.assertIn("complete builders do not have two distinct control_plane_identity values", report["errors"])
+
+    def test_submitted_roster_cannot_nominate_its_own_trust_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = AttestationFixture(Path(directory))
+            with self.assertRaisesRegex(repro_build.AssuranceError, "externally supplied trust root"):
+                repro_build.verify_attestation_set(
+                    fixture.attestations, fixture.trust_path, REVISION,
+                    trusted_builders_sha256="0" * 64, allow_test_keys=True,
+                )
 
 
 if __name__ == "__main__":

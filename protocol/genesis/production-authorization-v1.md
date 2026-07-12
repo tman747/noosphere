@@ -1,4 +1,4 @@
-# NOOSPHERE production authorization and ceremony tooling v1
+# NOOSPHERE production authorization and ceremony tooling v2
 
 Status: executable scaffolding; every production input remains owner- or
 external-blocked. This document and its tooling do not pass `GENESIS`, change a
@@ -50,25 +50,33 @@ an owner artifact based on `role-keyring.template.json`.
    applies the same rule to revealed complaint packets before any exclusion,
    and also requires every dealer/recipient pair, exact complaint exclusions, a
    surviving threshold, ordered unspliced records, the summed group key, and a
-   reproducible `D-DKG-TRANSCRIPT` root.
+   reproducible `D-DKG-CORE` v2 root. A core is explicitly incomplete.
    `dkg-finalize-share` verifies one private packet from every active dealer,
    sums the recipient's long-lived threshold share, and checks its public
-   share against the aggregate Feldman vector before writing secret state.
+   share against the aggregate Feldman vector before writing secret state. It
+   also emits an exact-role Ed25519-authenticated public-share record carrying
+   a BLS proof over `D-DKG-POSSESSION`. Only a sorted threshold-or-greater set
+   of distinct active holders with valid public shares and proofs produces the
+   final `D-DKG-TRANSCRIPT` v2 root. Reviews alone never finalize a DKG.
 6. `dkg-confirm-erasure` will not delete secrets or pretend deletion is
    provable. It runs only after the named private-state path is absent and the
    operator supplies the exact confirmation sentence. Its output explicitly
    remains a signed operator attestation, not proof of physical-media erasure.
 7. `rebuild-final-genesis` verifies all preceding artifacts, encodes the exact
-   `FinalGenesisBodyV1`, independently derives `genesis_hash`, and creates a
+   `FinalGenesisBodyV2`, including final DKG and holder-set roots, independently
+   derives `genesis_hash`, and creates a
    signed rebuild record. The caller must supply the role key and participant
    identity; the role label alone does not prove independence.
    `freeze-final-identity` rechecks every component and rebuild record, emits
    the `chain_id`/`genesis_hash` bundle, and requires all three final roles.
    Final identity freeze and cutover records remain authorization artifacts,
    never gate verdicts.
-8. `verify-cutover` requires matching hashes for the promotion ledger, release
+8. `verify-cutover` reuses the v2 promotion-record validator and requires matching hashes for the promotion ledger, release
    manifest, final identity freeze, and prepared cutover; an exact revision and
-   chain/genesis identity; all seven existing gate records already `PASSED`;
+   chain/genesis identity; all seven closed gate records cryptographically
+   recompute as `PASSED`; exact typed evidence hashes; ordered prerequisite
+   hashes and the complete ledger root; a revision-bound role keyring pinned by
+   the signed final freeze;
    and valid signatures for release-owner, build-reviewer, operations-owner,
    and security-reviewer. With the current blocker ledger it must refuse.
 

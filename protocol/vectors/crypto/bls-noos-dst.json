@@ -43,6 +43,14 @@
    "signature": "b0d0abed97104769859bdc86f5844684da9af5eb4b6b9112e8936e61845780608a677023b774baaf11737cf67fce8b030df30b8c3f3b5fb561ff49a0f1e02ef4816da26a5953b584807217e275818c03afe9176378573ca0f0d3b1c7818c232f"
   },
   {
+   "name": "d-bls-dkg-possession-sign",
+   "kind": "positive",
+   "bytes": "abababababababababababababababababababababababababababababababab",
+   "domain_id": "D-BLS-DKG-POSSESSION",
+   "public_key": "a491d1b0ecd9bb917989f0e74f0dea0422eac4a873e5e2644f368dffb9a6e20fd6e10c1b77654d067c0618f6e5a7f79a",
+   "signature": "aca97344985efce1918ff75fd0cb385dbff54e7f16219bbc7a5608237017f9620ab24cc04971231dd90d36e4eb3a21ff16566b946e750991d726cb28322ef2639bbf7f2ecc95847b82d1859994997025c4acc09bfc37d29c9d1bc73e09a407c2"
+  },
+  {
    "name": "d-bls-handover-sign",
    "kind": "positive",
    "bytes": "abababababababababababababababababababababababababababababababab",

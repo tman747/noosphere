@@ -151,7 +151,7 @@ def vector_accept(case,policy,manifest):
  return False
 
 def main(argv=None):
- ap=argparse.ArgumentParser();ap.add_argument("--root");ap.add_argument("--instance");ap.add_argument("--require-signed",action="store_true");ap.add_argument("--signatures");ap.add_argument("--keyring");ap.add_argument("--exact-revision");args=ap.parse_args(argv)
+ ap=argparse.ArgumentParser();ap.add_argument("--root");ap.add_argument("--instance");ap.add_argument("--require-signed",action="store_true");ap.add_argument("--signatures");ap.add_argument("--keyring");ap.add_argument("--exact-revision");ap.add_argument("--final-freeze");ap.add_argument("--final-freeze-signatures");args=ap.parse_args(argv)
  root=Path(args.root).resolve() if args.root else Path(__file__).resolve().parents[2]
  errors=[]
  try:
@@ -174,7 +174,7 @@ def main(argv=None):
  sig_props=signature_schema.get("properties",{})
  if signature_schema.get("additionalProperties") is not False or sig_props.get("algorithm",{}).get("const")!="ed25519":errors.append("detached signature schema invalid")
  builders=trust_template.get("builders",[])
- if trust_template.get("schema")!="noos/trusted-repro-builders/v1" or len(builders)!=2 or any(b.get("test_only") is not False or b.get("external_to_release_owner") is not True or b.get("public_key_base64")!="EXTERNAL_INPUT_REQUIRED" for b in builders):errors.append("trusted external builder template must remain placeholder-only")
+ if trust_template.get("schema")!="noos/trusted-repro-builders/v1" or trust_template.get("exact_revision")!="OWNER_BLOCKED" or "cannot nominate its own trust root" not in trust_template.get("trust_root_notice","") or len(builders)!=2 or any(b.get("test_only") is not False or b.get("external_to_release_owner") is not True or b.get("public_key_base64")!="EXTERNAL_INPUT_REQUIRED" for b in builders):errors.append("trusted external builder template must remain revision/root-blocked placeholder-only")
  try:api_roots=load_json(root/"protocol/api/contract-root-v1.json");telemetry_roots=load_json(root/"protocol/telemetry/contract-root-v1.json")
  except ValueError as exc:errors.append(str(exc));api_roots={};telemetry_roots={}
  bindings=manifest.get("schema_roots",{})
@@ -188,18 +188,24 @@ def main(argv=None):
   if actual!=expected:errors.append(f"vector {c.get('id')}: got {actual}, expected {expected}")
  if args.require_signed:
   if policy.get("state")!="SIGNED":errors.append("policy is not SIGNED; release build blocked")
-  if not all((args.signatures,args.keyring,args.exact_revision)):
-   errors.append("signed policy verification requires --signatures, --keyring, and --exact-revision")
+  if not all((args.signatures,args.keyring,args.exact_revision,args.final_freeze,args.final_freeze_signatures)):
+   errors.append("signed policy verification requires signatures, keyring, exact revision, and signed final freeze trust binding")
   elif policy.get("state")=="SIGNED":
    try:
     genesis_tools=root/"tools/genesis"
     if str(genesis_tools) not in sys.path:sys.path.insert(0,str(genesis_tools))
-    from production_authorization import load_keyring,read_json,verify_detached_signatures,require_current_revision,DOMAIN_REPRO_POLICY,FREEZE_ROLES
+    from production_authorization import load_keyring,read_json,verify_detached_signatures,require_current_revision,file_sha256,canonical_json,DOMAIN_REPRO_POLICY,DOMAIN_FINAL_FREEZE,FREEZE_ROLES,FINAL_ROLES
     signature_path=Path(args.signatures);keyring_path=Path(args.keyring)
     if not signature_path.is_absolute():signature_path=root/signature_path
     if not keyring_path.is_absolute():keyring_path=root/keyring_path
     keys,keyring_doc=load_keyring(keyring_path)
     if keyring_doc.get("exact_revision")!=args.exact_revision:raise ValueError("keyring exact revision mismatch")
+    final_freeze_path=Path(args.final_freeze);final_freeze_signatures_path=Path(args.final_freeze_signatures)
+    if not final_freeze_path.is_absolute():final_freeze_path=root/final_freeze_path
+    if not final_freeze_signatures_path.is_absolute():final_freeze_signatures_path=root/final_freeze_signatures_path
+    final_freeze=read_json(final_freeze_path);final_freeze_signatures=read_json(final_freeze_signatures_path)
+    if final_freeze.get("exact_revision")!=args.exact_revision or final_freeze.get("role_keyring_sha256")!=file_sha256(keyring_path):raise ValueError("signed final freeze does not pin revision-bound role keyring")
+    verify_detached_signatures(canonical_json(final_freeze),final_freeze_signatures,DOMAIN_FINAL_FREEZE,args.exact_revision,FINAL_ROLES,keys)
     require_current_revision(args.exact_revision)
     verify_detached_signatures((root/"protocol/release/repro-policy-v1.toml").read_bytes(),read_json(signature_path),DOMAIN_REPRO_POLICY,args.exact_revision,FREEZE_ROLES,keys)
    except Exception as exc:errors.append(f"signed policy cryptographic verification failed: {exc}")

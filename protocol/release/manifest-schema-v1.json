@@ -17,7 +17,7 @@
     "artifact_hashes":{"type":"object","minProperties":1,"additionalProperties":{"$ref":"#/$defs/hashOrPlaceholder"}},
     "gate_verdicts":{"type":"array","minItems":1,"items":{"type":"object","required":["gate","claim_id","verdict","evidence_root","date"],"properties":{"gate":{"enum":["G0","G1","G2","G3","G4","G5"]},"claim_id":{"type":"string"},"verdict":{"enum":["PENDING","PASS","FAIL","KILLED","BLOCKED"]},"evidence_root":{"$ref":"#/$defs/hashOrPlaceholder"},"date":{"type":"string"}}}},
     "unresolved_findings":{"type":"array","items":{"type":"object","required":["finding_id","severity","summary","owner","status"]}},
-    "signatures":{"type":"array","minItems":2,"items":{"type":"object","required":["role","name","sig","date"]}},
+    "signatures":{"type":"array","minItems":2,"maxItems":2,"items":{"type":"object","additionalProperties":false,"required":["role","key_id","signature_ed25519_hex"],"properties":{"role":{"enum":["release-owner","independent-build-reviewer"]},"key_id":{"type":"string","minLength":1},"signature_ed25519_hex":{"type":"string","anyOf":[{"pattern":"^[0-9a-f]{128}$"},{"const":"PENDING_SIGNATURE"}]}}}},
     "evidence_appendix":{"type":"object","additionalProperties":false,"required":["_comment","entries"],"properties":{"_comment":{"type":"string"},"entries":{"type":"array","items":{"$ref":"#/$defs/evidenceEntry"}}}}
   },
   "$defs": {

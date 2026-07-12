@@ -107,16 +107,14 @@
   ],
   "signatures": [
     {
-      "role": "owner",
-      "name": "PENDING",
-      "sig": "PENDING_SIGNATURE",
-      "date": "1970-01-01"
+      "role": "release-owner",
+      "key_id": "EXTERNAL_INPUT_REQUIRED",
+      "signature_ed25519_hex": "PENDING_SIGNATURE"
     },
     {
-      "role": "independent-economic-review",
-      "name": "PENDING",
-      "sig": "PENDING_SIGNATURE",
-      "date": "1970-01-01"
+      "role": "independent-build-reviewer",
+      "key_id": "EXTERNAL_INPUT_REQUIRED",
+      "signature_ed25519_hex": "PENDING_SIGNATURE"
     }
   ],
   "evidence_appendix": {

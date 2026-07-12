@@ -2,9 +2,11 @@
 """Fail-closed validator for the immutable staged-promotion blocker ledger."""
 from __future__ import annotations
 import json
+import argparse
 import re
 import sys
 from pathlib import Path
+from promotion_records import PromotionValidationError, validate_promotion_ledger
 
 ORDER = ["G0", "G1", "G2", "G3", "GENESIS", "G4", "G5"]
 HASH = re.compile(r"^[0-9a-f]{64}$")
@@ -30,7 +32,9 @@ def load(path: Path, errors: list[str]):
         return {}
 
 
-def validate(root: Path) -> list[str]:
+def validate(root: Path, keyring=None, trusted_role_keyring_sha256: str | None = None,
+             expected_revision: str | None = None, expected_chain_id: str | None = None,
+             expected_genesis_hash: str | None = None) -> list[str]:
     errors: list[str] = []
     path = root / "protocol/release/promotion-blockers.json"
     doc = load(path, errors)
@@ -50,6 +54,19 @@ def validate(root: Path) -> list[str]:
         value = binding.get(key)
         if value != "OWNER_BLOCKED" and not (isinstance(value, str) and HASH.fullmatch(value)):
             errors.append(f"{key} must be OWNER_BLOCKED or lowercase hash32")
+    authorization_binding = doc.get("authorization_binding", {})
+    if authorization_binding != {
+        "schema_version": 2,
+        "gate_record_domain": "NOOS/PROMOTION/GATE/V2",
+        "role_keyring_sha256": "OWNER_BLOCKED",
+        "final_freeze_sha256": "OWNER_BLOCKED",
+        "ledger_root": "OWNER_BLOCKED",
+    } and not (
+        authorization_binding.get("schema_version") == 2
+        and authorization_binding.get("gate_record_domain") == "NOOS/PROMOTION/GATE/V2"
+        and all(HASH.fullmatch(str(authorization_binding.get(k, ""))) for k in ("role_keyring_sha256", "final_freeze_sha256", "ledger_root"))
+    ):
+        errors.append("promotion authorization binding is neither honestly blocked nor fully pinned")
     cutover = doc.get("cutover", {})
     if cutover.get("dns_cutover") != "PROHIBITED" or cutover.get("execution_authority") != "SIGNED_G5_ONLY":
         errors.append("DNS cutover must remain PROHIBITED and SIGNED_G5_ONLY")
@@ -136,12 +153,63 @@ def validate(root: Path) -> list[str]:
     required_external = {"EXT.PUBLIC_TESTNET", "EXT.DKG", "EXT.ECONOMICS_COUNSEL", "EXT.CANARY", "EXT.PRODUCTION_ECOSYSTEM"}
     if {x.get("id") for x in external if isinstance(x, dict)} != required_external:
         errors.append("external blocker set incomplete")
+    try:
+        validate_promotion_ledger(
+            doc, root, keyring,
+            trusted_role_keyring_sha256=trusted_role_keyring_sha256,
+            expected_revision=expected_revision, expected_chain_id=expected_chain_id,
+            expected_genesis_hash=expected_genesis_hash,
+        )
+    except PromotionValidationError as exc:
+        errors.append(str(exc))
     return errors
 
 
 def main(argv: list[str]) -> int:
-    root = Path(argv[1]).resolve() if len(argv) > 1 else Path(__file__).resolve().parents[2]
-    errors = validate(root)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("root", nargs="?", default=str(Path(__file__).resolve().parents[2]))
+    parser.add_argument("--keyring")
+    parser.add_argument("--final-freeze")
+    parser.add_argument("--final-freeze-signatures")
+    args = parser.parse_args(argv[1:])
+    root = Path(args.root).resolve()
+    keyring = None
+    trust_root = None
+    expected_revision = expected_chain_id = expected_genesis_hash = None
+    pre_errors: list[str] = []
+    supplied = [args.keyring, args.final_freeze, args.final_freeze_signatures]
+    if any(supplied) and not all(supplied):
+        pre_errors.append("--keyring, --final-freeze, and --final-freeze-signatures must be supplied together")
+    elif args.keyring:
+        try:
+            genesis_tools = root / "tools/genesis"
+            if str(genesis_tools) not in sys.path:
+                sys.path.insert(0, str(genesis_tools))
+            from production_authorization import DOMAIN_FINAL_FREEZE, FINAL_ROLES, canonical_json, file_sha256, load_keyring, read_json, verify_detached_signatures
+            keyring_path = Path(args.keyring); freeze_path = Path(args.final_freeze)
+            if not keyring_path.is_absolute(): keyring_path = root / keyring_path
+            if not freeze_path.is_absolute(): freeze_path = root / freeze_path
+            keyring, keyring_doc = load_keyring(keyring_path)
+            trust_root = file_sha256(keyring_path)
+            freeze = read_json(freeze_path)
+            expected_revision = freeze.get("exact_revision")
+            expected_chain_id = freeze.get("chain_id")
+            expected_genesis_hash = freeze.get("genesis_hash")
+            if keyring_doc.get("exact_revision") != expected_revision:
+                raise ValueError("final freeze/keyring revision mismatch")
+            if freeze.get("role_keyring_sha256") != trust_root:
+                raise ValueError("final freeze does not pin supplied role keyring bytes")
+            signature_path = Path(args.final_freeze_signatures)
+            if not signature_path.is_absolute(): signature_path = root / signature_path
+            verify_detached_signatures(
+                canonical_json(freeze), read_json(signature_path), DOMAIN_FINAL_FREEZE,
+                expected_revision, FINAL_ROLES, keyring,
+            )
+        except Exception as exc:
+            pre_errors.append(f"trusted keyring/final-freeze load failed: {exc}")
+    errors = pre_errors + validate(
+        root, keyring, trust_root, expected_revision, expected_chain_id, expected_genesis_hash,
+    )
     if errors:
         for error in errors:
             print(f"ERROR: {error}")

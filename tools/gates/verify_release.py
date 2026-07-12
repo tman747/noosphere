@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail-closed verifier for NOOSPHERE release supply-chain manifests."""
 from __future__ import annotations
-import argparse, base64, hashlib, json, re, sys
+import argparse, hashlib, json, re, sys
 try:
  import tomllib
 except ModuleNotFoundError:
@@ -13,21 +13,48 @@ def safe(rel:str)->Path:
  p=(ROOT/rel).resolve()
  if ROOT.resolve() not in p.parents and p!=ROOT.resolve():raise ValueError(f"path escapes repository: {rel}")
  return p
-def verify_signatures(manifest:dict,errors:list[str]):
- sigs=manifest.get("signatures",[]); roles=set(); unsigned=dict(manifest);unsigned["signatures"]=[]
- payload=(json.dumps(unsigned,sort_keys=True,separators=(",",":"))+"\n").encode()
- try:
-  from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-  for rec in sigs:
-   Ed25519PublicKey.from_public_bytes(base64.b64decode(rec["public_key_base64"],validate=True)).verify(base64.b64decode(rec["signature_base64"],validate=True),payload);roles.add(rec["role"])
- except Exception as exc: errors.append(f"manifest signature invalid: {exc}")
- for role in ("release-owner","independent-build-reviewer"):
+def verify_signatures(manifest:dict,errors:list[str],blocked:list[str],keyring=None,*,test_mode:bool=False):
+ sigs=manifest.get("signatures",[]);required=("release-owner","independent-build-reviewer");roles={}
+ unsigned=dict(manifest);unsigned["signatures"]=[]
+ payload=json.dumps(unsigned,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
+ if not sigs:
+  for role in required:blocked.append(f"missing manifest signature role {role}")
+  return
+ if keyring is None:
+  errors.append("signed release manifest requires externally supplied pinned role keyring")
+  return
+ message=b"NOOS/RELEASE/MANIFEST/V2\x00"+payload
+ for rec in sigs:
+  if not isinstance(rec,dict) or set(rec)!={"role","key_id","signature_ed25519_hex"}:
+   errors.append("manifest signature has unknown/embedded-key fields");continue
+  role=rec.get("role")
+  if role in roles or role not in required:errors.append(f"manifest signature duplicate/unknown role {role}");continue
+  pinned=keyring.get(role)
+  if pinned is None or rec.get("key_id")!=pinned.key_id:errors.append(f"manifest signature role/key mismatch {role}");continue
+  try:pinned.public.verify(bytes.fromhex(rec["signature_ed25519_hex"]),message);roles[role]=rec
+  except Exception as exc:errors.append(f"manifest signature invalid for {role}: {exc}")
+ for role in required:
   if role not in roles:errors.append(f"missing manifest signature role {role}")
 def main()->int:
- p=argparse.ArgumentParser();p.add_argument("manifest");p.add_argument("--allow-external-blocked",action="store_true");a=p.parse_args();mp=safe(a.manifest)
+ p=argparse.ArgumentParser();p.add_argument("manifest");p.add_argument("--allow-external-blocked",action="store_true");p.add_argument("--keyring");p.add_argument("--final-freeze");p.add_argument("--final-freeze-signatures");a=p.parse_args();mp=safe(a.manifest)
  try:m=json.loads(mp.read_text("utf-8"))
  except Exception as exc:print(f"manifest parse failed: {exc}",file=sys.stderr);return 1
- errors=[];blocked=[]
+ errors=[];blocked=[];keyring=None
+ supplied=[a.keyring,a.final_freeze,a.final_freeze_signatures]
+ if any(supplied) and not all(supplied):errors.append("--keyring, --final-freeze, and --final-freeze-signatures must be supplied together")
+ elif all(supplied):
+  try:
+   gt=ROOT/"tools/genesis"
+   if str(gt) not in sys.path:sys.path.insert(0,str(gt))
+   from production_authorization import DOMAIN_FINAL_FREEZE,FINAL_ROLES,canonical_json,file_sha256,load_keyring,read_json,verify_detached_signatures
+   kp=safe(a.keyring);fp=safe(a.final_freeze);sp=safe(a.final_freeze_signatures)
+   keyring,keyring_doc=load_keyring(kp)
+   freeze=read_json(fp);revision=m.get("source",{}).get("repo_revision")
+   if keyring_doc.get("exact_revision")!=revision or freeze.get("exact_revision")!=revision:raise ValueError("release/keyring/final-freeze revision mismatch")
+   if freeze.get("role_keyring_sha256")!=file_sha256(kp):raise ValueError("final freeze does not pin supplied role keyring bytes")
+   if freeze.get("chain_id")!=m.get("identity",{}).get("chain_id") or freeze.get("genesis_hash")!=m.get("identity",{}).get("genesis_hash"):raise ValueError("release/final-freeze identity mismatch")
+   verify_detached_signatures(canonical_json(freeze),read_json(sp),DOMAIN_FINAL_FREEZE,revision,FINAL_ROLES,keyring)
+  except Exception as exc:errors.append(f"trusted release keyring/final-freeze verification failed: {exc}")
  if m.get("schema_version")!=1 or m.get("manifest_kind")!="noosphere-release-manifest":errors.append("wrong manifest schema/kind")
  for section in ("release","source","identity","toolchain_locks","artifact_hashes","checksums","sbom","provenance","gate_verdicts","unresolved_findings","signatures"):
   if section not in m:errors.append(f"missing section {section}")
@@ -89,7 +116,7 @@ def main()->int:
  ident=m.get("identity",{})
  for key in ("chain_id","genesis_hash"):
   if not HEX.fullmatch(str(ident.get(key,""))):blocked.append(f"INVALID_OR_UNFROZEN_{key.upper()}")
- verify_signatures(m,blocked)
+ verify_signatures(m,errors,blocked,keyring)
  for v in m.get("gate_verdicts",[]):
   if v.get("verdict")!="PASS":blocked.append(f"GATE_{v.get('gate','UNKNOWN')}_{v.get('verdict','MISSING')}")
  if errors:

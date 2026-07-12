@@ -1,5 +1,7 @@
 {
   "schema": "noos/trusted-repro-builders/v1",
+  "exact_revision": "OWNER_BLOCKED",
+  "trust_root_notice": "The SHA-256 of completed roster bytes must be supplied through the signed freeze or authorization path; a submitted roster cannot nominate its own trust root.",
   "_comment": "Template only. Production keys and identity records must arrive from externally controlled builders. Never replace these placeholders with test keys or CI job identities.",
   "builders": [
     {

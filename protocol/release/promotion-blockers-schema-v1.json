@@ -4,7 +4,7 @@
   "title": "NOOSPHERE immutable staged-promotion blocker ledger",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "ledger_policy", "protocol_binding", "cutover", "gates", "owner_decisions", "external_blockers"],
+  "required": ["schema_version", "ledger_policy", "protocol_binding", "authorization_binding", "cutover", "gates", "owner_decisions", "external_blockers"],
   "properties": {
     "$schema": {"const": "promotion-blockers-schema-v1.json"},
     "schema_version": {"const": 1},
@@ -17,6 +17,14 @@
       }
     },
     "protocol_binding": {"$ref": "#/$defs/binding"},
+    "authorization_binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "gate_record_domain", "role_keyring_sha256", "final_freeze_sha256", "ledger_root"],
+      "properties": {
+        "schema_version": {"const": 2}, "gate_record_domain": {"const": "NOOS/PROMOTION/GATE/V2"},
+        "role_keyring_sha256": {"type": "string"}, "final_freeze_sha256": {"type": "string"}, "ledger_root": {"type": "string"}
+      }
+    },
     "cutover": {
       "type": "object", "additionalProperties": false,
       "required": ["dns_cutover", "execution_authority", "prepared_manifest", "rollback_target"],
@@ -65,7 +73,23 @@
         "immutable_record": {"const": true},
         "requirements": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence"}},
         "unresolved": {"type": "array", "items": {"type": "string", "minLength": 1}},
-        "signatures": {"type": "array", "items": {"type": "object", "required": ["role", "key_id", "signature", "signed_artifact_hash"], "additionalProperties": false, "properties": {"role": {"type": "string"}, "key_id": {"type": "string"}, "signature": {"type": "string"}, "signed_artifact_hash": {"type": "string"}}}}
+        "authorization_record": {"$ref": "#/$defs/authorization_record"},
+        "signatures": {"type": "array", "items": {"type": "object", "required": ["role", "key_id", "signature_ed25519_hex"], "additionalProperties": false, "properties": {"role": {"type": "string"}, "key_id": {"type": "string"}, "signature_ed25519_hex": {"type": "string", "pattern": "^[0-9a-f]{128}$"}}}}
+      }
+    },
+    "authorization_record": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "kind", "gate_id", "exact_revision", "chain_id", "genesis_hash", "ordered_prerequisite_record_hashes", "requirement_ids", "evidence_artifacts", "unresolved", "decision", "signer_roles", "signer_key_ids", "predecessor_record_hash", "predecessor_ledger_root", "role_keyring_sha256"],
+      "properties": {
+        "schema_version": {"const": 2}, "kind": {"const": "noosphere-promotion-gate-record-v2"},
+        "gate_id": {"enum": ["G0", "G1", "G2", "G3", "GENESIS", "G4", "G5"]},
+        "exact_revision": {"type": "string"}, "chain_id": {"type": "string"}, "genesis_hash": {"type": "string"},
+        "ordered_prerequisite_record_hashes": {"type": "array", "items": {"type": "string"}},
+        "requirement_ids": {"type": "array", "items": {"type": "string"}},
+        "evidence_artifacts": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["requirement_id", "path", "sha256", "schema", "kind"], "properties": {"requirement_id": {"type": "string"}, "path": {"type": "string"}, "sha256": {"type": "string"}, "schema": {"type": "string"}, "kind": {"type": "string"}}}},
+        "unresolved": {"const": []}, "decision": {"const": "PASSED"},
+        "signer_roles": {"type": "array", "items": {"type": "string"}}, "signer_key_ids": {"type": "array", "items": {"type": "string"}},
+        "predecessor_record_hash": {"type": "string"}, "predecessor_ledger_root": {"type": "string"}, "role_keyring_sha256": {"type": "string"}
       }
     },
     "blocker": {
