@@ -1,0 +1,213 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"contract\":\"five-state lifecycle, exact optimal contiguous planner, integer boundary binding, conformance falsifiers\",\"test\":{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-hearth\",\"-p\",\"noos-workerd\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-hearth\",\"noos-workerd\"]}}",
+      "id": "local-precursor",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "requires >=10^9 measured operator instances on real NVIDIA, AMD, and CPU implementations",
+      "id": "external-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "H-HEARTH": "6f4d262379525cced05816f2f1ebe82a713dc277754ce60e4e8203f42ecf5526"
+  },
+  "claims": [
+    "H-HEARTH"
+  ],
+  "command": [
+    "tools/gates/run_hearth_claim.py",
+    "--claim",
+    "H-HEARTH"
+  ],
+  "evidence_sha256": "8304a165f6e77df9f01c65adfa84dfbd28f5f8108538d339fdfe6eb1e1962d9e",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "hearth-local-h-hearth",
+  "limitations": [
+    "requires >=10^9 measured operator instances on real NVIDIA, AMD, and CPU implementations",
+    "Deterministic fixtures and modeled threshold evaluators are local precursor evidence, not hardware, operator, WAN, public-duration, or independent evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 230,
+        "git_blob": "5eb0d42f5d4ed72b00adb154774bd7ba1517add8",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/Cargo.toml",
+        "sha256": "a623eacb1395837a76ce4a36ca87442dcf367e66842fb1fd88a5b3f09c707faa"
+      },
+      {
+        "bytes": 10590,
+        "git_blob": "9096f39c196de02606f6dcae391052a2d48e2245",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/audit.rs",
+        "sha256": "7f2fd1b26501d9bb3905df905e03adc9331d60387a2afdb81c9eb17d02e8ed67"
+      },
+      {
+        "bytes": 8949,
+        "git_blob": "6e701d6d77a6f109bab15aa87e1aaf2215ee1a8b",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/federation.rs",
+        "sha256": "b43350526f5aa038b5e877fadc3caacb34856f9e7b5708b113922ec5e056111f"
+      },
+      {
+        "bytes": 19078,
+        "git_blob": "95a73d14bfb637b80d21b849d914043dd54363b8",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/lib.rs",
+        "sha256": "64333983225ad5fa7c33c4c6994e389f91e5eb0bf3bd196950d93a5b76c19244"
+      },
+      {
+        "bytes": 23643,
+        "git_blob": "46e45f57c9cf287579456602cb6f27bb9789908a",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/lifecycle.rs",
+        "sha256": "db7176015ae8f234763d3efbc21f5c7d64287f65b9ffd5e1e671afc1861e16a4"
+      },
+      {
+        "bytes": 10638,
+        "git_blob": "02d952d4dee64f5803a7030780b838f0cc9a7a16",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/payment.rs",
+        "sha256": "19bc2cf8969252e26b27e2bfab1ff75d13a64b5686422441ac424a3c0df48e9d"
+      },
+      {
+        "bytes": 8008,
+        "git_blob": "ce066e35293f6b073ec9396dfcf85efa54ca1bae",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/relay.rs",
+        "sha256": "f21c35ce445eb36dc0b40fff4b20299ac2a0fb114be01e05c963c7cec996d342"
+      },
+      {
+        "bytes": 10822,
+        "git_blob": "eb95b0f7949483af1c91586bb3f90e7e7b0b7568",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/repair.rs",
+        "sha256": "5c8bd2ae9453420f7673a2257bb240df088c0539fc64dadb0b2de82fa4f2a86d"
+      },
+      {
+        "bytes": 4748,
+        "git_blob": "7a3baf73087f9d2c0a7271085eda3e65fc403f0a",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/rollback.rs",
+        "sha256": "a5527b68caced869ac9b04dc7ec2c427a7850a7f5e15a84e1cf9cd329be8213d"
+      },
+      {
+        "bytes": 12522,
+        "git_blob": "55cbee4d96b1cb1505ac59e15ea0a376a49d941c",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/seeding.rs",
+        "sha256": "7a493dd4107e943536a0abf6ca59389d369acb4dbe6820eedee43ba12f411b3e"
+      },
+      {
+        "bytes": 629,
+        "git_blob": "39449ecc07236226719b276dd30b5b27252991f5",
+        "git_mode": "100644",
+        "path": "crates/noos-workerd/Cargo.toml",
+        "sha256": "9114dff1cbe026b19a42f5bb9e46c245f137036f6aed78f9848edfb275b60062"
+      },
+      {
+        "bytes": 5794,
+        "git_blob": "bab997a6cf29a42011e3f116bd16f0b3d84c7ac4",
+        "git_mode": "100644",
+        "path": "crates/noos-workerd/src/config.rs",
+        "sha256": "18c5d43624f7609b633a9f2cd145f191e1024626be54e171e4ecd3e874e371c9"
+      },
+      {
+        "bytes": 1986,
+        "git_blob": "c4097423694c0bd5125abdd8e10aea1f3d97baae",
+        "git_mode": "100644",
+        "path": "crates/noos-workerd/src/hex.rs",
+        "sha256": "0372d76423cc35ab62869341429d8a12ce25ed89c425714d68f6ffb7cc5fd82b"
+      },
+      {
+        "bytes": 7355,
+        "git_blob": "d86fed3b01fedddfc2a19e63e398b6587c077d8e",
+        "git_mode": "100644",
+        "path": "crates/noos-workerd/src/main.rs",
+        "sha256": "5700c9c51fd766ee50beb9331b17df2f1da454c767d2165c28521b6020aea66a"
+      },
+      {
+        "bytes": 20086,
+        "git_blob": "8d15e04d6ea25853a2af975424b83f83299075c0",
+        "git_mode": "100644",
+        "path": "crates/noos-workerd/src/runtime.rs",
+        "sha256": "6284e193413fccd12ac1e492f8495ccab027c1f6c1878950a0240b78f808a794"
+      },
+      {
+        "bytes": 5200,
+        "git_blob": "d5be2aa249642e81a6a051e613d7ad24184b0bc3",
+        "git_mode": "100644",
+        "path": "crates/noos-workerd/src/telemetry.rs",
+        "sha256": "5391dba8a0bc7b35e7d912eef5726f06a14c44417b19a95f0bd971169d0d68c7"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 7751,
+        "git_blob": "6644ec45bd06c482e349c873c1e8300ec2b4b6bc",
+        "git_mode": "100644",
+        "path": "tools/gates/run_hearth_claim.py",
+        "sha256": "64f121d25e32a3477b8bd6aa628b2ec334101df02344378aaff4eb2f8fa2f408"
+      }
+    ],
+    "manifest_sha256": "208134b19c703a1ddf296224befa12452ffae59d0b4de764a3b40141ccde5acf",
+    "source_revision": "ead858a855b4cf831bbe4e4f0aafbca95b238593",
+    "source_tree": "74743570a450cae5d24a2b6f1a3840e90f518511"
+  }
+}

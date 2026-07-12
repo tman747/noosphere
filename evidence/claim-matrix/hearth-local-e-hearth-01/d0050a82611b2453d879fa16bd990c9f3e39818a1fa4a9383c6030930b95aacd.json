@@ -1,0 +1,227 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"contract\":\"local placement/schedule commitment falsifier and mandatory FP16 negative-control evaluator\",\"test\":{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-hearth\",\"-p\",\"noos-nel\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-hearth\",\"noos-nel\"]}}",
+      "id": "local-precursor",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "real mixed-vendor hardware campaign and >=10^9 measured instances are unavailable",
+      "id": "external-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-HEARTH-01": "744be7e71bf4030d9a0da2b97b6a05fc14d91632b7fbdf90829c44529f1f95a1"
+  },
+  "claims": [
+    "E-HEARTH-01"
+  ],
+  "command": [
+    "tools/gates/run_hearth_claim.py",
+    "--claim",
+    "E-HEARTH-01"
+  ],
+  "evidence_sha256": "d0050a82611b2453d879fa16bd990c9f3e39818a1fa4a9383c6030930b95aacd",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "hearth-local-e-hearth-01",
+  "limitations": [
+    "real mixed-vendor hardware campaign and >=10^9 measured instances are unavailable",
+    "Deterministic fixtures and modeled threshold evaluators are local precursor evidence, not hardware, operator, WAN, public-duration, or independent evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 230,
+        "git_blob": "5eb0d42f5d4ed72b00adb154774bd7ba1517add8",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/Cargo.toml",
+        "sha256": "a623eacb1395837a76ce4a36ca87442dcf367e66842fb1fd88a5b3f09c707faa"
+      },
+      {
+        "bytes": 10590,
+        "git_blob": "9096f39c196de02606f6dcae391052a2d48e2245",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/audit.rs",
+        "sha256": "7f2fd1b26501d9bb3905df905e03adc9331d60387a2afdb81c9eb17d02e8ed67"
+      },
+      {
+        "bytes": 8949,
+        "git_blob": "6e701d6d77a6f109bab15aa87e1aaf2215ee1a8b",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/federation.rs",
+        "sha256": "b43350526f5aa038b5e877fadc3caacb34856f9e7b5708b113922ec5e056111f"
+      },
+      {
+        "bytes": 19078,
+        "git_blob": "95a73d14bfb637b80d21b849d914043dd54363b8",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/lib.rs",
+        "sha256": "64333983225ad5fa7c33c4c6994e389f91e5eb0bf3bd196950d93a5b76c19244"
+      },
+      {
+        "bytes": 23643,
+        "git_blob": "46e45f57c9cf287579456602cb6f27bb9789908a",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/lifecycle.rs",
+        "sha256": "db7176015ae8f234763d3efbc21f5c7d64287f65b9ffd5e1e671afc1861e16a4"
+      },
+      {
+        "bytes": 10638,
+        "git_blob": "02d952d4dee64f5803a7030780b838f0cc9a7a16",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/payment.rs",
+        "sha256": "19bc2cf8969252e26b27e2bfab1ff75d13a64b5686422441ac424a3c0df48e9d"
+      },
+      {
+        "bytes": 8008,
+        "git_blob": "ce066e35293f6b073ec9396dfcf85efa54ca1bae",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/relay.rs",
+        "sha256": "f21c35ce445eb36dc0b40fff4b20299ac2a0fb114be01e05c963c7cec996d342"
+      },
+      {
+        "bytes": 10822,
+        "git_blob": "eb95b0f7949483af1c91586bb3f90e7e7b0b7568",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/repair.rs",
+        "sha256": "5c8bd2ae9453420f7673a2257bb240df088c0539fc64dadb0b2de82fa4f2a86d"
+      },
+      {
+        "bytes": 4748,
+        "git_blob": "7a3baf73087f9d2c0a7271085eda3e65fc403f0a",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/rollback.rs",
+        "sha256": "a5527b68caced869ac9b04dc7ec2c427a7850a7f5e15a84e1cf9cd329be8213d"
+      },
+      {
+        "bytes": 12522,
+        "git_blob": "55cbee4d96b1cb1505ac59e15ea0a376a49d941c",
+        "git_mode": "100644",
+        "path": "crates/noos-hearth/src/seeding.rs",
+        "sha256": "7a493dd4107e943536a0abf6ca59389d369acb4dbe6820eedee43ba12f411b3e"
+      },
+      {
+        "bytes": 371,
+        "git_blob": "9871a6f0a90c697f06d0ed71bddc9e8b253ef7ce",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/Cargo.toml",
+        "sha256": "17d2ecfb2e392c496e7dfaa14c28d1b89a4b97a16095b984434f3b81cfc99189"
+      },
+      {
+        "bytes": 8744,
+        "git_blob": "0b49812c55681348e8d197b04f315a506fbf656d",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/src/bin/nel-claim-harness.rs",
+        "sha256": "0e10847361b80724712f1486a19b7bb63049aecfccda5697eb9cd93b9e3f4b90"
+      },
+      {
+        "bytes": 65903,
+        "git_blob": "9cf848f4454a5b2add01b80046122ed8273e32a7",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/src/inference.rs",
+        "sha256": "304f6746a5b2bd9ba23e73a06553caac95b5c211c39377a50343ed4454b982c8"
+      },
+      {
+        "bytes": 28800,
+        "git_blob": "024c2db9fb11c388e6d1a8722a17d4203cad74a0",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/src/inference/tests.rs",
+        "sha256": "6d6ffbc02706b810b01987366910ce8f575bf88f95cc7473d9912680acfd6cf2"
+      },
+      {
+        "bytes": 43502,
+        "git_blob": "0d2b553259feedb2ec2dc4dd0bfa0df5e327f326",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/src/lab.rs",
+        "sha256": "9025a80a33ea303029633799605cd98675909b8a1a96cd57eb0d9a07731d505b"
+      },
+      {
+        "bytes": 38873,
+        "git_blob": "2114540a276df319614952d783a2627e32a54906",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/src/lib.rs",
+        "sha256": "30c1d4afbb6d1da58f6739b2deeab4d6d8b89a519803fa372ae1a97f2c2ca0a7"
+      },
+      {
+        "bytes": 6333,
+        "git_blob": "5ac49ecc0f40d67e4e5f392aab92bdb74d1676a4",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/src/luts.rs",
+        "sha256": "80d6ecea395a61c2d5fe103cd20aad2b8b7608d1442b0dcebb4ec017629c7acb"
+      },
+      {
+        "bytes": 23873,
+        "git_blob": "6094df89c778f14ef512b2eb32fd2b0bf67e9c6d",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/src/tests.rs",
+        "sha256": "142c4b0312705a1b30127d77c27670bb43fe40aba6fb7af7529fcdaae76dd67a"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 7751,
+        "git_blob": "6644ec45bd06c482e349c873c1e8300ec2b4b6bc",
+        "git_mode": "100644",
+        "path": "tools/gates/run_hearth_claim.py",
+        "sha256": "64f121d25e32a3477b8bd6aa628b2ec334101df02344378aaff4eb2f8fa2f408"
+      }
+    ],
+    "manifest_sha256": "ede82b63c733390ddf7186f2f439a641c17fcaa51f2e1d85736c2adb008c0bfa",
+    "source_revision": "ead858a855b4cf831bbe4e4f0aafbca95b238593",
+    "source_tree": "74743570a450cae5d24a2b6f1a3840e90f518511"
+  }
+}
