@@ -1,0 +1,128 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-work-loom\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-work-loom\"]}]",
+      "id": "local-deterministic-mechanism",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-work-loom\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-work-loom\"]}]",
+      "id": "local-falsifier-battery",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "[\"Assumption boundary: the predicate establishes the enumerated evidence bundle, not economic truth, hidden beneficial ownership, or output quality.\",\"A real public 30-day aggregate meeting the value, diversity, and concentration thresholds is unavailable; synthetic observations cannot satisfy the claim threshold.\"]",
+      "id": "full-claim-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-DEMAND-PREDICATE": "3fd4df2859045241c497939ed1473cc0434180f3011efae04932a45cac05072e"
+  },
+  "claims": [
+    "E-DEMAND-PREDICATE"
+  ],
+  "command": [
+    "tools/gates/run_economics_claim.py",
+    "--claim",
+    "E-DEMAND-PREDICATE"
+  ],
+  "evidence_sha256": "88980b3365a99397cbf9fd57240d9ee5a8a0eb0cb757c041cc2f1430948094d1",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "claim-e-demand-predicate",
+  "limitations": [
+    "Assumption boundary: the predicate establishes the enumerated evidence bundle, not economic truth, hidden beneficial ownership, or output quality.",
+    "A real public 30-day aggregate meeting the value, diversity, and concentration thresholds is unavailable; synthetic observations cannot satisfy the claim threshold."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 33432,
+        "git_blob": "f1d59093b4e4204a7c715168b4802befdf064813",
+        "git_mode": "100644",
+        "path": "crates/noos-work-loom/src/economics.rs",
+        "sha256": "4836f2f7f450886a239f00476a01c0b619354053e1060989429ea9df0454eff3"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 575499,
+        "git_blob": "874308e48df5362918dda1d129a59dc0fa59eab4",
+        "git_mode": "100644",
+        "path": "protocol/claims/registry.json",
+        "sha256": "a6c7627a494b91d0c0cce7f10fea69f99f55ec4fff59e4b42783b53e3225be14"
+      },
+      {
+        "bytes": 29858,
+        "git_blob": "28512fe855bcd4ad307ea479194210192c0950fe",
+        "git_mode": "100644",
+        "path": "protocol/spec/constants-v1.toml",
+        "sha256": "d1575f8f50a58648762f91555c3267deddefab0556fae63e5921c57e8a486258"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 6879,
+        "git_blob": "7ca6a9292ea370ac609eff67cda85e15edbac211",
+        "git_mode": "100644",
+        "path": "tools/gates/run_economics_claim.py",
+        "sha256": "bf871dacd20f5e42ae47b7bfa67a76f643809ab3e34eaa75083834742fd097dd"
+      }
+    ],
+    "manifest_sha256": "2617a386c5a33aa6220f0d035f688fea25047343e101897d9476ce650db694b4",
+    "source_revision": "b5e08edeec834c54d9deaa58274c0d98ca308f7f",
+    "source_tree": "3b51de56ae92d997cc776fcd3fbba7eb9c6c7302"
+  }
+}
