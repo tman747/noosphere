@@ -207,6 +207,9 @@ fn battery_bundle(
         .map(|item| json_string(item))
         .collect::<Vec<_>>()
         .join(",");
+    let output_path = out
+        .map(|path| path.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|| "evidence/base-battery.json".to_string());
     let libclang = std::env::var("LIBCLANG_PATH").unwrap_or_default();
     let rust_backtrace = std::env::var("RUST_BACKTRACE").unwrap_or_default();
     let revision = command_output("git", &["rev-parse", "HEAD"]);
@@ -224,7 +227,7 @@ fn battery_bundle(
             "  \"scenario\": \"battery\",\n",
             "  \"parameters\": {{\"seeds_expression\": \"{}..{}\", \"seed_start_inclusive\": {}, \"seed_end_exclusive\": {}, \"validators\": {}, \"slots_per_seed\": {}, \"clients\": [\"rust\",\"go\"], \"crypto\": \"real\"}},\n",
             "  \"seeds\": {{\"start_inclusive\": {}, \"end_exclusive\": {}, \"count\": {}}},\n",
-            "  \"command\": [\"cargo\",\"run\",\"-p\",\"noos-sim-net\",\"--release\",\"--locked\",\"--\",\"battery\",\"--seeds\",\"{}..{}\",\"--crypto\",\"real\",\"--out\",\"evidence/base-battery.json\"],\n",
+            "  \"command\": [\"cargo\",\"run\",\"-p\",\"noos-sim-net\",\"--release\",\"--locked\",\"--\",\"battery\",\"--seeds\",\"{}..{}\",\"--crypto\",\"real\",\"--out\",{}],\n",
             "  \"simulator_invocation\": [{}],\n  \"cwd\": {},\n",
             "  \"revision\": {{\"git_head\": {}, \"source_sha256\": {{\"crates/noos-sim-net/src/main.rs\": \"{}\", \"crates/noos-sim-net/src/lib.rs\": \"{}\", \"crates/noos-sim-net/Cargo.toml\": \"{}\", \"Cargo.lock\": \"{}\"}}}},\n",
             "  \"toolchain\": {{\"cargo\": {}, \"rustc\": {}}},\n",
@@ -249,6 +252,7 @@ fn battery_bundle(
         seed_range.1.saturating_sub(seed_range.0),
         seed_range.0,
         seed_range.1,
+        json_string(&output_path),
         simulator_invocation,
         json_string(&cwd.display().to_string()),
         json_string(&revision),

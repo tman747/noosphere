@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import subprocess
 import sys
 
@@ -112,6 +113,15 @@ CLAIMS = {
     },
 }
 
+ELAPSED_RE = re.compile(
+    r"(?P<prefix>target\(s\) in |; finished in )(?:(?:\d+)m )?\d+(?:\.\d+)?s"
+)
+
+
+def stable_log_sha256(output: str) -> str:
+    canonical = ELAPSED_RE.sub(r"\g<prefix><DURATION>", output.replace("\r\n", "\n"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
 
 def run_filtered_test(package: str, test_filter: str) -> dict[str, object]:
     command = [
@@ -142,7 +152,7 @@ def run_filtered_test(package: str, test_filter: str) -> dict[str, object]:
         "exit_code": completed.returncode,
         "package": package,
         "filter": test_filter,
-        "log_sha256": hashlib.sha256(completed.stdout.encode()).hexdigest(),
+        "log_sha256": stable_log_sha256(completed.stdout),
     }
 
 

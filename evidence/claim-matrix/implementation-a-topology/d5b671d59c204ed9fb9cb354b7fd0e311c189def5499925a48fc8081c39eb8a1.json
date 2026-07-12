@@ -1,0 +1,70 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-p2p",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-p2p"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-TOPOLOGY": "b2bc8a7c4a2259a35408b2cbd78d18dc623e77a44998ee0e0fdbfd8220f49777"
+  },
+  "claims": [
+    "A-TOPOLOGY"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-TOPOLOGY"
+  ],
+  "evidence_sha256": "d5b671d59c204ed9fb9cb354b7fd0e311c189def5499925a48fc8081c39eb8a1",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-topology",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-p2p/Cargo.toml": "cb95a27840edaac5af579cc5865a079944f85af19857bbde4313dc943c3920b0",
+    "crates/noos-p2p/src/lib.rs": "c8fc77855aa7876fc6390b4927e7df948c3ef9799b91fe270a4c3b3433523a14"
+  }
+}

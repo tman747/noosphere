@@ -1,0 +1,76 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-work-loom",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-work-loom"
+        ]
+      },
+      "name": "seeded terminal-state model, conservation, and mutation falsifiers",
+      "passed": true
+    },
+    {
+      "detail": "unresolved dispute timeout and all 4096 seeded traces end terminal with locked=0",
+      "name": "rollback timeout releases requester, worker, and challenger escrow",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-LOOM-MARKET": "c96e6935fe11798a64787f50fd591b9aeb740493e0a1f84ced210a8a87da2f59"
+  },
+  "claims": [
+    "A-LOOM-MARKET"
+  ],
+  "command": [
+    "tools/gates/run_economics_claim.py",
+    "--claim",
+    "A-LOOM-MARKET"
+  ],
+  "evidence_sha256": "1955d60dec0ce15ffa1e27b2c09395a368ef87101eefde1301ef7e77cf6db7f0",
+  "expected_result": "IMPLEMENTED",
+  "gate": "claim-a-loom-market",
+  "limitations": [
+    "Local deterministic implementation evidence only; no external demand or production-credit claim."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-work-loom/Cargo.toml": "f476280c0cd27c42f409a6a91fae5eefdeb484d4b336aeeef95353609981431a",
+    "crates/noos-work-loom/src/lib.rs": "832395d09eab207791a7b7510668e4d865aa72fcf9ed7940e195ce42c56269a1",
+    "crates/noos-work-loom/src/tests.rs": "97c4f4cd4a1c1e8cbccf70b85c3478d420993464219befcb8805827d3e37c26e"
+  }
+}

@@ -5,6 +5,7 @@
       "packages": ["noos-agent-class", "noos-contracts"],
       "command": "python tools/gates/run_agent_commerce_claim.py --claim S-AGENT",
       "rollback_command": "python tools/gates/run_agent_commerce_claim.py --claim S-AGENT --rollback-check",
+      "evidence_root": "evidence/claim-matrix/implementation-s-agent",
       "notes": "Stable AgentID now admits only authenticated version+1 rotations by the active key or the committed human recovery threshold while keeping genesis/controller identity fixed; intents bind current key/version plus exact mandate, capability, job, chain, profile, object, direction, budget, deadline and nonce. Delegated grants must strictly attenuate parent depth/scope/budget/expiry. Irreversible mandates require a compensation action. The existing ActionRouter remains the only contract-effect path and rechecks grant, mandate, key version and class epoch at dispatch. Falsifiers cover key-rotation identity theft, replay, cross-job/chain/profile substitution, scope, expiry, revocation races, monotone budgets, delegation widening, hostile text and unknown action types. Local deterministic evidence only; named production experiment owner and independent production exploit corpus remain external blockers."
     },
     "S-FREYSA": {
@@ -12,6 +13,7 @@
       "packages": ["noos-agent-class"],
       "command": "python tools/gates/run_agent_commerce_claim.py --claim S-FREYSA",
       "rollback_command": "python tools/gates/run_agent_commerce_claim.py --claim S-FREYSA --rollback-check",
+      "evidence_root": "evidence/claim-matrix/implementation-s-freysa",
       "notes": "ReceiveDonation is a typed inward action. A mandate commits action and direction independently of untrusted text; changing it to Transfer under incoming-donation language is denied before budget spend. The non-ignored deterministic battery executes exactly 100,000 multilingual/paraphrase/tool-injection mutations with zero outgoing effects, meeting the local registered threshold. This is a regression corpus, not a general jailbreak-immunity claim; named production owner remains external."
     },
     "S-COMMERCE": {
@@ -19,6 +21,7 @@
       "packages": ["noos-commerce"],
       "command": "python tools/gates/run_agent_commerce_claim.py --claim S-COMMERCE",
       "rollback_command": "python tools/gates/run_agent_commerce_claim.py --claim S-COMMERCE --rollback-check",
+      "evidence_root": "evidence/claim-matrix/implementation-s-commerce",
       "notes": "ACP lifecycle is an acyclic single-terminal state machine with 13 exhaustively enumerated maximal paths. Terminal states cannot be rewritten. Chain/profile/job/request-bound artifact availability starts the challenge deadline; withholding leaves it unset and reaches timeout refund. Delivery remains separate from Q0 quality. Settlement atomically consumes typed escrow/execution/dispute resources, rejects cross-job reuse and replay, and conserves escrow exactly across provider/evaluator/client credits. Lab fault injection is deterministic; no production evaluator/provider-duration evidence is claimed."
     },
     "S-ATTRIBUTION": {
@@ -26,6 +29,7 @@
       "packages": ["noos-commerce"],
       "command": "python tools/gates/run_agent_commerce_claim.py --claim S-ATTRIBUTION",
       "rollback_command": "python tools/gates/run_agent_commerce_claim.py --claim S-ATTRIBUTION --rollback-check",
+      "evidence_root": "evidence/claim-matrix/implementation-s-attribution",
       "notes": "ContributionGraph binds marginal evaluations to provenance, rejects contributor/evaluator self-dealing and evidence laundering, deduplicates evaluator failure domains, quotients sybil splits by declared contributor failure domain, and applies deterministic decay. Synthetic ground truth measures max error below 10% and wash-derived credit below 1%; a clone split mints zero aggregate credit. AttributionReport has consensus weight exactly zero and is advisory provenance, not objective ownership. Real-world independence and cartel resistance remain external."
     },
     "S-ACCESS": {
@@ -40,6 +44,7 @@
       "packages": ["noos-loam"],
       "command": "python tools/gates/run_agent_commerce_claim.py --claim S-TWIN-PROFILE",
       "rollback_command": "python tools/gates/run_agent_commerce_claim.py --claim S-TWIN-PROFILE --rollback-check",
+      "evidence_root": "evidence/claim-matrix/implementation-s-twin-profile",
       "notes": "TwinProfile is a content-derived advisory-profile identity distinct from its owner and contains observations/models/uncertainty plus explicit question and capability scopes. Consent checks bind principal, purpose, Evaluate right and expiry. Query/effect-proposal permits carry the profile revocation epoch and are rechecked at use; revocation races, stale permits, consent spoofing, out-of-scope questions/capabilities and profile substitution fail closed. The only output is TwinRecommendation with AUTHORITY=None; display identity is explicitly AdvisoryProfile, never the person."
     },
     "I-AGENT": {
@@ -47,6 +52,7 @@
       "packages": ["noos-agent-class", "noos-commerce", "noos-contracts"],
       "command": "python tools/gates/run_agent_commerce_claim.py --claim I-AGENT",
       "rollback_command": "python tools/gates/run_agent_commerce_claim.py --claim I-AGENT --rollback-check",
+      "evidence_root": "evidence/claim-matrix/implementation-i-agent",
       "notes": "AgentProtocolObject composes the existing ActionRouter/Firewall, declared-lineage reputation and ACP escrow/dispute state without adding consensus. One deterministic drill applies all four registered attacks: 12-signature clone farm collapses to weight 1 below quorum 3; exact mandate/envelope replay is rejected; key rotation between route and dispatch invalidates the stolen ticket; and a globally linear execution right cannot settle a second job while the first settlement conserves escrow. The dedicated runner also re-executes the canonical C:/tmp/chorus-quorum-lab and C:/tmp/nel-quarantine-lab fixtures and gates their clone-collapse, exhaustive quarantine, double-payout and cross-job reuse metrics. Component and composition evidence remain lab scale; named production owner is unresolved."
     }
   },

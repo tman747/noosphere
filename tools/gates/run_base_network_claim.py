@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import subprocess
 import sys
 
@@ -23,6 +24,14 @@ CLAIMS = (
     "E-WAN-01",
 )
 MAX_GENERATED = 10_000_000
+ELAPSED_RE = re.compile(
+    r"(?P<prefix>target\(s\) in |; finished in )(?:(?:\d+)m )?\d+(?:\.\d+)?s"
+)
+
+
+def stable_log_sha256(output: str) -> str:
+    canonical = ELAPSED_RE.sub(r"\g<prefix><DURATION>", output.replace("\r\n", "\n"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
 
 
 def run(command: list[str]) -> dict[str, object]:
@@ -40,7 +49,7 @@ def run(command: list[str]) -> dict[str, object]:
     return {
         "command": command,
         "exit_code": 0,
-        "stdout_sha256": hashlib.sha256(completed.stdout.encode()).hexdigest(),
+        "stdout_sha256": stable_log_sha256(completed.stdout),
     }
 
 

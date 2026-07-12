@@ -36,6 +36,13 @@
   "A-JET-FALLBACK": [
     "noos-braid"
   ],
+  "A-KEYLESS-CONSENSUS": [
+    "noos-braid",
+    "noos-node"
+  ],
+  "A-LOOM-MARKET": [
+    "noos-work-loom"
+  ],
   "A-LUMEN": [
     "noos-lumen"
   ],
@@ -118,11 +125,20 @@
   "E-WEFT-08": [
     "noos-weft-check"
   ],
+  "I-AGENT": [
+    "noos-agent-class",
+    "noos-commerce",
+    "noos-contracts"
+  ],
   "M-3PC-MALICIOUS": [
     "noos-private-besi"
   ],
   "M-BRANCH": [
     "noos-umbra"
+  ],
+  "M-CLOCK": [
+    "noos-reflex",
+    "noos-braid"
   ],
   "M-FIBER": [
     "noos-umbra"
@@ -185,6 +201,22 @@
   "P5-S-KERNEL-JET": [
     "noos-jet"
   ],
+  "S-AGENT": [
+    "noos-agent-class",
+    "noos-contracts"
+  ],
+  "S-ARTIFACT": [
+    "noos-species"
+  ],
+  "S-ATTRIBUTION": [
+    "noos-commerce"
+  ],
+  "S-COMMERCE": [
+    "noos-commerce"
+  ],
+  "S-FREYSA": [
+    "noos-agent-class"
+  ],
   "S-LIFECYCLE": [
     "noos-loam"
   ],
@@ -192,6 +224,16 @@
     "noos-loam"
   ],
   "S-LOAM-BASE": [
+    "noos-loam"
+  ],
+  "S-PRIVACY-IR": [
+    "noos-umbra"
+  ],
+  "S-REACTION": [
+    "noos-training",
+    "noos-species"
+  ],
+  "S-TWIN-PROFILE": [
     "noos-loam"
   ]
 }

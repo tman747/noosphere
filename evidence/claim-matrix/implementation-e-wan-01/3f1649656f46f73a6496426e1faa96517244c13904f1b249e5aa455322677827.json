@@ -1,0 +1,113 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-p2p",
+          "fault::tests",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "stdout_sha256": "764f2d8346b99df0d56183a10aef38c3bbf639eb44daaab8675f72ed7f5ef7b5"
+      },
+      "name": "deterministic behavior/falsifier precursor",
+      "passed": true
+    },
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-node",
+          "claim_e_wan_drift_sweep_selects_smallest_passing_genesis_value",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "stdout_sha256": "d002e19980a74a7d3bf4c7b8672ba213a344ab6245e53134476155e6e4dc8a59"
+      },
+      "name": "deterministic behavior/falsifier precursor",
+      "passed": true
+    },
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-node",
+          "claim_e_wan_partition_eclipse_da_withholding_heal_without_conflicting_finality",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "stdout_sha256": "054305db4c503e4672b2afbbdb6c7a12e69c84c0801fb8700566b3f074b8558a"
+      },
+      "name": "deterministic behavior/falsifier precursor",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-WAN-01": "f7fb35eaa57773d682cebbaf6abc2f5bfd72deb5f368ca8c5aa37616bd623cef"
+  },
+  "claims": [
+    "E-WAN-01"
+  ],
+  "command": [
+    "tools/gates/run_base_network_claim.py",
+    "--claim",
+    "E-WAN-01"
+  ],
+  "evidence_sha256": "3f1649656f46f73a6496426e1faa96517244c13904f1b249e5aa455322677827",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-e-wan-01",
+  "limitations": [
+    "Evidence exercises real local NodeCore/P2P paths; it is not external evidence.",
+    "Fault scheduling is deterministic and local; it is not four external regions or independent carriers.",
+    "The required six-hour real partition and public elapsed-duration evidence remain external."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-braid/src/keyless.rs": "bf81aebe61f1460b3e547b570e6a522c91f84c7791fa1ae852d778b2731bfd0a",
+    "crates/noos-braid/src/lib.rs": "f65a0aac3f4245f5d97f2c6f632596eb40f07efaf007dd85317503f6ec52ef61",
+    "crates/noos-node/src/consensus.rs": "c23d62739d7d43b68f275faefc3f14d56819642338f1703e55685f93acc3c591",
+    "crates/noos-node/src/network.rs": "6af96394dc03c2403c8c5b0e5babb33db4a50d19bb394e3abefaa9a2dea70e27",
+    "crates/noos-node/src/tests/claims.rs": "d78ec4279db0918b9aed17c27cead3a853f63f283ec763d507cff501cf3b00bf",
+    "crates/noos-p2p/src/fault.rs": "8e29557f117d51f6463764ef1d00f4abe5ef1ff7a97a78d23270e1d3cf4ae967",
+    "crates/noos-p2p/src/lib.rs": "c8fc77855aa7876fc6390b4927e7df948c3ef9799b91fe270a4c3b3433523a14",
+    "tools/gates/run_base_network_claim.py": "2c281fa7bae3e38d21e1cff3a3a2b33695878562a884749bbc7e19b03b29ea45"
+  }
+}

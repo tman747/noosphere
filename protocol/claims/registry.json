@@ -67,7 +67,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-GROUND",
       "evidence_root": "evidence/claim-matrix/implementation-a-ground",
-      "evidence_sha256": "9419aa952091daf20602dd9f84ed823f708e45d1e03db10bb965009f84411262",
+      "evidence_sha256": "f50ee33fa01a4a4addcae2fc55140ad159d124dce1ceacbb1490e9ca2f12b84b",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-GROUND --rollback-check",
       "reproduction_command": null,
@@ -144,7 +144,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-BRAID",
       "evidence_root": "evidence/claim-matrix/implementation-a-braid",
-      "evidence_sha256": "15f98da2d55cca2f1dfaf2fa29107b6d4c201f5819143144734cfad16635f89d",
+      "evidence_sha256": "7e74ca308a8d6b8e4e696dd330cbfb24353cf011cf3d65f476bf78a5f37a4493",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-BRAID --rollback-check",
       "reproduction_command": null,
@@ -213,7 +213,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-PULSE",
       "evidence_root": "evidence/claim-matrix/implementation-a-pulse",
-      "evidence_sha256": "947d819a5fc7556aac12adcfa0c6a162e3cc4882d8ea5142cf44e81739250707",
+      "evidence_sha256": "2f6eed713651b5305c245b1be63afcc1fe558e5049c02367395c4178f71e445e",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-PULSE --rollback-check",
       "reproduction_command": null,
@@ -282,7 +282,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-RING",
       "evidence_root": "evidence/claim-matrix/implementation-a-ring",
-      "evidence_sha256": "7f6fdde805d38672106650048ea765338d343ce7aa2dafc6201112687ce298c8",
+      "evidence_sha256": "e81e884f442b47ccc6d6eb6ee199b0c48c69f121e4de1b85ed115cbe8365cf55",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-RING --rollback-check",
       "reproduction_command": null,
@@ -346,7 +346,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-LUMEN",
       "evidence_root": "evidence/claim-matrix/implementation-a-lumen",
-      "evidence_sha256": "e7b06dd359dac7646ea1014ca82fe63f8487cf889b3c3064f491c8ddca17f4c4",
+      "evidence_sha256": "ca694170581b618a6594af3b802b157d314f9e49dcda74823450ff6224b0fdf7",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-LUMEN --rollback-check",
       "reproduction_command": null,
@@ -412,7 +412,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-TX",
       "evidence_root": "evidence/claim-matrix/implementation-a-tx",
-      "evidence_sha256": "ae428528832b9e9e700a540a0da0f29b706efc9970558d44923f4a0a7c55b778",
+      "evidence_sha256": "0bc029102018c7fc76e392a8025244c822c9761d763983e3aa968958c335cae2",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-TX --rollback-check",
       "reproduction_command": null,
@@ -477,7 +477,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-GRAIN",
       "evidence_root": "evidence/claim-matrix/implementation-a-grain",
-      "evidence_sha256": "bd611ef9b337958ab789ed361a87d87c04ce8ddec8b609110de53b3e2115c428",
+      "evidence_sha256": "025279a87591e5bb9bd27abf63f2351356ce5c0d1638375767cc2551eaa6bda6",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-GRAIN --rollback-check",
       "reproduction_command": null,
@@ -548,7 +548,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-JET-FALLBACK",
       "evidence_root": "evidence/claim-matrix/implementation-a-jet-fallback",
-      "evidence_sha256": "d8bb5a8eee7f77c4bc1c52fd2341868bded34b683b2bb581bdf72b901a4df87b",
+      "evidence_sha256": "6f6e75e08af8590a5e9f5ac16358563b3a468dada49bf1f995c1a538f33fba8b",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-JET-FALLBACK --rollback-check",
       "reproduction_command": null,
@@ -614,7 +614,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-FEES",
       "evidence_root": "evidence/claim-matrix/implementation-a-fees",
-      "evidence_sha256": "d4b74c96776b0d9d42788527d084d1defd5a3539fbdde1b60e19114fa9f75ce6",
+      "evidence_sha256": "8e41c91b3af83a954d83bce24cab369f87d87fa3877da2802613208bae00648b",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-FEES --rollback-check",
       "reproduction_command": null,
@@ -680,7 +680,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-DA",
       "evidence_root": "evidence/claim-matrix/implementation-a-da",
-      "evidence_sha256": "5193a5e7a38b66d4cf84afdd9924c1ada3474e038d76e768c05af7d205cbb71f",
+      "evidence_sha256": "3ec2adf6ba00167092b1a0118f836731281a1dfd7ae163793a0ac36fed01482a",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-DA --rollback-check",
       "reproduction_command": null,
@@ -748,7 +748,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-AGENT-ABI",
       "evidence_root": "evidence/claim-matrix/implementation-a-agent-abi",
-      "evidence_sha256": "0391bf2b7e1129a671f401d23ec3da4d1f14ce400d5913f03ad329b76fdbc40e",
+      "evidence_sha256": "5434263af2e17faaa08ecd67edc9fe757fa65e8830a516d03c0cb9b2a85ee173",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-AGENT-ABI --rollback-check",
       "reproduction_command": null,
@@ -814,7 +814,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-ASSURANCE",
       "evidence_root": "evidence/claim-matrix/implementation-a-assurance",
-      "evidence_sha256": "0fc88c3ecf447817005451f05b7b6dd5a793284d3b6f6ebc05ad7ff88a51ff19",
+      "evidence_sha256": "77123aab2c89d5f21ee9328102bfd948005fcf0ebfd4eff8f17d42a794122f70",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-ASSURANCE --rollback-check",
       "reproduction_command": null,
@@ -878,7 +878,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-TOPOLOGY",
       "evidence_root": "evidence/claim-matrix/implementation-a-topology",
-      "evidence_sha256": "7c4159b2821760fd15d7933bd0bfcd4c08da7118c86936a68e5a3e57555bb32f",
+      "evidence_sha256": "255890dccfdc9633b7cd252f1464206e2e72365dd6a4f2b8b5b8967972e5740f",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-TOPOLOGY --rollback-check",
       "reproduction_command": null,
@@ -943,7 +943,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-WALLET",
       "evidence_root": "evidence/claim-matrix/implementation-a-wallet",
-      "evidence_sha256": "dc957b3d90be800069a0d787a090a30bd389fe742029795059fe27d21f2aa836",
+      "evidence_sha256": "e49fa0fdd2c94b6debc098bd8a3dc86a9533775a173810003c2d9c86ec4ea81c",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-WALLET --rollback-check",
       "reproduction_command": null,
@@ -1009,7 +1009,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-NETWORK",
       "evidence_root": "evidence/claim-matrix/implementation-a-network",
-      "evidence_sha256": "2bf9c0f03cd89505720faa491f3c55298882ed889c1d4966a646d250490710f8",
+      "evidence_sha256": "e92f3bc0cf35c55e0fc164f5c18fda430ac07c3931db854ab9778a0f2ecaa03c",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-NETWORK --rollback-check",
       "reproduction_command": null,
@@ -1075,7 +1075,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-GOVERNANCE",
       "evidence_root": "evidence/claim-matrix/implementation-a-governance",
-      "evidence_sha256": "f1e417e44389413ba93b5834b0b337cc727fa1e695bcbe3a2bad74165ae0e7ea",
+      "evidence_sha256": "a76076cd1c3087fd200d6023b94940cd4d3f691c9a6a4d10bcfcb9b787117939",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-GOVERNANCE --rollback-check",
       "reproduction_command": null,
@@ -1092,7 +1092,7 @@
       "claim_id": "A-LOOM-MARKET",
       "mechanism_id": "A-LOOM-MARKET",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -1115,7 +1115,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "IMPLEMENTED: Exact local market contract is executable. Open-job identity now binds requester, precommitted refund account, class/assurance, input and program roots, delivery key/rule, fixed verifier/evaluator/DA accounts, resource envelope, escrow amounts, every deadline, and nonce; worker and result are subsequently commitment-bound. Settlement rejects recipient mutation, paid-ack jobs cannot settle before their matching delivery certificate, and every timeout including unresolved dispute releases requester escrow, worker bond, and challenger bond. Terminal distributions aggregate aliases and preflight all arithmetic atomically. The 4096-seed adversarial trace battery exercises cancel, open/commit/submit timeout, normal settlement, worker-fault rejection, unresolved-dispute timeout, duplicate terminal mutation, conservation, and locked=0 on every modeled path. Delivery, correctness, quality, and demand remain separate fields; production proposal/finality/issuance influence remains zero. [EconomicsClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -1143,24 +1143,24 @@
       "provenance": "Extracted verbatim from §3.2 A-LOOM-MARKET of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
+      "command": "python tools/gates/run_economics_claim.py --claim A-LOOM-MARKET",
       "evidence_root": "evidence/claim-matrix/claim-a-loom-market",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "evidence_sha256": "896989490340d10fe1b95cdba45152da8fa33e1143d9abdca97bdfd227f5e4e7",
+      "expected_result": "IMPLEMENTED",
+      "rollback_command": "python tools/gates/run_economics_claim.py --claim A-LOOM-MARKET --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
-      "local_evidence_state": "MISSING"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "M-TENSOR",
       "mechanism_id": "M-TENSOR",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -1178,7 +1178,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: tensor.rs implements the frozen Work Loom commit-before-beacon envelope with an injective exact-I64 tensor descriptor (role/order, shape, dtype, byte order, chunk boundary, signed-zero/NaN/quantization/compression policy), stable ArtifactID, pre-beacon input/output/delivery/profile/relation binding, finalized-after-commit challenge, challenge-keyed WorkCommit, evidence/delivery lifecycle, and single-use (job,worker,nonce). Deterministic root vectors plus post-beacon output, profile, trace, challenge, malformed/overflow, withholding, undecryptable-delivery, and replay falsifiers pass. PARTIAL: no independently authored second verifier/CPU-GPU root family, production beacon unpredictability campaign, frozen 256x256 encrypted paid-delivery trial, or calibrated work-per-joule evidence. [TensorHdfClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -1218,14 +1218,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "M-RESIDUE",
       "mechanism_id": "M-RESIDUE",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -1245,7 +1245,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: residue.rs implements exact prime-field rectangular A(Br)=Cr with canonical representatives, checked u128 modular arithmetic, deterministic prime validation, claim-before-beacon binding, rejection-sampled full-field challenges, round/domain separation, and range bounds at the adjoint integration. A fast verifier and independently structured residual-dot oracle agree on a 1024-case seeded sweep; exhaustive F3 enumeration covers all 80 nonzero 2x2 residuals and matches q^-rank exactly; characteristic two remains a valid exact residue field while HDF collapse stays separate. Alias, composite modulus, timing, challenge-tamper, and adaptive-error falsifiers reject. PARTIAL: both implementations are local, not independently authored verifier families, and production beacon uniformity/independence testing remains external; no large-field bound is inferred empirically. [TensorHdfClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -1281,7 +1281,7 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
@@ -1309,7 +1309,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: The universal M-HDF claim stays RETIRED/KILLED. noos-analytics exposes no universal acceptor: permanent tests retain the all-ones flat-error miss regression, spike/flat duality, characteristic-two singular collapse, post-commit binding, and 4x4 quantization-floor witness, while result types hard-code universal_dominance=false and exact_freivalds_amplification=false. The only executable survivor is the narrower M-HDF-ENERGY shadow estimator. [TensorHdfClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -1377,7 +1377,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: noos-analytics implements exact unnormalized signed Walsh-Hadamard transformation with checked i128 arithmetic, exact integer-square energy estimates, the frozen 8||E||_F^4/s variance bound, profile-bound post-commit row/column signs and hidden coordinates, and SHADOW_ONLY output types. Exhaustive {-1,0,1}^{2x2} nonzero residuals exercise exact unbiasedness and the variance boundary; 64 seeded sign profiles exercise energy conservation; malformed dimensions/signs/samples and overflow fail closed. FMM shadow accounting enumerates naive, tiled, Strassen, FFT, cached, sparse, diagonal, low-rank, output-only, and custom-hardware strategies; >1.05x work/joule, missing whole attempts, demand starvation, or any material challenge irreversibly zero shadow credit, with immutable submissions and two distinct profile/strategy-bound reproductions. PARTIAL: named-attack detection, false-positive, non-inferiority, compatible-resident-HD latency, pinned energy meters, and independent hardware reproductions remain external. [TensorHdfClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -1424,7 +1424,7 @@
       "claim_id": "S-HDF",
       "mechanism_id": "S-HDF",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "MEASURED_LAB",
       "lifecycle": "RETIRED",
       "result": "PARTIAL",
@@ -1446,7 +1446,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: S-HDF remains RETIRED/KILLED with M-HDF. hdf_profile.rs provides only a specialized M-HDF-ENERGY precursor: an immutable model root + numeric profile + dimensions + sample count derives the profile ID; residual commitment and finalized-after-commit beacon deterministically derive independent two-sided signs and coordinates; model/profile/residual/challenge splices reject. It cannot set exact Freivalds acceptance and reports only SHADOW_ONLY energy. PARTIAL: one local profile cannot satisfy the complete per-model, multi-hardware M-HDF thresholds or profile-specific false-positive gate. [TensorHdfClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -1484,7 +1484,7 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
@@ -1513,7 +1513,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: Local shadow precursor implements whole-attempt measurement, explicit algorithm families, exact >5% shortcut detection, deliverable-materialization rejection, stale-calibration zeroing, a hard 10%-of-total Omega ceiling (credit <= Ground/9), and irreversible per-class rollback to zero; production credit is structurally zero. PARTIAL: the 99%-confidence cross-shape/cross-hardware cost-per-joule campaign, independent reproductions, and sustained admitted demand for a retarget half-life are not local evidence and are not claimed. [EconomicsClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -1625,7 +1625,7 @@
       "claim_id": "M-ISSUANCE",
       "mechanism_id": "M-ISSUANCE",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "ACTIVE",
       "result": "UNTESTED",
@@ -1643,7 +1643,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Rust local precursor enforces a single schedule-only mint path, strictly advancing heights, forfeited skipped/orphaned emission, cap validation, exact terminal and post-terminal behavior, duplicate-height rejection, and atomic recipient crediting. Exact quotient/remainder mul-div removes false u128 overflow while preserving floor rounding; maximum-integer and recipient-alias mutations are covered. The dedicated runner executes the full crate plus 10^7 seeded duplicate/backward/skipped/terminal transition attempts in release. PARTIAL: no second client implements the issuance schedule, signed mainnet parameters/recipient shares/terminal height remain OWNER_BLOCKED, and zero-demand production liveness is not established by this local fixture. [EconomicsClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -1683,14 +1683,14 @@
       "external_blockers": [
         "Required independent, public, hardware, scale, or production evidence is unavailable."
       ],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "A-DUPLEX-ISSUANCE",
       "mechanism_id": "A-DUPLEX-ISSUANCE",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -1710,7 +1710,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Shadow allocator conserves scheduled = base + work exactly, floors the bounded reallocation cap with checked integers, requires qualifying demand, rejects duplicate height and duplicate receipt accounting, and rolls back to the fixed base path. Production always allocates the entire scheduled amount to base and zero to work. PARTIAL: base-security stress minima, 90 public days above 80% external paid-delivered share, and blackout finality require external elapsed-time/production evidence; Duplex remains hard-zero. [EconomicsClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -1748,14 +1748,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "S-DEMAND",
       "mechanism_id": "S-DEMAND/P4",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -1775,7 +1775,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Conservative deterministic classifier returns INDEPENDENT only for on-chain escrow, delivered result, requester acceptance or completed dispute, explicit requester separation from worker and evaluator control clusters, and external funding with no circular funding detected; common control/circular funding is RELATED, rebates are SUBSIDIZED, and incomplete/unknown evidence is UNKNOWN. The full 432-case truth table and wash mutations execute locally. A checked 30-day report computes exact 80% share, 10 requester clusters, 20 operator clusters, four hardware classes, and <=20% concentration. PARTIAL: hidden beneficial ownership and quality remain non-claims; blinded false-independent rates and real rolling public diversity/duration evidence are external. [EconomicsClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -1811,14 +1811,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "E-DEMAND-PREDICATE",
       "mechanism_id": "E-DEMAND predicate",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -1838,7 +1838,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: The exact evidence predicate and exhaustive local truth table are implemented: escrow, delivery, acceptance/dispute completion, both control-domain separations, and non-circular external funding are jointly necessary; every missing, wash, related, rebate, and unknown mutation fails qualification. Rolling-window arithmetic and diversity thresholds are executable with overflow refusal. PARTIAL: the claim pass threshold is about an actual public 30-day aggregate and cluster population, so synthetic local observations do not satisfy it and all demand-derived production influence remains zero. [EconomicsClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -1874,7 +1874,7 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
@@ -1930,7 +1930,7 @@
       "actionable": true,
       "command": "python tools/gates/run_privacy_claim.py --claim P1-S-DUAL-ROOT",
       "evidence_root": "evidence/claim-matrix/implementation-p1-s-dual-root",
-      "evidence_sha256": "346296a145ba7b45041e81d9f3c8ca34942da19325c5ee0cb43d9e0d4d039438",
+      "evidence_sha256": "988e18a8207e8e9038ff28b4a31b60f59ad6f18c3a979bc98a0b3a8a30c6acd0",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_privacy_claim.py --claim P1-S-DUAL-ROOT --rollback-check",
       "reproduction_command": null,
@@ -1995,7 +1995,7 @@
       "actionable": true,
       "command": "python tools/gates/run_privacy_claim.py --claim P2-S-FUSED-AUDIT",
       "evidence_root": "evidence/claim-matrix/implementation-p2-s-fused-audit",
-      "evidence_sha256": "5476fa0bcc1a3f28ba5a57af31979121b58e3c93b6dcb2e03ccb1c3852b8a935",
+      "evidence_sha256": "461d97a9680f5d7e5774f6e29e0cfa98fc2b6fd58b5d41ad021b46b87e8fd3a7",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_privacy_claim.py --claim P2-S-FUSED-AUDIT --rollback-check",
       "reproduction_command": null,
@@ -2058,7 +2058,7 @@
       "actionable": true,
       "command": "python tools/gates/run_privacy_claim.py --claim P3-S-ALGORITHM-TRANSITION",
       "evidence_root": "evidence/claim-matrix/implementation-p3-s-algorithm-transition",
-      "evidence_sha256": "3ed7712204f07c35726e03e012c10aaf8934274363112b3d9f286568bf7b54f3",
+      "evidence_sha256": "928e47b2d4770b990596baa2d214b49079ec03b6128eafc3608a38f0a662f807",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_privacy_claim.py --claim P3-S-ALGORITHM-TRANSITION --rollback-check",
       "reproduction_command": null,
@@ -2123,7 +2123,7 @@
       "actionable": true,
       "command": "python tools/gates/run_privacy_claim.py --claim P4-S-PAID-DELIVERY",
       "evidence_root": "evidence/claim-matrix/implementation-p4-s-paid-delivery",
-      "evidence_sha256": "cf81879bf0dfcb60619a4b1064ddb18ee1115f18aa91a0e5d7dad3b8bb87c156",
+      "evidence_sha256": "4ef48dee10cb3c98b9e735b1fb6873eee6f769d53f4980906ef90ad38949d8c3",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_privacy_claim.py --claim P4-S-PAID-DELIVERY --rollback-check",
       "reproduction_command": null,
@@ -2156,7 +2156,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: The kernel-jet bonding DISCIPLINE exists locally: an optimized implementation is admitted only by bonding against the canonical slow relation (Grain interpretation) across a randomized post-commit corpus with boundary values, and one surviving wrong result is impossible to admit (divergence falsifiers green; rollback = quarantine, slow path authoritative — dispatch declines to the interpreter). The frozen RV32 lowering (rv32.rs) additionally pins a versioned toolchain profile analog: deterministic byte-exact codegen, exact image-id hashing, domain-exit-never-wrong-answer law tested on golden vectors plus a 500-case random corpus. EXPLICITLY EXTERNAL: actual CuTe/CUDA kernels, device/compiler-version matrices, and race/layout adversaries — this workstation has no CUDA device (AMD GPU) and no GPU toolchain; the claim's production surface is untouched. Named experiment owner remains OWNER_BLOCKED. [JetProof4]"
+        "audit": "PARTIAL: PARTIAL only. The canonical slow Grain relation remains authoritative; certified jet admission, deterministic Grain-to-RV32 lowering, boundary-heavy differential corpora, domain-exit fallback, and the RISC Zero guest's separately implemented RV32 execution agree locally. A wrong or uncertified jet and any image substitution are rejected. The exact frozen threshold is not met: there is no CuTe/CUDA kernel, CUDA compiler/device matrix, race/layout campaign, or second independently implemented checker on this AMD workstation. Rollback remains quarantine plus pure Grain/reference execution. [RiscZeroProofClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -2254,7 +2254,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim M-JET",
       "evidence_root": "evidence/claim-matrix/implementation-m-jet",
-      "evidence_sha256": "3b179fa0372bee16b61377b7ebe10a23cd42519f7e88901489482362deeeeffe",
+      "evidence_sha256": "336ca52b7a41ded856ebe882e1422db81128a20886a4772b39d5c8552e95b449",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim M-JET --rollback-check",
       "reproduction_command": null,
@@ -2289,7 +2289,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: Certificates are machine-checked by full re-derivation, never trusted as stated: JetRegistry::admit recomputes the semantics hash from the certified formula bytes, re-derives the jet id, recomputes the binding digest, and REPLAYS the entire differential corpus against the offered native implementation before an entry can exist (registry.rs). Falsifiers all green: tampered field without digest fix -> DigestMismatch; forged equivalence root WITH recomputed digest -> EquivalenceRootMismatch via corpus replay; formula swap -> SemanticsHashMismatch; impl-tag tamper -> JetIdMismatch; a valid cert cannot smuggle a divergent native (EquivalenceDivergence); dispatch never fires an uncertified id nor a certified id on different semantics (declines to pure Grain, the ch04 rollback). EXPLICITLY EXTERNAL: proof-assistant-grade universal equivalence certificates (unsound-kernel adversary), translation validation of emitted binaries, a second INDEPENDENTLY IMPLEMENTED checker (local dual-path certify/admit shares code), and the preregistered 10^8 differential campaign. This row stays THEORY-backed until those exist; nothing here declares an uncertified nontrivial binary equivalent. [JetProof4]"
+        "audit": "PARTIAL: PARTIAL only. RISC Zero proof construction accepts only a JetId already admitted by JetRegistry and only the byte-identical deterministic RV32 lowering of that admitted certificate's canonical Grain formula. The public journal binds JetId, semantics hash, certificate digest, RV32 image id, input, result, steps, chain, domain, and proof-architecture profile; uncertified-jet and substituted-image falsifiers reject. The frozen universal-equivalence threshold remains external: no proof-assistant certificate/kernel, emitted-binary translation validation, second independent checker, or 10^8 differential campaign is claimed. [RiscZeroProofClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -2355,7 +2355,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: Proof dispatch is real and exact: ProofRequest binds an exact RV32 image id (BLAKE3 over ABI version, leaf count, and text bytes), an input commitment, and a journal commitment; ReceiptVerifier is the backend-independent interface (proof.rs). The local backing is LocalExecutionChecker — deterministic re-execution of the pinned image with strict receipt decoding — which has ZERO FALSE ACCEPTS BY CONSTRUCTION and rejects every tested mutation class: forged journal, forged input, cross-image receipt, unknown image, truncated/oversized/misversioned receipts (all falsifier tests green). NO SUCCINCT PROOF IS CLAIMED OR FAKED: the RISC Zero / recursive Plonky2-STARK toolchain cannot be fetched in this offline environment (crates.io returns 403; risc0 is absent from the workspace lockfile and additionally requires external rustup target + prover downloads), so re-execution is the honest stand-in. EXPLICITLY EXTERNAL: the succinct recursive verifier itself, the second independently implemented verifier, the 10^8 structured/mutated-proof E-VERIFY-01 campaign, and the first-party ~60KB proof-size figure (never reproduced here). [JetProof4]"
+        "audit": "PARTIAL: PARTIAL only. A real RISC Zero 3.0.5 guest method is reproducibly built with guest-builder r0.1.88.0 and embedded behind the explicit risc0 feature. Non-dev local CPU proving and cryptographic verification passed for both composite and recursively compressed succinct receipts. Receipt tamper, RISC Zero method substitution, canonical RV32 image substitution, journal splice, cross-chain replay, wrong domain, wrong profile, and uncertified jet all reject; interpreted fallback equality also passes. The deterministic LocalExecutionChecker remains a visibly separate non-production backend. The frozen threshold is still unmet: this is one first-party RISC Zero verifier, not an independent reproduction of Pearl's Plonky2/STARKy path, and there is no second independently implemented verifier or 10^8 structured/mutated-proof campaign. [RiscZeroProofClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -2450,7 +2450,7 @@
       "actionable": true,
       "command": "python tools/gates/run_privacy_claim.py --claim A-UMBRA-BASE",
       "evidence_root": "evidence/claim-matrix/implementation-a-umbra-base",
-      "evidence_sha256": "0830b8bf871e1c09f9dcd94a8d958071ae4dd19390fe43f3b5a5fd1cdeb1c0f9",
+      "evidence_sha256": "db22d8cf45a90d71d59c7808fc25cb6c191bc3a3434f888008464c29730d1e08",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_privacy_claim.py --claim A-UMBRA-BASE --rollback-check",
       "reproduction_command": null,
@@ -2515,7 +2515,7 @@
       "actionable": true,
       "command": "python tools/gates/run_privacy_claim.py --claim M-FIBER",
       "evidence_root": "evidence/claim-matrix/implementation-m-fiber",
-      "evidence_sha256": "58942e2acfab90df57e9d4ef2512c2fcbdf6d0143be1f38eed37ed70ab7e9827",
+      "evidence_sha256": "64ec61cfcab7cc466960ee5bf8ea276f285ed0dfcbe60fc50374ac3516bbb228",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_privacy_claim.py --claim M-FIBER --rollback-check",
       "reproduction_command": null,
@@ -2548,7 +2548,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: refresh.rs: proof-carrying refresh skeleton - every refresh emits a proof binding suite, both key epochs, rights root, both ciphertext commitments, and a plaintext-continuity digest; missing/forged/substituted proofs reject and retired epoch keys cannot open refreshed state. The continuity tag is a symmetric audit-key stand-in for the required complete zero-knowledge prover and second verifier, so the row stays PARTIAL. [Privacy]"
+        "audit": "PARTIAL: refresh.rs: dispatch binds proof suite, source/destination suites, both epochs, source/destination rights and policy roots, chain, job, transcript, fresh challenge window, both shape-bound ciphertext commitments, and plaintext continuity digest. Stateful verification rejects missing/stale/replayed challenges, epoch rollback, suite/policy/rights/context mutation, ciphertext substitution, proof tamper and cross-transcript splice; retired secret/audit keys expose an explicit zeroized state and reject use. The row stays PARTIAL because continuity is a symmetric audit-key tag over a toy negative-control ciphertext, not a complete ZK prover, and only one local verifier family exists. [PrivacyTeeClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -2642,7 +2642,7 @@
       "actionable": true,
       "command": "python tools/gates/run_privacy_claim.py --claim M-PRIVACY-DEPTH",
       "evidence_root": "evidence/claim-matrix/implementation-m-privacy-depth",
-      "evidence_sha256": "449045dec2e04ee04fe2a40d349d4c2c87e1604bdf9c56603d3d6c720d7f56e6",
+      "evidence_sha256": "5381fff2e1e5405e5e251361acee4a4acd2b2125d6dd0959f3f24ba34454078e",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_privacy_claim.py --claim M-PRIVACY-DEPTH --rollback-check",
       "reproduction_command": null,
@@ -2705,7 +2705,7 @@
       "actionable": true,
       "command": "python tools/gates/run_privacy_claim.py --claim A-UMBRA-HIDDEN",
       "evidence_root": "evidence/claim-matrix/implementation-a-umbra-hidden",
-      "evidence_sha256": "167b6672cce635b0aa014fe597246b12d734296dccb6b664c2371200efdf18f3",
+      "evidence_sha256": "a17dd8245f718014150b3e3805c5b8bed659c44288baaed3205d3c75600d4c01",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_privacy_claim.py --claim A-UMBRA-HIDDEN --rollback-check",
       "reproduction_command": null,
@@ -2770,7 +2770,7 @@
       "actionable": true,
       "command": "python tools/gates/run_privacy_claim.py --claim M-BRANCH",
       "evidence_root": "evidence/claim-matrix/implementation-m-branch",
-      "evidence_sha256": "74d6800197d5c19c6c089ca3365d812e91a5d9f959a1c1e85fe1269442b2da56",
+      "evidence_sha256": "31df2e99c14b432b5cbef56ac99364c5052ace0ac6876461066fd515177e33e0",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_privacy_claim.py --claim M-BRANCH --rollback-check",
       "reproduction_command": null,
@@ -2805,7 +2805,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: refresh.rs: toy integer-lattice ciphertext with tracked noise and fail-closed decrypt exercises the suite surface, but the claim needs a standard-assumption reduction, exact frozen parameters, an IND-style model, a concrete attack estimate, and two verifiers - none locally provable; row stays PARTIAL and umbra_suite_enabled[hfhe]=false. [Privacy]"
+        "audit": "PARTIAL: hfhe.rs + refresh.rs: exact deterministic F_(2^127-1) arithmetic and shape-bound ciphertext-as-circuit encoding are implemented as a conformance/cryptanalysis precursor, while the prior Z/(2^64) LWE-shaped ciphertext is explicitly a negative control. The boundary always reports registered=false/enabled=false and local activation rejects. Wrong-field downgrade, gate splice, noncanonical field, ciphertext shape ambiguity, and unsupported suite dispatch reject. The row stays PARTIAL: no IND model, standard-assumption reduction, independent concrete attack estimate, production parameters, complete public refresh prover, two independent verifier families, or rotation evidence exists. [PrivacyTeeClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -2853,7 +2853,7 @@
       "claim_id": "A-KEYLESS-CONSENSUS",
       "mechanism_id": "A-KEYLESS-CONSENSUS",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "UNMEASURED",
       "lifecycle": "ACTIVE",
       "result": "UNTESTED",
@@ -2871,7 +2871,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "IMPLEMENTED: KeylessConsensus makes a universal decrypt scope and secret key/share bytes unrepresentable in consensus state: client-held custody has no consensus authorization path; threshold custody is workload-scoped, member-bounded, exact-key-epoch, expiring, and counts distinct authenticated holders only. Exhaustive adaptive-corruption subsets reject below threshold; duplicate/foreign/old shares reject; rotation succeeds while a real NodeCore continues ordinary transfers, block production, and checkpoint finality with every optional lane disabled. The policy authorizes an opaque event only and never performs or stores decryption. [BaseNetworkClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -2899,11 +2899,11 @@
       "provenance": "Extracted verbatim from §3.4 A-KEYLESS-CONSENSUS of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-a-keyless-consensus",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "command": "python tools/gates/run_base_network_claim.py --claim A-KEYLESS-CONSENSUS",
+      "evidence_root": "evidence/claim-matrix/implementation-a-keyless-consensus",
+      "evidence_sha256": "fd5f8085eb7b205f47ee3915caf9d42fb0b47ec2b2439407c97e6b99dd0fcf96",
+      "expected_result": "IMPLEMENTED",
+      "rollback_command": "python tools/gates/run_base_network_claim.py --claim A-KEYLESS-CONSENSUS --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
@@ -2911,8 +2911,8 @@
       "external_blockers": [
         "Required independent, public, hardware, scale, or production evidence is unavailable."
       ],
-      "local_implementation_state": "MISSING",
-      "local_evidence_state": "MISSING"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "M-3PC-MALICIOUS",
@@ -2974,7 +2974,7 @@
       "actionable": true,
       "command": "python tools/gates/run_privacy_claim.py --claim M-3PC-MALICIOUS",
       "evidence_root": "evidence/claim-matrix/implementation-m-3pc-malicious",
-      "evidence_sha256": "ef2db33ab46a94d6dd2a32558156ae86d3983d742540ed822fd88dcefaec2d46",
+      "evidence_sha256": "1d6f709edbcfc1a5139361147648cfa31faa3563c533c58299c906322b402d74",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_privacy_claim.py --claim M-3PC-MALICIOUS --rollback-check",
       "reproduction_command": null,
@@ -2989,7 +2989,7 @@
       "claim_id": "S-ARTIFACT",
       "mechanism_id": "S-ARTIFACT",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -3007,7 +3007,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "IMPLEMENTED: Content identity binds the frozen Artifact fields and payload through a length-delimited canonical encoding; schema, length, and digest validate before use. The declared local erasure profile is k data plus exactly one XOR parity shard, reconstructs after every single-shard loss, and rejects corrupt shard digests or descriptor/payload splices. Deterministic topology selection forbids any non-local-site shard for interactive per-token traffic while allowing topology-ranked batch/replica retrieval. Immutable derivation edges bind ordered parents, output, transform, recipe, provenance, and height. Local behavior and rollback laws are complete; production promoted-corpus and geographic E-WAN-01 evidence remain external and are not claimed. [SpeciesReactionClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3033,24 +3033,24 @@
       "provenance": "Extracted verbatim from §3.5 S-ARTIFACT of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-s-artifact",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "command": "python tools/gates/run_species_reaction_claim.py --claim S-ARTIFACT",
+      "evidence_root": "evidence/claim-matrix/implementation-s-artifact",
+      "evidence_sha256": "1675be1971b225b9db76edf37f64081abd978735783fc4ff8ac3a50f51878e46",
+      "expected_result": "IMPLEMENTED",
+      "rollback_command": "python tools/gates/run_species_reaction_claim.py --claim S-ARTIFACT --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
-      "local_evidence_state": "MISSING"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "S-PROOF-ARCH",
       "mechanism_id": "S-PROOF-ARCH",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -3070,7 +3070,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: PARTIAL only. ProofArchitectureManifest canonically binds numeric profile, checkpoint, activation commitment, deterministic projection hook, constrained MoE route policy, and tolerance into the profile id carried by the RISC Zero journal. Mutation of every field changes the id, and wrong-profile receipt replay rejects. The frozen pass threshold remains external because cross-hardware conformance within tolerance has not been run on independent hardware for all vectors. No universal efficiency claim is made. [RiscZeroProofClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3106,14 +3106,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "S-GPU-COMMIT",
       "mechanism_id": "S-GPU-COMMIT",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -3133,7 +3133,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: PARTIAL only. The canonical CPU/reference commitment mechanics now separate stable ArtifactId from challenge-bound WorkCommit and bind profile id, trace root, and versioned fused-relation id; every mutation invalidates the declaration. No GPU result is relabeled as this reference path. The exact frozen threshold remains external: no GPU implementation/root corpus, imperfect-tree and partial-chunk GPU campaign, compiler/race matrix, transfer-integrated end-to-end advantage, or independent pinned H100 latency/energy reproduction exists on this AMD workstation. Rollback is the canonical CPU/reference commitment. [RiscZeroProofClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3171,14 +3171,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "S-SPECIES",
       "mechanism_id": "S-SPECIES",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -3198,7 +3198,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Immutable insert-once artifact/derivation/manifest/revision/relation storage now resolves deterministic member and directional edge views scoped by species, numeric profile, suite commitment, and half-open height interval; admitted members must bind locally verified artifact content, current_weights remains forbidden, and tolerance transitivity remains forbidden. Map-index and reference-scan resolver paths return byte-identical view IDs in local tests. PARTIAL because these are two paths in one Rust implementation, not independent resolver families, and the frozen 10^7 generated E-SPECIES-01 campaign has not run. [SpeciesReactionClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3236,14 +3236,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "M-QUOTIENT",
       "mechanism_id": "M-QUOTIENT/S-SPECIES-QUOTIENT",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -3261,7 +3261,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Finite suite/profile/tolerance-scoped quotient construction is deterministic, refuses any critical-safety failure, and proves transitivity over the offered finite relation before emitting classes; the explicit A~B, B~C, A!~C tolerance counterexample rejects with the three member IDs. PARTIAL because no rotating public and post-commit hidden suite, external semantic ground truth, 99% confidence bound, or measured false-equivalence rate below 1% exists. Rollback is the implemented refusal/split to finite exact relations. [SpeciesReactionClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3299,14 +3299,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "S-REACTION",
       "mechanism_id": "S-REACTION",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -3324,7 +3324,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "IMPLEMENTED: Immutable Reaction identity binds parent, canonical packet, content-bound integer adapter capsule, numeric profile, candidate, reproduced composition, and all transition heights. Controller submission actually applies the checked adapter delta to content-bound parent weights and requires byte-exact candidate state/root replay; inexact division, overflow, tamper, splice, replay, stale parent, premature availability/admission, and successful challenges reject. The only mutable pointer is private to PromotionController and moves Proposed -> Available -> Challengeable -> Admitted only after the deadline; rollback restores the retained parent without rewriting history. This completes the local transition/reproduction/rollback contract, not independent production-operator evidence. [SpeciesReactionClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3352,24 +3352,24 @@
       "provenance": "Extracted verbatim from §3.5 S-REACTION of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-s-reaction",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "command": "python tools/gates/run_species_reaction_claim.py --claim S-REACTION",
+      "evidence_root": "evidence/claim-matrix/implementation-s-reaction",
+      "evidence_sha256": "cd45d95600f04d71929ca3adfc7dc97549538830aeeddeaf23d4ec716ad84173",
+      "expected_result": "IMPLEMENTED",
+      "rollback_command": "python tools/gates/run_species_reaction_claim.py --claim S-REACTION --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
-      "local_evidence_state": "MISSING"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "S-UPDATE",
       "mechanism_id": "S-UPDATE",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -3389,7 +3389,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Strict length-delimited UpdatePacket encoding binds ordered base members, delta kind/payload, applicability, tokenizer, numeric profile, recipe/capsules, exact policy version, privacy/rights, provenance, nonempty availability commitments, contributors, evaluations, and expiry. Decoder rejects unknown tags, duplicate/unsorted collections, trailing bytes, omitted bindings, ID tamper, stale policy, expired packet, and unavailable parent/payload/tokenizer; encode-decode-reencode is byte-identical locally. PARTIAL because the pass threshold requires a second independently implemented decoder/replay engine and profile-tolerance differential evidence. [SpeciesReactionClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3425,14 +3425,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "S-RL-LAG",
       "mechanism_id": "S-RL-LAG",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -3450,7 +3450,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Typed rollouts always bind policy, tokenizer, and environment versions. Validated configured bands classify exact accept/downweight/reject/hard-cancel boundaries; future-version spoofing errors, tokenizer/environment mismatch cancels, and one hard-stale member cancels its whole group. The test exhausts all 500,500 rollout/current policy pairs for current versions 0..999 and asserts no weighted/accepted rollout beyond the downweight band and hard-max cancellation. PARTIAL because preregistered training-stability fault injection has not been conducted. [SpeciesReactionClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3486,14 +3486,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "M-ADJOINT",
       "mechanism_id": "M-ADJOINT/S-ADJOINT/S-CAPSULE",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -3511,7 +3511,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: adjoint.rs implements a deterministic exact-integer R_adj precursor binding C_theta,C_x,C_t,C_y,C_L,C_fwd,C_bwd,C_g,C_opt,C_theta', policy version, numeric profile, and lag before challenge. It verifies the three frozen GEMMs Y=XW, G_X=G_YW^T, G_W=X^TG_Y through distinct post-commit residue domains, checks the exact global dual identity, prevents modular aliases, and fully checks frozen ties-away clipping/momentum/learning-rate/updated-weight semantics. A 32^3 operation census is 11,264 certificate multiplications versus 100,352 replay multiplications; tamper/splice/profile/policy/timing/overflow tests reject, including a recomputed coherent fake that passes the scalar dual identity but fails a local graph relation. The local 10^7 structured capsule-header campaign has zero accepts. PARTIAL: the full 10^7 relation-level adversarial campaign, production training numeric profile, real proof plus witness-availability cost, independently authored verifier, and private-example leakage measurement remain external; output is SHADOW_ONLY and non-slashable. [TensorHdfClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3549,14 +3549,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "S-TOPLOC",
       "mechanism_id": "S-TOPLOC",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -3576,7 +3576,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: A deterministic signed-projection hidden-state fingerprint binds named model, numeric profile, hidden width, projection count, and a seed fixed by commitment before reveal. Seed/profile/model substitution rejects, and the local cheaper-hidden-state plus copied target-prefill falsifier exceeds the configured mismatch threshold. The API returns only execution-fidelity evidence and never semantic quality. PARTIAL because no published attack corpus, adaptive collision campaign, 99% confidence detection rate, or measured false-positive SLA exists. [SpeciesReactionClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3612,14 +3612,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "S-QUALITY",
       "mechanism_id": "S-QUALITY",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -3637,7 +3637,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Content-bound contextual QualityReceipt validation rejects task/rubric/candidate splices. Evaluator control domains are insert-once externally supplied identities; each domain contributes its conservative minimum and the aggregate is the median domain score, so twenty same-domain high-score Sybils do not change score or domain count. Any safety-critical reject is a zero-score veto. Deadline escrow pays one matching receipt once or becomes mechanically refundable after expiry, preventing double pay and trapped escrow locally. PARTIAL because no preregistered E-COLLUSION-01 task campaign demonstrates under-1% rank capture or independent real evaluator/payment behavior. [SpeciesReactionClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3675,7 +3675,7 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
@@ -3700,7 +3700,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: Signed software-attestation precursor implements task/beacon-derived random projection assignment, commitment/availability binding, identity/profile validity windows, inclusive clock-skew bounds, duplicate/finalized-stale rejection, deterministic multi-party replay, fork/equivocation removal, lineage/failure-domain quotient aggregation, receipts, aggregation rollback, retained optional local verification, and hard zero proposal/finality/slash weight. Local behavior/falsifier suite and generated chorus-mesh evidence are green. PARTIAL: S-CHORUS's exact threshold still requires consenting physical low-end phones/laptops plus emulator/root/replay/ASN/selective-withholding trials, 10x Sybil influence measurement, and observed p95 latency/bytes/battery/attrition; software signatures are not hardware attestation or real diversity evidence. [DreamChorusClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3794,7 +3794,7 @@
       "actionable": true,
       "command": "python tools/gates/run_loam_repair.py --all-admitted-transforms",
       "evidence_root": "evidence/claim-matrix/loam-repair",
-      "evidence_sha256": "c686638a8ce3366f5cd8a073de0dadc4f6928fd9986f5a9b164e587687883e8e",
+      "evidence_sha256": "e07056f5d44913368c5abf99f405b360da3abce19fe6f8c499eaf7b4573ab5de",
       "expected_result": "PASSED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim S-LOAM-BASE --rollback-check",
       "reproduction_command": null,
@@ -3860,7 +3860,7 @@
       "actionable": true,
       "command": "python tools/gates/run_loam_repair.py --all-admitted-transforms",
       "evidence_root": "evidence/claim-matrix/loam-repair",
-      "evidence_sha256": "c686638a8ce3366f5cd8a073de0dadc4f6928fd9986f5a9b164e587687883e8e",
+      "evidence_sha256": "e07056f5d44913368c5abf99f405b360da3abce19fe6f8c499eaf7b4573ab5de",
       "expected_result": "PASSED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim S-LOAM --rollback-check",
       "reproduction_command": null,
@@ -3875,7 +3875,7 @@
       "claim_id": "S-AGENT",
       "mechanism_id": "S-AGENT",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -3893,7 +3893,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "IMPLEMENTED: Stable AgentID now admits only authenticated version+1 rotations by the active key or the committed human recovery threshold while keeping genesis/controller identity fixed; intents bind current key/version plus exact mandate, capability, job, chain, profile, object, direction, budget, deadline and nonce. Delegated grants must strictly attenuate parent depth/scope/budget/expiry. Irreversible mandates require a compensation action. The existing ActionRouter remains the only contract-effect path and rechecks grant, mandate, key version and class epoch at dispatch. Falsifiers cover key-rotation identity theft, replay, cross-job/chain/profile substitution, scope, expiry, revocation races, monotone budgets, delegation widening, hostile text and unknown action types. Local deterministic evidence only; named production experiment owner and independent production exploit corpus remain external blockers. [AgentCommerceClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3922,24 +3922,24 @@
       "provenance": "Extracted verbatim from §3.5 S-AGENT of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-s-agent",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "command": "python tools/gates/run_agent_commerce_claim.py --claim S-AGENT",
+      "evidence_root": "evidence/claim-matrix/implementation-s-agent",
+      "evidence_sha256": "eeb4c6669dd5978d300a7ebc9f8908d97558429406f0242f8d6aae45b50adfe2",
+      "expected_result": "IMPLEMENTED",
+      "rollback_command": "python tools/gates/run_agent_commerce_claim.py --claim S-AGENT --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
-      "local_evidence_state": "MISSING"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "S-FREYSA",
       "mechanism_id": "S-FREYSA",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -3959,7 +3959,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "IMPLEMENTED: ReceiveDonation is a typed inward action. A mandate commits action and direction independently of untrusted text; changing it to Transfer under incoming-donation language is denied before budget spend. The non-ignored deterministic battery executes exactly 100,000 multilingual/paraphrase/tool-injection mutations with zero outgoing effects, meeting the local registered threshold. This is a regression corpus, not a general jailbreak-immunity claim; named production owner remains external. [AgentCommerceClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -3987,24 +3987,24 @@
       "provenance": "Extracted verbatim from §3.5 S-FREYSA of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-s-freysa",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "command": "python tools/gates/run_agent_commerce_claim.py --claim S-FREYSA",
+      "evidence_root": "evidence/claim-matrix/implementation-s-freysa",
+      "evidence_sha256": "0faa8e0d9a61e2e20d2bbeff914c7703dc7cda35349addf8ab4b4b3b320b94e9",
+      "expected_result": "IMPLEMENTED",
+      "rollback_command": "python tools/gates/run_agent_commerce_claim.py --claim S-FREYSA --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
-      "local_evidence_state": "MISSING"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "S-COMMERCE",
       "mechanism_id": "S-COMMERCE/S-ACP",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -4022,7 +4022,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "IMPLEMENTED: ACP lifecycle is an acyclic single-terminal state machine with 13 exhaustively enumerated maximal paths. Terminal states cannot be rewritten. Chain/profile/job/request-bound artifact availability starts the challenge deadline; withholding leaves it unset and reaches timeout refund. Delivery remains separate from Q0 quality. Settlement atomically consumes typed escrow/execution/dispute resources, rejects cross-job reuse and replay, and conserves escrow exactly across provider/evaluator/client credits. Lab fault injection is deterministic; no production evaluator/provider-duration evidence is claimed. [AgentCommerceClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -4048,24 +4048,24 @@
       "provenance": "Extracted verbatim from §3.5 S-COMMERCE / S-ACP of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-s-commerce",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "command": "python tools/gates/run_agent_commerce_claim.py --claim S-COMMERCE",
+      "evidence_root": "evidence/claim-matrix/implementation-s-commerce",
+      "evidence_sha256": "ede08eda692dec12ef076963eb4a764c7a59a0c18f131d4d07db9584bf4a8561",
+      "expected_result": "IMPLEMENTED",
+      "rollback_command": "python tools/gates/run_agent_commerce_claim.py --claim S-COMMERCE --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
-      "local_evidence_state": "MISSING"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "S-PRIVACY-IR",
       "mechanism_id": "S-PRIVACY-IR",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -4083,7 +4083,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "IMPLEMENTED: privacy_ir.rs: canonical typed set-intersection, private-lookup, and aggregate operations admit PSI/PIR/VDAF/MPC/TEE/FHE/ZK lowerings only when backend-specific named trust roots, semantic leakage and composition budgets, workload key holders/epochs, fail-closed recovery, and non-guarantees are explicit. A separate reference interpreter and lowered interpreter agree for every admitted backend; UI summaries preserve trust/non-guarantee names. Falsifiers reject unsupported downgrade, hidden TEE/committee trust, underdeclared/composed leakage, permanent global keys, duplicate roots, and operation/shape/backend ambiguity. This implements the local IR/admission claim, not any backend cryptosystem's security. [PrivacyTeeClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -4109,24 +4109,24 @@
       "provenance": "Extracted verbatim from §3.5 S-PRIVACY-IR of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-s-privacy-ir",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "command": "python tools/gates/run_privacy_claim.py --claim S-PRIVACY-IR",
+      "evidence_root": "evidence/claim-matrix/implementation-s-privacy-ir",
+      "evidence_sha256": "2424536c83c2acc3378c5a1f2eff0a915f463c506e245cb4f0fca215baab1e77",
+      "expected_result": "IMPLEMENTED",
+      "rollback_command": "python tools/gates/run_privacy_claim.py --claim S-PRIVACY-IR --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
-      "local_evidence_state": "MISSING"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "S-ATTRIBUTION",
       "mechanism_id": "S-ATTRIBUTION",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -4144,7 +4144,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "IMPLEMENTED: ContributionGraph binds marginal evaluations to provenance, rejects contributor/evaluator self-dealing and evidence laundering, deduplicates evaluator failure domains, quotients sybil splits by declared contributor failure domain, and applies deterministic decay. Synthetic ground truth measures max error below 10% and wash-derived credit below 1%; a clone split mints zero aggregate credit. AttributionReport has consensus weight exactly zero and is advisory provenance, not objective ownership. Real-world independence and cartel resistance remain external. [AgentCommerceClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -4172,24 +4172,24 @@
       "provenance": "Extracted verbatim from §3.5 S-ATTRIBUTION of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-s-attribution",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "command": "python tools/gates/run_agent_commerce_claim.py --claim S-ATTRIBUTION",
+      "evidence_root": "evidence/claim-matrix/implementation-s-attribution",
+      "evidence_sha256": "801c610cfe2aeb1834cf04764c790f4f98e690dd0f1e95fa8f2c250612481875",
+      "expected_result": "IMPLEMENTED",
+      "rollback_command": "python tools/gates/run_agent_commerce_claim.py --claim S-ATTRIBUTION --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
-      "local_evidence_state": "MISSING"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "S-ACCESS",
       "mechanism_id": "S-ACCESS",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -4207,7 +4207,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: PARTIAL local precursor: PortableAccessManifest commits local, threshold-recovery and portable-backup identity paths plus content-addressed replicas. Validation requires at least three distinct declared failure domains for identity and each artifact, rejects ambiguous replicas, and the deterministic partition drill removes every pair in turn while recovering identity plus the retained artifact through the survivor; execution is typed OffConsensus and inference outage cannot stop the base chain. The registered threshold requires genuinely independent paths. No three independently operated provider/path drill exists locally, so the row must remain PARTIAL/EXTERNAL_BLOCKED. [AgentCommerceClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -4243,7 +4243,7 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
@@ -4297,7 +4297,7 @@
       "actionable": true,
       "command": "python tools/gates/run_loam_repair.py --all-admitted-transforms",
       "evidence_root": "evidence/claim-matrix/loam-repair",
-      "evidence_sha256": "c686638a8ce3366f5cd8a073de0dadc4f6928fd9986f5a9b164e587687883e8e",
+      "evidence_sha256": "e07056f5d44913368c5abf99f405b360da3abce19fe6f8c499eaf7b4573ab5de",
       "expected_result": "PASSED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim S-LIFECYCLE --rollback-check",
       "reproduction_command": null,
@@ -4312,7 +4312,7 @@
       "claim_id": "S-TWIN-PROFILE",
       "mechanism_id": "S-TWIN-PROFILE",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -4330,7 +4330,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "IMPLEMENTED: TwinProfile is a content-derived advisory-profile identity distinct from its owner and contains observations/models/uncertainty plus explicit question and capability scopes. Consent checks bind principal, purpose, Evaluate right and expiry. Query/effect-proposal permits carry the profile revocation epoch and are rechecked at use; revocation races, stale permits, consent spoofing, out-of-scope questions/capabilities and profile substitution fail closed. The only output is TwinRecommendation with AUTHORITY=None; display identity is explicitly AdvisoryProfile, never the person. [AgentCommerceClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -4356,18 +4356,18 @@
       "provenance": "Extracted verbatim from §3.5 S-TWIN-PROFILE of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-s-twin-profile",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "command": "python tools/gates/run_agent_commerce_claim.py --claim S-TWIN-PROFILE",
+      "evidence_root": "evidence/claim-matrix/implementation-s-twin-profile",
+      "evidence_sha256": "6a612efeada21ff6a7225b8be7ecb2639f1816abb7ec9e1ac628d7d7fc187333",
+      "expected_result": "IMPLEMENTED",
+      "rollback_command": "python tools/gates/run_agent_commerce_claim.py --claim S-TWIN-PROFILE --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
-      "local_evidence_state": "MISSING"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "S-DREAM",
@@ -4391,7 +4391,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: Dream-only noos-reflex module implements owner/persona separation, consent-scoped TwinProfile identity binding, owner-signed revocation and quarantine, plural sealed branch families, deterministic reconciliation and hash-chained non-authoritative receipts, exact clock boundaries, independent resolver binding, influence invalidation, reveal commitments, and globally one-shot realization only through a distinct owner-signed capability. Persona output grants zero identity/authority and carries zero payout/proposal/finality weight. PARTIAL: the exact claim threshold also requires held-out preregistered forecasts beating a non-persona proper-scoring baseline by at least 10% without increased protected-group harm; no local fixture is presented as that evidence. [DreamChorusClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -4454,7 +4454,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: The killed general market remains non-enableable. Only the frozen surviving boundary is executable: private, payout-free, causally insulated, action-firewalled research notebooks; action influence invalidates resolution; persona self-realization fails; rollback quarantines the profile, discards application families/nullifiers, preserves the base root bit-for-bit, and leaves proposal/finality weight zero. Generated runner result is DISABLED. PARTIAL: the row's 90 real-day external-paid-demand and production causal-insulation threshold cannot be satisfied by local time or local fixtures, and the registered manipulation kill remains binding. [DreamChorusClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -4501,7 +4501,7 @@
       "claim_id": "M-CLOCK",
       "mechanism_id": "M-CLOCK",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "UNMEASURED",
       "lifecycle": "ACTIVE",
       "result": "UNTESTED",
@@ -4524,7 +4524,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "IMPLEMENTED: TwoHandedClock composes Braid's exact U256 ForkScore tuple with atomic Loom receipt admission: eligibility_epoch <= block epoch, activation boundary, fork-local ancestor nullifier freshness, per-block and cumulative L/(G+L) <= 0.10, monotone finalized/justified checkpoints and epochs, saturating normalized work, and c_L=0 rollback retaining Ground production. Falsifiers cover future receipts, activation-before-boundary, cap overflow, descendant replay on both child forks, checkpoint/epoch rollback, lower-finalized or lower-justified work stuffing, inverse-hash ordering, and Ground-only continuation. The dedicated gate differentially executes Rust noos-braid and independent Go braidref over the same generated 100,000-pair corpus with byte-identical winners. This completes the local threshold only; it is not independent-vendor or production promotion evidence. [IdentityReflexClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -4550,11 +4550,11 @@
       "provenance": "Extracted verbatim from §3.5 M-CLOCK of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-m-clock",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "command": "python tools/gates/run_identity_reflex_claim.py --claim M-CLOCK",
+      "evidence_root": "evidence/claim-matrix/implementation-m-clock",
+      "evidence_sha256": "2cdab0bfbe8aa02b5a3d415d524e29b1490c5ecfeeb862774734fa8a86477c77",
+      "expected_result": "IMPLEMENTED",
+      "rollback_command": "python tools/gates/run_identity_reflex_claim.py --claim M-CLOCK --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
@@ -4562,14 +4562,14 @@
       "external_blockers": [
         "Required independent, public, hardware, scale, or production evidence is unavailable."
       ],
-      "local_implementation_state": "MISSING",
-      "local_evidence_state": "MISSING"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "S-GLOBAL-ORGANISM",
       "mechanism_id": "S-GLOBAL-ORGANISM",
       "evidence_label": "DREAM",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -4587,7 +4587,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Finite application-scoped component evidence can be merged only across disjoint component IDs with checked conservation of observations, useful-work units, rights violations, weighted decision benefit, minimum semantic continuity, and maximum control concentration; partitioned and one-shot aggregation are identical and duplicates reject. The aggregate deliberately returns establishes_global_organism=false and zero proposal/finality weight. PARTIAL permanently at G0: the frozen row has no production threshold and global resilience/control/continuity/rights/benefit observables are not preregistered. [SpeciesReactionClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -4623,7 +4623,7 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
@@ -4650,7 +4650,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: crates/noos-nel/src/inference.rs + luts.rs: deterministic W8A8 integer decoder forward at mini shape (hidden 32, 2 layers, GQA 4q/2kv, head_dim 8, MLP 64) with every ch05 §3.2 op family pinned: INT8x INT8->INT32 GEMM with the G8 accumulator non-overflow lemma enforced at the shape boundary (unregistrable shapes reject), exact floor-quotient round-half-up dyadic requant, integer RMSNorm with pinned isqrt (seed 2^ceil(bits/2), 8 Newton + 2 correction steps, gated equal to floor sqrt), Q6 log2-domain integer softmax over the committed 64-entry exp2 LUT with masked-to-zero rows, one exact division per row and the load-bearing int16 P cap, committed Q1.15 rotate-half RoPE tables, committed 256-byte SiLU LUT, saturating residual add, greedy lowest-token-id ties. LUT bytes and every scale constant are frozen under lut_root/mini_profile_id; the whole run is frozen bit-for-bit in protocol/vectors/nel/forward-w8a8-v1.json. Falsifiers: frozen-vector mismatch, single-weight-bit flip diverges S_end and changes model identity, reduction-order (schedule) invariance gate, overflow-lemma rejection. PARTIAL because the claim requires the registered 0.5B model, the tokenizer byte-spec, and the >=10^9-instance cross-vendor NVIDIA/AMD/CPU conformance campaign (E-NEL-01/G5) — external; GPU/live-model rows stay PARTIAL. [NelRunner2]"
+        "audit": "PARTIAL: PARTIAL. The frozen mini W8A8 vector now has a complete local reference identity including a rejecting byte tokenizer; all 17 semantic op families execute, every recorded GEMM agrees with an independently ordered column-stream accumulator in forward and reverse-inner schedules, invalid tokenizer bytes reject, and identical work is co-batch invariant. This remains mini shape. The registered Qwen2.5-0.5B tokenizer/model, preregistered accuracy tolerance, two independently authored CPU implementations, certified AMD and NVIDIA kernels, and >=10^9 clean cross-vendor instances remain external. [NelLabClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -4743,7 +4743,7 @@
       "actionable": true,
       "command": "python tools/gates/run_nel_claim.py --claim N-TOKEN-STATE",
       "evidence_root": "evidence/claim-matrix/implementation-n-token-state",
-      "evidence_sha256": "da51bc50ec7636474219bb730c348d68cbf7815881d2150d23e1ea0282f4d492",
+      "evidence_sha256": "3942804c0e0bb3944cd23951fd984ae0d55842d3ff74ce21f3cb70ba5b239904",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_nel_claim.py --claim N-TOKEN-STATE --rollback-check",
       "reproduction_command": null,
@@ -4806,7 +4806,7 @@
       "actionable": true,
       "command": "python tools/gates/run_nel_claim.py --claim N-CHUNK-FREIVALDS",
       "evidence_root": "evidence/claim-matrix/implementation-n-chunk-freivalds",
-      "evidence_sha256": "661cad38f38b7e04d32bc3014ec33ffce99ec80423104aa4f282bae8e5a83e0d",
+      "evidence_sha256": "bd2fdc9cdd2be9edccd265e6fe6c3ccd3cfb17317181bd9b8b1ca1e691058b73",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_nel_claim.py --claim N-CHUNK-FREIVALDS --rollback-check",
       "reproduction_command": null,
@@ -4869,7 +4869,7 @@
       "actionable": true,
       "command": "python tools/gates/run_nel_claim.py --claim N-BISECT",
       "evidence_root": "evidence/claim-matrix/implementation-n-bisect",
-      "evidence_sha256": "ade219fe7f4e2b5136863ccef713afcbb17c234d939d4aee4f19541e396dd213",
+      "evidence_sha256": "db0f155d92654ac7b4bbb9ffbeb5881c0ae05b6e99b44556362fafb3e1b60063",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_nel_claim.py --claim N-BISECT --rollback-check",
       "reproduction_command": null,
@@ -4934,7 +4934,7 @@
       "actionable": true,
       "command": "python tools/gates/run_nel_claim.py --claim N-ACT-DA",
       "evidence_root": "evidence/claim-matrix/implementation-n-act-da",
-      "evidence_sha256": "2f1d63a74e0dc5a181b5bd2a7c96fb6cb0225a1c78ece9ece0099bb1f28094a6",
+      "evidence_sha256": "93e60299169759f5cf10026a68e335f364da12d743f49a492306775208d03b13",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_nel_claim.py --claim N-ACT-DA --rollback-check",
       "reproduction_command": null,
@@ -4997,7 +4997,7 @@
       "actionable": true,
       "command": "python tools/gates/run_nel_claim.py --claim N-KV-REPLAY",
       "evidence_root": "evidence/claim-matrix/implementation-n-kv-replay",
-      "evidence_sha256": "a5bb5cda59cd9e144322d08a4a7880c072ed0191c74e12fef92f7f3115f8bb68",
+      "evidence_sha256": "c88565a90ca4faf270d1f551864d2195ac2abe20c8cd8197e4a0dbc1408c6dc8",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_nel_claim.py --claim N-KV-REPLAY --rollback-check",
       "reproduction_command": null,
@@ -5058,7 +5058,7 @@
       "actionable": true,
       "command": "python tools/gates/run_nel_claim.py --claim N-SAMPLER",
       "evidence_root": "evidence/claim-matrix/implementation-n-sampler",
-      "evidence_sha256": "fc933c8b938385ad04da6828a5d783d570c11be802aa5f5908b63c1c46e06dad",
+      "evidence_sha256": "45e46d897cc28420b73903a3c4ef8386268f7788da6105bb0e55a4c2bc1d3cd1",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_nel_claim.py --claim N-SAMPLER --rollback-check",
       "reproduction_command": null,
@@ -5073,7 +5073,7 @@
       "claim_id": "N-TEE-FIBER",
       "mechanism_id": "N-TEE-FIBER",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -5093,7 +5093,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: tee_fiber.rs integrates against noos-nel PromptJob/PrivacyProfile/FinalityClass public interfaces and defines a hardware-quote verifier boundary binding encrypted prompt commitment, exact job/model/decoding/numeric profile, executor identity/binary, firmware/vendor trust, policy, output, fresh challenge, expiry, and monotonic rollback counter. Receipts are exactly ASSURED_TEE, name vendor trust, reject every NEL open/assured/proven settlement class, and private-profile rollback preserves historical receipts while disabling new jobs. Tests cover every field mutation, stale/replayed/rollback attestations, firmware downgrade, cross-job prompt splice, leakage observations, and prompt/key zeroization state. The row stays PARTIAL because the verifier fixture is not real vendor hardware and no preregistered real-hardware timing/length campaign or confidential arbitration evidence exists. [PrivacyTeeClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -5129,7 +5129,7 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
@@ -5184,7 +5184,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-01",
       "evidence_root": "evidence/claim-matrix/implementation-e-weft-01",
-      "evidence_sha256": "f433dae3917795691d927658311443848e07bfe317adfcaafa1af172546566ac",
+      "evidence_sha256": "ce9b237ed1dbb89030eafbc5e1ee0abf00125fdb9fa6273260d43a0a4fcd4037",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-01 --rollback-check",
       "reproduction_command": null,
@@ -5247,7 +5247,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-02",
       "evidence_root": "evidence/claim-matrix/implementation-e-weft-02",
-      "evidence_sha256": "e340824a9a637866f32ac053b3303b9b53af7b1092a5c794c912108b38c94f98",
+      "evidence_sha256": "8ed22832ce37fc15ba0e203e1862b600782e7ea6f89a7f517d0280a678331a58",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-02 --rollback-check",
       "reproduction_command": null,
@@ -5376,7 +5376,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-04",
       "evidence_root": "evidence/claim-matrix/implementation-e-weft-04",
-      "evidence_sha256": "382e26f39e9110f5b82caa952fbc6f967a0bccbeb44d52a2c315b6aa4b395932",
+      "evidence_sha256": "0975038bb8d634d2ca84679f731da12bd526e5186d050240bc02fe684e44cabc",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-04 --rollback-check",
       "reproduction_command": null,
@@ -5646,7 +5646,7 @@
       "claim_id": "H-HEARTH",
       "mechanism_id": "H-HEARTH",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -5667,7 +5667,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Local precursor: five-state FORMING/ATTESTING/ACTIVE/DEGRADED/RETIRED lifecycle with bond, generation, re-attestation, challenge-window, custody-handoff gates; exhaustive optimal contiguous whole-layer partitioner under memory/bandwidth constraints; generation/layer/byte-bound integer boundary commitments; conformance evaluator separates any mismatch, powerless FP16 control, >2x performance, and <70% partition quality. PARTIAL: no real NVIDIA/AMD/CPU corpus and no >=10^9 measured operator campaign. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -5703,14 +5703,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "H-FEDERATE",
       "mechanism_id": "H-FEDERATE",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -5730,7 +5730,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Local precursor: whole-job replica placement by locality/price and distinct failure domain, structurally zero cross-replica bytes per token, exact 0.8x-linear evaluator, integer WAN latency decomposition, +/-30% modeled-band check, and >=10 tok/s refutation mapped to retire-and-replace rather than kill. PARTIAL: 1000-hearth measured scale and the public real-WAN negative artifact are external. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -5766,14 +5766,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "H-SEED",
       "mechanism_id": "H-SEED",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -5793,7 +5793,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Local precursor: real systematic GF(256) Reed-Solomon 8-of-12 coding, reconstruction from every any-eight pattern, Species-style artifact root and per-shard content binding, corrupt/transplanted shard rejection, and resumable mid-fetch source departure without discarding accepted shards. PARTIAL: the 100-hearth real 8.03 GB residential-link timing threshold is not local evidence. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -5829,14 +5829,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "H-AUDIT",
       "mechanism_id": "H-AUDIT",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -5859,7 +5859,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Local precursor: post-commit unpredictable assignment bound to claim/auditor/shard/beacon, explicit TOPLOC -> sampled Freivalds -> full-dispute ladder with no stake move before terminal exact verdict, witness/client budgets, strict bond > gain/c calculation, four exact-fault classes, and the exact 40-phone x two-layer x 1.71 GB protocol shape. NEL and Work Loom tests exercise exact Freivalds, availability-before-clock, slashing, and conservation. PARTIAL: sustained real-time results on two independent phones and live witness delivery are external. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -5895,14 +5895,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "H-REPAIR",
       "mechanism_id": "H-REPAIR",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -5923,7 +5923,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Local precursor: conservative fixed-point replica solver reproduces all frozen p=0.3/0.6/0.9 x k=1/2/4 factors (20/74/850, 8/16/50, 3/5/7); evidence-weighted decaying availability classes; 8-of-12 reconstruction probability; ordered commitment check -> replica promotion -> exact replay -> reseed recovery. PARTIAL: 300 households, three regions, 90 elapsed days, correlated traces, and real repair economics remain external. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -5959,14 +5959,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "H-TRAIN",
       "mechanism_id": "H-TRAIN",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -5988,7 +5988,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Local precursor: exact TrainStepClaim receipt shape, graph-bound local opening, independently domain-separated Freivalds checks for forward Y=XW, input gradient dX=dY*W^T, and weight gradient dW=X^T*dY, detection surfaces for sign flip, stale policy, coherent fake Jacobian, and unopened-node corruption, plus exact 32-hearth/1.5B/H=500/batch-8192 sync-compute model and trusted-federation/no-credit rollback. PARTIAL: real convergence, 32 physical 24 GB hearths, residential WAN, witness traffic, and live stake/slashing are external. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6026,14 +6026,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "H-RELAY",
       "mechanism_id": "H-RELAY",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -6051,7 +6051,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Local precursor: direct traversal selection, mandatory funded relay fallback, unreachable/unfunded typed failures, measured RTTClass honesty, lowest-measured-RTT routing, and exact 60% direct/100% reachability/20% relay-cost/locality evaluators with <50% economic kill kept non-semantic. PARTIAL: deployed-population NAT and billed relay measurements are external. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6087,14 +6087,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "H-PAY",
       "mechanism_id": "H-PAY",
       "evidence_label": "THEORY",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -6116,7 +6116,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Local precursor: bonded admission with mixed-vendor/architecture conformance, one-use challenge/transcript replay protection, independent multi-probe RTT consistency, availability/failure-domain evidence, attack-class findings, exact one-third-vs-bond cohort rule, conserved executor/Chorus/evaluator/availability-relay payment plans, and proofpower eligibility requiring independent paid delivered matured non-circular demand with no same-window double credit. PARTIAL: funded red team and twelve months of external non-circular demand are unavailable. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6155,7 +6155,7 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
@@ -6200,7 +6200,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: A real deterministic INT8 span executes once into exact C32 and pinned-requant C8; five read-only product consumers bind that same root: escrow delivery, noos-work-loom counterfactual shadow accounting with production credit hard zero, verified dispute C32, three-leaf adjoint, and an M-BRANCH family registered from the N-TOKEN-STATE terminal commitment. Every single product is independently disableable and all receipts have zero consensus weight. PARTIAL because the exact threshold requires the production-shaped 0.5B T=32 witness and chapter-09 cycles/bytes/wall-clock marginal-cost vector; local 32^3 precursor evidence cannot substitute for those measurements. [IdentityReflexClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6245,7 +6245,7 @@
       "claim_id": "E-BASE-01",
       "mechanism_id": "E-BASE-01 Independent-client consensus differential",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -6269,7 +6269,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Executable local precursor: parameterized differential gate accepts 1..10^7 generated cases and compares separate Rust/Go processes with a local arbitrary-precision Python oracle and AA/AB/BA/BB matrix. Dedicated real NodeCore falsifiers cover durable restart with exact state/finality recovery, finalized snapshot reconstruction, deterministic below-finality reorg, and production-wire unknown-mandatory-field rejection. PARTIAL: the full 10^7 run is not claimed by a smaller invocation, management/authorship/review are not independent in this worktree, and no local process can self-certify those external properties. [BaseNetworkClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6306,14 +6306,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "E-BLACKOUT-01",
       "mechanism_id": "E-BLACKOUT-01 Zero-AI demand and total AI-service blackout",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -6333,7 +6333,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Real NodeCore precursor starts with controls_bits=0 (all optional lanes disabled), settles ordinary Lumen transfers before and after epoch boundaries, produces Ground-paced blocks, rotates the narrow key policy without interruption, and finalizes every block old enough for the one-epoch FFG lag. PARTIAL: this invocation does not claim 30 simulated days, seven public-testnet days, a separately operated maximum-load NEL service fleet killed mid-window, or repeated post-release external runs. [BaseNetworkClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6369,14 +6369,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "E-WAN-01",
       "mechanism_id": "E-WAN-01 Geographic latency, loss, eclipse, and partition",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -6399,7 +6399,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: Deterministic P2P fault scheduler covers the exact latency endpoints/cross-sweep 50,200,400,800 ms and loss 0,2,5,10%, reordering, bandwidth asymmetry, validator crash, DA withholding, regional eclipse, an in-bound minority partition, and minority-only AI reachability metadata for 10 validators/fault bound 3. Real production header envelopes and DA shards are fed to four NodeCore views; unavailable blocks park without finality, targeted repair heals eclipse/partition, ordinary state and finalized checkpoints converge, and conflicting finality is exactly zero within two epochs. NodeCore now binds future-drift validation to genesis and exercises {12000,18000,30000}, selecting 12000 as the smallest passing value. PARTIAL: no four external regions/independent carriers, real six-hour partition, external operators, or public elapsed duration were available. [BaseNetworkClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6435,7 +6435,7 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
@@ -6460,7 +6460,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: PARTIAL. The deterministic local conformance precursor covers tokenizer rejection, every W8A8 semantic op family, two reduction schedules, co-batch invariance, overflow boundaries, ties, cache-side operands, and the frozen forward vector with zero local mismatches. No claim is made for independent CPU authorship, AMD/NVIDIA execution, pinned live GPU firmware/toolchains, or the >=10^9-instance campaign; one unexplained future mismatch still kills the immutable profile. [NelLabClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6506,7 +6506,7 @@
       "claim_id": "E-NEL-02",
       "mechanism_id": "E-NEL-02 Frozen-profile accuracy",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -6524,7 +6524,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: PARTIAL. A fail-closed integer-ppm accuracy contract binds source, quantization, calibration, task and safety sets, power, tolerance, registration time, and hidden-suite opening time; it rejects post-open or missing registration, task suppression, duplicate tasks, and underpowered results, and reports every per-task loss before deciding the frozen tolerance. The harness uses an explicitly labeled fixture only. Real registered 0.5B source/W8A8 evaluation on the unopened hidden suite remains external. [NelLabClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6560,14 +6560,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "E-NEL-03",
       "mechanism_id": "E-NEL-03 Soft-final latency and label honesty",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -6585,7 +6585,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: PARTIAL. The local label/latency state machine rejects any non-SOFT surface, computes deterministic committed-token p50/p95/p99 from forward+quorum only, retains anchoring/on-chain/proof fields separately, counts disagreements, and pairs drops with refunds. A 100-sample fixture exercises three labeled clusters and the laundering falsifier, but is not a public latency experiment. Three independent live control clusters and preregistered load/fault observations remain external. [NelLabClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6621,14 +6621,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "E-NEL-04",
       "mechanism_id": "E-NEL-04 Hostile live dispute",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -6649,7 +6649,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: PARTIAL. A real local T=32 committed execution corrupts one layer-1 DOWN accumulator at position 31, the existing token-layer-op referee isolates it and faults the executor, an honest unrelated job continues, and a frivolous challenger loses. Deadline, malformed, late, availability-pause, and forced-move falsifiers remain in the crate suite; the frozen D=25 and declared 19-round/40-transaction public path are machine-bound. Public-testnet collusion/censorship timing and two sustainable independent challengers remain external. [NelLabClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6685,14 +6685,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "E-NEL-05",
       "mechanism_id": "E-NEL-05 Full weights/activation DA and KV replay",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -6713,7 +6713,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: PARTIAL. Every local model-weight byte and every layer-activation byte is namespace-bound, systematic-sharded with XOR parity across distinct operator identities, reconstructed after one loss, and unavailable after correlated loss so assurance cannot start. Two canonical executions are probed at 10^4 deterministic randomized KV positions with zero root mismatch; poison and cross-job cache reuse reject. The 4-16 MiB production shard schema is enforced. Real 0.5B shards, operator-diverse public custody, 99.9% retrieval for 30 days, and the production replay SLA remain external. [NelLabClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6749,14 +6749,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "E-NEL-06",
       "mechanism_id": "E-NEL-06 Real specialized proof benchmark",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -6776,7 +6776,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: PARTIAL. The specialized-proof benchmark interface requires public-hardware provenance, >=0.5B parameters, 16-32 tokens, named hardware, pinned circuit/compiler commits, witness memory, wall/energy/cost, proof bytes, aggregation/verifier timing, failures, challenge-window completion, and two differently named verifiers with identical results. Fixtures and extrapolations reject before economics; >10x cost, late proof, or verifier >=1s reject. No specialized proof was run and SpecializedChunkV1 stays disabled. [NelLabClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6812,14 +6812,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "E-NEL-07",
       "mechanism_id": "E-NEL-07 Sampling/beacon grind",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -6839,7 +6839,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: PARTIAL. The commit-before-beacon state machine fixes a unique threshold output after execution commitments close, rejects post-reveal commitments and alternate outputs, consumes each draw tuple once, and maps withholding only to bounded refund. The deterministic study executes 10^6 adversarial schedules with zero accepted post-reveal commitments, alternate beacons, or replayed draws; greedy state cursors remain zero and the integer sampler is exercised. Independent second-client authorship, a live threshold-beacon fault drill, and the 30-day <1% stall observation remain external. [NelLabClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6875,14 +6875,14 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "E-NEL-08",
       "mechanism_id": "E-NEL-08 Private prompt and assurance-class separation",
       "evidence_label": "BUILDABLE",
-      "implementation_status": "NOT_STARTED",
+      "implementation_status": "PARTIAL",
       "evidence_status": "UNMEASURED",
       "lifecycle": "DEFINED",
       "result": "UNTESTED",
@@ -6902,7 +6902,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "MISSING: no exact local deliverable is registered for this claim."
+        "audit": "PARTIAL: tee_fiber.rs provides executable local falsifiers for complete attestation mutation, relay across job/model/profile, challenge replay, stale expiry, monotonic-counter rollback, firmware downgrade, cross-job prompt separation, equal-public-behavior length/duration-bucket budget accounting, and attempts to spend TEE receipts as NEL Soft/Anchored/Assured/Proven. All reject or remain inside the zero-delta local fixture budget, and rollback disables only the private profile. The row stays PARTIAL: no real TEE, vendor, prompt side-channel timing campaign, public-duration evidence, or declared confidential-arbitration threshold/adversary has been exercised. [PrivacyTeeClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -6938,7 +6938,7 @@
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "MISSING",
+      "local_implementation_state": "PARTIAL",
       "local_evidence_state": "MISSING"
     },
     {
@@ -6966,7 +6966,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: Executable local precursor covers integer commitment equality surfaces, schedule/placement aggregation, mandatory divergent FP16 negative control, 2x profile performance, and 70% auto-plan quality. PARTIAL by design: no cross-vendor real hardware campaign and no >=10^9 measured instances. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7031,7 +7031,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: Executable local precursor pins the 40-phone/two-layer/1.71 GB assignment shape, post-commit witness budget, and accumulator/C8/saturation/transplant escalation while Workerd exercises the actual NEL Freivalds verifier. PARTIAL: real 3090/4090 serving and two independent thermally sustained phone platforms are not emulated. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7096,7 +7096,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: Executable local precursor reproduces synthetic p=0.3/0.6/0.9 replication controls, 8-of-12 custody probability, exact committed replay, and the full departure sequence through reseed. PARTIAL: the required 300 consenting households, three regions, and 90 elapsed days are external. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7161,7 +7161,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: Executable local precursor reconstructs canonical bytes under every four-shard-loss pattern, rejects corrupt and cross-artifact shards, and resumes after seeder departure without restart. PARTIAL: 100 real fresh hearths on 10-50 Mbps links fetching the real 8.03 GB artifact are external. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7226,7 +7226,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: Executable local precursor calculates integer compute/serialization/RTT/queue decomposition, checks +/-30% bands, keeps WAN interactive routing prohibited, and treats >=10 tok/s at >=2 hops and >=50 ms as refutation/retire-and-replace. PARTIAL: real WAN cells and first-class public negative-result publication are external. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7292,7 +7292,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: Executable local precursor pins the 32-hearth/1.5B/H=500/batch-8192 pilot model, <=1.296 sync/compute threshold, witness budget, three-GEMM receipts, all four planted attack surfaces, zero false-slash honest fixture, conservation, and trusted-federation rollback. PARTIAL: convergence, physical hearths, residential WAN, public testnet, and live stake are external. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7357,7 +7357,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: Executable local precursor covers VM flag, GPU/mixed-vendor inconsistency, replayed transcript, co-location/failure-domain, and cloud-box/RTT attacks, with independent conformance and latency findings and exact >=1/3 below-bond kill logic. PARTIAL: no funded independent red team or real attack-cost curve. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7422,7 +7422,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: Executable local precursor evaluates exact direct/relay reachability, funded relay cost share, RTTClass honesty, and locality-vs-random placement thresholds; traversal failure remains economic and cannot affect correctness. PARTIAL: deployed volunteer-population DCUtR and billed relay measurements are external. [HearthClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7487,7 +7487,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: Local precursor exercises five products from one actual 32^3 witness with one underlying execution, C8 escrow binding, receipt-only Loom weight zero, exact C32 dispute verification, C32-bound training adjoint, N-TOKEN-STATE branch registration, witness/adjoint mutation rejection, unauthorized activation rejection, each-product disablement, and zero double-credit across 100,000 deterministic adversarial orderings. PARTIAL because no production-shaped 0.5B cycle-harness run or measured chapter-09 section-2 marginal-cost vector exists. [IdentityReflexClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7554,7 +7554,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: The existing NEL exact gemm_i8/requant discipline executes Y=XW, G_X=G_Y*W^T, and G_W=X^T*G_Y at 32^3 and rectangular 32x16x24 shapes. Per-leaf span IDs reuse noos-training E-IDENT-02 domains and every training leaf binds G_Y. The local exact operation census is 3.0x with bit-exact phase sum; 15/15 operand/C32/requant/span mutations and all six directed training-leaf transplants reject, including low-bit and 2-adic accumulator perturbations. PARTIAL because the claim requires measured RV32IM cycle-model ratios and phase cycles; an operation census is not that experiment. [IdentityReflexClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7620,7 +7620,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: A deterministic closure evaluator requires exactly two ordered four-epoch cycles disabling dream, training credit, Loom credit, and Chorus one at a time; it requires the other four product costs, unchanged base finality/liveness, and zero forks. Falsifiers exercise the inclusive 1.25x pass edge, >1.25x target failure, >2x coupled-label collapse, malformed schedules, and base-chain universal kill. PARTIAL because the required shadow-mode testnet, real epoch toggles, and surviving-product measurements have not run. [IdentityReflexClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7720,7 +7720,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim M-LINEAGE-QUORUM",
       "evidence_root": "evidence/claim-matrix/implementation-m-lineage-quorum",
-      "evidence_sha256": "2ceb72943374f63484612b90aab782c765f74c75f3d2633e7d5422ca3d1ad2e2",
+      "evidence_sha256": "e32ce7b2527730066c2d1459acbc1b7dc62b84789669d023439037a6b2a79e6e",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim M-LINEAGE-QUORUM --rollback-check",
       "reproduction_command": null,
@@ -7790,7 +7790,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim M-QUARANTINE-SETTLE",
       "evidence_root": "evidence/claim-matrix/implementation-m-quarantine-settle",
-      "evidence_sha256": "6e1eed09d53cc8008ee60198ea597f170b1cf2704929ca5b74f943a236241446",
+      "evidence_sha256": "bc49cc8a8b3d744a7fd741947bfefebaaffcb3310062b4f013755f77898c0fb2",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim M-QUARANTINE-SETTLE --rollback-check",
       "reproduction_command": null,
@@ -7825,7 +7825,7 @@
         "version": "04-addendum-A (2026-07-10; binding proposed reservations for the next unfrozen ch04 revision)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: DreamInstrumentV1 is an exact integer evaluator precursor for the preregistered premiums {0,271,542,813,1084}, events=100000, seed=20260710, insulated-only policy, P=0 exclusion ineligibility, eligible [542,1084] interval, manipulator/honest sign tests, and both 75 mB quality gates. The dedicated runner hashes and re-evaluates the frozen C:/tmp/dream-lane result artifacts: mechanism gates remain green, the nonzero arms share exact raw entry margin 1605.6299 uT/event before premium, no eligible premium passes, and result remains KILLED without repricing or sweep extension. PARTIAL: repository code is a lifecycle/instrument precursor and artifact re-evaluator; it does not regenerate the 100000-event arms and is not independent, public-duration, or cross-vendor evidence. [DreamChorusClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7897,7 +7897,7 @@
         "version": "04-addendum-A (2026-07-10; binding proposed reservations for the next unfrozen ch04 revision)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: PARTIAL. The runner validates the exact existing measured artifacts at C:/tmp/nel-real-inference/runs: 24/24 layer digests and final logits equal, 3,502,080 SiLU activations, frozen LUT max/mean error and 41 clips, NEL-L0 1,166 clips, and token-7 pair drift below recorded FP cross-implementation noise with 16/16 Vulkan token agreement. Artifact hashes are generated by the command. The runner does not certify independent authorship and presents no GPU integer or NVIDIA evidence, so E-NEL-01 is unchanged. [NelLabClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7998,7 +7998,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-01a",
       "evidence_root": "evidence/claim-matrix/implementation-e-weft-01a",
-      "evidence_sha256": "96f6134bf93266cc59e2bad7eff21e45320c1c6efc947de168ce8b989547593b",
+      "evidence_sha256": "a1ba8c61ea4c33c7e57ff78f0af1be2c81feee33a5670489b0881b5e5a85ef8f",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-01a --rollback-check",
       "reproduction_command": null,
@@ -8066,7 +8066,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-02a",
       "evidence_root": "evidence/claim-matrix/implementation-e-weft-02a",
-      "evidence_sha256": "738bf660f1b0a337c639cb0ecd8577a7f7ad2369ad4fd6dd49fb85ca65fb0c74",
+      "evidence_sha256": "e4a4476bb2474ad6688967c61482368837173eca92c498c120dc1abc9be3b167",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-WEFT-02a --rollback-check",
       "reproduction_command": null,
@@ -8106,7 +8106,7 @@
         "version": "04-addendum-A (2026-07-10; binding proposed reservations for the next unfrozen ch04 revision)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: The local application lifecycle now covers registered slot keys and Ground bonds; signed <=250ms compact ticks with tx root, receipt root, cumulative gas and no state root; mandatory handoff pause and <=2-tick gap; canonical count/per-index accumulator and receipt-root mapping; total inclusion/omission/same-key contradiction verdict; causal A-CLASS-GATE.v2 enforcement; foreign-finality rejection; persistent monotone composition budgets; contradiction replay protection; unambiguous same-key liability; integer-exact multi-victim bond compensation; and canonical-only rollback. Proposal/finality weights and base_chain_delta remain structurally zero/None, and local/F9 evidence cannot enable production. PARTIAL because the required live-devnet cadence, p95 handoff, partitioned-delivery trials, and real bond payout drill remain unrun. [IdentityReflexClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -8201,7 +8201,7 @@
       "actionable": true,
       "command": "python tools/gates/run_negative_claim.py --claim A-CLASS-GATE.v1",
       "evidence_root": "evidence/claim-matrix/negative-a-class-gate-v1",
-      "evidence_sha256": "6178909c5543d1a79d88c3655dc5920fc93a8332166d066444f771bfc7356791",
+      "evidence_sha256": "f231f7b17d1b9cad92679781a29d30814af7c837986cbd163e708046286eb1cf",
       "expected_result": "KILLED",
       "rollback_command": "python tools/gates/run_negative_claim.py --claim A-CLASS-GATE.v1",
       "reproduction_command": "python tools/gates/run_negative_claim.py --claim A-CLASS-GATE.v1",
@@ -8270,7 +8270,7 @@
       "actionable": true,
       "command": "python tools/gates/run_class_gate.py --version 2 --irreversible-budget 0 --reorg-revocation-matrix",
       "evidence_root": "evidence/claim-matrix/class-gate-v2",
-      "evidence_sha256": "8cca70e993cd1f354c55538c90d27d3063557d1982c64b607046d0635441f5fa",
+      "evidence_sha256": "2b378bdfa87cae5c16c249ee7e40d482db1bc4f75bb833e6c0d3f5062c7e4958",
       "expected_result": "PASSED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-CLASS-GATE.v2 --rollback-check",
       "reproduction_command": null,
@@ -8285,7 +8285,7 @@
       "claim_id": "I-AGENT",
       "mechanism_id": "I-AGENT",
       "evidence_label": "THEORY",
-      "implementation_status": "PARTIAL",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "MEASURED_LAB",
       "lifecycle": "ACTIVE",
       "result": "PARTIAL",
@@ -8311,7 +8311,7 @@
         "version": "04-addendum-A (2026-07-10; binding proposed reservations for the next unfrozen ch04 revision)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: Application action router landed: noos-contracts router.rs routes typed ActionEnvelopes (untrusted Proposal + ClassGateRequest + contract call) to ContractHost effects ONLY through both gates - pure class gate first (finality/attestation axes, provenance meet, monotone budget; a denial spends nothing), then the agent Firewall (scope, replay, monotone grant budget, revocation), yielding a single-use privately-constructed RouteTicket; dispatch re-checks grant revocation (new fail-closed Firewall::is_revoked, unknown grant reads revoked) and class revocation epoch so mid-flight revocation rejects with zero host effects. Falsifiers green (router::tests, 6): monotone grant+class budget consumption with denied-route-spends-nothing exhaustion, grant revocation mid-flight, class epoch race mid-flight, foreign-finality receipt rejected before any spend, forged and replayed tickets fail closed as Bypass with host state untouched, and hostile model text cannot mint an effect (unknown grant, out-of-schema action, retargeted callee all denied; the one effect path carries the text digest as provenance only). Gate class-gate-v2 re-emitted PASSED covering both crates (evidence/claim-matrix/class-gate-v2/b983ca3a19c3fd91....json). Row stays PARTIAL: I-AGENT is the four-component composition claim and the composed four-attack drill (clone-farm reputation, cross-job resource reuse, key-rotation identity theft, mandate replay simultaneously over M-LINEAGE-QUORUM + M-QUARANTINE-SETTLE fixtures) has not run; named production experiment owner remains OWNER_BLOCKED. [ActionRouter5]"
+        "audit": "IMPLEMENTED: AgentProtocolObject composes the existing ActionRouter/Firewall, declared-lineage reputation and ACP escrow/dispute state without adding consensus. One deterministic drill applies all four registered attacks: 12-signature clone farm collapses to weight 1 below quorum 3; exact mandate/envelope replay is rejected; key rotation between route and dispatch invalidates the stolen ticket; and a globally linear execution right cannot settle a second job while the first settlement conserves escrow. The dedicated runner also re-executes the canonical C:/tmp/chorus-quorum-lab and C:/tmp/nel-quarantine-lab fixtures and gates their clone-collapse, exhaustive quarantine, double-payout and cross-job reuse metrics. Component and composition evidence remain lab scale; named production owner is unresolved. [AgentCommerceClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -8340,18 +8340,18 @@
       "provenance": "Extracted verbatim from A.3 I-AGENT of 04-addendum-A.md (binding on this program in the interim per its preamble); lab execution logged in VERIFICATION-2026-07-11.md.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/class-gate-v2",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "command": "python tools/gates/run_agent_commerce_claim.py --claim I-AGENT",
+      "evidence_root": "evidence/claim-matrix/implementation-i-agent",
+      "evidence_sha256": "c97d0c905522614b626a363b89f536f08580cb244e3cd402ef180f8f36e81b2f",
+      "expected_result": "IMPLEMENTED",
+      "rollback_command": "python tools/gates/run_agent_commerce_claim.py --claim I-AGENT --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "PARTIAL",
-      "local_evidence_state": "PARTIAL"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "E-REFLEX-01",
@@ -8375,7 +8375,7 @@
         "version": "04-addendum-A (2026-07-10; binding proposed reservations for the next unfrozen ch04 revision)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: The frozen row is WITHDRAWN IN FULL, superseded by E-REFLEX-02, and has evidence weight zero. The implementation preserves explicit WITHDRAWN/zero-weight constants and proves withdrawn-v1 or shape evidence cannot enable Reflex. No former G1-G6 result is reused; this row intentionally remains PARTIAL/withdrawn rather than presenting the rebuilt A-REFLEX lifecycle as E-REFLEX-01 evidence. [IdentityReflexClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -8475,7 +8475,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim E-REFLEX-02",
       "evidence_root": "evidence/claim-matrix/implementation-e-reflex-02",
-      "evidence_sha256": "4064c317d0a7e7a64a4ece314774e65af9d13d14ab71a73714d980905f495a4d",
+      "evidence_sha256": "6f7d50996be263df3930967ad2144e8ac3008501dc1b0108e9b80892ff912b8a",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-REFLEX-02 --rollback-check",
       "reproduction_command": null,
@@ -8542,7 +8542,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim E-NEL-01b",
       "evidence_root": "evidence/claim-matrix/implementation-e-nel-01b",
-      "evidence_sha256": "e46dfa588bba90f6777872148afd2fb0df68555b3d92cd1bcc11f858804399d0",
+      "evidence_sha256": "3be3b3bd80bae86a96f1f6e4467b530897834e8df94bbb55771127bebbe9aee5",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-NEL-01b --rollback-check",
       "reproduction_command": null,
@@ -8608,7 +8608,7 @@
       "actionable": true,
       "command": "python tools/gates/run_implementation_claim.py --claim A-REFLEX-F9",
       "evidence_root": "evidence/claim-matrix/implementation-a-reflex-f9",
-      "evidence_sha256": "24af783bd9119b1dd5ee49f0f5d8b0d1fe638b8b1cc19d14f74570953514c358",
+      "evidence_sha256": "f47f09dee4f6a290e2113a0e83ee862ae1b517f255ec8d9c87d87ea220becb94",
       "expected_result": "IMPLEMENTED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim A-REFLEX-F9 --rollback-check",
       "reproduction_command": null,
@@ -8676,7 +8676,7 @@
       "actionable": true,
       "command": "python tools/gates/run_oracle_gradient.py --claims E-ORACLE-01,E-GRAD-01 --independent-implementations 2",
       "evidence_root": "evidence/claim-matrix/oracle-gradient",
-      "evidence_sha256": "f0639c9b5d349adab92afb88ad60ac5d2f2bb7c67d38fa39bc5b052de8e5f24a",
+      "evidence_sha256": "52d753bed41b0c6e2a5b8a218656debe817729da9b42014f09b2f5716099f982",
       "expected_result": "PASSED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-ORACLE-01 --rollback-check",
       "reproduction_command": null,
@@ -8745,7 +8745,7 @@
       "actionable": true,
       "command": "python tools/gates/run_oracle_gradient.py --claims E-ORACLE-01,E-GRAD-01 --independent-implementations 2",
       "evidence_root": "evidence/claim-matrix/oracle-gradient",
-      "evidence_sha256": "f0639c9b5d349adab92afb88ad60ac5d2f2bb7c67d38fa39bc5b052de8e5f24a",
+      "evidence_sha256": "52d753bed41b0c6e2a5b8a218656debe817729da9b42014f09b2f5716099f982",
       "expected_result": "PASSED",
       "rollback_command": "python tools/gates/run_implementation_claim.py --claim E-GRAD-01 --rollback-check",
       "reproduction_command": null,
@@ -8822,7 +8822,7 @@
       "actionable": true,
       "command": "python tools/gates/run_negative_claim.py --claim E-DEMAND-WASH-01",
       "evidence_root": "evidence/claim-matrix/negative-e-demand-wash-01",
-      "evidence_sha256": "da2917d5275cc85250d3a924a4076fed28a3c9da988a6e24f8681f10f9bb9173",
+      "evidence_sha256": "482353fe34a6aa53189aedafa2cdd164f80a820780e1353fecd0fd0985c84a5e",
       "expected_result": "KILLED",
       "rollback_command": "python tools/gates/run_negative_claim.py --claim E-DEMAND-WASH-01",
       "reproduction_command": "python tools/gates/run_negative_claim.py --claim E-DEMAND-WASH-01",
@@ -8876,7 +8876,7 @@
         "version": "04-addendum-A (2026-07-10; binding proposed reservations for the next unfrozen ch04 revision)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: repository components exist, but no exact claim-complete implementation binding is registered."
+        "audit": "PARTIAL: lib.rs + transformer.rs: deterministic small-transformer BESI precursor physically pads every remote public-weight GEMM to 128 rows, split-shares over Z/(2^64), reconstructs raw accumulators, derives two post-response transcript-bound fresh exact-Z Freivalds challenges, and slices/requantizes only after acceptance; nonlinear/attention/KV-equivalent/residual work remains local. Tests cover all six GEMM tamper positions, challenge counts, executor-visible rows, channel replay/context/direction/epoch binding, canonical matrix shape ambiguity, raw-share DA rejection, adjudication tamper/rebind/replay/unknown-suite, exact ASSURED_SPLIT separation, and sanitized field names. The row stays PARTIAL: the deterministic fixture is not OS-CSPRNG sharing or independent executors, and it does not regenerate the frozen real Qwen2.5-0.5B 8/8-GEMM, 25-test, timing, or transport evidence. [PrivacyTeeClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [

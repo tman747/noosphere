@@ -29,7 +29,8 @@ import check_mainnet_template as mainnet_template_gate  # noqa: E402
 PROPOSAL = ROOT / "protocol/genesis/mainnet-parameters.proposal.toml"
 ALLOCATIONS = ROOT / "protocol/genesis/mainnet-allocations.proposal.json"
 DECISIONS = ROOT / "protocol/genesis/owner-decision.economics.proposal.json"
-ANALYSIS = ROOT / "evidence/economics/production-economics-sensitivity-v1.json"
+ANALYSIS_DIR = ROOT / "evidence/economics"
+LEGACY_ANALYSIS = ANALYSIS_DIR / "production-economics-sensitivity-v1.json"
 EXPECTED_ODRS = {
     "ODR-GROUND-001", "ODR-ECON-001", "ODR-EMISSION-001", "ODR-EMISSION-002",
     "ODR-EMISSION-003", "ODR-EMISSION-004", "ODR-EMISSION-005",
@@ -239,6 +240,11 @@ def canonical_json(value: dict) -> str:
     return json.dumps(value, indent=2, sort_keys=True, separators=(",", ": ")) + "\n"
 
 
+def analysis_path(rendered: str) -> Path:
+    digest = hashlib.sha256(rendered.encode()).hexdigest()
+    return ANALYSIS_DIR / f"production-economics-sensitivity-v1-{digest}.json"
+
+
 def validate(proposal_path: Path = PROPOSAL, write_analysis: bool = False) -> tuple[list[str], dict]:
     errors: list[str] = []
     doc = load(proposal_path)
@@ -270,10 +276,16 @@ def validate(proposal_path: Path = PROPOSAL, write_analysis: bool = False) -> tu
     }
     analysis = sensitivity(doc, rows, tests)
     rendered = canonical_json(analysis)
+    current_analysis = analysis_path(rendered)
     if write_analysis:
-        ANALYSIS.parent.mkdir(parents=True, exist_ok=True)
-        ANALYSIS.write_text(rendered, "utf-8")
-    elif not ANALYSIS.is_file() or ANALYSIS.read_text("utf-8") != rendered:
+        ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+        if current_analysis.exists() and current_analysis.read_text("utf-8") != rendered:
+            raise AssertionError("content-addressed sensitivity evidence collision")
+        current_analysis.write_text(rendered, "utf-8")
+    elif not any(
+        path.is_file() and path.read_text("utf-8") == rendered
+        for path in (current_analysis, LEGACY_ANALYSIS)
+    ):
         errors.append("sensitivity analysis missing or stale; run --write-analysis")
 
     blockers = [

@@ -1,0 +1,14 @@
+{
+  "schema_version": "noos.base-battery.v1",
+  "scenario": "battery",
+  "verdict": "PASS",
+  "seeds_run": 10000,
+  "validators": 4,
+  "safety": {"conflicting_finalizations": 0, "false_certificates": 0, "honest_slashes": 0},
+  "liveness": {"eligible_blocks": 640000, "finalized_blocks": 640000, "finalization_ratio": 1.000000, "max_recovery_slots": 1},
+  "roots": {"state_divergences": 0, "fork_divergences": 0, "final_root": "2ff579f2ed111b23dad15bc422787ff30dd754157936d62fc7ac90baf4dd75c3"},
+  "workload": {"transfers_applied": 640000, "contracts_executed": 1, "historical_receipts_verified": true},
+  "faults": {"messages_sent": 1920000, "messages_dropped": 76851, "messages_delayed": 0, "partitions_injected": 2500, "fsync_faults_injected": 0, "recovery_checks": 2500},
+  "blackout": {"optional_lanes_disabled": true, "disabled_lanes": ["ai","worker","prover","model","chorus","umbra","dream","reflex"], "ground_blocks": 160000, "lumen_transfers": 160000, "finalizations": 160000, "trapped_escrow": 0},
+  "client_pairs": ["go->go","go->rust","rust->go","rust->rust"]
+}

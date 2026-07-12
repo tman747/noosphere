@@ -17,7 +17,7 @@ use noos_nel::inference::{
 use noos_nel::{distribute_executor_slash, FreivaldsProfile, Verdict};
 use noos_work_loom::{
     artifact_id, domain_hash, domains, work_commit, Assurance, AvailabilityCertificate,
-    AvailabilityPolicy, Correctness, Delivery, DemandClassification, DisputeVerdict,
+    AvailabilityPolicy, Correctness, Delivery, DeliveryRule, DemandClassification, DisputeVerdict,
     EvaluatorPolicy, JobClass, JobState, LoomError, OpenJob, ProofProfile, Quality, Registries,
     RegistryStatus, ResourceVector, SettlementAccounts, SettlementSplit, WorkClass, WorkReceipt,
     WorkerCommit, WorkerProfile,
@@ -121,10 +121,18 @@ const PROMPT: [u32; 4] = [1, 2, 3, 4];
 fn open_job(model: &MiniModel, nonce: u64) -> OpenJob {
     OpenJob {
         requester: REQUESTER,
+        refund_account: REQUESTER,
         class_id: 1,
+        required_assurance: Assurance::V2,
         input_root: token_history_root(&PROMPT),
         model_or_program_root: model.weight_root(),
         delivery_pubkey: h(22),
+        delivery_rule: DeliveryRule::Availability,
+        settlement_accounts: SettlementAccounts {
+            verifier: WATCH_POOL,
+            evaluator: EVALUATOR,
+            da_provider: BURN_SINK,
+        },
         max_resources: ResourceVector {
             bytes: 100,
             compute: 100,

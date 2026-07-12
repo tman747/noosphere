@@ -1,0 +1,74 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-umbra",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-umbra"
+        ]
+      },
+      "name": "claim-specific crate tests with falsifiers",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "N-TEE-FIBER": "6cc0f386ad7572248265adb45dd529968bc87f8e98edf776c770913be7004b66"
+  },
+  "claims": [
+    "N-TEE-FIBER"
+  ],
+  "command": [
+    "tools/gates/run_privacy_claim.py",
+    "--claim",
+    "N-TEE-FIBER"
+  ],
+  "evidence_sha256": "1a043000a3b7f95a7ce1092fae2f75de00e95495a08d32a4e6e8445b466640b5",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-n-tee-fiber",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence.",
+    "The hardware quote verifier is an interface; no real vendor TEE, firmware, or specialized hardware evidence is supplied.",
+    "The leakage checks use preregistered coarse observations, not public-duration real-hardware timing evidence.",
+    "Confidential arbitration and vendor-compromise resistance remain outside the local threat model."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-nel/src/lib.rs": "30c1d4afbb6d1da58f6739b2deeab4d6d8b89a519803fa372ae1a97f2c2ca0a7",
+    "crates/noos-umbra/Cargo.toml": "2b821067f57ff5203a4878fcbe001b52780f0b7ad7cd7c6cb1b530d467033702",
+    "crates/noos-umbra/src/tee_fiber.rs": "ec33f9222db49b1357261e9876d69d2f1e2ff7dc2f222677087fa2562e4f67ba"
+  }
+}

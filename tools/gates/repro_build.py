@@ -203,9 +203,50 @@ def deterministic_environment(root: Path, target_dir: Path, target: str, epoch: 
         "GOARCH": cfg["goarch"],
         "CGO_ENABLED": "0",
         "GOFLAGS": "-mod=readonly -trimpath -buildvcs=false",
+        "GOCACHE": str(target_dir / "go-build-cache"),
     })
     rustflags = [f"--remap-path-prefix={root}=/workspace/noosphere", "-C", "debuginfo=0"]
     if target == "windows-x86_64":
+        windows = load_toolchains()["targets"][target]
+        msvc_version = windows.get("msvc_tools_version")
+        sdk_version = windows.get("windows_sdk_version")
+        if not isinstance(msvc_version, str) or not isinstance(sdk_version, str):
+            raise AssuranceError("Windows target lacks pinned MSVC/SDK versions")
+        vs_root = Path("C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools")
+        msvc_root = vs_root / "VC" / "Tools" / "MSVC" / msvc_version
+        sdk_root = Path("C:/Program Files (x86)/Windows Kits/10")
+        msvc_lib = msvc_root / "lib" / "x64"
+        sdk_lib = sdk_root / "Lib" / sdk_version
+        library_paths = [msvc_lib, sdk_lib / "ucrt" / "x64", sdk_lib / "um" / "x64"]
+        binary_paths = [msvc_root / "bin" / "Hostx64" / "x64", sdk_root / "bin" / sdk_version / "x64"]
+        sdk_include = sdk_root / "Include" / sdk_version
+        include_paths = [
+            msvc_root / "include",
+            sdk_include / "ucrt",
+            sdk_include / "shared",
+            sdk_include / "um",
+            sdk_include / "winrt",
+        ]
+        missing = [
+            str(path)
+            for path in (*library_paths, *binary_paths, *include_paths)
+            if not path.is_dir()
+        ]
+        if missing:
+            raise AssuranceError(f"pinned Windows toolchain directories missing: {missing}")
+        env["LIB"] = os.pathsep.join(str(path) for path in library_paths)
+        env["INCLUDE"] = os.pathsep.join(str(path) for path in include_paths)
+        env["PATH"] = os.pathsep.join([*(str(path) for path in binary_paths), env.get("PATH", "")])
+        env["VCINSTALLDIR"] = str(vs_root / "VC") + os.sep
+        env["VCToolsInstallDir"] = str(msvc_root) + os.sep
+        env["VCToolsVersion"] = msvc_version
+        env["WindowsSdkDir"] = str(sdk_root) + os.sep
+        env["WindowsSDKVersion"] = sdk_version + os.sep
+        rust_sysroot = Path(command(["rustc", "--print", "sysroot"]).strip())
+        rust_lld = rust_sysroot / "lib" / "rustlib" / "x86_64-pc-windows-msvc" / "bin" / "rust-lld.exe"
+        if not rust_lld.is_file():
+            raise AssuranceError(f"pinned Rust linker missing: {rust_lld}")
+        env["CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER"] = str(rust_lld)
         rustflags.extend(["-C", "link-arg=/Brepro", "-C", "link-arg=/PDBALTPATH:noos-transition.pdb"])
     # Unit-separator encoding preserves path arguments even when an external
     # builder checks the repository out below a directory containing spaces.
@@ -269,7 +310,11 @@ def build_target(target: str, out: Path, *, revision: str | None = None, smoke: 
     return result
 
 
-def _trusted_builders(path: Path, allow_test_keys: bool) -> dict[str, dict[str, Any]]:
+def _trusted_builders(
+    path: Path,
+    allow_test_keys: bool,
+    blockers: list[str] | None = None,
+) -> dict[str, dict[str, Any]]:
     trust = load_json(path)
     if trust.get("schema") != "noos/trusted-repro-builders/v1":
         raise AssuranceError("wrong trusted builder schema")
@@ -278,6 +323,10 @@ def _trusted_builders(path: Path, allow_test_keys: bool) -> dict[str, dict[str, 
         key_id = record.get("key_id")
         if not isinstance(key_id, str) or key_id in result:
             raise AssuranceError("trusted builder key_id missing or duplicated")
+        if record.get("public_key_base64") == "EXTERNAL_INPUT_REQUIRED":
+            if blockers is not None:
+                blockers.append(f"trusted builder {key_id}: external public key is required")
+            continue
         try:
             public = base64.b64decode(record["public_key_base64"], validate=True)
         except Exception as exc:
@@ -351,10 +400,10 @@ def verify_attestation_set(
     except ImportError as exc:  # pragma: no cover
         raise AssuranceError("cryptography package with Ed25519 support is required") from exc
 
-    trust = _trusted_builders(trusted_builders, allow_test_keys)
+    errors: list[str] = []
+    trust = _trusted_builders(trusted_builders, allow_test_keys, errors)
     locks = load_toolchains()
     expected_source = source_identity(expected_revision)
-    errors: list[str] = []
     policy_signature_errors = verify_policy_signatures()
     if not allow_test_keys:
         errors.extend(policy_signature_errors)

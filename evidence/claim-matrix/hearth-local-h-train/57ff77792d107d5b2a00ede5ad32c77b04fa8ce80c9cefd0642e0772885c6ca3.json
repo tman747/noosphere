@@ -1,0 +1,114 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "contract": "H=500 pilot shape, three integer GEMM audits, four attack classes, trusted-federation rollback",
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-training",
+          "-p",
+          "noos-hearth",
+          "-p",
+          "noos-nel",
+          "-p",
+          "noos-work-loom",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-training",
+          "noos-hearth",
+          "noos-nel",
+          "noos-work-loom"
+        ]
+      },
+      "name": "deterministic local precursor and falsifier tests",
+      "passed": true
+    },
+    {
+      "name": "exact registry pass threshold",
+      "passed": false,
+      "reason": "requires 32 physical 24 GB hearths, a real 1.5B run, residential WAN, and live testnet stake",
+      "status": "EXTERNAL_BLOCKED"
+    }
+  ],
+  "claim_fingerprints": {
+    "H-TRAIN": "a65455168a26dce92fb12fe91d4c4554372ba8ee066c3968f179395f645c985d"
+  },
+  "claims": [
+    "H-TRAIN"
+  ],
+  "command": [
+    "tools/gates/run_hearth_claim.py",
+    "--claim",
+    "H-TRAIN"
+  ],
+  "evidence_sha256": "57ff77792d107d5b2a00ede5ad32c77b04fa8ce80c9cefd0642e0772885c6ca3",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "hearth-local-h-train",
+  "limitations": [
+    "requires 32 physical 24 GB hearths, a real 1.5B run, residential WAN, and live testnet stake",
+    "Deterministic fixtures and modeled threshold evaluators are local precursor evidence, not hardware, operator, WAN, public-duration, or independent evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-hearth/Cargo.toml": "a623eacb1395837a76ce4a36ca87442dcf367e66842fb1fd88a5b3f09c707faa",
+    "crates/noos-hearth/src/audit.rs": "7f2fd1b26501d9bb3905df905e03adc9331d60387a2afdb81c9eb17d02e8ed67",
+    "crates/noos-hearth/src/federation.rs": "b43350526f5aa038b5e877fadc3caacb34856f9e7b5708b113922ec5e056111f",
+    "crates/noos-hearth/src/lib.rs": "64333983225ad5fa7c33c4c6994e389f91e5eb0bf3bd196950d93a5b76c19244",
+    "crates/noos-hearth/src/lifecycle.rs": "00f12ac95839d7c433c7fef10e31310a67f2953d939fd141852b02a5274e68d1",
+    "crates/noos-hearth/src/payment.rs": "19bc2cf8969252e26b27e2bfab1ff75d13a64b5686422441ac424a3c0df48e9d",
+    "crates/noos-hearth/src/relay.rs": "f21c35ce445eb36dc0b40fff4b20299ac2a0fb114be01e05c963c7cec996d342",
+    "crates/noos-hearth/src/repair.rs": "5c8bd2ae9453420f7673a2257bb240df088c0539fc64dadb0b2de82fa4f2a86d",
+    "crates/noos-hearth/src/rollback.rs": "a5527b68caced869ac9b04dc7ec2c427a7850a7f5e15a84e1cf9cd329be8213d",
+    "crates/noos-hearth/src/seeding.rs": "7a493dd4107e943536a0abf6ca59389d369acb4dbe6820eedee43ba12f411b3e",
+    "crates/noos-nel/Cargo.toml": "17d2ecfb2e392c496e7dfaa14c28d1b89a4b97a16095b984434f3b81cfc99189",
+    "crates/noos-nel/src/bin/nel-claim-harness.rs": "0e10847361b80724712f1486a19b7bb63049aecfccda5697eb9cd93b9e3f4b90",
+    "crates/noos-nel/src/inference.rs": "304f6746a5b2bd9ba23e73a06553caac95b5c211c39377a50343ed4454b982c8",
+    "crates/noos-nel/src/inference/tests.rs": "6d6ffbc02706b810b01987366910ce8f575bf88f95cc7473d9912680acfd6cf2",
+    "crates/noos-nel/src/lab.rs": "9025a80a33ea303029633799605cd98675909b8a1a96cd57eb0d9a07731d505b",
+    "crates/noos-nel/src/lib.rs": "30c1d4afbb6d1da58f6739b2deeab4d6d8b89a519803fa372ae1a97f2c2ca0a7",
+    "crates/noos-nel/src/luts.rs": "80d6ecea395a61c2d5fe103cd20aad2b8b7608d1442b0dcebb4ec017629c7acb",
+    "crates/noos-nel/src/tests.rs": "142c4b0312705a1b30127d77c27670bb43fe40aba6fb7af7529fcdaae76dd67a",
+    "crates/noos-training/Cargo.toml": "2d172c616a6041cbb5801a472b71c4b26386b0a2c0956aefec77c4e6a52ef02a",
+    "crates/noos-training/src/adjoint.rs": "86c92f4ee94bbb166b57022b377082d264839e3c731842ccca37a45aa40cbb1f",
+    "crates/noos-training/src/lib.rs": "bc72360a79dcb8c6d975ec2171b7dc4b6aa39857750fc4681c359cc9d99348d1",
+    "crates/noos-training/src/reaction.rs": "12691b920bf283e90019c610d1be33142d32a1fbd2a76152897c1a59aac42a59",
+    "crates/noos-training/src/rl_lag.rs": "6fe49f44a263382c0d4f5a7f144f912426afd82473f5d2a738f515bdcb73d440",
+    "crates/noos-training/src/toploc.rs": "ab194f9975feae9ebc9b5ede6eb890fab59c0fe2159e35862740f1a53330e827",
+    "crates/noos-work-loom/Cargo.toml": "f476280c0cd27c42f409a6a91fae5eefdeb484d4b336aeeef95353609981431a",
+    "crates/noos-work-loom/src/economics.rs": "4836f2f7f450886a239f00476a01c0b619354053e1060989429ea9df0454eff3",
+    "crates/noos-work-loom/src/lib.rs": "832395d09eab207791a7b7510668e4d865aa72fcf9ed7940e195ce42c56269a1",
+    "crates/noos-work-loom/src/tests.rs": "97c4f4cd4a1c1e8cbccf70b85c3478d420993464219befcb8805827d3e37c26e",
+    "tools/gates/run_hearth_claim.py": "69ee1973f8bd901018e1f8c116ea9eaf1ab1d4e0542444c7d60fcbe975ae54dc"
+  }
+}

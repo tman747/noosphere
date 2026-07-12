@@ -1,0 +1,98 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "contract": "local placement/schedule commitment falsifier and mandatory FP16 negative-control evaluator",
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-hearth",
+          "-p",
+          "noos-nel",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-hearth",
+          "noos-nel"
+        ]
+      },
+      "name": "deterministic local precursor and falsifier tests",
+      "passed": true
+    },
+    {
+      "name": "exact registry pass threshold",
+      "passed": false,
+      "reason": "real mixed-vendor hardware campaign and >=10^9 measured instances are unavailable",
+      "status": "EXTERNAL_BLOCKED"
+    }
+  ],
+  "claim_fingerprints": {
+    "E-HEARTH-01": "a41b3db2272221aee4e6b67211bcdbb6ef845bff95980f002cec3b37424431a4"
+  },
+  "claims": [
+    "E-HEARTH-01"
+  ],
+  "command": [
+    "tools/gates/run_hearth_claim.py",
+    "--claim",
+    "E-HEARTH-01"
+  ],
+  "evidence_sha256": "3280dde00fb0479edac3686f26192553071d5c4c789a566d0a7b282c17ad40de",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "hearth-local-e-hearth-01",
+  "limitations": [
+    "real mixed-vendor hardware campaign and >=10^9 measured instances are unavailable",
+    "Deterministic fixtures and modeled threshold evaluators are local precursor evidence, not hardware, operator, WAN, public-duration, or independent evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-hearth/Cargo.toml": "a623eacb1395837a76ce4a36ca87442dcf367e66842fb1fd88a5b3f09c707faa",
+    "crates/noos-hearth/src/audit.rs": "7f2fd1b26501d9bb3905df905e03adc9331d60387a2afdb81c9eb17d02e8ed67",
+    "crates/noos-hearth/src/federation.rs": "b43350526f5aa038b5e877fadc3caacb34856f9e7b5708b113922ec5e056111f",
+    "crates/noos-hearth/src/lib.rs": "64333983225ad5fa7c33c4c6994e389f91e5eb0bf3bd196950d93a5b76c19244",
+    "crates/noos-hearth/src/lifecycle.rs": "00f12ac95839d7c433c7fef10e31310a67f2953d939fd141852b02a5274e68d1",
+    "crates/noos-hearth/src/payment.rs": "19bc2cf8969252e26b27e2bfab1ff75d13a64b5686422441ac424a3c0df48e9d",
+    "crates/noos-hearth/src/relay.rs": "f21c35ce445eb36dc0b40fff4b20299ac2a0fb114be01e05c963c7cec996d342",
+    "crates/noos-hearth/src/repair.rs": "5c8bd2ae9453420f7673a2257bb240df088c0539fc64dadb0b2de82fa4f2a86d",
+    "crates/noos-hearth/src/rollback.rs": "a5527b68caced869ac9b04dc7ec2c427a7850a7f5e15a84e1cf9cd329be8213d",
+    "crates/noos-hearth/src/seeding.rs": "7a493dd4107e943536a0abf6ca59389d369acb4dbe6820eedee43ba12f411b3e",
+    "crates/noos-nel/Cargo.toml": "17d2ecfb2e392c496e7dfaa14c28d1b89a4b97a16095b984434f3b81cfc99189",
+    "crates/noos-nel/src/bin/nel-claim-harness.rs": "0e10847361b80724712f1486a19b7bb63049aecfccda5697eb9cd93b9e3f4b90",
+    "crates/noos-nel/src/inference.rs": "304f6746a5b2bd9ba23e73a06553caac95b5c211c39377a50343ed4454b982c8",
+    "crates/noos-nel/src/inference/tests.rs": "6d6ffbc02706b810b01987366910ce8f575bf88f95cc7473d9912680acfd6cf2",
+    "crates/noos-nel/src/lab.rs": "9025a80a33ea303029633799605cd98675909b8a1a96cd57eb0d9a07731d505b",
+    "crates/noos-nel/src/lib.rs": "30c1d4afbb6d1da58f6739b2deeab4d6d8b89a519803fa372ae1a97f2c2ca0a7",
+    "crates/noos-nel/src/luts.rs": "80d6ecea395a61c2d5fe103cd20aad2b8b7608d1442b0dcebb4ec017629c7acb",
+    "crates/noos-nel/src/tests.rs": "142c4b0312705a1b30127d77c27670bb43fe40aba6fb7af7529fcdaae76dd67a",
+    "tools/gates/run_hearth_claim.py": "69ee1973f8bd901018e1f8c116ea9eaf1ab1d4e0542444c7d60fcbe975ae54dc"
+  }
+}

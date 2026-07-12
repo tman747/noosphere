@@ -25,7 +25,10 @@ class ClaimIntegrityTests(unittest.TestCase):
     def test_full_audit_counts_and_no_disposition_replay(self) -> None:
         rows = self.registry["claims"]
         self.assertEqual(len(rows), 136)
-        self.assertEqual(Counter(row["local_implementation_state"] for row in rows), {"IMPLEMENTED": 31, "PARTIAL": 31, "MISSING": 74})
+        self.assertEqual(
+            Counter(row["local_implementation_state"] for row in rows),
+            {"IMPLEMENTED": 63, "PARTIAL": 73},
+        )
         self.assertEqual(sum(bool(row["external_blockers"]) for row in rows), 36)
         self.assertFalse([row["claim_id"] for row in rows if isinstance(row.get("command"), str) and "reproduce_claim.py" in row["command"]])
         self.assertFalse([error for row in rows for error in MATRIX.audit_row(row)])
@@ -56,8 +59,8 @@ class ClaimIntegrityTests(unittest.TestCase):
             self.assertEqual(row["command"], row["reproduction_command"])
             self.assertIn("run_negative_claim.py", row["command"])
 
-    def test_reproducer_reports_local_missing_without_evidence(self) -> None:
-        missing = next(row for row in self.registry["claims"] if row["local_implementation_state"] == "MISSING")
+    def test_reproducer_reports_local_incomplete_without_evidence(self) -> None:
+        missing = next(row for row in self.registry["claims"] if row["local_implementation_state"] == "PARTIAL")
         completed = subprocess.run(
             [sys.executable, "tools/gates/reproduce_claim.py", "--claim", missing["claim_id"]],
             cwd=ROOT,

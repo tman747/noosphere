@@ -1,0 +1,71 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-umbra",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-umbra"
+        ]
+      },
+      "name": "claim-specific crate tests with falsifiers",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-UMBRA-BASE": "5393e68b6908ad0ab2e4a20f3fa853b86d71230a15802705264c0b7b3421e64d"
+  },
+  "claims": [
+    "A-UMBRA-BASE"
+  ],
+  "command": [
+    "tools/gates/run_privacy_claim.py",
+    "--claim",
+    "A-UMBRA-BASE"
+  ],
+  "evidence_sha256": "2300d3db7f6f1e01cf73921a07e81a84e7a3fe6297aa2854f0f9e3949601c779",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-umbra-base",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-umbra/Cargo.toml": "2b821067f57ff5203a4878fcbe001b52780f0b7ad7cd7c6cb1b530d467033702",
+    "crates/noos-umbra/src/lib.rs": "625bb25f08967c2ceffd21a6b1d47ff7d60002f1ffa56eff3e76a8665b35fb32",
+    "crates/noos-umbra/src/stealth.rs": "d3c12bc299c030ed9d8c53793208bccfd6af5b41b96722a07e8f6a23afff51d3"
+  }
+}

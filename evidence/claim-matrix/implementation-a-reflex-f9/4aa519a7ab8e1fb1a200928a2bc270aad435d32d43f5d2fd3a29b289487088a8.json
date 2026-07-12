@@ -1,0 +1,70 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-reflex",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-reflex"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-REFLEX-F9": "4fe1adff83347afed97f524ab7aff99ccf23eee8bcc5d4b07195d7558c4f706c"
+  },
+  "claims": [
+    "A-REFLEX-F9"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-REFLEX-F9"
+  ],
+  "evidence_sha256": "4aa519a7ab8e1fb1a200928a2bc270aad435d32d43f5d2fd3a29b289487088a8",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-reflex-f9",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-reflex/Cargo.toml": "f947bf21e9789a7124212b141949b5d41d95544ade491c6caf07c6b33023c581",
+    "crates/noos-reflex/src/lib.rs": "3273e0c197bd18e098bdce6fa25e1502d8dd6e1571bdc2cd248d147ba691ff12"
+  }
+}

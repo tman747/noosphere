@@ -1,0 +1,78 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-reflex",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-reflex"
+        ]
+      },
+      "name": "claim-cluster deterministic behavior and falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "I-PENTAGON": "1fe2157629700569219ee93ccc1cb4d55897da2bf1b969af6cf93f7285f9a9d8"
+  },
+  "claims": [
+    "I-PENTAGON"
+  ],
+  "command": [
+    "tools/gates/run_identity_reflex_claim.py",
+    "--claim",
+    "I-PENTAGON"
+  ],
+  "evidence_sha256": "9d123f8b0ee3d578bc64bf62fd68c49376a4666ce373e32276d326bec217d848",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-i-pentagon",
+  "limitations": [
+    "The exact local precursor emits five products from one real 32^3 C32 witness, but the claim threshold requires a production-shaped 0.5B-class T=32 witness and measured chapter-09 marginal-cost vector.",
+    "Production Loom, paid demand, Chorus, and dream lanes remain shadow-only or disabled; no composition receipt has consensus credit."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-nel/src/inference.rs": "304f6746a5b2bd9ba23e73a06553caac95b5c211c39377a50343ed4454b982c8",
+    "crates/noos-reflex/Cargo.toml": "f947bf21e9789a7124212b141949b5d41d95544ade491c6caf07c6b33023c581",
+    "crates/noos-reflex/src/clock.rs": "f921fd9186bf5b7d79adcbad68c632090d98473a01789a65d0b8682049c89be6",
+    "crates/noos-reflex/src/identity.rs": "f5b8db3c8f1ffbfb554c82c556be03317a6ec4e8292861fd0e80defbc9390d82",
+    "crates/noos-reflex/src/lib.rs": "3273e0c197bd18e098bdce6fa25e1502d8dd6e1571bdc2cd248d147ba691ff12",
+    "crates/noos-training/src/lib.rs": "bc72360a79dcb8c6d975ec2171b7dc4b6aa39857750fc4681c359cc9d99348d1",
+    "crates/noos-umbra/src/branch.rs": "09539d9610c3ca15fa9e0735836677166258133046d28786d92ba1e3679f832c",
+    "crates/noos-work-loom/src/lib.rs": "832395d09eab207791a7b7510668e4d865aa72fcf9ed7940e195ce42c56269a1",
+    "tools/gates/run_identity_reflex_claim.py": "f75d015ba55b293fd2845473db7c752a9f90f2ab09a43d6e98b149ba1ba8723c"
+  }
+}

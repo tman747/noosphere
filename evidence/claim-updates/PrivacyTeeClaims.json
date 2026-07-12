@@ -5,6 +5,7 @@
       "packages": ["noos-umbra"],
       "command": "python tools/gates/run_privacy_claim.py --claim S-PRIVACY-IR",
       "rollback_command": "python tools/gates/run_privacy_claim.py --claim S-PRIVACY-IR --rollback-check",
+      "evidence_root": "evidence/claim-matrix/implementation-s-privacy-ir",
       "notes": "privacy_ir.rs: canonical typed set-intersection, private-lookup, and aggregate operations admit PSI/PIR/VDAF/MPC/TEE/FHE/ZK lowerings only when backend-specific named trust roots, semantic leakage and composition budgets, workload key holders/epochs, fail-closed recovery, and non-guarantees are explicit. A separate reference interpreter and lowered interpreter agree for every admitted backend; UI summaries preserve trust/non-guarantee names. Falsifiers reject unsupported downgrade, hidden TEE/committee trust, underdeclared/composed leakage, permanent global keys, duplicate roots, and operation/shape/backend ambiguity. This implements the local IR/admission claim, not any backend cryptosystem's security."
     },
     "M-HFHE-SUITE": {

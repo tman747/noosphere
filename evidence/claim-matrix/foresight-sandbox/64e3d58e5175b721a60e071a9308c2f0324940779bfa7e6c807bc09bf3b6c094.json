@@ -1,0 +1,87 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-reflex",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-reflex"
+        ]
+      },
+      "name": "consent, revocation, authority firewall, and receipts",
+      "passed": true
+    },
+    {
+      "controls": [
+        "dream_lane_enabled"
+      ],
+      "name": "activation controls remain off",
+      "passed": true
+    },
+    {
+      "name": "forecast gain and protected-group harm threshold",
+      "passed": false,
+      "reason": "requires preregistered held-out events, non-persona baseline, proper scoring, and protected-group evaluation",
+      "status": "EXTERNAL_BLOCKED"
+    }
+  ],
+  "claim_fingerprints": {
+    "S-DREAM": "e772150692524854805b0e7b7307439bd0035c6eac2818346280383458f55323"
+  },
+  "claims": [
+    "S-DREAM"
+  ],
+  "command": [
+    "tools/gates/run_dream_chorus_claim.py",
+    "--claim",
+    "S-DREAM"
+  ],
+  "evidence_sha256": "64e3d58e5175b721a60e071a9308c2f0324940779bfa7e6c807bc09bf3b6c094",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "foresight-sandbox",
+  "limitations": [
+    "No 10% calibrated forecast gain or protected-group harm result is claimed.",
+    "Persona output is non-authoritative and realization requires a distinct owner-signed capability."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-reflex/Cargo.toml": "f947bf21e9789a7124212b141949b5d41d95544ade491c6caf07c6b33023c581",
+    "crates/noos-reflex/src/dream.rs": "27d73a5dcd36a8d2999478af4857f732875fccba989ec705e170074071a70128",
+    "crates/noos-reflex/src/lib.rs": "3273e0c197bd18e098bdce6fa25e1502d8dd6e1571bdc2cd248d147ba691ff12",
+    "protocol/spec/constants-v1.toml": "d1575f8f50a58648762f91555c3267deddefab0556fae63e5921c57e8a486258",
+    "tools/gates/run_dream_chorus_claim.py": "3ad3a3f34032534bd3541dd0579257af96fd1e148786e9e2b1fd81f904835b44"
+  }
+}

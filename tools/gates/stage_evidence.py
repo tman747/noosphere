@@ -30,6 +30,22 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def retained_artifact_matches(item: dict, artifact: Path) -> bool:
+    raw = artifact.read_bytes()
+    if item.get("bytes") == len(raw) and item.get("sha256") == hashlib.sha256(raw).hexdigest():
+        return True
+    # Git historically normalized one Windows-produced raw stdout artifact
+    # from CRLF to LF. Accept only an exact, reversible newline transport:
+    # reconstructing CRLF must match both the producer-recorded size and hash.
+    if artifact.suffix == ".raw" and b"\r" not in raw:
+        producer_bytes = raw.replace(b"\n", b"\r\n")
+        return (
+            item.get("bytes") == len(producer_bytes)
+            and item.get("sha256") == hashlib.sha256(producer_bytes).hexdigest()
+        )
+    return False
+
+
 def hashed_file(root: Path, path: Path) -> dict:
     resolved = path.resolve()
     try:
@@ -92,7 +108,7 @@ def validate_bundle(root: Path, path: Path) -> list[str]:
         if not artifact.is_file():
             errors.append(f"{path}: retained artifact missing: {item.get('path')}")
             continue
-        if item.get("bytes") != artifact.stat().st_size or item.get("sha256") != sha256(artifact):
+        if not retained_artifact_matches(item, artifact):
             errors.append(f"{path}: retained artifact hash/size mismatch: {item.get('path')}")
     evaluation = doc.get("evaluation", {})
     required_evaluation = {"thresholds", "measurements", "verdict", "verdict_basis", "exclusions", "conflicts"}

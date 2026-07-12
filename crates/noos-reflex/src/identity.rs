@@ -14,7 +14,10 @@ use noos_umbra::{
     branch::{family_nullifier, BranchError, BranchRegistry, FamilyRegistration},
     Commitment32,
 };
-use noos_work_loom::{shadow, DemandClassification};
+use noos_work_loom::{
+    economics::{CompletionEvidence, ControlEvidence, DemandEvidence, FundingEvidence},
+    shadow,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
@@ -472,7 +475,14 @@ pub fn compose_pentagon(
                     settled_value: witness.artifact.c8.len() as u128,
                     calibration_units: u128::from(shared.inference_cost),
                     raw_stake: u128::from(shared.inference_cost),
-                    demand: DemandClassification::Independent,
+                    demand_evidence: DemandEvidence {
+                        on_chain_escrow: true,
+                        delivered: true,
+                        requester_worker_control: ControlEvidence::Independent,
+                        requester_evaluator_control: ControlEvidence::Independent,
+                        completion: CompletionEvidence::RequesterAccepted,
+                        funding: FundingEvidence::ExternalNoCircularDetected,
+                    },
                     delivered: true,
                     paid_certificate: true,
                 },

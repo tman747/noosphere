@@ -5,6 +5,7 @@
       "packages": ["noos-braid", "noos-node"],
       "command": "python tools/gates/run_base_network_claim.py --claim A-KEYLESS-CONSENSUS",
       "rollback_command": "python tools/gates/run_base_network_claim.py --claim A-KEYLESS-CONSENSUS --rollback-check",
+      "evidence_root": "evidence/claim-matrix/implementation-a-keyless-consensus",
       "notes": "KeylessConsensus makes a universal decrypt scope and secret key/share bytes unrepresentable in consensus state: client-held custody has no consensus authorization path; threshold custody is workload-scoped, member-bounded, exact-key-epoch, expiring, and counts distinct authenticated holders only. Exhaustive adaptive-corruption subsets reject below threshold; duplicate/foreign/old shares reject; rotation succeeds while a real NodeCore continues ordinary transfers, block production, and checkpoint finality with every optional lane disabled. The policy authorizes an opaque event only and never performs or stores decryption."
     },
     "E-BASE-01": {

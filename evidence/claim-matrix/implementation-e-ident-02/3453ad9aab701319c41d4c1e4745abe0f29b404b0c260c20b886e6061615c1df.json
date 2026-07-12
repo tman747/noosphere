@@ -1,0 +1,76 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-reflex",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-reflex"
+        ]
+      },
+      "name": "claim-cluster deterministic behavior and falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-IDENT-02": "e0482c31de11b371c5333e910974407256c594843fe5e3779aacad3b182f0b28"
+  },
+  "claims": [
+    "E-IDENT-02"
+  ],
+  "command": [
+    "tools/gates/run_identity_reflex_claim.py",
+    "--claim",
+    "E-IDENT-02"
+  ],
+  "evidence_sha256": "3453ad9aab701319c41d4c1e4745abe0f29b404b0c260c20b886e6061615c1df",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-e-ident-02",
+  "limitations": [
+    "The exact 32^3 and rectangular integer GEMM triples pass a 3.0x MAC census, 15/15 mutation rejection, domain substitution rejection, and exact phase sums, but no RV32IM cycle-model run was performed.",
+    "The operation census is local precursor evidence, not a substitute for the required cycle measurements."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-nel/src/inference.rs": "304f6746a5b2bd9ba23e73a06553caac95b5c211c39377a50343ed4454b982c8",
+    "crates/noos-reflex/Cargo.toml": "f947bf21e9789a7124212b141949b5d41d95544ade491c6caf07c6b33023c581",
+    "crates/noos-reflex/src/clock.rs": "f921fd9186bf5b7d79adcbad68c632090d98473a01789a65d0b8682049c89be6",
+    "crates/noos-reflex/src/identity.rs": "f5b8db3c8f1ffbfb554c82c556be03317a6ec4e8292861fd0e80defbc9390d82",
+    "crates/noos-reflex/src/lib.rs": "3273e0c197bd18e098bdce6fa25e1502d8dd6e1571bdc2cd248d147ba691ff12",
+    "crates/noos-training/src/lib.rs": "bc72360a79dcb8c6d975ec2171b7dc4b6aa39857750fc4681c359cc9d99348d1",
+    "tools/gates/run_identity_reflex_claim.py": "f75d015ba55b293fd2845473db7c752a9f90f2ab09a43d6e98b149ba1ba8723c"
+  }
+}

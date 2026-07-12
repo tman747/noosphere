@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "scope_id": "NOOS-INDEPENDENT-AUDIT-SCOPE-V1",
+  "subject": {
+    "project": "NOOSPHERE",
+    "organization_ids": ["noosphere", "mindchain-engineering"],
+    "automation_independence_claim": false
+  },
+  "policy_bindings": {
+    "promotion_ledger": "protocol/release/promotion-blockers.json",
+    "release_policy": "protocol/release/repro-policy-v1.toml",
+    "claim_registry": "protocol/claims/registry.json",
+    "genesis_identity": "protocol/spec/genesis-identity-v1.md",
+    "severity_taxonomy": "protocol/audit/severity-taxonomy-v1.json",
+    "finding_lifecycle": "protocol/audit/finding-lifecycle-v1.json"
+  },
+  "report_policy": {
+    "max_report_age_days": 90,
+    "require_exact_revision": true,
+    "require_detached_ed25519_signature": true,
+    "require_external_auditor_roster": true,
+    "require_independence_declaration": true,
+    "severity_1_blocks_ingest": true,
+    "waivers_permitted": false,
+    "ingest_has_promotion_authority": false
+  },
+  "workstreams": [
+    {
+      "id": "consensus",
+      "title": "Exact-revision consensus audit",
+      "claim_ids": ["A-GROUND", "A-BRAID", "A-PULSE", "A-RING", "A-DA", "A-GOVERNANCE", "E-BLACKOUT-01", "E-WAN-01"],
+      "source_globs": ["crates/noos-ground/**/*.rs", "crates/noos-braid/**/*.rs", "crates/noos-witness/**/*.rs", "crates/noos-da/**/*.rs", "crates/noos-node/**/*.rs", "go/braidref/*.go", "protocol/schemas/witness-v1.md", "protocol/vectors/braid/**", "protocol/vectors/witness/**", "protocol/vectors/ground/**", "protocol/vectors/da/**"],
+      "required_questions": ["conflicting finality and equivocation", "fork choice and retarget determinism", "availability-before-finality", "AI-off safety and liveness boundary", "upgrade and governance safety boundaries"]
+    },
+    {
+      "id": "networking",
+      "title": "Exact-revision networking audit",
+      "claim_ids": ["A-NETWORK", "A-TOPOLOGY", "A-BRAID", "A-DA", "E-WAN-01", "E-BLACKOUT-01"],
+      "source_globs": ["crates/noos-p2p/**/*.rs", "crates/noos-node/**/*.rs", "crates/noos-da/**/*.rs", "crates/noos-store/**/*.rs", "protocol/schemas/p2p-v1.md", "protocol/schemas/node-v1.md", "protocol/vectors/wan-seeds.txt", "tools/e2e/*.py"],
+      "required_questions": ["identity and protocol-version binding", "eclipse downgrade replay and flood resistance", "bounded work and queue priority", "partition healing and state recovery", "optional worker isolation"]
+    },
+    {
+      "id": "state-transition",
+      "title": "Exact-revision state-transition audit",
+      "claim_ids": ["A-LUMEN", "A-TX", "A-GRAIN", "A-JET-FALLBACK", "A-FEES", "A-AGENT-ABI", "A-GOVERNANCE"],
+      "source_globs": ["crates/noos-lumen/**/*.rs", "crates/noos-codec/**/*.rs", "crates/noos-grain/**/*.rs", "crates/noos-contracts/**/*.rs", "crates/noos-node/**/*.rs", "crates/noos-store/**/*.rs", "go/lumenref/*.go", "go/grainref/*.go", "protocol/vectors/lumen/**", "protocol/vectors/grain/**", "protocol/vectors/codec/**"],
+      "required_questions": ["authorization conservation and replay", "canonical decoding and cross-client agreement", "metering and total execution", "atomicity rollback and persistence", "upgrade boundary and deterministic fees"]
+    },
+    {
+      "id": "cryptography-cryptanalysis",
+      "title": "Exact-revision cryptography and cryptanalysis audit",
+      "claim_ids": ["A-TX", "A-RING", "A-DA", "A-UMBRA-BASE", "M-RECURSIVE-VERIFIER", "M-PROOF-CARRYING-REFRESH", "A-KEYLESS-CONSENSUS"],
+      "source_globs": ["crates/noos-crypto/**/*.rs", "crates/noos-witness/**/*.rs", "crates/noos-umbra/**/*.rs", "crates/noos-private-besi/**/*.rs", "crates/noos-jet/**/*.rs", "protocol/spec/crypto-domains-v1.csv", "protocol/vectors/crypto/**", "protocol/schemas/identity-v1.md", "protocol/spec/genesis-identity-v1.md"],
+      "required_questions": ["domain separation and canonical preimages", "signature threshold and proof verification", "key lifecycle DKG and recovery", "cryptanalytic assumptions and parameter adequacy", "test-fixture versus production-key separation"]
+    },
+    {
+      "id": "economics",
+      "title": "Exact-revision economics audit",
+      "claim_ids": ["A-FEES", "M-ISSUANCE", "A-DUPLEX-ISSUANCE", "M-PROOFPOWER", "E-DEMAND-WASH-01", "S-DEMAND", "P3-S-ALGORITHM-TRANSITION"],
+      "source_globs": ["crates/noos-lumen/**/*.rs", "crates/noos-witness/**/*.rs", "crates/noos-work-loom/**/*.rs", "crates/noos-analytics/**/*.rs", "crates/noos-commerce/**/*.rs", "protocol/spec/constants-v1.toml", "protocol/genesis/*.toml", "experiments/**"],
+      "required_questions": ["supply and issuance conservation", "fee adequacy and denial-of-service externalities", "beneficial ownership wash and capture", "disabled useful-work influence invariants", "mainnet parameter gaps and sensitivity"]
+    },
+    {
+      "id": "operations",
+      "title": "Exact-revision operations and launch audit",
+      "claim_ids": ["A-TOPOLOGY", "A-NETWORK", "A-WALLET", "E-BLACKOUT-01", "E-WAN-01"],
+      "source_globs": ["crates/noos-node/**/*.rs", "crates/noos-cli/**/*.rs", "crates/noos-wallet/**/*.rs", "wallet/**", "deploy/**", "docs/v1/**", "tools/genesis/*.py", "tools/gates/*.py", "scripts/check.ps1", "protocol/release/**"],
+      "required_questions": ["build provenance and release integrity", "key custody DKG backup and recovery", "monitoring incident response and disaster recovery", "configuration privilege and process isolation", "launch rollback and forbidden pre-G5 cutover"]
+    }
+  ]
+}

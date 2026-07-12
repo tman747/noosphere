@@ -1,0 +1,99 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-reflex",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-reflex"
+        ]
+      },
+      "name": "claim-cluster deterministic behavior and falsifier tests",
+      "passed": true
+    },
+    {
+      "cases": 100000,
+      "corpus_sha256": "59da008c5bc4fea38bda7f9e6e64caba30e3efd4b20a4f3d27ca8bc4edcc32d0",
+      "go_command": [
+        "go",
+        "run",
+        "./cmd/mclockdiff"
+      ],
+      "name": "Rust/Go shared-corpus fork-ordering differential",
+      "passed": true,
+      "rust_command": [
+        "cargo",
+        "run",
+        "--quiet",
+        "--locked",
+        "-p",
+        "noos-reflex",
+        "--bin",
+        "m-clock-diff"
+      ],
+      "winner_sha256": "7e5237e71e655d36f504235550c0d987d13c847d382734e8549d11e804d664a6"
+    }
+  ],
+  "claim_fingerprints": {
+    "M-CLOCK": "0affd55bc442d6117f17160beb304e629a16cacd6407d559bc63d9a8961e46a4"
+  },
+  "claims": [
+    "M-CLOCK"
+  ],
+  "command": [
+    "tools/gates/run_identity_reflex_claim.py",
+    "--claim",
+    "M-CLOCK"
+  ],
+  "evidence_sha256": "dc03f042d5f1a9ed9676c3c87df498b01a482fc9a9212724f777bf42fbdce070",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-m-clock",
+  "limitations": [
+    "This is complete local two-client implementation evidence, not independent-vendor, public-duration, or production promotion evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-braid/src/fork.rs": "2f44685d1b742e057c4330e39a025b9ad6e1ce7214064f0c870cdee71c5eed1f",
+    "crates/noos-reflex/Cargo.toml": "f947bf21e9789a7124212b141949b5d41d95544ade491c6caf07c6b33023c581",
+    "crates/noos-reflex/src/bin/m-clock-diff.rs": "2ac1f8bcdc55204433a608e4f8a277d90ab5037a421882624fa09db9d4bfdaf1",
+    "crates/noos-reflex/src/clock.rs": "f921fd9186bf5b7d79adcbad68c632090d98473a01789a65d0b8682049c89be6",
+    "crates/noos-reflex/src/identity.rs": "f5b8db3c8f1ffbfb554c82c556be03317a6ec4e8292861fd0e80defbc9390d82",
+    "crates/noos-reflex/src/lib.rs": "3273e0c197bd18e098bdce6fa25e1502d8dd6e1571bdc2cd248d147ba691ff12",
+    "go/braidref/forkchoice.go": "c06976d763e0e996f832ff52fdfdbfa61a53829ab31ca76d9cbce93855213f57",
+    "go/cmd/mclockdiff/main.go": "70772c92bdfc16bd3178203f381e49df569940c1c2f6aef6aeac0abc30ecce5a",
+    "tools/gates/run_identity_reflex_claim.py": "f75d015ba55b293fd2845473db7c752a9f90f2ab09a43d6e98b149ba1ba8723c"
+  }
+}

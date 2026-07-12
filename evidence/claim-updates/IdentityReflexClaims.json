@@ -5,6 +5,7 @@
       "packages": ["noos-reflex", "noos-braid"],
       "command": "python tools/gates/run_identity_reflex_claim.py --claim M-CLOCK",
       "rollback_command": "python tools/gates/run_identity_reflex_claim.py --claim M-CLOCK --rollback-check",
+      "evidence_root": "evidence/claim-matrix/implementation-m-clock",
       "notes": "TwoHandedClock composes Braid's exact U256 ForkScore tuple with atomic Loom receipt admission: eligibility_epoch <= block epoch, activation boundary, fork-local ancestor nullifier freshness, per-block and cumulative L/(G+L) <= 0.10, monotone finalized/justified checkpoints and epochs, saturating normalized work, and c_L=0 rollback retaining Ground production. Falsifiers cover future receipts, activation-before-boundary, cap overflow, descendant replay on both child forks, checkpoint/epoch rollback, lower-finalized or lower-justified work stuffing, inverse-hash ordering, and Ground-only continuation. The dedicated gate differentially executes Rust noos-braid and independent Go braidref over the same generated 100,000-pair corpus with byte-identical winners. This completes the local threshold only; it is not independent-vendor or production promotion evidence."
     },
     "I-PENTAGON": {

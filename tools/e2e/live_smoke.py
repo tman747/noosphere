@@ -15,7 +15,8 @@ crosses >= 2 epoch boundaries and actually FINALIZES the transfer's block
 while the smoke watches. Verdict is fail-closed: every stage must complete
 within its deadline or the bundle records FAIL and the exit code is 1.
 
-Evidence: evidence/live-devnet-smoke.json (hash-bound sources + binaries).
+Evidence: append-only evidence/live-devnet-smoke/<content-sha256>.json
+(hash-bound sources + binaries). The historical fixed-path bundle is retained.
 """
 from __future__ import annotations
 
@@ -375,8 +376,15 @@ def main() -> int:
             "verdict": verdict,
         }
         EVIDENCE.mkdir(exist_ok=True)
-        out = EVIDENCE / "live-devnet-smoke.json"
-        out.write_text(json.dumps(bundle, indent=2) + "\n", encoding="utf-8", newline="\n")
+        rendered = json.dumps(bundle, indent=2) + "\n"
+        content_sha256 = hashlib.sha256(
+            json.dumps(bundle, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        out = EVIDENCE / "live-devnet-smoke" / f"{content_sha256}.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if out.exists() and out.read_text(encoding="utf-8") != rendered:
+            raise RuntimeError(f"immutable live-smoke evidence collision at {out}")
+        out.write_text(rendered, encoding="utf-8", newline="\n")
         print(f"RESULT live_devnet_smoke={verdict} out={out.relative_to(ROOT)}")
         shutil.rmtree(work, ignore_errors=True)
     return 0 if verdict == "PASS" else 1

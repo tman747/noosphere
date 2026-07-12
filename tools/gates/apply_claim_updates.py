@@ -9,6 +9,7 @@ directly; they drop update manifests under evidence/claim-updates/ with:
         "packages": ["crate", ...],
         "command": "...",
         "rollback_command": "...",
+        "evidence_root": "evidence/claim-matrix/implementation-...",
         "notes": "..."
     }}}
 
@@ -50,8 +51,20 @@ def main() -> int:
     bindings = load(BINDINGS)
     errors: list[str] = []
     applied: list[str] = []
+    manifest_paths = sorted(UPDATES.glob("*.json"))
+    batch_implemented: set[str] = set()
+    for manifest_path in manifest_paths:
+        try:
+            manifest = load(manifest_path)
+        except (OSError, json.JSONDecodeError):
+            continue
+        batch_implemented.update(
+            cid
+            for cid, update in (manifest.get("claims") or {}).items()
+            if update.get("local_implementation_state") == "IMPLEMENTED"
+        )
 
-    for manifest_path in sorted(UPDATES.glob("*.json")):
+    for manifest_path in manifest_paths:
         agent = manifest_path.stem
         try:
             manifest = load(manifest_path)
@@ -69,6 +82,12 @@ def main() -> int:
                 errors.append(f"{label}: invalid state {state!r}")
                 continue
             if row.get("local_implementation_state") == "IMPLEMENTED" and state != "IMPLEMENTED":
+                if cid in batch_implemented:
+                    # A later manifest in this same deterministic batch owns
+                    # the IMPLEMENTED upgrade. Preserve the stronger state so
+                    # rerunning the merger is idempotent.
+                    applied.append(label)
+                    continue
                 errors.append(f"{label}: cannot regress an IMPLEMENTED claim")
                 continue
             if row.get("expected_result") in NEGATIVE:
@@ -97,7 +116,23 @@ def main() -> int:
                 row["command"] = command
                 row["rollback_command"] = rollback
                 row.setdefault("evidence_sha256", "PENDING")
-                if not isinstance(row.get("evidence_root"), str) or not row["evidence_root"].strip() or row["evidence_root"] == "NOT_EXECUTABLE_LOCAL_GAP":
+                evidence_root = update.get("evidence_root")
+                if evidence_root is not None:
+                    if not isinstance(evidence_root, str) or not evidence_root.strip():
+                        errors.append(f"{label}: evidence_root must be a non-empty string")
+                        continue
+                    candidate = (ROOT / evidence_root).resolve()
+                    allowed = (ROOT / "evidence" / "claim-matrix").resolve()
+                    try:
+                        relative = candidate.relative_to(allowed)
+                    except ValueError:
+                        errors.append(f"{label}: evidence_root must stay under evidence/claim-matrix")
+                        continue
+                    if not relative.parts:
+                        errors.append(f"{label}: evidence_root must name a claim-specific directory")
+                        continue
+                    row["evidence_root"] = candidate.relative_to(ROOT).as_posix()
+                elif not isinstance(row.get("evidence_root"), str) or not row["evidence_root"].strip() or row["evidence_root"] == "NOT_EXECUTABLE_LOCAL_GAP":
                     slug = cid.lower().replace(".", "-")
                     row["evidence_root"] = f"evidence/claim-matrix/implementation-{slug}"
                 if packages:
@@ -120,7 +155,7 @@ def main() -> int:
     if not args.dry_run:
         dump(REGISTRY, doc)
         dump(BINDINGS, bindings)
-    print(f"RESULT apply_claim_updates=PASS applied={len(applied)} manifests={len(list(UPDATES.glob('*.json')))}")
+    print(f"RESULT apply_claim_updates=PASS applied={len(applied)} manifests={len(manifest_paths)}")
     for label in applied:
         print(f"APPLIED {label}")
     return 0

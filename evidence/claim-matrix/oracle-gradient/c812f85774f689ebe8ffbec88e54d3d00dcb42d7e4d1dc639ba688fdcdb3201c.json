@@ -1,0 +1,81 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-training",
+          "-p",
+          "noos-analytics",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-training",
+          "noos-analytics"
+        ]
+      },
+      "name": "lineage quotient and integer gradient/Freivalds regression",
+      "passed": true
+    },
+    {
+      "detail": "oracle is not universal truth; execution fidelity is distinct from training quality; zero-gradient cases are not counted as forged-gradient coverage",
+      "name": "assurance boundaries",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-GRAD-01": "9b536df1419dbf02343d07eba17cad07f3c9cb1988bcc1d9d4d2a9d1a48f870b",
+    "E-ORACLE-01": "8d0216c0aa26840670ff0e397a89aad3d18180380111d38b38805424fcdff0b7"
+  },
+  "claims": [
+    "E-GRAD-01",
+    "E-ORACLE-01"
+  ],
+  "command": [
+    "tools/gates/run_oracle_gradient.py",
+    "--claims",
+    "E-ORACLE-01,E-GRAD-01",
+    "--independent-implementations",
+    "2"
+  ],
+  "evidence_sha256": "c812f85774f689ebe8ffbec88e54d3d00dcb42d7e4d1dc639ba688fdcdb3201c",
+  "expected_result": "PASSED",
+  "gate": "oracle-gradient",
+  "limitations": [],
+  "registry_schema_version": "1.2.0",
+  "result": "PASSED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-analytics/src/lib.rs": "89de4f7faee055767b3c05b5e5e1d70526583ee1a11d72c3006859529aa41dfb",
+    "crates/noos-training/Cargo.toml": "2d172c616a6041cbb5801a472b71c4b26386b0a2c0956aefec77c4e6a52ef02a",
+    "crates/noos-training/src/lib.rs": "bc72360a79dcb8c6d975ec2171b7dc4b6aa39857750fc4681c359cc9d99348d1"
+  }
+}

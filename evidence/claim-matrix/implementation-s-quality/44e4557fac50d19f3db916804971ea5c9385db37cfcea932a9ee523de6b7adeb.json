@@ -1,0 +1,74 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-swarm",
+          "claim_quality",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "filter": "claim_quality",
+        "log_sha256": "7aff82b8353849d628d996cbfd6266789bfdd0d00c029ee0963c2e778ce1fbb5",
+        "package": "noos-swarm"
+      },
+      "name": "claim-specific behavior and falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-QUALITY": "f61e27a06fe9f3cbaf374976fb4f0b2dc0c2b81ccf87d97500a3d9f295f7aac9"
+  },
+  "claims": [
+    "S-QUALITY"
+  ],
+  "command": [
+    "tools/gates/run_species_reaction_claim.py",
+    "--claim",
+    "S-QUALITY"
+  ],
+  "evidence_sha256": "44e4557fac50d19f3db916804971ea5c9385db37cfcea932a9ee523de6b7adeb",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-s-quality",
+  "limitations": [
+    "Escrow mechanics and within-domain Sybil non-inflation are implemented locally.",
+    "The preregistered adversarial rank-capture rate and independent real evaluator/payment campaign required by E-COLLUSION-01 do not exist."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-swarm/Cargo.toml": "8897e41f67566eeabd589cb57570cfdcec8a0ccf0f476b348856ec777b54ca1b",
+    "crates/noos-swarm/src/lib.rs": "0162526faaf321ffbf67ea38cd22b224f5a12c0b9a4f36e99838aeeaef74d547",
+    "crates/noos-swarm/src/quality.rs": "c009494290d653aba181c0a9f9404ab5e17d7d2794b70a01e5d33486647af308",
+    "tools/gates/run_species_reaction_claim.py": "be395b72fbc0b199648cd11bed85f62352e03dc8b1cf364c5ec435bf9ab582b1"
+  }
+}

@@ -20,6 +20,13 @@ FILES = {
     "crash-matrix": ROOT / "evidence/base-crash-matrix.json",
     "client-matrix": ROOT / "evidence/base-client-matrix.json",
 }
+BOUND_SOURCES = (
+    "crates/noos-sim-net/src/lib.rs",
+    "crates/noos-sim-net/src/main.rs",
+    "crates/noos-sim-net/Cargo.toml",
+    "tools/e2e/run_network.py",
+    "Cargo.lock",
+)
 REQUIRED_PAIRS = {"rust->rust", "rust->go", "go->rust", "go->go"}
 
 
@@ -38,6 +45,19 @@ def sha256(data: bytes) -> str:
 
 def canonical_hash(value: object) -> str:
     return sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+
+
+def current_files() -> dict[str, Path]:
+    binding = canonical_hash({source: sha256((ROOT / source).read_bytes()) for source in BOUND_SOURCES})
+    directory = ROOT / "evidence" / "g2" / binding
+    return {
+        "battery": directory / "base-battery.json",
+        "base-transfer-contract": directory / "base-base-transfer-contract.json",
+        "wan-fault-matrix": directory / "base-wan-fault-matrix.json",
+        "ai-blackout": directory / "base-ai-blackout.json",
+        "crash-matrix": directory / "base-crash-matrix.json",
+        "client-matrix": directory / "base-client-matrix.json",
+    }
 
 
 def load(path: Path) -> tuple[dict[str, Any], bytes]:
@@ -152,7 +172,7 @@ def verify_metrics(bundle: dict[str, Any]) -> None:
         require(workload.get("historical_receipts_verified") is True, f"{scenario}[{index}]: receipts not verified")
 
 
-def verify_exact(bundle: dict[str, Any], scenario: str) -> None:
+def verify_exact(bundle: dict[str, Any], scenario: str, evidence_path: Path) -> None:
     params = bundle.get("parameters", {})
     require(params.get("crypto") == "real", f"{scenario}: crypto is not real")
     if scenario == "battery":
@@ -160,11 +180,12 @@ def verify_exact(bundle: dict[str, Any], scenario: str) -> None:
         require(bundle.get("seeds") == {"start_inclusive": 0, "end_exclusive": 10000, "count": 10000}, "battery: wrong seed coverage")
         require(params.get("clients") == ["rust", "go"], "battery: both clients required")
         require(bundle.get("observations", {}).get("seeds_run") == 10000, "battery: not all 10000 seeds ran")
+        output = evidence_path.relative_to(ROOT).as_posix()
         require(
             bundle.get("command") == [
                 "cargo", "run", "-p", "noos-sim-net", "--release", "--locked", "--",
                 "battery", "--seeds", "0..10000", "--crypto", "real", "--out",
-                "evidence/base-battery.json",
+                output,
             ],
             "battery: exact release command not recorded",
         )
@@ -201,10 +222,12 @@ def verify_exact(bundle: dict[str, Any], scenario: str) -> None:
 
 def main() -> int:
     try:
-        for scenario, path in FILES.items():
+        current = current_files()
+        files = current if any(path.exists() for path in current.values()) else FILES
+        for scenario, path in files.items():
             bundle, raw = load(path)
             verify_common(bundle, raw, scenario)
-            verify_exact(bundle, scenario)
+            verify_exact(bundle, scenario, path)
             verify_metrics(bundle)
     except (InvalidEvidence, OSError, KeyError, TypeError, ValueError) as exc:
         print(f"RESULT noosphere_base_evidence=FAIL: {exc}", file=sys.stderr)

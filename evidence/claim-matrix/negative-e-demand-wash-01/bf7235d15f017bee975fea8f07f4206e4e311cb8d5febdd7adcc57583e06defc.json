@@ -1,0 +1,85 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "controls": [
+        "work_loom_credit_enabled",
+        "work_loom_weight_cap",
+        "witness_proofpower_bonus_enabled"
+      ],
+      "name": "activation controls remain off",
+      "passed": true
+    },
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-work-loom",
+          "-p",
+          "noos-analytics",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-work-loom",
+          "noos-analytics"
+        ]
+      },
+      "name": "demand-wash zero-credit falsifier",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-DEMAND-WASH-01": "1b0a528e4a81ed4c74b65f8ff4e462526566d1ee3676e285c846cd0c25b82fe9"
+  },
+  "claims": [
+    "E-DEMAND-WASH-01"
+  ],
+  "command": [
+    "tools/gates/run_negative_claim.py",
+    "--claim",
+    "E-DEMAND-WASH-01"
+  ],
+  "evidence_sha256": "bf7235d15f017bee975fea8f07f4206e4e311cb8d5febdd7adcc57583e06defc",
+  "expected_result": "KILLED",
+  "gate": "negative-e-demand-wash-01",
+  "limitations": [
+    "The killed claim remains fail-closed; the replacement mechanism is a separate claim."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "KILLED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-analytics/Cargo.toml": "d1af1318d679b7efc79ecd514f963d194e3cbd7285017955628f0369dee93d87",
+    "crates/noos-analytics/src/lib.rs": "89de4f7faee055767b3c05b5e5e1d70526583ee1a11d72c3006859529aa41dfb",
+    "crates/noos-work-loom/Cargo.toml": "f476280c0cd27c42f409a6a91fae5eefdeb484d4b336aeeef95353609981431a",
+    "crates/noos-work-loom/src/lib.rs": "832395d09eab207791a7b7510668e4d865aa72fcf9ed7940e195ce42c56269a1",
+    "protocol/spec/constants-v1.toml": "d1575f8f50a58648762f91555c3267deddefab0556fae63e5921c57e8a486258"
+  }
+}

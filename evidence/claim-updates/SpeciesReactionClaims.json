@@ -5,6 +5,7 @@
       "packages": ["noos-species"],
       "command": "python tools/gates/run_species_reaction_claim.py --claim S-ARTIFACT",
       "rollback_command": "python tools/gates/run_species_reaction_claim.py --claim S-ARTIFACT --rollback-check",
+      "evidence_root": "evidence/claim-matrix/implementation-s-artifact",
       "notes": "Content identity binds the frozen Artifact fields and payload through a length-delimited canonical encoding; schema, length, and digest validate before use. The declared local erasure profile is k data plus exactly one XOR parity shard, reconstructs after every single-shard loss, and rejects corrupt shard digests or descriptor/payload splices. Deterministic topology selection forbids any non-local-site shard for interactive per-token traffic while allowing topology-ranked batch/replica retrieval. Immutable derivation edges bind ordered parents, output, transform, recipe, provenance, and height. Local behavior and rollback laws are complete; production promoted-corpus and geographic E-WAN-01 evidence remain external and are not claimed."
     },
     "S-SPECIES": {
@@ -26,6 +27,7 @@
       "packages": ["noos-training", "noos-species"],
       "command": "python tools/gates/run_species_reaction_claim.py --claim S-REACTION",
       "rollback_command": "python tools/gates/run_species_reaction_claim.py --claim S-REACTION --rollback-check",
+      "evidence_root": "evidence/claim-matrix/implementation-s-reaction",
       "notes": "Immutable Reaction identity binds parent, canonical packet, content-bound integer adapter capsule, numeric profile, candidate, reproduced composition, and all transition heights. Controller submission actually applies the checked adapter delta to content-bound parent weights and requires byte-exact candidate state/root replay; inexact division, overflow, tamper, splice, replay, stale parent, premature availability/admission, and successful challenges reject. The only mutable pointer is private to PromotionController and moves Proposed -> Available -> Challengeable -> Admitted only after the deadline; rollback restores the retained parent without rewriting history. This completes the local transition/reproduction/rollback contract, not independent production-operator evidence."
     },
     "S-UPDATE": {

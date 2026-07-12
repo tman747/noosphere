@@ -100,6 +100,16 @@ class AttestationFixture:
 
 
 class ReproBuildMutationTests(unittest.TestCase):
+    def test_external_input_template_is_blocked_not_malformed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = repro_build.verify_attestation_set(
+                Path(directory),
+                repro_build.ROOT / "protocol/release/trusted-repro-builders-template.json",
+                REVISION,
+            )
+            self.assertEqual(report["verdict"], "EXTERNAL_BLOCKED")
+            self.assertTrue(any("external public key is required" in error for error in report["errors"]))
+
     def test_complete_fixture_is_permanently_smoke_only(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = AttestationFixture(Path(directory))

@@ -1,0 +1,73 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-training",
+          "claim_rl_lag",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "filter": "claim_rl_lag",
+        "log_sha256": "f3f67f44f30124df2b3b4206fd350eccdd3f46123dca45cada4ce0751ce523a6",
+        "package": "noos-training"
+      },
+      "name": "claim-specific behavior and falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-RL-LAG": "1bdf9ea3e24c1b3664b4ee3b9ecede9d57e4d89f9e9edbd5a736941839d2b84f"
+  },
+  "claims": [
+    "S-RL-LAG"
+  ],
+  "command": [
+    "tools/gates/run_species_reaction_claim.py",
+    "--claim",
+    "S-RL-LAG"
+  ],
+  "evidence_sha256": "f9dd3ba59d0c6938c953cba295d1dcafbfe5e50334d109be96616479316901f1",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-s-rl-lag",
+  "limitations": [
+    "Exact boundaries and 500,500 generated policy pairs are locally exercised, but no preregistered training-stability fault-injection campaign exists."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-training/Cargo.toml": "2d172c616a6041cbb5801a472b71c4b26386b0a2c0956aefec77c4e6a52ef02a",
+    "crates/noos-training/src/lib.rs": "bc72360a79dcb8c6d975ec2171b7dc4b6aa39857750fc4681c359cc9d99348d1",
+    "crates/noos-training/src/rl_lag.rs": "6fe49f44a263382c0d4f5a7f144f912426afd82473f5d2a738f515bdcb73d440",
+    "tools/gates/run_species_reaction_claim.py": "be395b72fbc0b199648cd11bed85f62352e03dc8b1cf364c5ec435bf9ab582b1"
+  }
+}

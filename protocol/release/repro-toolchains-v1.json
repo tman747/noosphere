@@ -18,13 +18,15 @@
     "cargo_locked": true,
     "dependencies_offline_during_build": true,
     "go_buildvcs": false,
+    "go_cache": "target-local disposable cache",
     "go_mod": "readonly",
     "go_trimpath": true,
     "locale": "C.UTF-8",
     "path_remap": "/workspace/noosphere",
     "post_build_normalization": "forbidden",
     "source_date_epoch": "git_commit_timestamp",
-    "timezone": "UTC"
+    "timezone": "UTC",
+    "windows_linker": "rust-lld from the pinned rustc toolchain"
   },
   "targets": {
     "windows-x86_64": {
@@ -32,6 +34,8 @@
       "rust_target": "x86_64-pc-windows-msvc",
       "goos": "windows",
       "goarch": "amd64",
+      "msvc_tools_version": "14.35.32215",
+      "windows_sdk_version": "10.0.22000.0",
       "native_required": true
     },
     "linux-x86_64": {

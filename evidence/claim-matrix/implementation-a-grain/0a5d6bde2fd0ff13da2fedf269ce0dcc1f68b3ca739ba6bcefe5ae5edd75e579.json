@@ -1,0 +1,80 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-grain",
+          "-p",
+          "noos-contracts",
+          "-p",
+          "noos-node",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-grain",
+          "noos-contracts",
+          "noos-node"
+        ]
+      },
+      "name": "claim-specific crate tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-GRAIN": "db78c0801826ad0546563ad18810a778274d86be86017a646f8733dd818445db"
+  },
+  "claims": [
+    "A-GRAIN"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-GRAIN"
+  ],
+  "evidence_sha256": "0a5d6bde2fd0ff13da2fedf269ce0dcc1f68b3ca739ba6bcefe5ae5edd75e579",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-grain",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-contracts/Cargo.toml": "17780b46cac4e57d2f390215f823095e30392eedcdeb7edc804c8207a2c77e9a",
+    "crates/noos-contracts/src/lib.rs": "9459ffd0fd3cddabb8935ab3bfc39dbf9e04a53cd3ba3f6d52933981bc18d962",
+    "crates/noos-grain/Cargo.toml": "cb53cbb9f790cf60512c616f2cec30524cdaec3edddf99fb6c432e9840099a05",
+    "crates/noos-grain/src/lib.rs": "f5895e22606ee3f56db12a087d7401efbfe1a1dd08295b9033fe21976db2389e",
+    "crates/noos-node/Cargo.toml": "ee4cbcc1a968057ca5966d2826a2c8375eb4995ed1456ef01270e1f92a989c47",
+    "crates/noos-node/src/lib.rs": "a1d4f79e089cff03496ad001a4ba939c41a845d6d5d0c67d8c8699915b788b57"
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-species",
+          "claim_update",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "filter": "claim_update",
+        "log_sha256": "bc2e873ea169202cf3834fb166748c88ec6e89d565a6ac8c3cbe1a9874b2f26c",
+        "package": "noos-species"
+      },
+      "name": "claim-specific behavior and falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-UPDATE": "40938812e1d25b0817e4ea0d7a9e9bbdf2b05b52ab311884d7161e7e7354cc5f"
+  },
+  "claims": [
+    "S-UPDATE"
+  ],
+  "command": [
+    "tools/gates/run_species_reaction_claim.py",
+    "--claim",
+    "S-UPDATE"
+  ],
+  "evidence_sha256": "7112260373c3acd3887f7303c88eba307adaa57e64e19fafbb596ddb933e7426",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-s-update",
+  "limitations": [
+    "Only one implementation family exists; canonical encode/decode round trips are not cross-vendor evidence.",
+    "No independent replay engine has established profile-tolerance identity."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-species/Cargo.toml": "0aa308ddb798097808b3e81c2d89bfc81319edf452fc2526785e6fb42f0296ca",
+    "crates/noos-species/src/canonical.rs": "7ed8b0f3da0764a2670ec5308c64de5b8662a21823b088c737f8583d4851ae44",
+    "crates/noos-species/src/lib.rs": "27026acf0ce2d7731d727b5fc44e4758e6358faa7defb647484b11fa734ea76e",
+    "crates/noos-species/src/update.rs": "212a6542888ec902ab42abc1b69d12f1d3c40cb20463e2ab6639c403905237e2",
+    "tools/gates/run_species_reaction_claim.py": "be395b72fbc0b199648cd11bed85f62352e03dc8b1cf364c5ec435bf9ab582b1"
+  }
+}

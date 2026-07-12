@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "lifecycle_id": "NOOS-AUDIT-FINDING-LIFECYCLE-V1",
+  "append_only": true,
+  "events_are_hash_chained": true,
+  "waivers_permitted": false,
+  "forbidden_states": ["waived", "accepted_risk", "deleted", "suppressed"],
+  "initial_state": "open",
+  "states": [
+    "open",
+    "acknowledged",
+    "remediation_submitted",
+    "retest_failed",
+    "resolved_verified"
+  ],
+  "transitions": {
+    "open": ["acknowledged", "remediation_submitted"],
+    "acknowledged": ["remediation_submitted"],
+    "remediation_submitted": ["retest_failed", "resolved_verified"],
+    "retest_failed": ["remediation_submitted"],
+    "resolved_verified": []
+  },
+  "severity_1_rule": "The final event must be resolved_verified and must be authored by the registered external auditor organization. No waiver or risk-acceptance event is terminal."
+}

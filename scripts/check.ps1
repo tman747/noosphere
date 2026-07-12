@@ -9,7 +9,7 @@ param(
 # Runs, in order, from the repository root:
 #   cargo fmt --all -- --check
 #   cargo clippy --workspace --all-targets -- -D warnings
-#   cargo test --workspace --locked
+#   cargo test --workspace --locked -- --test-threads=1
 #   go test ./...                                  (from go/)
 #   python tools/gates/validate_registry.py protocol/claims/registry.json
 #   python tools/gates/check_identity.py --reject-root C:/ascent
@@ -119,7 +119,11 @@ if ($crateManifests.Count -eq 0) {
 } else {
     Invoke-Step 'cargo fmt' @('cargo', 'fmt', '--all', '--', '--check') $Root
     Invoke-Step 'cargo clippy' @('cargo', 'clippy', '--workspace', '--all-targets', '--', '-D', 'warnings') $Root
-    Invoke-Step 'cargo test' @('cargo', 'test', '--workspace', '--locked') $Root
+    # The node battery contains multiple RocksDB/replay and real-loopback
+    # fixtures. Serial libtest scheduling preserves every test while avoiding
+    # cross-fixture resource starvation that can otherwise look like a socket
+    # hang on loaded builders. Claim runners use the same deterministic mode.
+    Invoke-Step 'cargo test' @('cargo', 'test', '--workspace', '--locked', '--', '--test-threads=1') $Root
 }
 
 # --- Go module step -------------------------------------------------------

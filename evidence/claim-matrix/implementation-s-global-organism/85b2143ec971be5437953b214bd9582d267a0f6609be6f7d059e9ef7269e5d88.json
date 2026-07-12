@@ -1,0 +1,74 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-swarm",
+          "claim_global_organism",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "filter": "claim_global_organism",
+        "log_sha256": "2e67488a37991ca862484d6300d2a528673b8bc3a94daf74499bbebfd58b8a4b",
+        "package": "noos-swarm"
+      },
+      "name": "claim-specific behavior and falsifier tests",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-GLOBAL-ORGANISM": "87874ddd6bfe4111624d29acea8da305a946d7a3f6592724f9dad7604d1f02b3"
+  },
+  "claims": [
+    "S-GLOBAL-ORGANISM"
+  ],
+  "command": [
+    "tools/gates/run_species_reaction_claim.py",
+    "--claim",
+    "S-GLOBAL-ORGANISM"
+  ],
+  "evidence_sha256": "85b2143ec971be5437953b214bd9582d267a0f6609be6f7d059e9ef7269e5d88",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-s-global-organism",
+  "limitations": [
+    "The frozen claim has no production threshold and finite component aggregation explicitly cannot establish it.",
+    "Resilience, ownership/control concentration, semantic continuity, rights compliance, and decision-benefit observables have not been preregistered globally."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-swarm/Cargo.toml": "8897e41f67566eeabd589cb57570cfdcec8a0ccf0f476b348856ec777b54ca1b",
+    "crates/noos-swarm/src/lib.rs": "0162526faaf321ffbf67ea38cd22b224f5a12c0b9a4f36e99838aeeaef74d547",
+    "crates/noos-swarm/src/organism.rs": "57ca5355f4c001f6a178490a61bcc9facec667918d1fd0456759a0dcc6dd6795",
+    "tools/gates/run_species_reaction_claim.py": "be395b72fbc0b199648cd11bed85f62352e03dc8b1cf364c5ec435bf9ab582b1"
+  }
+}

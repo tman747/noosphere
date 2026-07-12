@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": 1,
+  "taxonomy_id": "NOOS-AUDIT-SEVERITY-V1",
+  "policy": {
+    "severity_1_blocks_ingest_until_auditor_verified_resolution": true,
+    "waivers_permitted": false,
+    "risk_acceptance_closes_finding": false,
+    "missing_severity_is_rejected": true
+  },
+  "levels": [
+    {
+      "id": "S1",
+      "name": "critical",
+      "definition": "A credible path to conflicting finality, unauthorized state or supply change, production key compromise, signature/proof forgery, systemic loss of consensus-required data, or an operational failure that can irreversibly compromise the network.",
+      "blocking": true,
+      "required_terminal_state": "resolved_verified"
+    },
+    {
+      "id": "S2",
+      "name": "high",
+      "definition": "A material safety, liveness, confidentiality, economic, or operational failure requiring substantial capability, limited scope, or recoverable impact, without an established S1 path.",
+      "blocking": false,
+      "required_terminal_state": null
+    },
+    {
+      "id": "S3",
+      "name": "moderate",
+      "definition": "A bounded weakness, hardening gap, or defense-in-depth failure with limited direct impact under the declared threat model.",
+      "blocking": false,
+      "required_terminal_state": null
+    },
+    {
+      "id": "S4",
+      "name": "low",
+      "definition": "A minor weakness, documentation defect, or maintainability concern without a demonstrated material security impact.",
+      "blocking": false,
+      "required_terminal_state": null
+    }
+  ]
+}

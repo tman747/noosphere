@@ -1,0 +1,94 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "contract": "one-third/bond cohort evaluator and independent conformance/latency detectors",
+      "detail": {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "noos-hearth",
+          "-p",
+          "noos-work-loom",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "packages": [
+          "noos-hearth",
+          "noos-work-loom"
+        ]
+      },
+      "name": "deterministic local precursor and falsifier tests",
+      "passed": true
+    },
+    {
+      "name": "exact registry pass threshold",
+      "passed": false,
+      "reason": "funded independent red-team operators and real-value attack economics are unavailable",
+      "status": "EXTERNAL_BLOCKED"
+    }
+  ],
+  "claim_fingerprints": {
+    "E-HEARTH-07": "41a6ebd5927987db660c38864d0615ce22b980ed8be5d0cad1634eb02972f108"
+  },
+  "claims": [
+    "E-HEARTH-07"
+  ],
+  "command": [
+    "tools/gates/run_hearth_claim.py",
+    "--claim",
+    "E-HEARTH-07"
+  ],
+  "evidence_sha256": "0747bee0b17e8a3048b0b782e2277fc60941c900cfc2a44038b0775eb25da3a9",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "hearth-local-e-hearth-07",
+  "limitations": [
+    "funded independent red-team operators and real-value attack economics are unavailable",
+    "Deterministic fixtures and modeled threshold evaluators are local precursor evidence, not hardware, operator, WAN, public-duration, or independent evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v1",
+  "source_sha256": {
+    "crates/noos-hearth/Cargo.toml": "a623eacb1395837a76ce4a36ca87442dcf367e66842fb1fd88a5b3f09c707faa",
+    "crates/noos-hearth/src/audit.rs": "7f2fd1b26501d9bb3905df905e03adc9331d60387a2afdb81c9eb17d02e8ed67",
+    "crates/noos-hearth/src/federation.rs": "b43350526f5aa038b5e877fadc3caacb34856f9e7b5708b113922ec5e056111f",
+    "crates/noos-hearth/src/lib.rs": "64333983225ad5fa7c33c4c6994e389f91e5eb0bf3bd196950d93a5b76c19244",
+    "crates/noos-hearth/src/lifecycle.rs": "00f12ac95839d7c433c7fef10e31310a67f2953d939fd141852b02a5274e68d1",
+    "crates/noos-hearth/src/payment.rs": "19bc2cf8969252e26b27e2bfab1ff75d13a64b5686422441ac424a3c0df48e9d",
+    "crates/noos-hearth/src/relay.rs": "f21c35ce445eb36dc0b40fff4b20299ac2a0fb114be01e05c963c7cec996d342",
+    "crates/noos-hearth/src/repair.rs": "5c8bd2ae9453420f7673a2257bb240df088c0539fc64dadb0b2de82fa4f2a86d",
+    "crates/noos-hearth/src/rollback.rs": "a5527b68caced869ac9b04dc7ec2c427a7850a7f5e15a84e1cf9cd329be8213d",
+    "crates/noos-hearth/src/seeding.rs": "7a493dd4107e943536a0abf6ca59389d369acb4dbe6820eedee43ba12f411b3e",
+    "crates/noos-work-loom/Cargo.toml": "f476280c0cd27c42f409a6a91fae5eefdeb484d4b336aeeef95353609981431a",
+    "crates/noos-work-loom/src/economics.rs": "4836f2f7f450886a239f00476a01c0b619354053e1060989429ea9df0454eff3",
+    "crates/noos-work-loom/src/lib.rs": "832395d09eab207791a7b7510668e4d865aa72fcf9ed7940e195ce42c56269a1",
+    "crates/noos-work-loom/src/tests.rs": "97c4f4cd4a1c1e8cbccf70b85c3478d420993464219befcb8805827d3e37c26e",
+    "tools/gates/run_hearth_claim.py": "69ee1973f8bd901018e1f8c116ea9eaf1ab1d4e0542444c7d60fcbe975ae54dc"
+  }
+}

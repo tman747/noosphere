@@ -52,7 +52,8 @@ fn submit(handle: &NodeHandle, tx: Vec<u8>, wit: Vec<u8>) -> Result<Hash32, Admi
             reply,
         })
         .expect("consensus inbox");
-    rx.recv().expect("reply")
+    rx.recv_timeout(DEADLINE)
+        .expect("submit reply before network-test deadline")
 }
 
 fn tx_status(handle: &NodeHandle, txid: Hash32) -> ViewLookup<TxStatus> {
@@ -61,7 +62,10 @@ fn tx_status(handle: &NodeHandle, txid: Hash32) -> ViewLookup<TxStatus> {
         .consensus_tx
         .send(ConsensusMsg::GetReceipt { txid, reply })
         .expect("consensus inbox");
-    match rx.recv().expect("reply") {
+    match rx
+        .recv_timeout(DEADLINE)
+        .expect("receipt reply before network-test deadline")
+    {
         ViewLookup::Found((state, _)) => ViewLookup::Found(state),
         ViewLookup::Pruned => ViewLookup::Pruned,
         ViewLookup::NotFound => ViewLookup::NotFound,
