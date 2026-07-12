@@ -1,0 +1,158 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-weft-compile\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-weft-compile\"]}",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-weft-compile\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-weft-compile\"]}",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "RISC Zero 32^3/64^3 derived-guest parity and cycle envelope remain external.",
+      "id": "residual-requirement",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-WEFT-03": "ec6e84b7aaf67d79fc53db1e6d99320be56021f427aac5e76b2348e341e97275"
+  },
+  "claims": [
+    "E-WEFT-03"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "E-WEFT-03",
+    "--result",
+    "PARTIAL"
+  ],
+  "evidence_sha256": "a9e5b1bebfac5604c9c983fe2f1ac286f2a0fc4cc335c0d96ab7123120bb0c59",
+  "expected_result": "PARTIAL",
+  "gate": "partial-implementation-e-weft-03",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence.",
+    "RISC Zero 32^3/64^3 derived-guest parity and cycle envelope remain external."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "PARTIAL",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 446,
+        "git_blob": "11eac14f6638bd3fc481c9aed1f4332f80a9be65",
+        "git_mode": "100644",
+        "path": "crates/noos-weft-compile/Cargo.toml",
+        "sha256": "3a98d2a6f7ed8a8b7f5b61abfc5bb9ed4dcaf70249ade80a417f27ff93d93fbd"
+      },
+      {
+        "bytes": 42451,
+        "git_blob": "0f6d18560135542c658644d0a312562abd5651d2",
+        "git_mode": "100644",
+        "path": "crates/noos-weft-compile/src/lib.rs",
+        "sha256": "1068f8249503c79a5dce5e5b1baa3954fa6278c2e9b2d4242cf127a93e9b9748"
+      },
+      {
+        "bytes": 16214,
+        "git_blob": "0bc309b32117349e8114e93ef769023b6eb30822",
+        "git_mode": "100644",
+        "path": "crates/noos-weft-compile/tests/e_weft_03.rs",
+        "sha256": "c547c19fdf8d84df445d075db0d070fdba03978771f99fe3a09a90fed19082ac"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 25779,
+        "git_blob": "1724fc0f3deeb0b35558a411c2b2ef802ba39f52",
+        "git_mode": "100644",
+        "path": "protocol/schemas/weft-v0.md",
+        "sha256": "e474a2beab40d1994f83a487a6a7a749d756e9dad7d1ba608402ad63c111341f"
+      },
+      {
+        "bytes": 18346,
+        "git_blob": "cf6f309cc6ab564498740474829cd523eee78796",
+        "git_mode": "100644",
+        "path": "protocol/vectors/weft/weft-cost-v0.json",
+        "sha256": "e2733f5c6d2f81efb0ce6bd6547ff950f09f483b1e3db40914427928a01ffed2"
+      },
+      {
+        "bytes": 6571,
+        "git_blob": "768feea349e7511e939fb80d0abcae839ad3e5cc",
+        "git_mode": "100644",
+        "path": "protocol/vectors/weft/weft-profile-v0.json",
+        "sha256": "2391f6408ef2edf2adb2e65bd2878181f27be5db13988e3d8c8e233c95bde971"
+      },
+      {
+        "bytes": 43130,
+        "git_blob": "b897d0547714754253ee78db15003902952b134d",
+        "git_mode": "100644",
+        "path": "protocol/vectors/weft/weft-refs-v0.json",
+        "sha256": "dfb0f1c1abd23a969e6dcf600576b2c5bdbdae400e691a00a4daf1a7b299604f"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 4001,
+        "git_blob": "3a9320d991dba39a348dea0b43cf974122537ff2",
+        "git_mode": "100644",
+        "path": "tools/gates/run_implementation_claim.py",
+        "sha256": "f1754f72a93943b1e11fd838d920479474b9d1a59344bb1af9b5f9493872e44f"
+      }
+    ],
+    "manifest_sha256": "fa495e6966c698bf2f05019d26f43911027244a68195571e8e26062b85626acf",
+    "source_revision": "bdd45e32d87632822ea5cd1d6a2b0176b40cc6f8",
+    "source_tree": "33a0815217f26eff0244830ae989fc9bc70e6753"
+  }
+}
