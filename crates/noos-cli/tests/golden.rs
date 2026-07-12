@@ -10,7 +10,7 @@
 
 use noos_cli::{from_hex, to_hex, CliError};
 use noos_codec::{NoosDecode, NoosEncode};
-use noos_lumen::objects::{object_id, ActionV1, BoundedBytes, TransactionV1};
+use noos_lumen::objects::{asset_id, object_id, pool_id, ActionV1, BoundedBytes, TransactionV1};
 use serde_json::{json, Value};
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -246,6 +246,65 @@ fn tx_build_encodes_structured_contract_actions_canonically() {
             input: BoundedBytes::new(vec![0xde, 0xad, 0xbe, 0xef]).unwrap(),
         }
     );
+}
+
+#[test]
+fn tx_build_encodes_launch_and_swap_actions() {
+    let issuer = h(0x41);
+    let paired_asset = h(0x42);
+    let mut spec = minimal_spec();
+    spec["actions"] = json!([{
+        "type": "create_asset",
+        "issuer": issuer,
+        "symbol": "MIND",
+        "name": "Mind Launch",
+        "decimals": 6,
+        "total_supply": "1000000000"
+    }]);
+    let built = noos_cli::tx_build(&spec.to_string()).unwrap();
+    let txid: [u8; 32] = from_hex(built["txid"].as_str().unwrap())
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let launched = asset_id(&txid, 0);
+    assert_eq!(built["created_assets"][0]["asset_id"], to_hex(&launched));
+    assert_eq!(built["created_assets"][0]["symbol"], "MIND");
+
+    spec["actions"] = json!([{
+        "type": "create_pool",
+        "provider": issuer,
+        "asset_a": to_hex(&launched),
+        "asset_b": paired_asset,
+        "amount_a": "100000000",
+        "amount_b": "10000000",
+        "fee_bps": 30
+    }, {
+        "type": "swap_exact_in",
+        "trader": issuer,
+        "pool_id": to_hex(&pool_id(&launched, &[0x42; 32])),
+        "asset_in": paired_asset,
+        "amount_in": "1000",
+        "min_amount_out": "1"
+    }]);
+    let built = noos_cli::tx_build(&spec.to_string()).unwrap();
+    assert_eq!(
+        built["created_pools"][0]["pool_id"],
+        to_hex(&pool_id(&launched, &[0x42; 32]))
+    );
+    let tx =
+        TransactionV1::decode_canonical(&from_hex(built["tx"].as_str().unwrap()).unwrap()).unwrap();
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[0].as_slice()).unwrap(),
+        ActionV1::CreatePool { fee_bps: 30, .. }
+    ));
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[1].as_slice()).unwrap(),
+        ActionV1::SwapExactIn {
+            amount_in: 1000,
+            min_amount_out: 1,
+            ..
+        }
+    ));
 }
 
 #[test]

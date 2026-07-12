@@ -12,6 +12,10 @@
 //!                   mechanism id, never empty success
 //! GET  /block/<height|hash-hex>
 //! GET  /receipt/<txid-hex>
+//! GET  /assets      fixed-supply user asset registry
+//! GET  /pools       constant-product pool registry
+//! GET  /balance/<account>/<asset>
+//!                   liquid account balance for one asset
 //! GET  /metrics     Prometheus text, every series `noos_*` (no auth,
 //!                   read-only, localhost)
 //! ```
@@ -216,6 +220,11 @@ fn handle_connection(
         _ if method == "GET" && path.starts_with("/receipt/") => {
             receipt_route(consensus_tx, &path["/receipt/".len()..])
         }
+        ("GET", "/assets") => assets_route(consensus_tx),
+        ("GET", "/pools") => pools_route(consensus_tx),
+        _ if method == "GET" && path.starts_with("/balance/") => {
+            balance_route(consensus_tx, &path["/balance/".len()..])
+        }
         _ => json_error("404 Not Found", "unknown_route", "no such operator route"),
     }
 }
@@ -407,6 +416,128 @@ fn receipt_route(consensus_tx: &SyncSender<ConsensusMsg>, txid_raw: &str) -> Str
         ViewLookup::Pruned => json_error("410 Gone", "pruned", "outside the retention window"),
         ViewLookup::NotFound => json_error("404 Not Found", "not_found", "unknown transaction"),
     }
+}
+
+fn json_escape(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for character in text.chars() {
+        match character {
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            value if value.is_control() => {
+                use std::fmt::Write as _;
+                let _ = write!(escaped, "\\u{:04x}", u32::from(value));
+            }
+            value => escaped.push(value),
+        }
+    }
+    escaped
+}
+
+fn assets_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
+    let Some(assets) = round_trip(consensus_tx, |reply| ConsensusMsg::GetAssets { reply }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no asset registry reply",
+        );
+    };
+    let entries = assets
+        .iter()
+        .map(|asset| {
+            let symbol = std::str::from_utf8(asset.symbol.as_slice()).unwrap_or_default();
+            let name = std::str::from_utf8(asset.name.as_slice()).unwrap_or_default();
+            format!(
+                r#"{{"asset_id":"{}","issuer":"{}","symbol":"{}","name":"{}","decimals":{},"total_supply":"{}"}}"#,
+                hex(&asset.asset_id),
+                hex(&asset.issuer),
+                json_escape(symbol),
+                json_escape(name),
+                asset.decimals,
+                asset.total_supply,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    http(
+        "200 OK",
+        "application/json",
+        &format!(r#"{{"items":[{entries}]}}"#),
+    )
+}
+
+fn pools_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
+    let Some(pools) = round_trip(consensus_tx, |reply| ConsensusMsg::GetPools { reply }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no pool registry reply",
+        );
+    };
+    let entries = pools
+        .iter()
+        .map(|pool| {
+            format!(
+                r#"{{"pool_id":"{}","asset_0":"{}","asset_1":"{}","reserve_0":"{}","reserve_1":"{}","fee_bps":{},"creator":"{}"}}"#,
+                hex(&pool.pool_id),
+                hex(&pool.asset_0),
+                hex(&pool.asset_1),
+                pool.reserve_0,
+                pool.reserve_1,
+                pool.fee_bps,
+                hex(&pool.creator),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    http(
+        "200 OK",
+        "application/json",
+        &format!(r#"{{"items":[{entries}]}}"#),
+    )
+}
+
+fn balance_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> String {
+    let mut parts = raw.split('/');
+    let (Some(account_raw), Some(asset_raw), None) = (parts.next(), parts.next(), parts.next())
+    else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "expected /balance/<account>/<asset>",
+        );
+    };
+    let (Some(account), Some(asset)) = (unhex32(account_raw), unhex32(asset_raw)) else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "account and asset must be 32-byte hex",
+        );
+    };
+    let Some(balance) = round_trip(consensus_tx, |reply| ConsensusMsg::GetBalance {
+        account,
+        asset,
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no balance reply",
+        );
+    };
+    http(
+        "200 OK",
+        "application/json",
+        &format!(
+            r#"{{"account":"{}","asset":"{}","balance":"{}"}}"#,
+            hex(&account),
+            hex(&asset),
+            balance
+        ),
+    )
 }
 
 // ---------------------------------------------------------------------------

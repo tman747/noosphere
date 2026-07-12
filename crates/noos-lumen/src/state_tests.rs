@@ -16,8 +16,8 @@ use crate::engine::{AuthVerifier, ContractEngine, EngineOutcome, EngineTrap};
 use crate::fees::{self, FeeParamsV1, FeeStateV1};
 use crate::issuance::{EmissionSharesV1, IssuanceParamsV1};
 use crate::objects::{
-    note_id, txid, witness_root, AccessEntry, AccountV1, ActionV1, BoundedBytes, BoundedList,
-    CapabilityGrantV1, FeatureControlV1, IntentV1, NoteV1, ObjectV1, OptionalHash32,
+    asset_id, note_id, pool_id, txid, witness_root, AccessEntry, AccountV1, ActionV1, BoundedBytes,
+    BoundedList, CapabilityGrantV1, FeatureControlV1, IntentV1, NoteV1, ObjectV1, OptionalHash32,
     OptionalObject, ResourceVector, SignedIntentV1, TransactionV1, TransactionWitnessesV1,
 };
 use crate::state::{
@@ -502,6 +502,138 @@ fn per_asset_conservation_is_strict() {
     // Note set untouched: the seed note is still unspent.
     assert_eq!(before.notes_root, ledger.roots().notes_root);
     assert!(ledger.get_note(&seed2).is_some());
+}
+
+#[test]
+fn fixed_supply_launch_and_constant_product_swaps_are_atomic() {
+    let mut ledger = genesis();
+    let symbol = BoundedBytes::new(b"MIND".to_vec()).unwrap();
+    let name = BoundedBytes::new(b"Mind Launch".to_vec()).unwrap();
+    let supply = 1_000_000_000u128;
+    let (create_bytes, create_witnesses, create_tx) = build_tx(
+        1,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::CreateAsset {
+            issuer: PAYER,
+            symbol,
+            name,
+            decimals: 6,
+            total_supply: supply,
+        }],
+        vec![],
+    );
+    let launched = asset_id(&txid(&create_tx), 0);
+    let outcome = ledger
+        .apply_transaction(
+            &ctx(1),
+            &create_bytes,
+            &create_witnesses,
+            &StubEngine,
+            &AcceptAll,
+        )
+        .unwrap();
+    assert!(matches!(outcome, ApplyOutcome::Applied { .. }));
+    assert_eq!(ledger.get_asset(&launched).unwrap().total_supply, supply);
+    assert_eq!(ledger.balance(&PAYER, &launched), supply);
+
+    let seeded_noos = 10_000_000u128;
+    let seeded_token = 100_000_000u128;
+    let pool = pool_id(&NOOS_ASSET, &launched);
+    let (pool_bytes, pool_witnesses, _) = build_tx(
+        2,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::CreatePool {
+            provider: PAYER,
+            asset_a: NOOS_ASSET,
+            asset_b: launched,
+            amount_a: seeded_noos,
+            amount_b: seeded_token,
+            fee_bps: 30,
+        }],
+        vec![],
+    );
+    let outcome = ledger
+        .apply_transaction(
+            &ctx(2),
+            &pool_bytes,
+            &pool_witnesses,
+            &StubEngine,
+            &AcceptAll,
+        )
+        .unwrap();
+    assert!(matches!(outcome, ApplyOutcome::Applied { .. }));
+    let before = ledger.get_pool(&pool).unwrap();
+    assert_eq!(
+        (before.reserve_0, before.reserve_1),
+        (seeded_noos, seeded_token)
+    );
+
+    let amount_in = 1_000_000u128;
+    let effective = amount_in * 9_970 / 10_000;
+    let expected_out = seeded_token * effective / (seeded_noos + effective);
+    let token_before = ledger.balance(&PAYER, &launched);
+    let (swap_bytes, swap_witnesses, _) = build_tx(
+        3,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::SwapExactIn {
+            trader: PAYER,
+            pool_id: pool,
+            asset_in: NOOS_ASSET,
+            amount_in,
+            min_amount_out: expected_out,
+        }],
+        vec![],
+    );
+    let outcome = ledger
+        .apply_transaction(
+            &ctx(3),
+            &swap_bytes,
+            &swap_witnesses,
+            &StubEngine,
+            &AcceptAll,
+        )
+        .unwrap();
+    assert!(matches!(outcome, ApplyOutcome::Applied { .. }));
+    let after = ledger.get_pool(&pool).unwrap();
+    assert_eq!(after.reserve_0, seeded_noos + amount_in);
+    assert_eq!(after.reserve_1, seeded_token - expected_out);
+    assert_eq!(
+        ledger.balance(&PAYER, &launched),
+        token_before + expected_out
+    );
+    assert!(
+        after.reserve_0 * after.reserve_1 >= before.reserve_0 * before.reserve_1,
+        "fees keep constant product nondecreasing"
+    );
+
+    let pool_before_failure = after.clone();
+    let (bad_bytes, bad_witnesses, _) = build_tx(
+        4,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::SwapExactIn {
+            trader: PAYER,
+            pool_id: pool,
+            asset_in: NOOS_ASSET,
+            amount_in,
+            min_amount_out: u128::MAX,
+        }],
+        vec![],
+    );
+    let outcome = ledger
+        .apply_transaction(&ctx(4), &bad_bytes, &bad_witnesses, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert!(matches!(
+        outcome,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert_eq!(ledger.get_pool(&pool), Some(pool_before_failure));
 }
 
 #[test]

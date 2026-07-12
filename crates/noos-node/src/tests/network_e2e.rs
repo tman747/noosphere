@@ -12,7 +12,7 @@ use std::sync::mpsc::sync_channel;
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use crate::consensus::NodeConfig;
+use crate::consensus::{NodeConfig, NodeMode};
 use crate::mempool::AdmitError;
 use crate::supervisor::{self, ConsensusMsg, NodeHandle, StatusSnapshot};
 use crate::view::{TxStatus, ViewLookup};
@@ -39,6 +39,16 @@ fn networked_config(seed: u8, bootstrap: Vec<noos_p2p::Multiaddr>) -> NodeConfig
 
 fn status(handle: &NodeHandle) -> StatusSnapshot {
     handle.status().expect("status")
+}
+
+fn sync_head(handle: &NodeHandle) -> (u64, Hash32) {
+    let (reply, rx) = sync_channel(1);
+    handle
+        .consensus_tx
+        .send(ConsensusMsg::SyncHead { reply })
+        .expect("consensus inbox");
+    rx.recv_timeout(DEADLINE)
+        .expect("sync-head reply before network-test deadline")
 }
 
 fn submit(handle: &NodeHandle, tx: Vec<u8>, wit: Vec<u8>) -> Result<Hash32, AdmitError> {
@@ -162,6 +172,34 @@ fn peer_ready_pull_syncs_more_than_one_range_page() {
         (s.head_height == target_height).then_some(s.head_hash)
     });
     assert_eq!(imported, target_hash, "B imported every range page");
+
+    b.shutdown();
+    a.shutdown();
+}
+
+#[test]
+fn light_peer_syncs_more_than_one_range_page() {
+    let _network_guard = network_test_guard();
+    let dir_a = test_dir("net-e2e-light-range-a");
+    let dir_b = test_dir("net-e2e-light-range-b");
+    let a = supervisor::start(networked_config(0xE1, Vec::new()), spec(), dir_a).expect("start a");
+    let addr_a = a.p2p_addr.clone().expect("a listens");
+    let target_height = u64::from(noos_p2p::MAX_RANGE_HEADERS) + 1;
+    let mut target_hash = status(&a).head_hash;
+    for height in 1..=target_height {
+        a.set_now(GENESIS_TIME_MS + height).expect("advance clock");
+        target_hash = a.produce_block().expect("produce light-sync block");
+    }
+
+    let mut light = networked_config(0xE2, vec![addr_a]);
+    light.mode = NodeMode::Light;
+    let b = supervisor::start(light, spec(), dir_b).expect("start light b");
+    let imported = wait_until("multi-page light peer pull sync", || {
+        let (height, hash) = sync_head(&b);
+        (height == target_height).then_some(hash)
+    });
+    assert_eq!(imported, target_hash, "light B imported every range page");
+    assert_eq!(status(&b).head_height, 0, "light mode executes no bodies");
 
     b.shutdown();
     a.shutdown();

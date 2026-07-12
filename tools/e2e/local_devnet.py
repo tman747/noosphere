@@ -300,7 +300,7 @@ def run(runtime: Path, *, build: bool) -> int:
         )
         procs.append(validator)
         up = validator.wait_line(
-            r"noosd up: chain_id=([0-9a-f]{64}) genesis_hash=([0-9a-f]{64})", 60
+            r"noosd up: chain_id=([0-9a-f]{64}) genesis_hash=([0-9a-f]{64})", 300
         )
         match = re.search(
             r"chain_id=([0-9a-f]{64}) genesis_hash=([0-9a-f]{64})", up
@@ -330,12 +330,13 @@ def run(runtime: Path, *, build: bool) -> int:
                 "--devnet-account",
                 recipient,
                 "--devnet-contract-fixture",
+                "--devnet-witness-fixture",
             ],
             env,
             logs,
         )
         procs.append(observer)
-        observer.wait_line(r"noosd up: chain_id=" + chain_id, 60)
+        observer.wait_line(r"noosd up: chain_id=" + chain_id, 300)
 
         indexer_root = runtime / "indexer"
         indexer_root.mkdir(exist_ok=True)

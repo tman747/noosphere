@@ -326,13 +326,18 @@ impl<P: StorePort> NodeCore<P> {
         let encoded = encode_body(&da_form_bytes(&built.body))?;
         availability.record_encoded(&encoded);
 
+        if cfg.contract_codes != spec.contract_codes {
+            return Err(NodeError::Config(
+                "node contract registry differs from genesis commitment".into(),
+            ));
+        }
         let proposer_secret =
             BlsSecretKey::from_seed(DEVNET_PROPOSER_SEED).map_err(|_| NodeError::Crypto)?;
 
         let engine = GrainContractEngine::new(
             built.chain_id,
             built.genesis_hash,
-            cfg.contract_codes.clone(),
+            spec.contract_codes.clone(),
         );
         let mut core = NodeCore {
             view: ChainView::new(cfg.view_retention_blocks),
@@ -417,6 +422,29 @@ impl<P: StorePort> NodeCore<P> {
     #[must_use]
     pub fn head(&self) -> (u64, Hash32) {
         (self.exec_height, self.exec_head)
+    }
+
+    #[must_use]
+    pub fn mode(&self) -> NodeMode {
+        self.cfg.mode
+    }
+
+    /// Highest accepted chain position for network synchronization. Full
+    /// nodes advance this through execution; light nodes advance it through
+    /// validated header import.
+    #[must_use]
+    pub fn sync_head(&self) -> (u64, Hash32) {
+        if self.cfg.mode == NodeMode::Full {
+            return self.head();
+        }
+        self.dag
+            .select_head()
+            .and_then(|hash| {
+                self.dag
+                    .get(&hash)
+                    .map(|stored| (stored.header.height, hash))
+            })
+            .unwrap_or_else(|| self.head())
     }
 
     #[must_use]
@@ -808,13 +836,24 @@ impl<P: StorePort> NodeCore<P> {
         )?)
     }
 
-    /// Light-mode import: stages 0-2 only (ch01 §10.5 light sync).
-    pub fn import_header_light(
+    /// Network light-sync entry point. Full nodes must import complete bodies.
+    pub fn import_header_for_light_sync(
         &mut self,
         header: &BlockHeaderV1,
         ticket: &GroundTicketV1,
+        certificates: &BoundedList<FinalityCertificateV1, MAX_FINALITY_CERTIFICATES>,
     ) -> Result<ImportOutcome, NodeError> {
-        let outcome = self.import_header_stages(header, ticket, None)?;
+        if self.cfg.mode != NodeMode::Light {
+            return Err(NodeError::Config(
+                "header-only import is restricted to light mode".into(),
+            ));
+        }
+        if body_cert_root(certificates)? != header.finality_certificate_root {
+            return Err(NodeError::BodyMismatch {
+                what: "finality_certificate_root",
+            });
+        }
+        let outcome = self.import_header_stages(header, ticket, Some(certificates.as_slice()))?;
         let hash = match outcome {
             InsertOutcome::Inserted { hash } => hash,
             InsertOutcome::Orphaned { hash, .. } => return Ok(ImportOutcome::Orphaned { hash }),
@@ -823,15 +862,31 @@ impl<P: StorePort> NodeCore<P> {
         Ok(ImportOutcome::HeaderAccepted { hash })
     }
 
+    /// Light-mode import: stages 0-2 only (ch01 §10.5 light sync).
+    pub fn import_header_light(
+        &mut self,
+        header: &BlockHeaderV1,
+        ticket: &GroundTicketV1,
+    ) -> Result<ImportOutcome, NodeError> {
+        let certificates =
+            BoundedList::<FinalityCertificateV1, MAX_FINALITY_CERTIFICATES>::default();
+        self.import_header_for_light_sync(header, ticket, &certificates)
+    }
+
     fn promote_light_orphans(&mut self, root: Hash32) {
         let mut queue = vec![root];
         let mut cursor = 0;
+        let empty_cert_root = body_cert_root(&BoundedList::<
+            FinalityCertificateV1,
+            MAX_FINALITY_CERTIFICATES,
+        >::default())
+        .ok();
         while cursor < queue.len() {
             let parent = queue[cursor];
             cursor = cursor.saturating_add(1);
             for orphan in self.dag.take_orphans_waiting_on(&parent) {
                 let mut candidate = self.staged_consensus();
-                let result = if orphan.header.finality_certificate_root != ZERO_ROOT {
+                let result = if Some(orphan.header.finality_certificate_root) != empty_cert_root {
                     Err(NodeError::BodyMismatch {
                         what: "finality certificate evidence absent",
                     })
@@ -1932,6 +1987,13 @@ impl<P: StorePort> NodeCore<P> {
             }
         }
 
+        // A certificate can be durably ingested immediately after the last
+        // block and therefore be newer than every certificate embedded in
+        // the replayed bodies. Preserve that boundary so such certificates
+        // are re-embedded in the first post-restart block for peers that did
+        // not receive the standalone certificate.
+        let embedded_justified_epoch = self.tracker.justified_head().epoch;
+
         // Certificates in epoch order.
         let certs = self.port.scan_indices(b"c/")?;
         for (_, value) in certs {
@@ -1950,6 +2012,11 @@ impl<P: StorePort> NodeCore<P> {
                     self.dag.set_justified(self.tracker.justified_head())?;
                 }
                 IngestOutcome::Duplicate => {}
+            }
+            if cert.target.epoch > embedded_justified_epoch
+                && self.pending_certs.len() < MAX_FINALITY_CERTIFICATES as usize
+            {
+                self.pending_certs.push(cert);
             }
         }
 

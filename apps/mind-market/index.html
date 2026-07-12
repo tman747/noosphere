@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Launch fixed-supply assets and trade constant-product pools on MindChain.">
+  <title>Mind Market</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Mind Market home">MIND<span>/MARKET</span></a>
+    <div class="network" id="network"><i aria-hidden="true"></i><span>Connecting</span></div>
+  </header>
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">Applications on MindChain</p>
+        <h1 id="hero-title">Issue an asset.<br>Make a market.</h1>
+        <p>Two consensus-backed applications share one fixed-supply asset registry and one constant-product liquidity layer. Every launch, reserve, quote, and swap is derived from chain state.</p>
+      </div>
+      <div class="chain-readout" aria-label="Connected chain identity">
+        <span>CHAIN</span><code id="chain-id">—</code>
+        <span>HEAD</span><strong id="chain-head">—</strong>
+        <span>ACCOUNT</span><code id="account">—</code>
+      </div>
+    </section>
+    <section class="apps" aria-label="MindChain market applications">
+      <a class="app app-launch" href="/launch/">
+        <div><span class="index">01</span><span class="status">Fixed supply</span></div>
+        <h2>Foundry</h2>
+        <p>Create a named user asset, issue its entire supply once, and seed its first NOOS market.</p>
+        <span class="action">Open launchpad <b aria-hidden="true">→</b></span>
+      </a>
+      <a class="app app-exchange" href="/exchange/">
+        <div><span class="index">02</span><span class="status">x × y = k</span></div>
+        <h2>Current</h2>
+        <p>Buy and sell across live constant-product pools with integer quotes and explicit slippage floors.</p>
+        <span class="action">Open exchange <b aria-hidden="true">→</b></span>
+      </a>
+    </section>
+    <footer>
+      <p>Local engineering network · valueless test assets</p>
+      <p>Every transaction is signed by the deterministic local developer account.</p>
+    </footer>
+  </main>
+  <script src="/app.js" defer></script>
+</body>
+</html>

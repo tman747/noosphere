@@ -1183,7 +1183,14 @@ impl JobRuntime {
         Ok(())
     }
     pub fn assure(&mut self) -> Result<(), NelError> {
-        if self.state != JobState::Anchored || self.available_chunks != self.anchored_chunks {
+        let required_chunks = self.total_tokens.div_ceil(CHUNK_TOKENS as u32);
+        let complete = usize::try_from(required_chunks)
+            .is_ok_and(|required| self.anchored_chunks.len() == required)
+            && (0..required_chunks).all(|index| self.anchored_chunks.contains(&index));
+        if self.state != JobState::Anchored
+            || !complete
+            || self.available_chunks != self.anchored_chunks
+        {
             return Err(NelError::AvailabilityRequired);
         }
         self.state = JobState::Assured;

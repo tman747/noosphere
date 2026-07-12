@@ -414,6 +414,54 @@ impl LineProtocolSource {
             .to_owned();
         Ok(NodeSubmission { txid })
     }
+
+    /// Identity-gated read-through for consensus-owned application state.
+    /// The indexer never fabricates market records from incomplete events.
+    pub fn forward_query(
+        &self,
+        expected: &Identity,
+        path: &str,
+    ) -> std::result::Result<Value, ForwardError> {
+        let (status_code, status_body) = http_request(
+            &self.addr,
+            "GET",
+            "/status",
+            &self.token,
+            None,
+            self.timeout,
+        )
+        .map_err(|_| ForwardError::Unavailable)?;
+        if status_code != 200 {
+            return Err(ForwardError::Unavailable);
+        }
+        let status: Value =
+            serde_json::from_str(&status_body).map_err(|_| ForwardError::MalformedResponse)?;
+        let actual = Identity {
+            chain_id: status["chain_id"]
+                .as_str()
+                .ok_or(ForwardError::MalformedResponse)?
+                .to_owned(),
+            genesis_hash: status["genesis_hash"]
+                .as_str()
+                .ok_or(ForwardError::MalformedResponse)?
+                .to_owned(),
+            api_version: crate::API_VERSION.to_owned(),
+        };
+        expected
+            .require(&actual)
+            .map_err(|_| ForwardError::WrongProtocolIdentity)?;
+        let (code, body) = http_request(&self.addr, "GET", path, &self.token, None, self.timeout)
+            .map_err(|_| ForwardError::Unavailable)?;
+        if code != 200 {
+            let (node_code, detail) = node_error(&body);
+            return Err(ForwardError::Refused {
+                status: code,
+                node_code,
+                detail,
+            });
+        }
+        serde_json::from_str(&body).map_err(|_| ForwardError::MalformedResponse)
+    }
 }
 
 /// Successful noosd protocol admission. The public API exposes this txid but

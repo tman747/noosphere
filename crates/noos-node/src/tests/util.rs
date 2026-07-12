@@ -96,7 +96,8 @@ pub fn node_config() -> NodeConfig {
 
 /// Boots a fresh full node over a (new or existing) store in `dir`.
 pub fn boot_node(dir: &std::path::Path, cfg: NodeConfig) -> NodeCore<InProcStore> {
-    let spec = spec();
+    let mut spec = spec();
+    spec.contract_codes = cfg.contract_codes.clone();
     let built = spec.build().expect("genesis build");
     let port = InProcStore::open(dir.to_path_buf(), &built.chain_id, &built.genesis_hash)
         .expect("store open");

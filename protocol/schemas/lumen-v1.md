@@ -107,6 +107,15 @@ under any other domain (legacy chain, sibling context) never verifies
 `object_id = H("NOOS/OBJECT/ID/V1" || creating_txid || action_index_u32_le || class_id_u32_le)`.
 Creation of an existing id fails the transaction.
 
+### 4.4 user asset and pool identities
+
+`asset_id = H("NOOS/ASSET/ID/V1" || creating_txid || action_index_u32_le)`.
+User assets are fixed-supply and issued exactly once by their creation action;
+the zero asset id remains the separately scheduled NOOS asset.
+
+`pool_id = H("NOOS/POOL/ID/V1" || min(asset_a,asset_b) || max(asset_a,asset_b))`.
+There is at most one native constant-product pool for an unordered asset pair.
+
 ## 5. Transaction envelope and typed actions
 
 Object shapes and collection maxima are exactly the tables in
@@ -129,13 +138,40 @@ transaction at step 1.
 9  GrantCapability { CapabilityGrantV1 }            — issuer must be signed
 10 RevokeCapability { grant_id }                    — issuer must be signed
 11 SubmitIntent { IntentV1 }                        — deterministic policy gate
+12 CreateAsset { issuer, symbol, name, decimals, total_supply } — fixed supply
+13 CreatePool { provider, asset_a, asset_b, amount_a, amount_b, fee_bps }
+14 SwapExactIn { trader, pool_id, asset_in, amount_in, min_amount_out }
 ```
 
-**Closed action law (plan §4.7).** The enum contains NO variant that mints,
-seizes user state, reverts finalized state, forges finality, admits code
-outside the registry path, exceeds caps, or activates a disabled suite.
-Discriminant 12+ rejects (`unknown_discriminant`); this is type-level, and the
-conformance test constructs the rejection.
+**Closed action law (plan §4.7).** `CreateAsset` issues only a new,
+domain-derived user asset once; it cannot mint NOOS or increase an existing
+asset supply. The enum contains no variant that seizes user state, reverts
+finalized state, forges finality, admits code outside the registry path,
+exceeds caps, or activates a disabled suite. Discriminant 15+ rejects
+(`unknown_discriminant`).
+
+### 5.1 fixed-supply launch and constant-product swap
+
+`CreateAsset` requires the issuer account signature, uppercase ASCII symbol
+of 1–12 bytes, UTF-8 name of 1–64 bytes, `decimals ≤ 18`, and
+`total_supply > 0`. The whole declared supply is credited atomically to the
+issuer; the action cannot be repeated for its derived id.
+
+`CreatePool` requires the provider signature, two distinct registered assets
+(NOOS is intrinsically registered), nonzero reserves, and `fee_bps ≤ 1000`.
+It debits the provider and stores reserves in canonical asset order.
+
+For `SwapExactIn`, with input reserve `x`, output reserve `y`, exact input
+`a`, and fee `f` basis points:
+
+`effective = floor(a × (10000-f) / 10000)`
+
+`amount_out = floor(y × effective / (x + effective))`.
+
+The full input `a` enters the reserve, so the fee remains in the pool and
+`x × y` is nondecreasing. Zero output, insufficient balance,
+`amount_out < min_amount_out`, overflow, or an asset/pool mismatch fails
+atomically.
 
 ## 6. Transaction application (normative order, arch §6.6)
 

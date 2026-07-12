@@ -21,9 +21,10 @@ use crate::engine::{AuthVerifier, ContractEngine};
 use crate::fees::{self, FeeParamsV1, FeeStateV1, Usage};
 use crate::issuance::{EmissionSharesV1, IssuanceParamsV1};
 use crate::objects::{
-    witness_root as derive_witness_root, AccessEntry, AccountV1, ActionV1, CapabilityGrantV1,
-    FeatureControlV1, NoteV1, ObjectV1, ParamRecordV1, PendingParamV1, ReceiptV1, ResourceVector,
-    TransactionV1, TransactionWitnessesV1,
+    asset_id as derive_asset_id, pool_id as derive_pool_id, witness_root as derive_witness_root,
+    AccessEntry, AccountV1, ActionV1, AssetV1, CapabilityGrantV1, FeatureControlV1, NoteV1,
+    ObjectV1, ParamRecordV1, PendingParamV1, PoolV1, ReceiptV1, ResourceVector, TransactionV1,
+    TransactionWitnessesV1,
 };
 use crate::smt::Smt;
 use crate::Hash32;
@@ -412,6 +413,36 @@ impl LumenLedger {
         self.objects
             .get(id)
             .and_then(|b| ObjectV1::decode_canonical(b).ok())
+    }
+
+    #[must_use]
+    pub fn get_asset(&self, id: &Hash32) -> Option<AssetV1> {
+        self.objects
+            .get(id)
+            .and_then(|bytes| AssetV1::decode_canonical(bytes).ok())
+    }
+
+    #[must_use]
+    pub fn get_pool(&self, id: &Hash32) -> Option<PoolV1> {
+        self.objects
+            .get(id)
+            .and_then(|bytes| PoolV1::decode_canonical(bytes).ok())
+    }
+
+    #[must_use]
+    pub fn assets(&self) -> Vec<AssetV1> {
+        self.objects
+            .iter()
+            .filter_map(|(_, bytes)| AssetV1::decode_canonical(bytes).ok())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn pools(&self) -> Vec<PoolV1> {
+        self.objects
+            .iter()
+            .filter_map(|(_, bytes)| PoolV1::decode_canonical(bytes).ok())
+            .collect()
     }
 
     #[must_use]
@@ -1124,6 +1155,15 @@ impl LumenLedger {
                 ActionV1::WithdrawFromAccount { account_id, .. } if !signed(account_id) => {
                     return Err(RejectReason::CapabilityDenied);
                 }
+                ActionV1::CreateAsset { issuer, .. } if !signed(issuer) => {
+                    return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::CreatePool { provider, .. } if !signed(provider) => {
+                    return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::SwapExactIn { trader, .. } if !signed(trader) => {
+                    return Err(RejectReason::CapabilityDenied);
+                }
                 _ => {}
             }
         }
@@ -1399,6 +1439,188 @@ impl LumenLedger {
                         .ok_or(FailCode::InsufficientBalance)?;
                     ov.objects
                         .insert(grant.grant_id, Some(grant.encode_canonical()));
+                    ov.write_count()?;
+                }
+                ActionV1::CreateAsset {
+                    issuer,
+                    symbol,
+                    name,
+                    decimals,
+                    total_supply,
+                } => {
+                    let symbol_valid = !symbol.as_slice().is_empty()
+                        && symbol
+                            .as_slice()
+                            .iter()
+                            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit());
+                    if !symbol_valid
+                        || name.as_slice().is_empty()
+                        || std::str::from_utf8(name.as_slice()).is_err()
+                        || *decimals > 18
+                        || *total_supply == 0
+                        || overlay_account(&ov, self, issuer).is_none()
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let idx = u32::try_from(index).map_err(|_| FailCode::Overflow)?;
+                    let id = derive_asset_id(txid, idx);
+                    if id == NOOS_ASSET || overlay_object(&ov, self, &id).is_some() {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let asset = AssetV1 {
+                        asset_id: id,
+                        issuer: *issuer,
+                        symbol: symbol.clone(),
+                        name: name.clone(),
+                        decimals: *decimals,
+                        total_supply: *total_supply,
+                    };
+                    ov.objects.insert(id, Some(asset.encode_canonical()));
+                    let current = overlay_balance(&ov, self, issuer, &id);
+                    let next = current
+                        .checked_add(*total_supply)
+                        .ok_or(FailCode::Overflow)?;
+                    ov.balances.insert((*issuer, id), next);
+                    add_flow(&mut inflow, &id, *total_supply)?;
+                    add_flow(&mut outflow, &id, *total_supply)?;
+                    ov.write_count()?;
+                    ov.write_count()?;
+                }
+                ActionV1::CreatePool {
+                    provider,
+                    asset_a,
+                    asset_b,
+                    amount_a,
+                    amount_b,
+                    fee_bps,
+                } => {
+                    if asset_a == asset_b
+                        || *amount_a == 0
+                        || *amount_b == 0
+                        || *fee_bps > 1_000
+                        || overlay_account(&ov, self, provider).is_none()
+                        || (*asset_a != NOOS_ASSET
+                            && AssetV1::decode_canonical(
+                                &overlay_object(&ov, self, asset_a)
+                                    .ok_or(FailCode::PostconditionFailed)?,
+                            )
+                            .is_err())
+                        || (*asset_b != NOOS_ASSET
+                            && AssetV1::decode_canonical(
+                                &overlay_object(&ov, self, asset_b)
+                                    .ok_or(FailCode::PostconditionFailed)?,
+                            )
+                            .is_err())
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let id = derive_pool_id(asset_a, asset_b);
+                    if overlay_object(&ov, self, &id).is_some() {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let balance_a = overlay_balance(&ov, self, provider, asset_a);
+                    let balance_b = overlay_balance(&ov, self, provider, asset_b);
+                    ov.balances.insert(
+                        (*provider, *asset_a),
+                        balance_a
+                            .checked_sub(*amount_a)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    ov.balances.insert(
+                        (*provider, *asset_b),
+                        balance_b
+                            .checked_sub(*amount_b)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    let (asset_0, asset_1, reserve_0, reserve_1) = if asset_a < asset_b {
+                        (*asset_a, *asset_b, *amount_a, *amount_b)
+                    } else {
+                        (*asset_b, *asset_a, *amount_b, *amount_a)
+                    };
+                    let pool = PoolV1 {
+                        pool_id: id,
+                        asset_0,
+                        asset_1,
+                        reserve_0,
+                        reserve_1,
+                        fee_bps: *fee_bps,
+                        creator: *provider,
+                    };
+                    ov.objects.insert(id, Some(pool.encode_canonical()));
+                    ov.write_count()?;
+                    ov.write_count()?;
+                    ov.write_count()?;
+                }
+                ActionV1::SwapExactIn {
+                    trader,
+                    pool_id,
+                    asset_in,
+                    amount_in,
+                    min_amount_out,
+                } => {
+                    if *amount_in == 0 || overlay_account(&ov, self, trader).is_none() {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let raw =
+                        overlay_object(&ov, self, pool_id).ok_or(FailCode::PostconditionFailed)?;
+                    let mut pool = PoolV1::decode_canonical(&raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let (reserve_in, reserve_out, asset_out, input_is_zero) =
+                        if *asset_in == pool.asset_0 {
+                            (pool.reserve_0, pool.reserve_1, pool.asset_1, true)
+                        } else if *asset_in == pool.asset_1 {
+                            (pool.reserve_1, pool.reserve_0, pool.asset_0, false)
+                        } else {
+                            return Err(FailCode::PostconditionFailed);
+                        };
+                    let effective = amount_in
+                        .checked_mul(u128::from(10_000u16.saturating_sub(pool.fee_bps)))
+                        .and_then(|value| value.checked_div(10_000))
+                        .ok_or(FailCode::Overflow)?;
+                    let amount_out = reserve_out
+                        .checked_mul(effective)
+                        .and_then(|value| value.checked_div(reserve_in.checked_add(effective)?))
+                        .ok_or(FailCode::Overflow)?;
+                    if amount_out == 0 || amount_out < *min_amount_out || amount_out >= reserve_out
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let input_balance = overlay_balance(&ov, self, trader, asset_in);
+                    let output_balance = overlay_balance(&ov, self, trader, &asset_out);
+                    ov.balances.insert(
+                        (*trader, *asset_in),
+                        input_balance
+                            .checked_sub(*amount_in)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    ov.balances.insert(
+                        (*trader, asset_out),
+                        output_balance
+                            .checked_add(amount_out)
+                            .ok_or(FailCode::Overflow)?,
+                    );
+                    if input_is_zero {
+                        pool.reserve_0 = pool
+                            .reserve_0
+                            .checked_add(*amount_in)
+                            .ok_or(FailCode::Overflow)?;
+                        pool.reserve_1 = pool
+                            .reserve_1
+                            .checked_sub(amount_out)
+                            .ok_or(FailCode::Overflow)?;
+                    } else {
+                        pool.reserve_1 = pool
+                            .reserve_1
+                            .checked_add(*amount_in)
+                            .ok_or(FailCode::Overflow)?;
+                        pool.reserve_0 = pool
+                            .reserve_0
+                            .checked_sub(amount_out)
+                            .ok_or(FailCode::Overflow)?;
+                    }
+                    ov.objects.insert(*pool_id, Some(pool.encode_canonical()));
+                    ov.write_count()?;
+                    ov.write_count()?;
                     ov.write_count()?;
                 }
             }

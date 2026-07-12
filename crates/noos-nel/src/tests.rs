@@ -386,6 +386,9 @@ fn monotone_availability_anchor_tail_and_tombstone() {
     j.anchor(0, 50).unwrap();
     assert_eq!(j.assure(), Err(NelError::AvailabilityRequired));
     j.mark_available(0).unwrap();
+    assert_eq!(j.assure(), Err(NelError::AvailabilityRequired));
+    j.anchor(1, 51).unwrap();
+    j.mark_available(1).unwrap();
     j.assure().unwrap();
     assert_eq!(j.soft(), Err(NelError::InvalidTransition));
     j.invalidate_tail(17, [[4; 32], [5; 32], [6; 32]], 2)

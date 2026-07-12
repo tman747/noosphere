@@ -47,6 +47,9 @@ OPTIONS:
     --devnet-contract-fixture
                            Register the deterministic [0 1] Grain identity
                            contract at code hash c0...c0 (TEST NETWORKS ONLY)
+    --devnet-witness-fixture
+                           Install fixture witness bonds for certificate
+                           verification without signing (TEST NETWORKS ONLY)
     --observer             Observer mode: transaction submission disabled
                            (explicit feature_disabled, never empty success)
     --p2p-listen <multiaddr>
@@ -91,6 +94,7 @@ fn main() -> ExitCode {
     let mut produce_interval_ms: u64 = 6000;
     let mut devnet_accounts: Vec<noos_node::Hash32> = Vec::new();
     let mut devnet_contract_fixture = false;
+    let mut devnet_witness_fixture = false;
     let mut light = false;
     let mut retention: u64 = 0;
     let mut social: Option<noos_braid::CheckpointRef> = None;
@@ -177,6 +181,7 @@ fn main() -> ExitCode {
                 }
             }
             "--devnet-contract-fixture" => devnet_contract_fixture = true,
+            "--devnet-witness-fixture" => devnet_witness_fixture = true,
             "--observer" => observer = true,
             "--light" => light = true,
             "--retention" => match take("--retention").and_then(|v| v.parse().ok()) {
@@ -226,8 +231,15 @@ fn main() -> ExitCode {
         );
         return ExitCode::FAILURE;
     }
+    if devnet_witness_fixture && !params.is_test_network {
+        eprintln!(
+            "error: --devnet-witness-fixture is a devnet fixture; \
+             is_test_network = false"
+        );
+        return ExitCode::FAILURE;
+    }
     let min_bond = params.min_bond_micro;
-    let witness_bonds = if validator {
+    let witness_bonds = if validator || devnet_witness_fixture {
         match noos_node::devnet_fixture::fixture_witness_bonds(4) {
             Ok(bonds) => bonds,
             Err(e) => {
@@ -257,6 +269,7 @@ fn main() -> ExitCode {
     } else {
         BTreeMap::new()
     };
+    spec.contract_codes = contract_codes.clone();
     let cfg = NodeConfig {
         mode: if light {
             NodeMode::Light

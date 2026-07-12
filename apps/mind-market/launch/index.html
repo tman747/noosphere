@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="/launch/">
+<title>Foundry — MindChain token launch</title>
+<meta name="description" content="Register a fixed-supply asset on MindChain and seed its constant-product NOOS pool.">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23121412'/%3E%3Crect x='4.5' y='4.5' width='7' height='7' fill='%23a8d65e' transform='rotate(45 8 8)'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<header class="site-head">
+  <div class="brand">
+    <a class="wordmark" href="./">FOUNDRY</a>
+    <span class="brand-tag">MindChain asset foundry</span>
+  </div>
+  <div class="chain-chip" id="chain-chip" aria-live="polite">
+    <span class="chip-dot" id="chain-dot" data-state="loading" aria-hidden="true"></span>
+    <span class="chip-body">
+      <span class="chip-title skeleton-text" id="chain-name">connecting</span>
+      <span class="chip-meta" id="chain-meta">querying local gateway</span>
+    </span>
+  </div>
+</header>
+
+<main>
+  <section class="intro">
+    <p class="kicker">Launch NO. <span id="launch-ordinal">—</span></p>
+    <h1>Mint once.<br>Trade forever.</h1>
+    <p class="lede">
+      Foundry registers a <strong>fixed-supply</strong> asset: the total supply you set here is
+      minted in a single act and can never be increased or burned. In the same transaction, part
+      of that supply is paired with your NOOS deposit to seed a constant-product pool — those two
+      amounts define the opening price, and everything you do not deposit stays in your account.
+    </p>
+  </section>
+
+  <div class="layout">
+
+    <form id="launch-form" class="panel form-panel" novalidate>
+      <div class="panel-head">
+        <h2>Launch parameters</h2>
+        <p class="panel-sub">All fields are validated against MindChain ledger rules before submission.</p>
+      </div>
+
+      <fieldset>
+        <legend>Identity</legend>
+
+        <div class="field">
+          <label for="f-symbol">Ticker symbol</label>
+          <input id="f-symbol" name="symbol" type="text" autocomplete="off" spellcheck="false"
+                 maxlength="12" placeholder="OBOL" aria-describedby="h-symbol e-symbol">
+          <p class="hint" id="h-symbol">1–12 characters, uppercase A–Z and 0–9 only. Lowercase is upcased as you type.</p>
+          <p class="field-error" id="e-symbol" role="alert" hidden></p>
+        </div>
+
+        <div class="field">
+          <label for="f-name">Asset name</label>
+          <input id="f-name" name="name" type="text" autocomplete="off"
+                 maxlength="64" placeholder="Obol Credit" aria-describedby="h-name e-name">
+          <p class="hint" id="h-name">Human-readable name, at most 64 bytes of UTF-8.</p>
+          <p class="field-error" id="e-name" role="alert" hidden></p>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Fixed supply</legend>
+
+        <div class="field-row">
+          <div class="field field-narrow">
+            <label for="f-decimals">Decimals</label>
+            <input id="f-decimals" name="decimals" type="text" inputmode="numeric" autocomplete="off"
+                   value="6" aria-describedby="h-decimals e-decimals">
+            <p class="hint" id="h-decimals">0–18. Subdivision of one whole token.</p>
+            <p class="field-error" id="e-decimals" role="alert" hidden></p>
+          </div>
+
+          <div class="field">
+            <label for="f-supply">Total supply <span class="label-unit">whole tokens</span></label>
+            <input id="f-supply" name="total_supply" type="text" inputmode="decimal" autocomplete="off"
+                   placeholder="1000000" aria-describedby="h-supply e-supply">
+            <p class="hint" id="h-supply">Minted exactly once. Immutable after launch.</p>
+            <p class="field-error" id="e-supply" role="alert" hidden></p>
+          </div>
+        </div>
+        <p class="base-readout mono" id="supply-base" aria-live="polite"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Initial liquidity</legend>
+        <p class="fieldset-note">
+          Both deposits move into the pool at launch. The ratio
+          <span class="mono">NOOS&nbsp;:&nbsp;tokens</span> sets the opening price; the constant-product
+          curve moves it with every trade after that.
+        </p>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="f-noos">NOOS deposit <span class="label-unit">NOOS</span></label>
+            <input id="f-noos" name="initial_noos" type="text" inputmode="decimal" autocomplete="off"
+                   placeholder="250" aria-describedby="h-noos e-noos">
+            <p class="hint" id="h-noos">Native NOOS paid from your account into the pool.</p>
+            <p class="field-error" id="e-noos" role="alert" hidden></p>
+          </div>
+
+          <div class="field">
+            <label for="f-tokens">Token deposit <span class="label-unit">whole tokens</span></label>
+            <input id="f-tokens" name="initial_tokens" type="text" inputmode="decimal" autocomplete="off"
+                   placeholder="500000" aria-describedby="h-tokens e-tokens">
+            <p class="hint" id="h-tokens">Portion of the fixed supply seeded into the pool. The rest stays with you.</p>
+            <p class="field-error" id="e-tokens" role="alert" hidden></p>
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="label" id="l-fee">Swap fee</span>
+          <div class="fee-row" role="group" aria-labelledby="l-fee">
+            <button type="button" class="fee-preset" data-bps="10" aria-pressed="false">0.10%</button>
+            <button type="button" class="fee-preset" data-bps="30" aria-pressed="false">0.30%</button>
+            <button type="button" class="fee-preset" data-bps="100" aria-pressed="false">1.00%</button>
+            <div class="fee-custom">
+              <input id="f-fee" name="fee_bps" type="text" inputmode="numeric" autocomplete="off"
+                     value="30" aria-label="Swap fee in basis points" aria-describedby="h-fee e-fee">
+              <span class="fee-unit" aria-hidden="true">bps</span>
+            </div>
+          </div>
+          <p class="hint" id="h-fee">0–1000 basis points, kept by the pool on every swap.</p>
+          <p class="field-error" id="e-fee" role="alert" hidden></p>
+        </div>
+      </fieldset>
+
+      <div class="form-banner" id="form-banner" role="alert" hidden></div>
+
+      <div class="form-foot">
+        <button type="submit" class="btn-launch" id="btn-launch">
+          <span class="btn-label">Launch asset</span>
+          <span class="btn-progress" aria-hidden="true"></span>
+        </button>
+        <p class="form-foot-note">Submits one atomic transaction: register asset, then seed its NOOS pool.</p>
+      </div>
+    </form>
+
+    <aside class="rail">
+
+      <section class="panel receipt-panel" id="receipt" hidden aria-live="polite">
+        <div class="panel-head">
+          <h2>Launch confirmed</h2>
+          <p class="panel-sub" id="receipt-sub"></p>
+        </div>
+        <dl class="receipt-list" id="receipt-list"></dl>
+        <button type="button" class="btn-ghost" id="btn-again">Launch another asset</button>
+      </section>
+
+      <section class="panel summary-panel" aria-labelledby="summary-title">
+        <div class="panel-head">
+          <h2 id="summary-title">Allocation</h2>
+          <p class="panel-sub">Live preview computed from the form. Nothing here is on-chain yet.</p>
+        </div>
+
+        <div class="alloc" aria-live="polite">
+          <div class="alloc-bar" id="alloc-bar" role="img" aria-label="Share of supply deposited into the pool">
+            <span class="alloc-bar-fill" id="alloc-fill" style="width:0%"></span>
+          </div>
+          <dl class="alloc-grid">
+            <div class="alloc-cell">
+              <dt>Pool share</dt>
+              <dd class="mono" id="s-share">—</dd>
+            </div>
+            <div class="alloc-cell">
+              <dt>Opening price</dt>
+              <dd class="mono" id="s-price">—</dd>
+            </div>
+            <div class="alloc-cell">
+              <dt>Pool tokens</dt>
+              <dd class="mono" id="s-pool">—</dd>
+            </div>
+            <div class="alloc-cell">
+              <dt>Retained by you</dt>
+              <dd class="mono" id="s-retained">—</dd>
+            </div>
+            <div class="alloc-cell">
+              <dt>NOOS deposit</dt>
+              <dd class="mono" id="s-noos">—</dd>
+            </div>
+            <div class="alloc-cell">
+              <dt>Swap fee</dt>
+              <dd class="mono" id="s-fee">—</dd>
+            </div>
+          </dl>
+          <p class="alloc-note" id="s-note">Fill the form to preview how the fixed supply splits between the pool and your account.</p>
+        </div>
+      </section>
+
+      <section class="panel registry-panel" aria-labelledby="registry-title">
+        <div class="panel-head panel-head-row">
+          <div>
+            <h2 id="registry-title">Registry</h2>
+            <p class="panel-sub">Assets already live on this chain.</p>
+          </div>
+          <button type="button" class="btn-ghost btn-small" id="btn-refresh">Refresh</button>
+        </div>
+        <ol class="asset-list" id="asset-list" aria-busy="true"></ol>
+      </section>
+
+    </aside>
+  </div>
+</main>
+
+<footer class="site-foot">
+  <p>Foundry speaks only to the local MindChain gateway on this origin. Supplies are fixed at genesis of the asset; pools are constant-product with the fee you choose.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -16,9 +16,10 @@
 
 use noos_codec::{NoosDecode, NoosEncode};
 use noos_lumen::objects::{
-    object_id as lumen_object_id, txid as lumen_txid, witness_root, AccessEntry, ActionV1,
-    BoundedBytes, BoundedList, FeeAuthorizationV1, NoteV1, OptionalHash32, OptionalObject,
-    ResourceVector, SignedIntentV1, TransactionV1, TransactionWitnessesV1,
+    asset_id as lumen_asset_id, object_id as lumen_object_id, pool_id as lumen_pool_id,
+    txid as lumen_txid, witness_root, AccessEntry, ActionV1, BoundedBytes, BoundedList,
+    FeeAuthorizationV1, NoteV1, OptionalHash32, OptionalObject, ResourceVector, SignedIntentV1,
+    TransactionV1, TransactionWitnessesV1,
 };
 use noos_wallet::{derive_authority, IdentityGate, NodeIdentity, Purpose};
 use serde_json::{json, Value};
@@ -207,6 +208,21 @@ fn spec_u32(v: &Value, key: &str) -> Result<u32> {
         .map_err(|_| CliError::Malformed(format!("spec field {key} must be u32")))
 }
 
+fn spec_u16(v: &Value, key: &str) -> Result<u16> {
+    u16::try_from(spec_u64(v, key)?)
+        .map_err(|_| CliError::Malformed(format!("spec field {key} must be u16")))
+}
+
+fn spec_u8(v: &Value, key: &str) -> Result<u8> {
+    u8::try_from(spec_u64(v, key)?)
+        .map_err(|_| CliError::Malformed(format!("spec field {key} must be u8")))
+}
+
+fn spec_text<const MAX: u32>(v: &Value, key: &str) -> Result<BoundedBytes<MAX>> {
+    BoundedBytes::new(spec_str(v, key)?.as_bytes().to_vec())
+        .ok_or_else(|| CliError::Malformed(format!("spec field {key} exceeds {MAX} bytes")))
+}
+
 fn spec_hash(v: &Value, key: &str) -> Result<[u8; 32]> {
     from_hex32(spec_str(v, key)?)
 }
@@ -247,6 +263,28 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
             storage_words: spec_u64(spec, "storage_words")?,
             rent_deposit: spec_u128(spec, "rent_deposit")?,
             flags: spec_u32(spec, "flags")?,
+        },
+        "create_asset" => ActionV1::CreateAsset {
+            issuer: spec_hash(spec, "issuer")?,
+            symbol: spec_text(spec, "symbol")?,
+            name: spec_text(spec, "name")?,
+            decimals: spec_u8(spec, "decimals")?,
+            total_supply: spec_u128(spec, "total_supply")?,
+        },
+        "create_pool" => ActionV1::CreatePool {
+            provider: spec_hash(spec, "provider")?,
+            asset_a: spec_hash(spec, "asset_a")?,
+            asset_b: spec_hash(spec, "asset_b")?,
+            amount_a: spec_u128(spec, "amount_a")?,
+            amount_b: spec_u128(spec, "amount_b")?,
+            fee_bps: spec_u16(spec, "fee_bps")?,
+        },
+        "swap_exact_in" => ActionV1::SwapExactIn {
+            trader: spec_hash(spec, "trader")?,
+            pool_id: spec_hash(spec, "pool_id")?,
+            asset_in: spec_hash(spec, "asset_in")?,
+            amount_in: spec_u128(spec, "amount_in")?,
+            min_amount_out: spec_u128(spec, "min_amount_out")?,
         },
         other => {
             return Err(CliError::Malformed(format!(
@@ -428,11 +466,62 @@ pub fn tx_build(spec_json: &str) -> Result<Value> {
             }))
         })
         .collect();
+    let created_assets: Vec<Value> = tx
+        .actions
+        .as_slice()
+        .iter()
+        .enumerate()
+        .filter_map(|(index, bytes)| {
+            let ActionV1::CreateAsset {
+                symbol,
+                name,
+                decimals,
+                total_supply,
+                ..
+            } = ActionV1::decode_canonical(bytes.as_slice()).ok()?
+            else {
+                return None;
+            };
+            let action_index = u32::try_from(index).ok()?;
+            Some(json!({
+                "action_index": action_index,
+                "asset_id": to_hex(&lumen_asset_id(&txid, action_index)),
+                "symbol": String::from_utf8(symbol.as_slice().to_vec()).ok()?,
+                "name": String::from_utf8(name.as_slice().to_vec()).ok()?,
+                "decimals": decimals,
+                "total_supply": total_supply.to_string(),
+            }))
+        })
+        .collect();
+    let created_pools: Vec<Value> = tx
+        .actions
+        .as_slice()
+        .iter()
+        .filter_map(|bytes| {
+            let ActionV1::CreatePool {
+                asset_a,
+                asset_b,
+                fee_bps,
+                ..
+            } = ActionV1::decode_canonical(bytes.as_slice()).ok()?
+            else {
+                return None;
+            };
+            Some(json!({
+                "pool_id": to_hex(&lumen_pool_id(&asset_a, &asset_b)),
+                "asset_0": to_hex(if asset_a < asset_b { &asset_a } else { &asset_b }),
+                "asset_1": to_hex(if asset_a < asset_b { &asset_b } else { &asset_a }),
+                "fee_bps": fee_bps,
+            }))
+        })
+        .collect();
     Ok(json!({
         "tx": to_hex(&bytes),
         "txid": to_hex(&txid),
         "witness_root": to_hex(&tx.witness_root),
         "created_objects": created_objects,
+        "created_assets": created_assets,
+        "created_pools": created_pools,
     }))
 }
 

@@ -73,8 +73,10 @@ def http_json(addr: str, path: str, token: str | None = None, timeout: float = 5
 
 def build_binaries(env: dict) -> dict[str, Path]:
     subprocess.run(
-        ["cargo", "build", "--locked", "-p", "noos-node", "--bin", "noosd",
-         "-p", "noos-indexer", "-p", "noos-cli"],
+        ["cargo", "build", "--locked",
+         "-p", "noos-node", "--bin", "noosd",
+         "-p", "noos-indexer", "--bin", "noos-indexer",
+         "-p", "noos-cli", "--bin", "noos-cli"],
         cwd=ROOT, env=env, check=True)
     probe = subprocess.check_output(
         ["cargo", "metadata", "--format-version", "1", "--no-deps"],

@@ -260,7 +260,9 @@ pub fn audit_local_reference() -> Result<ConformanceReport, NelError> {
         })
         .count() as u64;
     let canonical_contract = FrozenProfileContract::canonical_local();
-    canonical_contract.validate_local().map_err(|_| NelError::InvalidCount)?;
+    canonical_contract
+        .validate_local()
+        .map_err(|_| NelError::InvalidCount)?;
     let mut mutations = Vec::new();
     for replacement in [[90; 32], [91; 32], [92; 32], [93; 32]] {
         let mut mutation = canonical_contract.clone();

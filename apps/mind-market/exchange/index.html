@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <base href="/exchange/">
+  <title>Current — MindChain Exchange</title>
+  <meta name="description" content="Constant-product exchange for the MindChain local market.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">Current</span>
+      <span class="brand-tag">exchange</span>
+    </div>
+    <div class="chain-identity" id="chain-identity" aria-live="polite">
+      <div class="identity-skeleton" id="identity-skeleton" aria-hidden="true">
+        <span class="skeleton skeleton-pill"></span>
+        <span class="skeleton skeleton-pill wide"></span>
+      </div>
+      <div class="identity-body" id="identity-body" hidden>
+        <span class="net-dot" aria-hidden="true"></span>
+        <span class="identity-chain mono" id="identity-chain"></span>
+        <span class="identity-sep" aria-hidden="true">/</span>
+        <span class="identity-account mono" id="identity-account" title=""></span>
+      </div>
+      <div class="identity-error" id="identity-error" hidden>
+        <span class="net-dot off" aria-hidden="true"></span>
+        <span>gateway offline</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Pools panel -->
+    <section class="pools-panel" aria-labelledby="pools-heading">
+      <div class="panel-head">
+        <h2 id="pools-heading">Pools</h2>
+        <button type="button" class="ghost-btn" id="refresh-pools">Refresh</button>
+      </div>
+
+      <div id="pools-skeleton" class="pools-skeleton" aria-hidden="true">
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
+      </div>
+
+      <div id="pools-error" class="inline-error" hidden>
+        <p id="pools-error-text">Could not load pools.</p>
+        <button type="button" class="ghost-btn" id="pools-retry">Retry</button>
+      </div>
+
+      <div id="pools-empty" class="empty-state" hidden>
+        <p class="empty-title">No pools yet</p>
+        <p class="empty-copy">The market is quiet. Launch a token with seed liquidity to open the first pool.</p>
+        <a class="ghost-btn" href="../launch/">Open launchpad</a>
+      </div>
+
+      <ul id="pool-list" class="pool-list" role="listbox" aria-labelledby="pools-heading" hidden></ul>
+    </section>
+
+    <!-- Swap panel -->
+    <section class="swap-panel" aria-labelledby="swap-heading">
+      <div class="panel-head">
+        <h1 id="swap-heading">Swap</h1>
+        <div class="slippage-control">
+          <span class="slippage-label" id="slippage-label">Slippage</span>
+          <div class="slippage-presets" role="group" aria-labelledby="slippage-label">
+            <button type="button" class="slip-btn" data-bps="10">0.1%</button>
+            <button type="button" class="slip-btn is-active" data-bps="50">0.5%</button>
+            <button type="button" class="slip-btn" data-bps="100">1%</button>
+          </div>
+          <label class="slip-custom">
+            <span class="visually-hidden">Custom slippage percent</span>
+            <input type="text" id="slippage-input" inputmode="decimal" autocomplete="off"
+                   placeholder="0.5" aria-describedby="slippage-hint">
+            <span aria-hidden="true">%</span>
+          </label>
+        </div>
+      </div>
+      <p class="field-hint" id="slippage-hint" hidden></p>
+
+      <form id="swap-form" novalidate>
+        <!-- You pay -->
+        <div class="trade-box" id="pay-box">
+          <div class="trade-box-head">
+            <label for="amount-in">You pay</label>
+            <div class="balance-line">
+              <span id="balance-display" class="mono">—</span>
+              <button type="button" class="max-btn" id="max-btn" hidden>Max</button>
+            </div>
+          </div>
+          <div class="trade-box-body">
+            <input type="text" id="amount-in" inputmode="decimal" autocomplete="off"
+                   placeholder="0" aria-describedby="amount-hint" disabled>
+            <span class="asset-chip mono" id="asset-in-chip">—</span>
+          </div>
+        </div>
+
+        <div class="flip-row">
+          <button type="button" id="flip-btn" class="flip-btn" aria-label="Reverse swap direction" disabled>
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none"
+                 stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 2v10M5 12l-2.5-2.5M5 12l2.5-2.5"/>
+              <path d="M11 14V4M11 4l-2.5 2.5M11 4l2.5 2.5"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- You receive -->
+        <div class="trade-box" id="receive-box">
+          <div class="trade-box-head">
+            <label for="amount-out">You receive (estimated)</label>
+          </div>
+          <div class="trade-box-body">
+            <output id="amount-out" class="amount-out mono" for="amount-in">0</output>
+            <span class="asset-chip mono" id="asset-out-chip">—</span>
+          </div>
+        </div>
+
+        <p class="field-hint" id="amount-hint" role="status"></p>
+
+        <!-- Quote details -->
+        <dl class="quote-details" id="quote-details" hidden>
+          <div class="detail-row">
+            <dt>Rate</dt>
+            <dd class="mono" id="detail-rate">—</dd>
+          </div>
+          <div class="detail-row">
+            <dt>Price impact</dt>
+            <dd class="mono" id="detail-impact">—</dd>
+          </div>
+          <div class="detail-row">
+            <dt>Minimum received</dt>
+            <dd class="mono" id="detail-min">—</dd>
+          </div>
+          <div class="detail-row">
+            <dt>Pool fee</dt>
+            <dd class="mono" id="detail-fee">—</dd>
+          </div>
+          <div class="detail-row">
+            <dt>Reserves</dt>
+            <dd class="mono" id="detail-reserves">—</dd>
+          </div>
+        </dl>
+
+        <button type="submit" id="swap-btn" class="swap-btn" disabled>Select a pool</button>
+      </form>
+
+      <div id="swap-status" class="swap-status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>MindChain local market</span>
+    <span class="mono" id="footer-genesis"></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

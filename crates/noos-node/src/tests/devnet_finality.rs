@@ -40,3 +40,32 @@ fn devnet_finality_tick_advances_two_epoch_ladder_only_when_enabled() {
     assert_eq!(disabled.justified(), justified_before);
     assert_eq!(disabled.finalized(), finalized_before);
 }
+
+#[test]
+fn restart_reembeds_certificate_queued_after_epoch_boundary() {
+    let dir = test_dir("devnet-finality-restart-pending");
+    let mut cfg = node_config();
+    cfg.devnet_fixture_finality = true;
+    let mut producer = boot_node(&dir, cfg.clone());
+    for _ in 0..EPOCH_LENGTH {
+        produce_next(&mut producer);
+    }
+    assert!(producer
+        .devnet_finality_tick()
+        .expect("queue epoch-1 certificate"));
+    assert_eq!(producer.justified().epoch, 1);
+    drop(producer);
+
+    let mut restarted = boot_node(&dir, cfg);
+    assert_eq!(restarted.justified().epoch, 1);
+    let next = produce_full(&mut restarted);
+    assert_eq!(
+        next.body.finality_certificates.as_slice().len(),
+        1,
+        "first post-restart body re-embeds the durable pending certificate"
+    );
+    assert_eq!(
+        next.body.finality_certificates.as_slice()[0].target.epoch,
+        1
+    );
+}

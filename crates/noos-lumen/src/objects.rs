@@ -510,18 +510,67 @@ pub fn witness_root(lock_reveals: &BoundedList<BoundedBytes<4096>, 256>) -> Hash
     domain_hash(domains::TX_WROOT, &[&lock_reveals.encode_canonical()])
 }
 
+define_object! {
+    /// Fixed-supply user asset registered exactly once by `CreateAsset`.
+    pub struct AssetV1 {
+        version: 1;
+        1 => asset_id: [u8; 32],
+        2 => issuer: [u8; 32],
+        3 => symbol: BoundedBytes<12>,
+        4 => name: BoundedBytes<64>,
+        5 => decimals: u8,
+        6 => total_supply: u128,
+    }
+}
+
+define_object! {
+    /// Constant-product liquidity pool. Asset ordering is canonical.
+    pub struct PoolV1 {
+        version: 1;
+        1 => pool_id: [u8; 32],
+        2 => asset_0: [u8; 32],
+        3 => asset_1: [u8; 32],
+        4 => reserve_0: u128,
+        5 => reserve_1: u128,
+        6 => fee_bps: u16,
+        7 => creator: [u8; 32],
+    }
+}
+
+#[must_use]
+pub fn asset_id(creating_txid: &Hash32, action_index: u32) -> Hash32 {
+    domain_hash(
+        "NOOS/ASSET/ID/V1",
+        &[creating_txid, &action_index.to_le_bytes()],
+    )
+}
+
+#[must_use]
+pub fn pool_id(asset_a: &Hash32, asset_b: &Hash32) -> Hash32 {
+    let (asset_0, asset_1) = if asset_a < asset_b {
+        (asset_a, asset_b)
+    } else {
+        (asset_b, asset_a)
+    };
+    domain_hash("NOOS/POOL/ID/V1", &[asset_0, asset_1])
+}
+
 // ---------------------------------------------------------------------------
 // Typed actions (declaration-order discriminants, lumen-v1.md §5)
 // ---------------------------------------------------------------------------
+
+// User-asset issuance below is fixed-supply, domain-derived, and exactly once;
+// it cannot mint NOOS, alter scheduled issuance, seize state, revert finality,
+// admit code, exceed hard caps, or activate a disabled suite.
 
 /// Typed transaction action. Encoded as `u16` discriminant in declaration
 /// order followed by the variant fields; carried inside the envelope's
 /// bounded `actions[]` byte strings.
 ///
-/// Closed by construction (plan §4.7): there is NO variant that mints, seizes
-/// user state, reverts finalized state, forges finality, admits code outside
-/// the registry path, exceeds caps, or activates a disabled suite. Emergency
-/// variants can only disable or quarantine.
+/// Closed by construction (plan §4.7): user-asset creation is fixed-supply
+/// and domain-derived; there is no variant that mints NOOS, seizes user
+/// state, reverts finalized state, forges finality, admits code outside the
+/// registry path, exceeds caps, or activates a disabled suite.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActionV1 {
     /// 0 — call a Grain contract object through the ContractEngine.
@@ -580,10 +629,35 @@ pub enum ActionV1 {
     RevokeCapability { grant_id: Hash32 },
     /// 11 — submit a typed agent intent through the deterministic policy gate.
     SubmitIntent { intent: IntentV1 },
+    /// 12 — register and issue a fixed-supply user asset to its signed issuer.
+    CreateAsset {
+        issuer: Hash32,
+        symbol: BoundedBytes<12>,
+        name: BoundedBytes<64>,
+        decimals: u8,
+        total_supply: u128,
+    },
+    /// 13 — seed the unique constant-product pool for an unordered pair.
+    CreatePool {
+        provider: Hash32,
+        asset_a: Hash32,
+        asset_b: Hash32,
+        amount_a: u128,
+        amount_b: u128,
+        fee_bps: u16,
+    },
+    /// 14 — swap an exact signed-account input with a minimum output.
+    SwapExactIn {
+        trader: Hash32,
+        pool_id: Hash32,
+        asset_in: Hash32,
+        amount_in: u128,
+        min_amount_out: u128,
+    },
 }
 
 impl ActionV1 {
-    pub const VARIANT_COUNT: u16 = 12;
+    pub const VARIANT_COUNT: u16 = 15;
 }
 
 impl NoosEncode for ActionV1 {
@@ -676,6 +750,50 @@ impl NoosEncode for ActionV1 {
                 w.put_u16(11);
                 intent.encode(w);
             }
+            ActionV1::CreateAsset {
+                issuer,
+                symbol,
+                name,
+                decimals,
+                total_supply,
+            } => {
+                w.put_u16(12);
+                w.put_array32(issuer);
+                symbol.encode(w);
+                name.encode(w);
+                w.put_u8(*decimals);
+                w.put_u128(*total_supply);
+            }
+            ActionV1::CreatePool {
+                provider,
+                asset_a,
+                asset_b,
+                amount_a,
+                amount_b,
+                fee_bps,
+            } => {
+                w.put_u16(13);
+                w.put_array32(provider);
+                w.put_array32(asset_a);
+                w.put_array32(asset_b);
+                w.put_u128(*amount_a);
+                w.put_u128(*amount_b);
+                w.put_u16(*fee_bps);
+            }
+            ActionV1::SwapExactIn {
+                trader,
+                pool_id,
+                asset_in,
+                amount_in,
+                min_amount_out,
+            } => {
+                w.put_u16(14);
+                w.put_array32(trader);
+                w.put_array32(pool_id);
+                w.put_array32(asset_in);
+                w.put_u128(*amount_in);
+                w.put_u128(*min_amount_out);
+            }
         }
     }
 }
@@ -733,6 +851,28 @@ impl NoosDecode for ActionV1 {
             }),
             11 => Ok(ActionV1::SubmitIntent {
                 intent: IntentV1::decode(r)?,
+            }),
+            12 => Ok(ActionV1::CreateAsset {
+                issuer: r.get_array32()?,
+                symbol: BoundedBytes::decode(r)?,
+                name: BoundedBytes::decode(r)?,
+                decimals: r.get_u8()?,
+                total_supply: r.get_u128()?,
+            }),
+            13 => Ok(ActionV1::CreatePool {
+                provider: r.get_array32()?,
+                asset_a: r.get_array32()?,
+                asset_b: r.get_array32()?,
+                amount_a: r.get_u128()?,
+                amount_b: r.get_u128()?,
+                fee_bps: r.get_u16()?,
+            }),
+            14 => Ok(ActionV1::SwapExactIn {
+                trader: r.get_array32()?,
+                pool_id: r.get_array32()?,
+                asset_in: r.get_array32()?,
+                amount_in: r.get_u128()?,
+                min_amount_out: r.get_u128()?,
             }),
             _ => Err(CodecError::UnknownDiscriminant),
         }

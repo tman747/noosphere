@@ -318,6 +318,9 @@ fn build_router(indexer: Indexer, submission_source: Option<ingest::LineProtocol
         .route("/api/v1/blocks/{hash_or_height}", get(block))
         .route("/api/v1/transactions", post(submit_transaction))
         .route("/api/v1/transactions/{txid}", get(entity_transaction))
+        .route("/api/v1/assets", get(market_assets))
+        .route("/api/v1/pools", get(market_pools))
+        .route("/api/v1/balances/{account}/{asset}", get(market_balance))
         .route("/api/v1/notes/{noteid}", get(hash_not_found))
         .route("/api/v1/addresses/{address}/notes", get(address_page))
         .route("/api/v1/addresses/{address}/balance", get(address_resource))
@@ -567,6 +570,52 @@ async fn submit_transaction(
         .headers_mut()
         .insert(header::CONTENT_TYPE, HeaderValue::from_static(MEDIA_TYPE));
     Ok(response)
+}
+
+async fn market_query(s: AppState, headers: HeaderMap, path: String) -> ApiResult<Response> {
+    accepted(&headers)?;
+    let source = s.submission_source.ok_or_else(|| {
+        ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unavailable",
+            "market state forwarding is unavailable",
+        )
+    })?;
+    let expected = s.indexer.identity.clone();
+    let value = tokio::task::spawn_blocking(move || source.forward_query(&expected, &path))
+        .await
+        .map_err(|_| {
+            ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                "market query task unavailable",
+            )
+        })?
+        .map_err(forward_error)?;
+    Ok(api_json(value))
+}
+
+async fn market_assets(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    market_query(s, headers, "/assets".to_owned()).await
+}
+
+async fn market_pools(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    market_query(s, headers, "/pools".to_owned()).await
+}
+
+async fn market_balance(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    Path((account, asset)): Path<(String, String)>,
+) -> ApiResult<Response> {
+    if !is_hash(&account) || !is_hash(&asset) {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "invalid_request",
+            "account and asset must be 32-byte lowercase hex",
+        ));
+    }
+    market_query(s, headers, format!("/balance/{account}/{asset}")).await
 }
 
 fn canonical_hex(value: &str) -> bool {

@@ -34,6 +34,7 @@ use crate::roots::{
     body_cert_root, body_receipt_root, body_ticket_root, body_tx_root, body_witness_root,
 };
 use crate::{Hash32, NodeError};
+use std::collections::BTreeMap;
 
 // ---------------------------------------------------------------------------
 // Devnet fixture identities (valueless; node-v1.md §2.2)
@@ -433,6 +434,10 @@ pub struct GenesisSpec {
     /// their operator accounts here. REFUSED unless `is_test_network = true`
     /// (plan §2.5); mainnet allocations are OWNER_BLOCKED by design.
     pub extra_accounts: Vec<(Hash32, u128)>,
+    /// Immutable test-network Grain code registry. Its canonical commitment
+    /// is installed as an unspendable zero-balance genesis account, binding
+    /// the complete registry to `genesis_hash`.
+    pub contract_codes: BTreeMap<Hash32, Vec<u8>>,
 }
 
 /// A fully derived genesis: identity, ledger, and the genesis block.
@@ -455,6 +460,7 @@ impl GenesisSpec {
             genesis_time_ms,
             initial_ground_target: U256::MAX,
             extra_accounts: Vec::new(),
+            contract_codes: BTreeMap::new(),
         }
     }
 
@@ -574,10 +580,32 @@ impl GenesisSpec {
         }
     }
 
+    fn contract_registry_account(&self) -> Option<Hash32> {
+        if self.contract_codes.is_empty() {
+            return None;
+        }
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"NOOS/GENESIS/CONTRACT-REGISTRY/V1");
+        hasher.update(&(self.contract_codes.len() as u64).to_le_bytes());
+        for (code_hash, formula) in &self.contract_codes {
+            hasher.update(code_hash);
+            hasher.update(&(formula.len() as u64).to_le_bytes());
+            hasher.update(formula);
+        }
+        Some(*hasher.finalize().as_bytes())
+    }
+
     fn canonical_accounts(&self) -> Result<Vec<(AccountV1, Vec<(Hash32, u128)>)>, NodeError> {
         if !self.extra_accounts.is_empty() && !self.params.is_test_network {
             return Err(NodeError::Config(
                 "extra fixture accounts are a test-network-only mechanism \
+                 (is_test_network = false)"
+                    .into(),
+            ));
+        }
+        if !self.contract_codes.is_empty() && !self.params.is_test_network {
+            return Err(NodeError::Config(
+                "fixture contract codes are a test-network-only mechanism \
                  (is_test_network = false)"
                     .into(),
             ));
@@ -597,6 +625,9 @@ impl GenesisSpec {
                 vec![],
             ),
         ];
+        if let Some(commitment) = self.contract_registry_account() {
+            accounts.push((Self::fixture_account(commitment, &[]), vec![]));
+        }
         for (id, balance) in &self.extra_accounts {
             let balances = if *balance > 0 {
                 vec![(NOOS_ASSET, *balance)]
@@ -897,6 +928,26 @@ mod production_proposal_refusal_tests {
         let mut duplicate = first;
         duplicate.extra_accounts.push(([0x71; 32], 10));
         assert!(duplicate.build().is_err());
+    }
+
+    #[test]
+    fn contract_registry_is_bound_to_genesis_identity() {
+        let params = DevnetParams::parse(DEVNET).unwrap();
+        let empty = GenesisSpec::devnet(params.clone(), 1_760_000_000_000);
+        let mut registered = GenesisSpec::devnet(params.clone(), 1_760_000_000_000);
+        registered.contract_codes.insert([0xC0; 32], vec![1, 2, 3]);
+        let mut changed = GenesisSpec::devnet(params, 1_760_000_000_000);
+        changed.contract_codes.insert([0xC0; 32], vec![1, 2, 4]);
+
+        assert_eq!(empty.chain_id().unwrap(), registered.chain_id().unwrap());
+        assert_ne!(
+            empty.genesis_hash().unwrap(),
+            registered.genesis_hash().unwrap()
+        );
+        assert_ne!(
+            registered.genesis_hash().unwrap(),
+            changed.genesis_hash().unwrap()
+        );
     }
 
     #[test]

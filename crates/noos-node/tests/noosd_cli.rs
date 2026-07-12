@@ -24,6 +24,10 @@ fn help_prints_the_operator_surface_and_exits_zero() {
     );
     assert!(text.contains("--rpc"), "documents the operator RPC");
     assert!(
+        text.contains("--devnet-witness-fixture"),
+        "documents verification-only devnet witness bonds"
+    );
+    assert!(
         text.contains("NEVER") || text.contains("never"),
         "the social-checkpoint law is stated"
     );

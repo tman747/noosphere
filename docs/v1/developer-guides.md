@@ -46,13 +46,42 @@ contract forms:
 Build output includes every deterministically derived `created_objects[]`
 identifier. Sign with the development seed and submit through either the
 authenticated node RPC or the indexer's transaction-forwarding endpoint.
-Calls must declare the object in `object_access_list` with `read_write` mode
-when the formula may update state.
+Every current `call_object` action must declare its object in
+`object_access_list` with `read_write` mode; the execution path always
+updates the object version even when the formula returns equivalent state.
 
 This is an execution and application-development path, not permissionless
 code deployment. The running fixture exposes one registered formula. Adding
 arbitrary immutable formula bytes still requires the versioned registry /
 governance path and is not exposed as a local CLI command.
+
+## Mind Market applications
+
+With the local network running, start the loopback-only application gateway:
+
+```text
+python tools/e2e/market_gateway.py
+```
+
+Open `http://127.0.0.1:18100`. The hub links to:
+
+- **Foundry** (`/launch/`): registers a domain-derived, fixed-supply user asset
+  and seeds its unique NOOS constant-product pool.
+- **Current** (`/exchange/`): quotes and submits exact-input buys and sells
+  against live pool reserves.
+
+User assets cannot mint NOOS or change scheduled issuance. `CreateAsset`
+issues the declared supply exactly once to its signed issuer. `CreatePool`
+moves existing signed-account balances into canonically ordered reserves.
+`SwapExactIn` uses integer-floor constant-product math, retains the declared
+fee in the pool, enforces `min_amount_out`, and commits reserve and trader
+balance changes atomically. Failed slippage or balance checks leave the pool
+unchanged and charge only the ordinary deterministic failure fee.
+
+The gateway reads consensus-owned assets, pools, and balances through the
+identity-gated indexer and signs with the deterministic local developer
+account. It is a local test harness, binds only to loopback, and must never be
+deployed with its fixture seed.
 
 ## Wallet guide
 
@@ -70,8 +99,10 @@ Contract admission binds canonical Grain formula bytes/hash, version, manifest, 
 
 The Neural Execution Lane (`noos-nel`) implements deterministic integer
 inference primitives, model/token state, data-availability commitments,
-chunk claims, Freivalds checks, disputes/bisection, and settlement
-integration. Exercise the implemented path with:
+chunk claims, Freivalds checks, and dispute/bisection primitives. A
+fixture-only integration test composes these with Work Loom and Hearth
+settlement types; the node does not dispatch NEL jobs or settle them in its
+production consensus path. Exercise the implemented library path with:
 
 ```text
 cargo test -p noos-nel --locked
@@ -80,8 +111,10 @@ cargo test -p noos-nel --test settlement --locked
 
 NEL is disabled in the genesis feature controls
 (`neural_lane_enabled = false`). It has zero consensus weight, issuance, and
-ProofPower contribution. The registered first-activation specification is a
-494M-parameter P0_OPEN/W8A8 test fixture; the repository's executable tests
+ProofPower contribution. The first-activation validator checks a
+494M-parameter P0_OPEN/W8A8 shape and caller-supplied manifest commitments;
+the repository does not contain governed immutable production weights,
+tokenizer artifacts, verifier keys, or an activation record. Executable tests
 use deterministic compact models, not a hosted or decentralized production
 LLM. No local-devnet model/job API is advertised while the control remains
 disabled.

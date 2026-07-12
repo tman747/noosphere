@@ -26,11 +26,11 @@ use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
-use noos_braid::{BlockHeaderV1, CheckpointRef, FinalityCertificateV1};
+use noos_braid::{BlockHeaderV1, CheckpointRef, FinalityCertificateV1, MAX_FINALITY_CERTIFICATES};
 use noos_codec::NoosDecode;
 use noos_da::{encode_body, BodyDaClaimV1, ShardCandidateV1, BODY_TOTAL_SHARDS};
 use noos_ground::GroundTicketV1;
-use noos_lumen::objects::ReceiptV1;
+use noos_lumen::objects::{AssetV1, BoundedList, PoolV1, ReceiptV1};
 use noos_lumen::state::LumenRoots;
 use noos_p2p::{
     BodyReplyV1, ChainIdentity, InboundItem, Multiaddr, P2pConfig, P2pEvent, P2pHandle, P2pNode,
@@ -40,7 +40,7 @@ use noos_store::WriteSet;
 use noos_witness::vote::FinalityVoteV1;
 use tokio::runtime::Handle;
 
-use crate::consensus::{ImportOutcome, NodeConfig, NodeCore};
+use crate::consensus::{ImportOutcome, NodeConfig, NodeCore, NodeMode};
 use crate::genesis::GenesisSpec;
 use crate::mempool::AdmitError;
 use crate::metrics::Metrics;
@@ -237,6 +237,12 @@ pub enum ConsensusMsg {
         shards: Vec<ShardCandidateV1>,
         reply: Reply<Result<ImportOutcome, String>>,
     },
+    ImportHeader {
+        header: Box<BlockHeaderV1>,
+        ticket: GroundTicketV1,
+        certificates: BoundedList<FinalityCertificateV1, MAX_FINALITY_CERTIFICATES>,
+        reply: Reply<Result<ImportOutcome, String>>,
+    },
     ProduceBlock {
         reply: Reply<Result<Hash32, String>>,
     },
@@ -255,6 +261,12 @@ pub enum ConsensusMsg {
     Status {
         reply: Reply<StatusSnapshot>,
     },
+    SyncHead {
+        reply: Reply<(u64, Hash32)>,
+    },
+    Mode {
+        reply: Reply<NodeMode>,
+    },
     GetBlock {
         id: BlockId,
         reply: Reply<ViewLookup<BlockSummary>>,
@@ -262,6 +274,17 @@ pub enum ConsensusMsg {
     GetReceipt {
         txid: Hash32,
         reply: Reply<ViewLookup<(TxStatus, Option<ReceiptV1>)>>,
+    },
+    GetAssets {
+        reply: Reply<Vec<AssetV1>>,
+    },
+    GetPools {
+        reply: Reply<Vec<PoolV1>>,
+    },
+    GetBalance {
+        account: Hash32,
+        asset: Hash32,
+        reply: Reply<u128>,
     },
     SetNow(u64),
     /// Test hook: panic the consensus task to prove containment.
@@ -332,6 +355,17 @@ fn core_loop<P: StorePort>(
                 }
                 let _ = reply.send(result);
             }
+            ConsensusMsg::ImportHeader {
+                header,
+                ticket,
+                certificates,
+                reply,
+            } => {
+                let result = core
+                    .import_header_for_light_sync(&header, &ticket, &certificates)
+                    .map_err(|error| error.to_string());
+                let _ = reply.send(result);
+            }
             ConsensusMsg::ProduceBlock { reply } => {
                 let result = core.produce_block().map_err(|e| e.to_string());
                 let result = match result {
@@ -360,6 +394,12 @@ fn core_loop<P: StorePort>(
             ConsensusMsg::Status { reply } => {
                 let _ = reply.send(status_of(core, observer));
             }
+            ConsensusMsg::SyncHead { reply } => {
+                let _ = reply.send(core.sync_head());
+            }
+            ConsensusMsg::Mode { reply } => {
+                let _ = reply.send(core.mode());
+            }
             ConsensusMsg::GetBlock { id, reply } => {
                 let lookup = match id {
                     BlockId::Height(h) => core.view.block_by_height(h),
@@ -384,6 +424,19 @@ fn core_loop<P: StorePort>(
                     ViewLookup::NotFound => ViewLookup::NotFound,
                 };
                 let _ = reply.send(lookup);
+            }
+            ConsensusMsg::GetAssets { reply } => {
+                let _ = reply.send(core.ledger().assets());
+            }
+            ConsensusMsg::GetPools { reply } => {
+                let _ = reply.send(core.ledger().pools());
+            }
+            ConsensusMsg::GetBalance {
+                account,
+                asset,
+                reply,
+            } => {
+                let _ = reply.send(core.ledger().balance(&account, &asset));
             }
             ConsensusMsg::SetNow(t) => core.set_now(t),
             ConsensusMsg::InjectCrash => panic!("injected consensus crash (containment test)"),
@@ -443,9 +496,54 @@ async fn import_wire_block(
         .map_err(|_| "consensus reply closed".to_owned())?
 }
 
-fn consensus_status(consensus: &SyncSender<ConsensusMsg>) -> Option<StatusSnapshot> {
+async fn import_wire_header(
+    consensus: &SyncSender<ConsensusMsg>,
+    p2p: &P2pHandle,
+    peer: noos_p2p::PeerId,
+    announced: &[u8],
+) -> Result<ImportOutcome, String> {
+    let (header, ticket) = decode_header_announce(announced)
+        .map_err(|error| format!("decode header announce: {error:?}"))?;
+    let empty = BoundedList::<FinalityCertificateV1, MAX_FINALITY_CERTIFICATES>::default();
+    let empty_root = crate::roots::body_cert_root(&empty)
+        .map_err(|error| format!("empty certificate root: {error}"))?;
+    let certificates = if header.finality_certificate_root == empty_root {
+        empty
+    } else {
+        let BodyReplyV1::Body(body) = p2p
+            .request_body(peer, header.body_da_root)
+            .await
+            .map_err(|error| format!("request certificate body: {error}"))?
+        else {
+            return Err("certificate body not found".to_owned());
+        };
+        noos_braid::BlockBodyV1::decode_canonical(&body.0)
+            .map_err(|error| format!("decode certificate body: {error}"))?
+            .finality_certificates
+    };
     let (reply, reply_rx) = sync_channel(1);
-    consensus.send(ConsensusMsg::Status { reply }).ok()?;
+    consensus
+        .send(ConsensusMsg::ImportHeader {
+            header: Box::new(header),
+            ticket,
+            certificates,
+            reply,
+        })
+        .map_err(|_| "consensus inbox closed".to_owned())?;
+    reply_rx
+        .recv()
+        .map_err(|_| "consensus reply closed".to_owned())?
+}
+
+fn consensus_mode(consensus: &SyncSender<ConsensusMsg>) -> Option<NodeMode> {
+    let (reply, reply_rx) = sync_channel(1);
+    consensus.send(ConsensusMsg::Mode { reply }).ok()?;
+    reply_rx.recv().ok()
+}
+
+fn consensus_sync_head(consensus: &SyncSender<ConsensusMsg>) -> Option<(u64, Hash32)> {
+    let (reply, reply_rx) = sync_channel(1);
+    consensus.send(ConsensusMsg::SyncHead { reply }).ok()?;
     reply_rx.recv().ok()
 }
 
@@ -454,11 +552,14 @@ async fn sync_ready_peer(
     p2p: &P2pHandle,
     peer: noos_p2p::PeerId,
 ) {
+    let Some(mode) = consensus_mode(consensus) else {
+        return;
+    };
     loop {
-        let Some(before) = consensus_status(consensus) else {
+        let Some(before) = consensus_sync_head(consensus) else {
             return;
         };
-        let Some(start_height) = before.head_height.checked_add(1) else {
+        let Some(start_height) = before.0.checked_add(1) else {
             return;
         };
         let Ok(range) = p2p
@@ -471,16 +572,26 @@ async fn sync_ready_peer(
             return;
         }
         for header in range.headers.0 {
-            if let Err(_error) = import_wire_block(consensus, p2p, peer, &header.0).await {
+            let result = if mode == NodeMode::Light {
+                import_wire_header(consensus, p2p, peer, &header.0).await
+            } else {
+                import_wire_block(consensus, p2p, peer, &header.0).await
+            };
+            if let Err(_error) = result {
                 #[cfg(test)]
-                eprintln!("range-sync import stopped: {_error}");
+                {
+                    let height = decode_header_announce(&header.0)
+                        .ok()
+                        .map(|(decoded, _)| decoded.height);
+                    eprintln!("range-sync import stopped at {height:?}: {_error}");
+                }
                 return;
             }
         }
-        let Some(after) = consensus_status(consensus) else {
+        let Some(after) = consensus_sync_head(consensus) else {
             return;
         };
-        if after.head_height <= before.head_height || !range.more.0 {
+        if after.0 <= before.0 || !range.more.0 {
             return;
         }
     }
@@ -611,8 +722,8 @@ fn spawn_network(
                                         let heights = decode_header_announce(&header)
                                             .ok()
                                             .and_then(|(announced, _)| {
-                                                consensus_status(&consensus).map(|local| {
-                                                    (announced.height, local.head_height)
+                                                consensus_sync_head(&consensus).map(|local| {
+                                                    (announced.height, local.0)
                                                 })
                                             });
                                         match heights {
@@ -625,10 +736,19 @@ fn spawn_network(
                                                 sync_ready_peer(&consensus, &p2p, peer).await;
                                             }
                                             Some(_) => {
-                                                let _ = import_wire_block(
-                                                    &consensus, &p2p, peer, &header,
-                                                )
-                                                .await;
+                                                if consensus_mode(&consensus)
+                                                    == Some(NodeMode::Light)
+                                                {
+                                                    let _ = import_wire_header(
+                                                        &consensus, &p2p, peer, &header,
+                                                    )
+                                                    .await;
+                                                } else {
+                                                    let _ = import_wire_block(
+                                                        &consensus, &p2p, peer, &header,
+                                                    )
+                                                    .await;
+                                                }
                                             }
                                             None => {}
                                         }
