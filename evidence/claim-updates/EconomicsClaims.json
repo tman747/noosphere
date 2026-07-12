@@ -12,6 +12,7 @@
       "packages": ["noos-analytics", "noos-work-loom"],
       "command": "python tools/gates/run_economics_claim.py --claim M-OMEGA",
       "rollback_command": "python tools/gates/run_economics_claim.py --claim M-OMEGA --rollback-check",
+      "evidence_root": "evidence/claim-matrix/claim-m-omega",
       "notes": "Local shadow precursor implements whole-attempt measurement, explicit algorithm families, exact >5% shortcut detection, deliverable-materialization rejection, stale-calibration zeroing, a hard 10%-of-total Omega ceiling (credit <= Ground/9), and irreversible per-class rollback to zero; production credit is structurally zero. PARTIAL: the 99%-confidence cross-shape/cross-hardware cost-per-joule campaign, independent reproductions, and sustained admitted demand for a retarget half-life are not local evidence and are not claimed."
     },
     "M-ISSUANCE": {
@@ -19,6 +20,7 @@
       "packages": ["noos-lumen"],
       "command": "python tools/gates/run_economics_claim.py --claim M-ISSUANCE",
       "rollback_command": "python tools/gates/run_economics_claim.py --claim M-ISSUANCE --rollback-check",
+      "evidence_root": "evidence/claim-matrix/claim-m-issuance",
       "notes": "Rust local precursor enforces a single schedule-only mint path, strictly advancing heights, forfeited skipped/orphaned emission, cap validation, exact terminal and post-terminal behavior, duplicate-height rejection, and atomic recipient crediting. Exact quotient/remainder mul-div removes false u128 overflow while preserving floor rounding; maximum-integer and recipient-alias mutations are covered. The dedicated runner executes the full crate plus 10^7 seeded duplicate/backward/skipped/terminal transition attempts in release. PARTIAL: no second client implements the issuance schedule, signed mainnet parameters/recipient shares/terminal height remain OWNER_BLOCKED, and zero-demand production liveness is not established by this local fixture."
     },
     "A-DUPLEX-ISSUANCE": {
@@ -26,6 +28,7 @@
       "packages": ["noos-work-loom", "noos-lumen"],
       "command": "python tools/gates/run_economics_claim.py --claim A-DUPLEX-ISSUANCE",
       "rollback_command": "python tools/gates/run_economics_claim.py --claim A-DUPLEX-ISSUANCE --rollback-check",
+      "evidence_root": "evidence/claim-matrix/claim-a-duplex-issuance",
       "notes": "Shadow allocator conserves scheduled = base + work exactly, floors the bounded reallocation cap with checked integers, requires qualifying demand, rejects duplicate height and duplicate receipt accounting, and rolls back to the fixed base path. Production always allocates the entire scheduled amount to base and zero to work. PARTIAL: base-security stress minima, 90 public days above 80% external paid-delivered share, and blackout finality require external elapsed-time/production evidence; Duplex remains hard-zero."
     },
     "S-DEMAND": {
@@ -33,6 +36,7 @@
       "packages": ["noos-work-loom"],
       "command": "python tools/gates/run_economics_claim.py --claim S-DEMAND",
       "rollback_command": "python tools/gates/run_economics_claim.py --claim S-DEMAND --rollback-check",
+      "evidence_root": "evidence/claim-matrix/claim-s-demand",
       "notes": "Conservative deterministic classifier returns INDEPENDENT only for on-chain escrow, delivered result, requester acceptance or completed dispute, explicit requester separation from worker and evaluator control clusters, and external funding with no circular funding detected; common control/circular funding is RELATED, rebates are SUBSIDIZED, and incomplete/unknown evidence is UNKNOWN. The full 432-case truth table and wash mutations execute locally. A checked 30-day report computes exact 80% share, 10 requester clusters, 20 operator clusters, four hardware classes, and <=20% concentration. PARTIAL: hidden beneficial ownership and quality remain non-claims; blinded false-independent rates and real rolling public diversity/duration evidence are external."
     },
     "E-DEMAND-PREDICATE": {
@@ -40,6 +44,7 @@
       "packages": ["noos-work-loom"],
       "command": "python tools/gates/run_economics_claim.py --claim E-DEMAND-PREDICATE",
       "rollback_command": "python tools/gates/run_economics_claim.py --claim E-DEMAND-PREDICATE --rollback-check",
+      "evidence_root": "evidence/claim-matrix/claim-e-demand-predicate",
       "notes": "The exact evidence predicate and exhaustive local truth table are implemented: escrow, delivery, acceptance/dispute completion, both control-domain separations, and non-circular external funding are jointly necessary; every missing, wash, related, rebate, and unknown mutation fails qualification. Rolling-window arithmetic and diversity thresholds are executable with overflow refusal. PARTIAL: the claim pass threshold is about an actual public 30-day aggregate and cluster population, so synthetic local observations do not satisfy it and all demand-derived production influence remains zero."
     },
     "M-PROOFPOWER": {
@@ -47,6 +52,7 @@
       "packages": ["noos-work-loom", "noos-jet", "noos-witness"],
       "command": "python tools/gates/run_economics_claim.py --claim M-PROOFPOWER",
       "rollback_command": "python tools/gates/run_economics_claim.py --claim M-PROOFPOWER --rollback-check",
+      "evidence_root": "evidence/claim-matrix/claim-m-proofpower",
       "notes": "Local shadow accounting now enforces >=30-day maturity, exact linear decay, qualified external delivered/non-self-dealing evidence, duplicate receipt rejection, commitment mutation rejection, proposal-credit maturity-window exclusion, proofpower <=20% of effective Ring weight (bonus <= raw/4), strict cluster concentration check, and beta=0 exactly when n_e*c_W<=1. Rollback zeroes beta. Every report returns production bonuses empty and production effective Ring byte-equal to raw stake, so measurement cannot leak into consensus. Forgery, wash, duplicate, immature, overlap, small-population, overflow, and cluster-capture falsifiers execute locally. PARTIAL: cryptographic verification remains supplied by noos-jet's typed verifier gate; preregistered E-WASH-01/E-CAPTURE-01 power, real control clustering, declared adversary-budget capture cost, 30-day elapsed maturity, and any nonzero G4 activation remain external."
     }
   }
