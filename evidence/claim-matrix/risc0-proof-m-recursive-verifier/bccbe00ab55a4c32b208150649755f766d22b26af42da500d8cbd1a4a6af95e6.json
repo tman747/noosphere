@@ -1,0 +1,325 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "[{\"command\":[\"wsl.exe\",\"-e\",\"bash\",\"-lc\",\"cd /mnt/c/noosphere-agents/proof-claims-finish && env -u RISC0_DEV_MODE RISC0_PROVER=local CARGO_TARGET_DIR=$HOME/.cache/noosphere-risc0-target cargo test -p noos-jet --features risc0 --locked risc0_ -- --test-threads=1\"],\"duration_seconds\":1152.406,\"exit_code\":0,\"log_sha256\":\"b213c0f8d5cd5ad8f8b806511bc64429c632c3882e7f2245165d1ac050626edf\"}]",
+      "id": "local-precursor",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "[\"RISC Zero CPU composite and succinct-recursive receipts are local first-party precursors, not Pearl's independently reproduced Plonky2/STARKy verifier path.\",\"The required second independently implemented verifier and 10^8 structured/mutated-proof identity campaign remain external.\"]",
+      "id": "external-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-RECURSIVE-VERIFIER": "f75e2190b56762a72911fb41da70a01de31812c514d76958ebfd317706793e59"
+  },
+  "claims": [
+    "M-RECURSIVE-VERIFIER"
+  ],
+  "command": [
+    "tools/gates/run_risc0_proof_claim.py",
+    "--claim",
+    "M-RECURSIVE-VERIFIER"
+  ],
+  "evidence_sha256": "bccbe00ab55a4c32b208150649755f766d22b26af42da500d8cbd1a4a6af95e6",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "risc0-proof-m-recursive-verifier",
+  "limitations": [
+    "RISC Zero CPU composite and succinct-recursive receipts are local first-party precursors, not Pearl's independently reproduced Plonky2/STARKy verifier path.",
+    "The required second independently implemented verifier and 10^8 structured/mutated-proof identity campaign remain external."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 152889,
+        "git_blob": "518a6fd8312262dfb05f7cedbc5bb3f0b510c46f",
+        "git_mode": "100644",
+        "path": "Cargo.lock",
+        "sha256": "35abb6f03cfd6ed925f630886b06639a82ed7b55691913d2dec7a5d1776c6776"
+      },
+      {
+        "bytes": 736,
+        "git_blob": "091d108f43215abc85fd7ffdab58e83fefedb70d",
+        "git_mode": "100644",
+        "path": "Cargo.toml",
+        "sha256": "a6fb49c0f93418aab06a7b7869d1b63ca9e2d91d85abf2c5b178e21eae5b26c5"
+      },
+      {
+        "bytes": 372,
+        "git_blob": "ad47b7da4c86036e61599bb50024ecc6b2929cc1",
+        "git_mode": "100644",
+        "path": "crates/noos-grain/Cargo.toml",
+        "sha256": "cb53cbb9f790cf60512c616f2cec30524cdaec3edddf99fb6c432e9840099a05"
+      },
+      {
+        "bytes": 4207,
+        "git_blob": "09cf2bc50f9387c956387ed1b6e227de1ba2d131",
+        "git_mode": "100644",
+        "path": "crates/noos-grain/src/bytes.rs",
+        "sha256": "f77d7ab6d9fdbfd4bad1181e24b9dbf781a5ce4c64fc021e5dbb75504735e63e"
+      },
+      {
+        "bytes": 16139,
+        "git_blob": "8da1d2d49aaa39a7ca4feed75b158f55bd6a0e53",
+        "git_mode": "100644",
+        "path": "crates/noos-grain/src/eval.rs",
+        "sha256": "0dbcb8cb0bae75200ce1d8f74851a682b927ff30bfd99f23b75223ac14486646"
+      },
+      {
+        "bytes": 9220,
+        "git_blob": "6126fe40087d0a1b7a17b01051a7d02ac05beef1",
+        "git_mode": "100644",
+        "path": "crates/noos-grain/src/lib.rs",
+        "sha256": "f5895e22606ee3f56db12a087d7401efbfe1a1dd08295b9033fe21976db2389e"
+      },
+      {
+        "bytes": 5473,
+        "git_blob": "e996877fb5ea9f55853f1df003f4da9a18f9e898",
+        "git_mode": "100644",
+        "path": "crates/noos-grain/src/noun.rs",
+        "sha256": "10ae8bd9918c8cc70cc3211aa4e7e8423030d8fa94d285805452cdd21f51637a"
+      },
+      {
+        "bytes": 1179,
+        "git_blob": "70203a51ec5278e21ede38a141233ab800924ee2",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/Cargo.toml",
+        "sha256": "fb787eab322d76feca51801ad2e2086f6291b5753a2012e253b79a4623e280d6"
+      },
+      {
+        "bytes": 61478,
+        "git_blob": "71bfe09e16f1abcdb6697403cc7dd9dcb06b87fe",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/risc0-methods/Cargo.lock",
+        "sha256": "bd627cc5a3b2b0b3f198ccad4b247c8b88d0afffb9a0ec6a88c0a6ef56fc3637"
+      },
+      {
+        "bytes": 431,
+        "git_blob": "2f378a17de10d8a8f04dd7208f4b062e0a2fb3e2",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/risc0-methods/Cargo.toml",
+        "sha256": "c2d00f4c4ad4906c45ee858a944f860be9e0523f81910d9625d04550cae694fb"
+      },
+      {
+        "bytes": 336500,
+        "git_blob": "aef2a656cc676d11e1fb432320f51f13c31e4503",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/risc0-methods/artifacts/jet_proof.bin",
+        "sha256": "b7218892bb9229b2806e78a2543bf8715bfc46af5c9210a768c6e27c448c6a30"
+      },
+      {
+        "bytes": 656,
+        "git_blob": "cd5da047cd16675c03c151478a8de3f8bfb8fcc9",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/risc0-methods/build.rs",
+        "sha256": "f72260794d219992f36763f7646db0a84250d1bd629c18f6308dcca566c3a42e"
+      },
+      {
+        "bytes": 308,
+        "git_blob": "ebc1c559017e272e8300825c8073d3475d1ad6fe",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/risc0-methods/guest/Cargo.toml",
+        "sha256": "a69b6d2134b0505856d7d0602cc6511108c78cd23fac38bfb7ffc22d3f405cda"
+      },
+      {
+        "bytes": 551,
+        "git_blob": "ede2e2eba5ef393a1d167e633b36aa54c4866189",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/risc0-methods/guest/src/main.rs",
+        "sha256": "ae119441cbdf17d963ecbb47d7febd5c9cbf444b25f210a801490feaa0ed6685"
+      },
+      {
+        "bytes": 1152,
+        "git_blob": "ebef31d29402668c3d670161987a644035b96dcf",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/risc0-methods/rebuild-guest.ps1",
+        "sha256": "6667f6f0ebea742f84eedaaa6b7b5a75b991b66d56fe2b32ec11d1333ad563f2"
+      },
+      {
+        "bytes": 209,
+        "git_blob": "39fdd05463c9c4e05b70587c28e75ebbad38495a",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/risc0-methods/shared/Cargo.toml",
+        "sha256": "558117f59e61b4989437bf1ba4736589ae626114b88f4018f35308ea2914d31e"
+      },
+      {
+        "bytes": 14907,
+        "git_blob": "3551269b0194da6befd5beb73e607d0b33b15dc7",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/risc0-methods/shared/src/lib.rs",
+        "sha256": "afcca6dfaa32f241d8f851ec1519a7aa1bbe135c83fd312f603022b52c0be5cf"
+      },
+      {
+        "bytes": 577,
+        "git_blob": "e9f7e635b780f10c3357905eeb769ba1affa4585",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/risc0-methods/src/lib.rs",
+        "sha256": "dfea19f4d1c119958b1d295424d763b27ad6df75bd760491f7da771f83909cbb"
+      },
+      {
+        "bytes": 6809,
+        "git_blob": "8ce1042d916a348b600ebd917286f15b196f040a",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/src/architecture.rs",
+        "sha256": "456d581ae6a14d7d1081db88d83d61bd07eb318d6ba221a33e0cc8c656427298"
+      },
+      {
+        "bytes": 855,
+        "git_blob": "9b910b6f23bef1caa1fd7ee684b8bc056fdfbbf3",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/src/bin/jet-risc0-vec.rs",
+        "sha256": "38e73568ea62e0671379b99e51720595cbdbadd6e1a5c86fdaba17cf4427e4fa"
+      },
+      {
+        "bytes": 5247,
+        "git_blob": "39d6971b178a3070e79179175ce0ee7854a5b490",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/src/cert.rs",
+        "sha256": "80497f98cfee110a647e18c97be822e5cf2b034c454609a2c04edd921f9435b8"
+      },
+      {
+        "bytes": 3647,
+        "git_blob": "47942926246778273f5b7312c9a91b9f5ce66673",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/src/corpus.rs",
+        "sha256": "5aa5a0a04c140e423c08e3ebaa334f8b8de94b5d2f3a1df10f57ce1d67aa7fad"
+      },
+      {
+        "bytes": 5035,
+        "git_blob": "fe22ac6458bf6f16a1ed95c71eaa4ac09425013c",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/src/jets.rs",
+        "sha256": "7bfcdd1528985808aca52aa33c37d0b06de43a843717114dee060f43d0e11050"
+      },
+      {
+        "bytes": 3192,
+        "git_blob": "ecd0c7085bc15712f6b60669941d73be498fe84d",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/src/lib.rs",
+        "sha256": "b4d96be481d260b737c33f5d5c76fdd20d91dddfb0cb710a639d5f813db7099c"
+      },
+      {
+        "bytes": 9525,
+        "git_blob": "9f6f22543e12066106f890af5ba96f956ff2ec51",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/src/proof.rs",
+        "sha256": "4394e677829010f3fea9fd86a0eb999f761f75e8eb71ea2239c4e5454cc6a35a"
+      },
+      {
+        "bytes": 10244,
+        "git_blob": "27a9a6aa60e3d4ee98b5af8f89232d574218fe95",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/src/registry.rs",
+        "sha256": "151d8dffbee4b6d5f1d42b6df4063d597e6e9680964b0a5af47eaac4f934f9da"
+      },
+      {
+        "bytes": 9602,
+        "git_blob": "c12f8e3a47200c1af12a805b882148edd327958d",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/src/risc0.rs",
+        "sha256": "ca08cd493085112cb2ea89b88a17622232c9bb5ce1499308b6144ea9df0f19c9"
+      },
+      {
+        "bytes": 22667,
+        "git_blob": "05346ed1b3b1fd3212ae86fda15cf512911b835e",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/src/rv32.rs",
+        "sha256": "d382c0f941fe0b639f23219d382c7c6eee16bf7fa111041e8668e4321d644ffe"
+      },
+      {
+        "bytes": 35339,
+        "git_blob": "333f58fa27fbda12a6789f578af1921441ba6ea0",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/src/tests.rs",
+        "sha256": "234a2be5392c3e6b8444d918dc089f87bd33379318e1708fa880741b43603150"
+      },
+      {
+        "bytes": 18554,
+        "git_blob": "a758e4a0ea8c40a577bec83eda8e0f7d8fdece3e",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/src/vectors.rs",
+        "sha256": "d4d2b01c35b681d708702d9450d30ef6c5c8048af08aebc3ae44b53bf54697c3"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 2737,
+        "git_blob": "5d48c71ce44bf14495067f879728cb660ed82664",
+        "git_mode": "100644",
+        "path": "protocol/vectors/jet/jet-risc0-proof-v1.json",
+        "sha256": "778e151a216383b50b1c14b013625d72f3ad1c131ed7c0b31ccec3b19a5ffb72"
+      },
+      {
+        "bytes": 31,
+        "git_blob": "2d45363a5be01bea0448da65c5416a5d596017a6",
+        "git_mode": "100644",
+        "path": "rust-toolchain.toml",
+        "sha256": "6791dcb04edcb490caaf08590dbe1dd9d9954b46dab2095df12dc984f704f1a8"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 7033,
+        "git_blob": "113fd2a3b5d9bd47a9fcd24489b35b5e6c5843fb",
+        "git_mode": "100644",
+        "path": "tools/gates/run_risc0_proof_claim.py",
+        "sha256": "37b02f97d737741562ebadda6829b86b253e1a8144a98274b65179b6123ba228"
+      }
+    ],
+    "manifest_sha256": "5010ae4cf4abd00107142e5293c5dd61af66530cdc4bf0fd5a5d012b922d9e27",
+    "source_revision": "6ee437751815413fc9a2c57afa74e7f932375c8a",
+    "source_tree": "f44e1961ac19f1fbb52f68d0742a97852900e5c2"
+  }
+}
