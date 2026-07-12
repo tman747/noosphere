@@ -1,0 +1,124 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-umbra\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-umbra\"]}",
+      "id": "local-precursor",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[\"Attestation mutation, replay, rollback, cross-job, and cross-class behavior is exercised only against a deterministic fixture verifier.\",\"No real TEE prompt timing/length campaign or preregistered hardware leakage budget has run.\",\"No declared confidential-arbitration threshold/adversary has external evidence.\"]",
+      "id": "external-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-NEL-08": "1fe1c84c417ba3c90551d6454f2bbd5e6e7de2e4caca446f4a15acae1957515a"
+  },
+  "claims": [
+    "E-NEL-08"
+  ],
+  "command": [
+    "tools/gates/run_privacy_claim.py",
+    "--claim",
+    "E-NEL-08"
+  ],
+  "evidence_sha256": "4dd15a3d529de9682f9da6596549929f05312647c8b5b288f3c507df189e67a1",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-e-nel-08",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence.",
+    "Attestation mutation, replay, rollback, cross-job, and cross-class behavior is exercised only against a deterministic fixture verifier.",
+    "No real TEE prompt timing/length campaign or preregistered hardware leakage budget has run.",
+    "No declared confidential-arbitration threshold/adversary has external evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 38873,
+        "git_blob": "2114540a276df319614952d783a2627e32a54906",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/src/lib.rs",
+        "sha256": "30c1d4afbb6d1da58f6739b2deeab4d6d8b89a519803fa372ae1a97f2c2ca0a7"
+      },
+      {
+        "bytes": 451,
+        "git_blob": "6ffc95be822770e6924d3a3e7135a724c8c881c3",
+        "git_mode": "100644",
+        "path": "crates/noos-umbra/Cargo.toml",
+        "sha256": "2b821067f57ff5203a4878fcbe001b52780f0b7ad7cd7c6cb1b530d467033702"
+      },
+      {
+        "bytes": 26826,
+        "git_blob": "6b29e0c15545a432e46629c4347a94cc6e562023",
+        "git_mode": "100644",
+        "path": "crates/noos-umbra/src/tee_fiber.rs",
+        "sha256": "ec33f9222db49b1357261e9876d69d2f1e2ff7dc2f222677087fa2562e4f67ba"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 6297,
+        "git_blob": "52c37e3cfcfdaf3fa97fe3668b67d75010876bda",
+        "git_mode": "100644",
+        "path": "tools/gates/run_privacy_claim.py",
+        "sha256": "52fb8249fec9fd240e706727608a17ab12bd1a2dbe4550975c00aacda10b5381"
+      }
+    ],
+    "manifest_sha256": "386333a006bee667385636d641aae191faab5eac79ea3b05f89806271e02867a",
+    "source_revision": "605b5336fe645ccc42c8af0dfda61dd3ed0469d2",
+    "source_tree": "5c74649ca779547f22e13f3ba13905a503901158"
+  }
+}

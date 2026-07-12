@@ -1,0 +1,167 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-nel\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-nel\"]},{\"command\":[\"cargo\",\"run\",\"--locked\",\"-q\",\"-p\",\"noos-nel\",\"--bin\",\"nel-claim-harness\",\"--\",\"E-NEL-01\"],\"metrics\":{\"claim\":\"E-NEL-01\",\"cobatch_mismatches\":0,\"invalid_tokenizer_bytes_rejected\":true,\"matmul_instances\":297,\"profile_id\":\"e492b0e4e0f044971af46441b0749f76621ae21fb524a1f8dc45c3f7f4e2dee0\",\"schedule_mismatches\":0,\"semantic_op_families\":17,\"tokenizer_root\":\"8bfd22d554df63b97dad72c0a51ca40934a177f9673c6b1c2ba918c96c905eb6\"}},{\"local_command\":\"python tools/gates/run_nel_lab_claim.py --claim E-NEL-01\",\"required_external\":[\"pinned compiler toolchains, GPU drivers, and GPU firmware\",\"two independently authored CPU references\",\"certified AMD and NVIDIA integer kernels\",\"at least 1000000000 clean cross-vendor operator instances\"]}]",
+      "id": "local-precursor",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "[\"pinned compiler toolchains, GPU drivers, and GPU firmware\",\"two independently authored CPU references\",\"certified AMD and NVIDIA integer kernels\",\"at least 1000000000 clean cross-vendor operator instances\"]",
+      "id": "external-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-NEL-01": "2e97a0029404b8aa1400472d77ca67f09dc1fadc390c83a5742b7c10b0295ff5"
+  },
+  "claims": [
+    "E-NEL-01"
+  ],
+  "command": [
+    "tools/gates/run_nel_lab_claim.py",
+    "--claim",
+    "E-NEL-01"
+  ],
+  "evidence_sha256": "6de31095a408095cb8c7f1286ddb872c28e3b26d07f165c0fdc030c037e7e135",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-e-nel-01",
+  "limitations": [
+    "Local deterministic evidence only; it is not independent, cross-vendor, public-duration, or production evidence.",
+    "pinned compiler toolchains, GPU drivers, and GPU firmware",
+    "two independently authored CPU references",
+    "certified AMD and NVIDIA integer kernels",
+    "at least 1000000000 clean cross-vendor operator instances"
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 371,
+        "git_blob": "9871a6f0a90c697f06d0ed71bddc9e8b253ef7ce",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/Cargo.toml",
+        "sha256": "17d2ecfb2e392c496e7dfaa14c28d1b89a4b97a16095b984434f3b81cfc99189"
+      },
+      {
+        "bytes": 3743,
+        "git_blob": "778914d50d68c69c1e82c0d5b324972280469432",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/fixtures/claim-prerequisites-v1.json",
+        "sha256": "2cc557d30d64431df6fcaa777b659b016719e61fc86abf166d261015137a6f94"
+      },
+      {
+        "bytes": 8744,
+        "git_blob": "0b49812c55681348e8d197b04f315a506fbf656d",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/src/bin/nel-claim-harness.rs",
+        "sha256": "0e10847361b80724712f1486a19b7bb63049aecfccda5697eb9cd93b9e3f4b90"
+      },
+      {
+        "bytes": 65903,
+        "git_blob": "9cf848f4454a5b2add01b80046122ed8273e32a7",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/src/inference.rs",
+        "sha256": "304f6746a5b2bd9ba23e73a06553caac95b5c211c39377a50343ed4454b982c8"
+      },
+      {
+        "bytes": 43502,
+        "git_blob": "0d2b553259feedb2ec2dc4dd0bfa0df5e327f326",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/src/lab.rs",
+        "sha256": "9025a80a33ea303029633799605cd98675909b8a1a96cd57eb0d9a07731d505b"
+      },
+      {
+        "bytes": 38873,
+        "git_blob": "2114540a276df319614952d783a2627e32a54906",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/src/lib.rs",
+        "sha256": "30c1d4afbb6d1da58f6739b2deeab4d6d8b89a519803fa372ae1a97f2c2ca0a7"
+      },
+      {
+        "bytes": 6333,
+        "git_blob": "5ac49ecc0f40d67e4e5f392aab92bdb74d1676a4",
+        "git_mode": "100644",
+        "path": "crates/noos-nel/src/luts.rs",
+        "sha256": "80d6ecea395a61c2d5fe103cd20aad2b8b7608d1442b0dcebb4ec017629c7acb"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 1632,
+        "git_blob": "2f7b7f7ce213c30023749c9039b16abae5654fe8",
+        "git_mode": "100644",
+        "path": "protocol/vectors/nel/forward-w8a8-v1.json",
+        "sha256": "afa7a0ac2466f878cafbb41edc510a04ad595e0ceaac39aabed5c34dd8eeab9a"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 11627,
+        "git_blob": "8c121a3255e09c8b67a30ec314d3abc4e29d2283",
+        "git_mode": "100644",
+        "path": "tools/gates/run_nel_lab_claim.py",
+        "sha256": "9eea3b385e11ef35a6a16be336786f8cf428365b3a741eccd81fe5ded021b109"
+      },
+      {
+        "bytes": 1825,
+        "git_blob": "5ef961693696bd938a8108ae3ad9e9eefc95eb96",
+        "git_mode": "100644",
+        "path": "tools/gates/test_nel_lab_claim.py",
+        "sha256": "7d4616ba422cb5b7661397018897e3eb9bf42bdf50d11b24d809da8d16d75427"
+      }
+    ],
+    "manifest_sha256": "f76cadb6d9249f66e6d075e184574204f8fcc880553a6786df850a0913b7361d",
+    "source_revision": "605b5336fe645ccc42c8af0dfda61dd3ed0469d2",
+    "source_tree": "5c74649ca779547f22e13f3ba13905a503901158"
+  }
+}
