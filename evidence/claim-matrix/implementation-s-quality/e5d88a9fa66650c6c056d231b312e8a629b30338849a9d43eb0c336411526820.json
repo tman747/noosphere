@@ -1,0 +1,122 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-swarm\",\"claim_quality\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"filter\":\"claim_quality\",\"log_sha256\":\"e30928a94acd273306a2e1d923418226cf4ec8335a6abc41c535efe163c51e2c\",\"package\":\"noos-swarm\"}",
+      "id": "local-precursor",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[\"Escrow mechanics and within-domain Sybil non-inflation are implemented locally.\",\"The preregistered adversarial rank-capture rate and independent real evaluator/payment campaign required by E-COLLUSION-01 do not exist.\"]",
+      "id": "external-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-QUALITY": "f2d74cffa9fe9589d92210dfc26b5929cf2d82a00332120e554d7e9c801ccf0a"
+  },
+  "claims": [
+    "S-QUALITY"
+  ],
+  "command": [
+    "tools/gates/run_species_reaction_claim.py",
+    "--claim",
+    "S-QUALITY"
+  ],
+  "evidence_sha256": "e5d88a9fa66650c6c056d231b312e8a629b30338849a9d43eb0c336411526820",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-s-quality",
+  "limitations": [
+    "Escrow mechanics and within-domain Sybil non-inflation are implemented locally.",
+    "The preregistered adversarial rank-capture rate and independent real evaluator/payment campaign required by E-COLLUSION-01 do not exist."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 287,
+        "git_blob": "893de867c77e51fab01a2551ff7eb8146acd1ce0",
+        "git_mode": "100644",
+        "path": "crates/noos-swarm/Cargo.toml",
+        "sha256": "8897e41f67566eeabd589cb57570cfdcec8a0ccf0f476b348856ec777b54ca1b"
+      },
+      {
+        "bytes": 10925,
+        "git_blob": "09366625fa523823d4d26fcdc6f0dea13f70cbeb",
+        "git_mode": "100644",
+        "path": "crates/noos-swarm/src/lib.rs",
+        "sha256": "0162526faaf321ffbf67ea38cd22b224f5a12c0b9a4f36e99838aeeaef74d547"
+      },
+      {
+        "bytes": 10098,
+        "git_blob": "3f1482331da866ae6e6bd239362b116242431e5f",
+        "git_mode": "100644",
+        "path": "crates/noos-swarm/src/quality.rs",
+        "sha256": "c009494290d653aba181c0a9f9404ab5e17d7d2794b70a01e5d33486647af308"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 7815,
+        "git_blob": "c4c56a24ff972dbfefa206269a2a6d885ce54de7",
+        "git_mode": "100644",
+        "path": "tools/gates/run_species_reaction_claim.py",
+        "sha256": "5a5bdba40a44702fc73677752812e630842001f8122a384d31cd2c4685d00839"
+      }
+    ],
+    "manifest_sha256": "4c78a663059fba5824e1df92bd2406701b15a15ed03488b56c6d977d3ff9d558",
+    "source_revision": "b56cdc0aa266fd0bfe1132a018da454579d3da14",
+    "source_tree": "6e27bc0a57dd8c44774f07ad5f485855ef982e91"
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-training\",\"claim_toploc\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"filter\":\"claim_toploc\",\"log_sha256\":\"21edad98e78db41a55405d16a92668f49b97cd8ed11431fea6aa2b7807259a39\",\"package\":\"noos-training\"}",
+      "id": "local-precursor",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[\"The committed-seed named-model/profile fingerprint precursor is local only.\",\"No published attack corpus, 99% confidence detection estimate, false-positive SLA measurement, or adaptive collision campaign exists.\"]",
+      "id": "external-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-TOPLOC": "4d85c7d85fa40df84970da0a78bc90113e1ec5ddeb08c962e4813b7ff3bbd2c8"
+  },
+  "claims": [
+    "S-TOPLOC"
+  ],
+  "command": [
+    "tools/gates/run_species_reaction_claim.py",
+    "--claim",
+    "S-TOPLOC"
+  ],
+  "evidence_sha256": "50b2be125d1d630e6d3e70d934faed63ec0a275ab05b0702fcf29d85ab2de912",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-s-toploc",
+  "limitations": [
+    "The committed-seed named-model/profile fingerprint precursor is local only.",
+    "No published attack corpus, 99% confidence detection estimate, false-positive SLA measurement, or adaptive collision campaign exists."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 381,
+        "git_blob": "85b5adf2472aa5d24ec3b361640bc701114873c1",
+        "git_mode": "100644",
+        "path": "crates/noos-training/Cargo.toml",
+        "sha256": "2d172c616a6041cbb5801a472b71c4b26386b0a2c0956aefec77c4e6a52ef02a"
+      },
+      {
+        "bytes": 36562,
+        "git_blob": "4ee7023bc69aabbe89e7fba25e731b630f22cb4a",
+        "git_mode": "100644",
+        "path": "crates/noos-training/src/lib.rs",
+        "sha256": "bc72360a79dcb8c6d975ec2171b7dc4b6aa39857750fc4681c359cc9d99348d1"
+      },
+      {
+        "bytes": 6489,
+        "git_blob": "14dd8614a87a5de9e15010aeb5f8e6f54d95b174",
+        "git_mode": "100644",
+        "path": "crates/noos-training/src/toploc.rs",
+        "sha256": "ab194f9975feae9ebc9b5ede6eb890fab59c0fe2159e35862740f1a53330e827"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 7815,
+        "git_blob": "c4c56a24ff972dbfefa206269a2a6d885ce54de7",
+        "git_mode": "100644",
+        "path": "tools/gates/run_species_reaction_claim.py",
+        "sha256": "5a5bdba40a44702fc73677752812e630842001f8122a384d31cd2c4685d00839"
+      }
+    ],
+    "manifest_sha256": "521752d97d59827c4672e31f31de2f34085f48e08f74df133929cbad3bdcbfdd",
+    "source_revision": "b56cdc0aa266fd0bfe1132a018da454579d3da14",
+    "source_tree": "6e27bc0a57dd8c44774f07ad5f485855ef982e91"
+  }
+}

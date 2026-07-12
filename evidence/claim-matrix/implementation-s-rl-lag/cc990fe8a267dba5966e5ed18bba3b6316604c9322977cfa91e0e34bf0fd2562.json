@@ -1,0 +1,121 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-training\",\"claim_rl_lag\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"filter\":\"claim_rl_lag\",\"log_sha256\":\"2bc682fc5be19949bc00f17cfcb165be94e127ae9127a0d5a3dc87cdba5c04a8\",\"package\":\"noos-training\"}",
+      "id": "local-precursor",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[\"Exact boundaries and 500,500 generated policy pairs are locally exercised, but no preregistered training-stability fault-injection campaign exists.\"]",
+      "id": "external-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-RL-LAG": "ba8fa2e03085d3c5690f6d3b0c4c5ad9612b0114e7e3d541fa5c7dc882817c41"
+  },
+  "claims": [
+    "S-RL-LAG"
+  ],
+  "command": [
+    "tools/gates/run_species_reaction_claim.py",
+    "--claim",
+    "S-RL-LAG"
+  ],
+  "evidence_sha256": "cc990fe8a267dba5966e5ed18bba3b6316604c9322977cfa91e0e34bf0fd2562",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-s-rl-lag",
+  "limitations": [
+    "Exact boundaries and 500,500 generated policy pairs are locally exercised, but no preregistered training-stability fault-injection campaign exists."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 381,
+        "git_blob": "85b5adf2472aa5d24ec3b361640bc701114873c1",
+        "git_mode": "100644",
+        "path": "crates/noos-training/Cargo.toml",
+        "sha256": "2d172c616a6041cbb5801a472b71c4b26386b0a2c0956aefec77c4e6a52ef02a"
+      },
+      {
+        "bytes": 36562,
+        "git_blob": "4ee7023bc69aabbe89e7fba25e731b630f22cb4a",
+        "git_mode": "100644",
+        "path": "crates/noos-training/src/lib.rs",
+        "sha256": "bc72360a79dcb8c6d975ec2171b7dc4b6aa39857750fc4681c359cc9d99348d1"
+      },
+      {
+        "bytes": 5673,
+        "git_blob": "759dc5b1653991ab7cd88671fed4d028887f58fc",
+        "git_mode": "100644",
+        "path": "crates/noos-training/src/rl_lag.rs",
+        "sha256": "6fe49f44a263382c0d4f5a7f144f912426afd82473f5d2a738f515bdcb73d440"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 7815,
+        "git_blob": "c4c56a24ff972dbfefa206269a2a6d885ce54de7",
+        "git_mode": "100644",
+        "path": "tools/gates/run_species_reaction_claim.py",
+        "sha256": "5a5bdba40a44702fc73677752812e630842001f8122a384d31cd2c4685d00839"
+      }
+    ],
+    "manifest_sha256": "165d64acd30cc00c43a9dbe838a502603ab692107b6511bd3c2b398f3404c638",
+    "source_revision": "b56cdc0aa266fd0bfe1132a018da454579d3da14",
+    "source_tree": "6e27bc0a57dd8c44774f07ad5f485855ef982e91"
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-species\",\"claim_species\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"filter\":\"claim_species\",\"log_sha256\":\"592c265cbc3dc1065cc97e0c066a92a46f06292c695d0c6aef6c4e61d70fb5e7\",\"package\":\"noos-species\"}",
+      "id": "local-precursor",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[\"The two resolver paths are local dual-path code, not independently implemented resolver families.\",\"The frozen 10^7 generated graph/query campaign has not been run.\"]",
+      "id": "external-pass-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-SPECIES": "398d33a0a654bb5808560145fccb9c1ea744d0a5d0a50a77f211151eab00a921"
+  },
+  "claims": [
+    "S-SPECIES"
+  ],
+  "command": [
+    "tools/gates/run_species_reaction_claim.py",
+    "--claim",
+    "S-SPECIES"
+  ],
+  "evidence_sha256": "31be8cf7c008cccb9ea6f59606c6966901a9ffd46ec8ab7bb9bca89a8a7fac77",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "implementation-s-species",
+  "limitations": [
+    "The two resolver paths are local dual-path code, not independently implemented resolver families.",
+    "The frozen 10^7 generated graph/query campaign has not been run."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 187,
+        "git_blob": "5004ac3aeeaa78612f1530e2c9836eccae81e35e",
+        "git_mode": "100644",
+        "path": "crates/noos-species/Cargo.toml",
+        "sha256": "0aa308ddb798097808b3e81c2d89bfc81319edf452fc2526785e6fb42f0296ca"
+      },
+      {
+        "bytes": 32055,
+        "git_blob": "0f61bd3395cb57741f64a2be8d22035631a91233",
+        "git_mode": "100644",
+        "path": "crates/noos-species/src/lib.rs",
+        "sha256": "27026acf0ce2d7731d727b5fc44e4758e6358faa7defb647484b11fa734ea76e"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 7815,
+        "git_blob": "c4c56a24ff972dbfefa206269a2a6d885ce54de7",
+        "git_mode": "100644",
+        "path": "tools/gates/run_species_reaction_claim.py",
+        "sha256": "5a5bdba40a44702fc73677752812e630842001f8122a384d31cd2c4685d00839"
+      }
+    ],
+    "manifest_sha256": "dac6cc2173f18de28deee7356c00af51589d2709ecbd5a9210ad8c91a938d0d1",
+    "source_revision": "b56cdc0aa266fd0bfe1132a018da454579d3da14",
+    "source_tree": "6e27bc0a57dd8c44774f07ad5f485855ef982e91"
+  }
+}
