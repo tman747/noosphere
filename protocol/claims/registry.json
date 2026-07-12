@@ -1208,17 +1208,19 @@
       "provenance": "Extracted verbatim from §3.2 M-TENSOR of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-m-tensor",
+      "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-TENSOR",
+      "evidence_root": "evidence/claim-matrix/implementation-m-tensor",
       "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "expected_result": "EXTERNAL_BLOCKED",
+      "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-TENSOR --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
-      "external_blockers": [],
-      "local_implementation_state": "PARTIAL",
+      "external_blockers": [
+        "Independent cross-verifier authorship, production beacon unpredictability, and pinned encrypted-delivery/work-per-joule campaigns remain unavailable locally."
+      ],
+      "local_implementation_state": "IMPLEMENTED",
       "local_evidence_state": "MISSING"
     },
     {
@@ -1271,17 +1273,19 @@
       "provenance": "Extracted verbatim from §3.2 M-RESIDUE of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-m-residue",
+      "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-RESIDUE",
+      "evidence_root": "evidence/claim-matrix/implementation-m-residue",
       "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "expected_result": "EXTERNAL_BLOCKED",
+      "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-RESIDUE --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
-      "external_blockers": [],
-      "local_implementation_state": "PARTIAL",
+      "external_blockers": [
+        "Independently authored verifier families and preregistered production-beacon uniformity and independence measurements remain unavailable locally."
+      ],
+      "local_implementation_state": "IMPLEMENTED",
       "local_evidence_state": "MISSING"
     },
     {
@@ -1339,18 +1343,18 @@
       "provenance": "§3.2 M-HDF row of frozen ch04; retirement disposition per plan §1.4 and §12.15; lab evidence VERIFICATION-2026-07-11.md row 10.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/hdf-fmm",
+      "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF",
+      "evidence_root": "evidence/claim-matrix/implementation-m-hdf",
       "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "expected_result": "KILLED",
+      "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "PARTIAL",
-      "local_evidence_state": "PARTIAL"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "M-HDF-ENERGY",
@@ -1407,18 +1411,20 @@
       "provenance": "Active-scope row created per plan §1.4 ('surviving M-HDF-ENERGY as a separate active-scope row') and §12.15; mathematical evidence from the HDF math lab, VERIFICATION-2026-07-11.md row 10.",
       "supersedes": "M-HDF",
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/hdf-fmm",
+      "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF-ENERGY",
+      "evidence_root": "evidence/claim-matrix/implementation-m-hdf-energy",
       "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "expected_result": "EXTERNAL_BLOCKED",
+      "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-HDF-ENERGY --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
-      "external_blockers": [],
-      "local_implementation_state": "PARTIAL",
-      "local_evidence_state": "PARTIAL"
+      "external_blockers": [
+        "Pinned hardware/error-distribution false-positive, detection, equal-cost non-inferiority, and compatible-resident-HD latency campaigns remain unavailable locally."
+      ],
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "MISSING"
     },
     {
       "claim_id": "S-HDF",
@@ -1474,17 +1480,17 @@
       "provenance": "§3.2 S-HDF row of frozen ch04 (same claim as M-HDF); retirement follows M-HDF per plan §1.4.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-s-hdf",
+      "command": "python tools/gates/run_tensor_hdf_claim.py --claim S-HDF",
+      "evidence_root": "evidence/claim-matrix/implementation-s-hdf",
       "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "expected_result": "KILLED",
+      "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim S-HDF --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "PARTIAL",
+      "local_implementation_state": "IMPLEMENTED",
       "local_evidence_state": "MISSING"
     },
     {
@@ -3539,17 +3545,19 @@
       "provenance": "Extracted verbatim from §3.5 M-ADJOINT / S-ADJOINT / S-CAPSULE of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-m-adjoint",
+      "command": "python tools/gates/run_tensor_hdf_claim.py --claim M-ADJOINT",
+      "evidence_root": "evidence/claim-matrix/implementation-m-adjoint",
       "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "expected_result": "EXTERNAL_BLOCKED",
+      "rollback_command": "python tools/gates/run_tensor_hdf_claim.py --claim M-ADJOINT --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
-      "external_blockers": [],
-      "local_implementation_state": "PARTIAL",
+      "external_blockers": [
+        "A full 10^7 relation-level adversarial-capsule campaign, independent proof/verifier family, production witness-cost comparison, and private-example leakage measurement remain unavailable locally."
+      ],
+      "local_implementation_state": "IMPLEMENTED",
       "local_evidence_state": "MISSING"
     },
     {
