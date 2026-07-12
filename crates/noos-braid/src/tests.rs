@@ -400,7 +400,7 @@ fn insert_rejects_duplicates_and_bad_linkage() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn orphans_connect_when_parent_arrives() {
+fn orphans_require_explicit_contextual_promotion() {
     let (mut dag, ghash) = new_dag();
     let parent = mk_header(ghash, 1, 1, MODEST, 0, 0);
     let parent_hash = hash_of(&parent);
@@ -426,15 +426,20 @@ fn orphans_connect_when_parent_arrives() {
     );
     assert_eq!(dag.orphan_count(), 2);
 
-    // The parent connects the whole cascade deterministically.
+    // The linkage layer connects only the parent. Consensus must explicitly
+    // take and fully validate each newly reachable orphan.
     let outcome = dag.insert(parent, &mk_ticket(1)).unwrap();
-    assert_eq!(
-        outcome,
-        InsertOutcome::Inserted {
-            hash: parent_hash,
-            connected_orphans: vec![child_hash, grandchild_hash],
-        }
-    );
+    assert_eq!(outcome, InsertOutcome::Inserted { hash: parent_hash });
+    let children = dag.take_orphans_waiting_on(&parent_hash);
+    assert_eq!(children.len(), 1);
+    assert_eq!(children[0].hash, child_hash);
+    dag.insert(children[0].header.clone(), &children[0].ticket)
+        .unwrap();
+    let grandchildren = dag.take_orphans_waiting_on(&child_hash);
+    assert_eq!(grandchildren.len(), 1);
+    assert_eq!(grandchildren[0].hash, grandchild_hash);
+    dag.insert(grandchildren[0].header.clone(), &grandchildren[0].ticket)
+        .unwrap();
     assert_eq!(dag.orphan_count(), 0);
     assert!(dag.contains(&grandchild_hash));
 }
@@ -546,7 +551,7 @@ fn fork_score_ordering_is_exactly_lexicographic() {
 }
 
 #[test]
-fn finalized_checkpoint_never_reverted_by_astronomical_work() {
+fn raw_checkpoint_claims_never_increase_fork_weight() {
     let (mut dag, ghash) = new_dag();
 
     // Branch A claims finalized epoch 1 with negligible work.
@@ -568,8 +573,45 @@ fn finalized_checkpoint_never_reverted_by_astronomical_work() {
     let score_a = dag.fork_score(&a1_hash).unwrap();
     assert_eq!(score_a.work_since_finalized, U256::ZERO);
 
-    assert!(score_a > score_b, "finality hand outranks the work hand");
-    assert_eq!(dag.select_head(), Some(a1_hash));
+    assert_eq!(score_a.finalized_epoch, 0);
+    assert_eq!(score_a.justified_epoch, 0);
+    assert_eq!(score_b.finalized_epoch, 0);
+    assert_eq!(score_b.justified_epoch, 0);
+    assert!(
+        score_b > score_a,
+        "only verified finality and work are scored"
+    );
+    assert_eq!(dag.select_head(), Some(b2_hash));
+}
+
+#[test]
+fn verified_justification_weights_only_its_descendant_branch() {
+    let (mut dag, genesis) = new_dag();
+    let mut justified_tip = genesis;
+    let mut work_tip = genesis;
+    for height in 1..=EPOCH_LENGTH {
+        let seed = height.to_le_bytes()[0];
+        let justified = mk_header(justified_tip, height, seed, MODEST, 0, 0);
+        justified_tip = hash_of(&justified);
+        dag.insert(justified, &mk_ticket(height)).unwrap();
+
+        let work = mk_header(work_tip, height, seed.wrapping_add(1), [0; 32], 0, 0);
+        work_tip = hash_of(&work);
+        dag.insert(work, &mk_ticket(height)).unwrap();
+    }
+    dag.set_justified(CheckpointRef {
+        epoch: 1,
+        checkpoint_hash: justified_tip,
+    })
+    .unwrap();
+
+    let justified_score = dag.fork_score(&justified_tip).unwrap();
+    let work_score = dag.fork_score(&work_tip).unwrap();
+    assert_eq!(justified_score.justified_epoch, 1);
+    assert_eq!(work_score.justified_epoch, 0);
+    assert_eq!(work_score.work_since_finalized, U256::MAX);
+    assert!(justified_score > work_score);
+    assert_eq!(dag.select_head(), Some(justified_tip));
 }
 
 #[test]

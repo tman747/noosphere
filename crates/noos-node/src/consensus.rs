@@ -14,16 +14,15 @@
 //! 2. ticket validation              (noos-ground; DAG DuplicateSet; Pulse)
 //! 3. DA reconstruction              (noos-da; insufficiency PARKS, never
 //!                                    rejects) + body/header cross-check
-//! 4. body execution                 (noos-lumen normative order; system
-//!                                    transitions first: param activation,
-//!                                    emission)
-//! 5. root comparison                (six Lumen roots + execution_receipt_
-//!                                    root + lumen_receipts_state_root +
-//!                                    gas/prices; mismatch = typed invalid)
-//! 6. fork choice update             (ForkScore; reorg rollback/replay
-//!                                    through the store)
-//! 7. finality processing            (noos-witness certificates; finalized
-//!                                    pointer advance; anchor refresh)
+//! 4. prospective finality           (all body certificates, in wire order;
+//!                                    header checkpoints must exactly bind
+//!                                    the resulting verified tracker state)
+//! 5. body execution + roots         (noos-lumen normative order against a
+//!                                    staged ledger; every claimed root)
+//! 6. orphan promotion + fork choice (full contextual revalidation; staged
+//!                                    rollback/replay below finality)
+//! 7. one atomic commit              (block/body/state/receipts/certificates/
+//!                                    pointers), then install staged memory
 //! ```
 //!
 //! ## Pulse anchor law (node-v1.md §4.4)
@@ -155,6 +154,7 @@ pub enum ImportOutcome {
     HeaderAccepted { hash: Hash32 },
 }
 
+#[derive(Clone)]
 struct ParkedBlock {
     header: BlockHeaderV1,
     ticket: GroundTicketV1,
@@ -176,6 +176,27 @@ struct ExecResult {
     receipts: Vec<ReceiptV1>,
     merged_delta: StateDelta,
     roots: LumenRoots,
+}
+
+#[derive(Clone)]
+struct StagedConsensus {
+    dag: HeaderDag,
+    ledger: LumenLedger,
+    anchor: (Hash32, u64, LumenLedger),
+    exec_head: Hash32,
+    exec_height: u64,
+    tracker: FinalityTracker,
+    registry: SnapshotRegistry,
+    availability: AvailabilityLedger,
+    orphan_blocks: BTreeMap<Hash32, ParkedBlock>,
+    mempool: Mempool,
+    view: ChainView,
+}
+
+#[derive(Clone)]
+struct StagedBody {
+    header: BlockHeaderV1,
+    body: BlockBodyV1,
 }
 
 /// DAG-backed checkpoint ancestry oracle for the finality tracker.
@@ -236,6 +257,7 @@ pub struct NodeCore<P: StorePort> {
     registry: SnapshotRegistry,
     availability: AvailabilityLedger,
     parked: BTreeMap<Hash32, ParkedBlock>,
+    orphan_blocks: BTreeMap<Hash32, ParkedBlock>,
     pending_votes: Vec<FinalityVoteV1>,
     pending_certs: Vec<FinalityCertificateV1>,
     pub mempool: Mempool,
@@ -249,6 +271,36 @@ pub struct NodeCore<P: StorePort> {
 }
 
 impl<P: StorePort> NodeCore<P> {
+    fn staged_consensus(&self) -> StagedConsensus {
+        StagedConsensus {
+            dag: self.dag.clone(),
+            ledger: self.ledger.clone(),
+            anchor: self.anchor.clone(),
+            exec_head: self.exec_head,
+            exec_height: self.exec_height,
+            tracker: self.tracker.clone(),
+            registry: self.registry.clone(),
+            availability: self.availability.clone(),
+            orphan_blocks: self.orphan_blocks.clone(),
+            mempool: self.mempool.clone(),
+            view: self.view.clone(),
+        }
+    }
+
+    fn install_staged_consensus(&mut self, staged: StagedConsensus) {
+        self.dag = staged.dag;
+        self.ledger = staged.ledger;
+        self.anchor = staged.anchor;
+        self.exec_head = staged.exec_head;
+        self.exec_height = staged.exec_height;
+        self.tracker = staged.tracker;
+        self.registry = staged.registry;
+        self.availability = staged.availability;
+        self.orphan_blocks = staged.orphan_blocks;
+        self.mempool = staged.mempool;
+        self.view = staged.view;
+    }
+
     /// Boots a node: installs genesis when the store is fresh, otherwise
     /// replays the durable chain and recovers the exact state.
     pub fn boot(
@@ -301,6 +353,7 @@ impl<P: StorePort> NodeCore<P> {
             registry: SnapshotRegistry::new(),
             availability,
             parked: BTreeMap::new(),
+            orphan_blocks: BTreeMap::new(),
             pending_votes: Vec::new(),
             pending_certs: Vec::new(),
             port,
@@ -557,10 +610,21 @@ impl<P: StorePort> NodeCore<P> {
     /// Ensures the epoch snapshot exists in the registry (devnet fixture
     /// candidate source; node-v1.md §9 gap G3 for the live bond path).
     pub fn ensure_snapshot(&mut self, epoch: u64) -> Result<(), NodeError> {
-        if self.registry.get(epoch).is_some() || self.cfg.witness_bonds.is_empty() {
+        let mut registry = self.registry.clone();
+        self.ensure_snapshot_for(&mut registry, epoch)?;
+        self.registry = registry;
+        Ok(())
+    }
+
+    fn ensure_snapshot_for(
+        &self,
+        registry: &mut SnapshotRegistry,
+        epoch: u64,
+    ) -> Result<(), NodeError> {
+        if registry.get(epoch).is_some() || self.cfg.witness_bonds.is_empty() {
             return Ok(());
         }
-        let prev = self.registry.get(epoch.wrapping_sub(1)).cloned();
+        let prev = registry.get(epoch.wrapping_sub(1)).cloned();
         let outcome = build_snapshot(
             epoch,
             &self.cfg.witness_bonds,
@@ -571,7 +635,7 @@ impl<P: StorePort> NodeCore<P> {
         )?;
         match outcome {
             SnapshotOutcome::Normal(s) | SnapshotOutcome::EmergencyContinuation(s) => {
-                self.registry
+                registry
                     .insert(s)
                     .map_err(|_| NodeError::Witness(noos_witness::WitnessError::UnknownSnapshot))?;
                 Ok(())
@@ -592,13 +656,48 @@ impl<P: StorePort> NodeCore<P> {
 
     // -- import pipeline -------------------------------------------------------
 
-    /// Stages 0-2 + DAG insertion, shared by every mode.
+    /// Stages 0-2 + DAG insertion. Body certificates, when available, are
+    /// applied in canonical order before the header checkpoint pair is
+    /// compared with the prospective verified finality state.
     fn import_header_stages(
         &mut self,
         header: &BlockHeaderV1,
         ticket: &GroundTicketV1,
+        certificates: Option<&[FinalityCertificateV1]>,
     ) -> Result<InsertOutcome, NodeError> {
-        // Stage 1: structural law + proposer signature.
+        self.validate_header_non_context(header, ticket)?;
+        let mut staged = self.staged_consensus();
+        if !staged.dag.contains(&header.parent_hash) {
+            let outcome = staged.dag.insert(header.clone(), ticket)?;
+            self.dag = staged.dag;
+            return Ok(outcome);
+        }
+        self.validate_ticket_in_context_for(&staged.dag, header, ticket)?;
+        let outcome = staged.dag.insert(header.clone(), ticket)?;
+        let hash = match outcome {
+            InsertOutcome::Inserted { hash } => hash,
+            InsertOutcome::Orphaned { .. } => {
+                return Err(NodeError::Dag(noos_braid::DagError::UnknownBlock));
+            }
+        };
+        if certificates.is_none() && header.finality_certificate_root != ZERO_ROOT {
+            return Err(NodeError::BodyMismatch {
+                what: "finality certificate evidence absent",
+            });
+        }
+        self.stage_certificates(&mut staged, certificates.unwrap_or_default(), None)?;
+        Self::validate_checkpoint_binding(&staged, header, &hash)?;
+        self.dag = staged.dag;
+        self.tracker = staged.tracker;
+        self.registry = staged.registry;
+        Ok(outcome)
+    }
+
+    fn validate_header_non_context(
+        &self,
+        header: &BlockHeaderV1,
+        ticket: &GroundTicketV1,
+    ) -> Result<(), NodeError> {
         header
             .validate_structure(&self.chain_id, false)
             .map_err(|e| NodeError::Dag(noos_braid::DagError::Header(e)))?;
@@ -612,39 +711,27 @@ impl<P: StorePort> NodeCore<P> {
                 what: "proposer signature",
             }
         })?;
-
-        // Ticket root binding (header field 24 <-> the gossiped ticket).
         if body_ticket_root(ticket)? != header.ground_ticket_root {
             return Err(NodeError::BodyMismatch {
                 what: "ground_ticket_root",
             });
         }
-
-        // Parent unknown → bounded orphan pool (ticket law needs context).
-        if !self.dag.contains(&header.parent_hash) {
-            return Ok(self.dag.insert(header.clone(), ticket)?);
-        }
-
-        // Stage 2: the eight-rule ticket law.
-        self.validate_ticket_in_context(header, ticket)?;
-
-        Ok(self.dag.insert(header.clone(), ticket)?)
+        Ok(())
     }
 
-    fn validate_ticket_in_context(
+    fn validate_ticket_in_context_for(
         &self,
+        dag: &HeaderDag,
         header: &BlockHeaderV1,
         ticket: &GroundTicketV1,
     ) -> Result<(), NodeError> {
-        let parent = self
-            .dag
+        let parent = dag
             .get(&header.parent_hash)
             .ok_or(NodeError::Dag(noos_braid::DagError::UnknownBlock))?;
         let parent_target = parent.header.ground_target_u256();
-        let expected = self.expected_target(&parent.hash, header.height)?;
-        let parent_timestamps = self
-            .dag
-            .parent_timestamps(&parent.hash, noos_ground::MEDIAN_TIME_PAST_BLOCKS);
+        let expected = self.expected_target_for(dag, &parent.hash, header.height)?;
+        let parent_timestamps =
+            dag.parent_timestamps(&parent.hash, noos_ground::MEDIAN_TIME_PAST_BLOCKS);
         let chain = noos_crypto::Hash32::from_bytes(self.chain_id);
         let parent_hash = noos_crypto::Hash32::from_bytes(parent.hash);
         let commitment = header
@@ -667,7 +754,7 @@ impl<P: StorePort> NodeCore<P> {
             proposal_commitment: &commitment,
             proposer_pubkey: &header.proposer_key.0,
         };
-        validate_ticket(&ctx, ticket, &self.dag.duplicate_scan(&parent.hash))?;
+        validate_ticket(&ctx, ticket, &dag.duplicate_scan(&parent.hash))?;
         Ok(())
     }
 
@@ -679,8 +766,16 @@ impl<P: StorePort> NodeCore<P> {
         parent_hash: &Hash32,
         child_height: u64,
     ) -> Result<U256, NodeError> {
-        let parent = self
-            .dag
+        self.expected_target_for(&self.dag, parent_hash, child_height)
+    }
+
+    fn expected_target_for(
+        &self,
+        dag: &HeaderDag,
+        parent_hash: &Hash32,
+        child_height: u64,
+    ) -> Result<U256, NodeError> {
+        let parent = dag
             .get(parent_hash)
             .ok_or(NodeError::Dag(noos_braid::DagError::UnknownBlock))?;
         let anchor_ref = parent.header.finalized_checkpoint;
@@ -690,20 +785,15 @@ impl<P: StorePort> NodeCore<P> {
         } else {
             anchor_ref.checkpoint_hash
         };
-        let anchor = self
-            .dag
+        let anchor = dag
             .get(&anchor_hash)
             .ok_or(NodeError::Dag(noos_braid::DagError::UnknownBlock))?;
         let anchor_mtp_ms = median_time_past_ms(
-            &self
-                .dag
-                .parent_timestamps(&anchor_hash, noos_ground::MEDIAN_TIME_PAST_BLOCKS),
+            &dag.parent_timestamps(&anchor_hash, noos_ground::MEDIAN_TIME_PAST_BLOCKS),
         )
         .unwrap_or(anchor.header.timestamp_ms);
         let parent_mtp_ms = median_time_past_ms(
-            &self
-                .dag
-                .parent_timestamps(parent_hash, noos_ground::MEDIAN_TIME_PAST_BLOCKS),
+            &dag.parent_timestamps(parent_hash, noos_ground::MEDIAN_TIME_PAST_BLOCKS),
         )
         .unwrap_or(parent.header.timestamp_ms);
         let pulse_anchor = PulseAnchor {
@@ -724,12 +814,59 @@ impl<P: StorePort> NodeCore<P> {
         header: &BlockHeaderV1,
         ticket: &GroundTicketV1,
     ) -> Result<ImportOutcome, NodeError> {
-        let outcome = self.import_header_stages(header, ticket)?;
+        let outcome = self.import_header_stages(header, ticket, None)?;
         let hash = match outcome {
-            InsertOutcome::Inserted { hash, .. } => hash,
+            InsertOutcome::Inserted { hash } => hash,
             InsertOutcome::Orphaned { hash, .. } => return Ok(ImportOutcome::Orphaned { hash }),
         };
+        self.promote_light_orphans(hash);
         Ok(ImportOutcome::HeaderAccepted { hash })
+    }
+
+    fn promote_light_orphans(&mut self, root: Hash32) {
+        let mut queue = vec![root];
+        let mut cursor = 0;
+        while cursor < queue.len() {
+            let parent = queue[cursor];
+            cursor = cursor.saturating_add(1);
+            for orphan in self.dag.take_orphans_waiting_on(&parent) {
+                let mut candidate = self.staged_consensus();
+                let result = if orphan.header.finality_certificate_root != ZERO_ROOT {
+                    Err(NodeError::BodyMismatch {
+                        what: "finality certificate evidence absent",
+                    })
+                } else {
+                    self.validate_header_non_context(&orphan.header, &orphan.ticket)
+                        .and_then(|()| {
+                            self.validate_ticket_in_context_for(
+                                &candidate.dag,
+                                &orphan.header,
+                                &orphan.ticket,
+                            )
+                        })
+                        .and_then(|()| {
+                            candidate
+                                .dag
+                                .insert(orphan.header.clone(), &orphan.ticket)
+                                .map_err(NodeError::Dag)
+                                .map(|_| ())
+                        })
+                        .and_then(|()| {
+                            Self::validate_checkpoint_binding(
+                                &candidate,
+                                &orphan.header,
+                                &orphan.hash,
+                            )
+                        })
+                };
+                if result.is_ok() {
+                    self.dag = candidate.dag;
+                    queue.push(orphan.hash);
+                } else {
+                    self.dag.drop_orphan_subtree(&orphan.hash);
+                }
+            }
+        }
     }
 
     /// Full import: the complete seven-stage pipeline.
@@ -743,13 +880,37 @@ impl<P: StorePort> NodeCore<P> {
         if self.cfg.mode == NodeMode::Light {
             return self.import_header_light(header, ticket);
         }
-        let outcome = self
-            .import_header_stages(header, ticket)
-            .inspect_err(|_| self.metrics.inc(&self.metrics.blocks_rejected_total))?;
-        let hash = match outcome {
-            InsertOutcome::Inserted { hash, .. } => hash,
-            InsertOutcome::Orphaned { hash, .. } => return Ok(ImportOutcome::Orphaned { hash }),
-        };
+        self.validate_header_non_context(header, ticket)?;
+        let hash = *header
+            .block_hash()
+            .map_err(|_| NodeError::Crypto)?
+            .as_bytes();
+
+        // Unknown-parent blocks remain inert. Their full payload is retained
+        // only inside the same bounded orphan cache so parent arrival can
+        // rerun the ordinary full import law before connection.
+        if !self.dag.contains(&header.parent_hash) {
+            let mut staged = self.staged_consensus();
+            let outcome = staged.dag.insert(header.clone(), ticket)?;
+            let retained = matches!(outcome, InsertOutcome::Orphaned { retained: true, .. });
+            staged
+                .orphan_blocks
+                .retain(|known, _| staged.dag.is_orphan(known));
+            if retained {
+                staged.orphan_blocks.insert(
+                    hash,
+                    ParkedBlock {
+                        header: header.clone(),
+                        ticket: *ticket,
+                        claim: *claim,
+                        shards: shards.to_vec(),
+                    },
+                );
+            }
+            self.dag = staged.dag;
+            self.orphan_blocks = staged.orphan_blocks;
+            return Ok(ImportOutcome::Orphaned { hash });
+        }
 
         // Stage 3: DA reconstruction. Insufficient shards PARK the block.
         let body = match self.reconstruct_body(header, ticket, claim, shards) {
@@ -769,12 +930,10 @@ impl<P: StorePort> NodeCore<P> {
                 return Ok(ImportOutcome::ParkedAwaitingBody { hash });
             }
             Err(e) => {
-                self.metrics.inc(&self.metrics.blocks_rejected_total);
                 return Err(e);
             }
         };
-
-        self.accept_body(hash, header, ticket, &body)
+        self.validate_stage_commit(hash, header, ticket, body)
     }
 
     /// Feeds late shards to a parked block; resumes the pipeline when
@@ -787,6 +946,7 @@ impl<P: StorePort> NodeCore<P> {
         let Some(mut parked) = self.parked.remove(block_hash) else {
             return Ok(None);
         };
+        let original = parked.clone();
         parked.shards.extend_from_slice(more);
         match self.reconstruct_body(
             &parked.header,
@@ -795,19 +955,26 @@ impl<P: StorePort> NodeCore<P> {
             &parked.shards,
         ) {
             Ok(body) => {
-                self.metrics
-                    .set(&self.metrics.blocks_parked, self.parked.len() as u64);
                 let header = parked.header.clone();
                 let ticket = parked.ticket;
-                self.accept_body(*block_hash, &header, &ticket, &body)
-                    .map(Some)
+                match self.validate_stage_commit(*block_hash, &header, &ticket, body) {
+                    Ok(outcome) => {
+                        self.metrics
+                            .set(&self.metrics.blocks_parked, self.parked.len() as u64);
+                        Ok(Some(outcome))
+                    }
+                    Err(error) => {
+                        self.parked.insert(*block_hash, original);
+                        Err(error)
+                    }
+                }
             }
             Err(NodeError::Da(DaError::NotEnoughValidShards { .. })) => {
                 self.parked.insert(*block_hash, parked);
                 Ok(None)
             }
             Err(e) => {
-                self.metrics.inc(&self.metrics.blocks_rejected_total);
+                self.parked.insert(*block_hash, original);
                 Err(e)
             }
         }
@@ -816,7 +983,7 @@ impl<P: StorePort> NodeCore<P> {
     /// Stage-3 body work: reconstruct, decode the DA form, substitute the
     /// validated ticket, cross-check every body-derived header root.
     fn reconstruct_body(
-        &mut self,
+        &self,
         header: &BlockHeaderV1,
         ticket: &GroundTicketV1,
         claim: &BodyDaClaimV1,
@@ -858,59 +1025,416 @@ impl<P: StorePort> NodeCore<P> {
             });
         }
         check_blob_descriptors(body.consensus_blob_descriptors.as_slice())?;
-        self.availability.record_reconstructed(&reconstructed);
         Ok(body)
     }
 
-    /// Stages 4-7 for a connected header whose body is now available.
-    fn accept_body(
+    fn validate_stage_commit(
         &mut self,
         hash: Hash32,
         header: &BlockHeaderV1,
         ticket: &GroundTicketV1,
-        body: &BlockBodyV1,
+        body: BlockBodyV1,
     ) -> Result<ImportOutcome, NodeError> {
-        let extends_exec_head = header.parent_hash == self.exec_head;
-        let outcome = if extends_exec_head {
-            // Stage 4-5: execute against the live single-writer ledger.
-            match self.execute_and_verify(header, body) {
-                Ok(exec) => {
-                    self.commit_executed_block(hash, header, ticket, body, &exec)?;
-                    ImportOutcome::Executed { hash }
-                }
-                Err(e) => {
-                    // The ledger may be dirty: rebuild from the finalized
-                    // anchor along the canonical path (recovery law).
-                    self.metrics.inc(&self.metrics.blocks_rejected_total);
-                    self.rebuild_ledger_to(self.exec_head)?;
-                    return Err(e);
-                }
-            }
+        let mut staged = self.staged_consensus();
+        let mut writes = WriteSet::default();
+        let mut bodies = BTreeMap::new();
+        self.stage_connected_block(
+            &mut staged,
+            &mut writes,
+            &mut bodies,
+            hash,
+            header,
+            ticket,
+            body,
+        )?;
+        self.stage_reachable_orphans(&mut staged, &mut writes, &mut bodies, hash);
+        let (reorged, connected_blocks, settled_txs) =
+            self.stage_fork_choice(&mut staged, &mut writes, &bodies)?;
+        self.stage_refresh_anchor(&mut staged, &bodies)?;
+
+        let justified = staged.tracker.justified_head();
+        let finalized = staged.tracker.finalized_head();
+        writes
+            .indices
+            .push((KEY_JUSTIFIED.to_vec(), Some(justified.encode_canonical())));
+        writes
+            .indices
+            .push((KEY_FINALIZED.to_vec(), Some(finalized.encode_canonical())));
+        staged.view.heads.justified = justified;
+        staged.view.heads.finalized = finalized;
+
+        let canonical = staged
+            .dag
+            .ancestor_at_height(&staged.exec_head, header.height)
+            .is_some_and(|ancestor| ancestor.hash == hash);
+        let outcome = if canonical {
+            ImportOutcome::Executed { hash }
         } else {
-            // Side branch: persist header + body; execution deferred to
-            // fork choice.
-            let mut ws = WriteSet::default();
-            let mut header_bytes = header.encode_canonical();
-            header_bytes.extend_from_slice(&ticket.encode());
-            ws.headers.push((key_header(&hash), Some(header_bytes)));
-            ws.blobs.push(Blob {
+            ImportOutcome::SideChain { hash }
+        };
+        let seq = self.port.commit(&writes)?;
+        self.install_staged_consensus(staged);
+
+        let m = &self.metrics;
+        m.set(&m.store_seq, seq);
+        m.set(&m.height, self.exec_height);
+        m.set(&m.justified_epoch, justified.epoch);
+        m.set(&m.finalized_epoch, finalized.epoch);
+        m.set(&m.mempool_txs, self.mempool.len() as u64);
+        m.set(&m.mempool_bytes, self.mempool.total_bytes() as u64);
+        for _ in 0..connected_blocks {
+            m.inc(&m.blocks_imported_total);
+        }
+        for _ in 0..settled_txs {
+            m.inc(&m.txs_settled_total);
+        }
+        if reorged {
+            m.inc(&m.reorgs_total);
+        }
+        Ok(outcome)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn stage_connected_block(
+        &self,
+        staged: &mut StagedConsensus,
+        writes: &mut WriteSet,
+        bodies: &mut BTreeMap<Hash32, StagedBody>,
+        expected_hash: Hash32,
+        header: &BlockHeaderV1,
+        ticket: &GroundTicketV1,
+        body: BlockBodyV1,
+    ) -> Result<(), NodeError> {
+        self.validate_header_non_context(header, ticket)?;
+        self.validate_ticket_in_context_for(&staged.dag, header, ticket)?;
+        let outcome = staged.dag.insert(header.clone(), ticket)?;
+        let hash = match outcome {
+            InsertOutcome::Inserted { hash } => hash,
+            InsertOutcome::Orphaned { .. } => {
+                return Err(NodeError::Dag(noos_braid::DagError::UnknownBlock));
+            }
+        };
+        if hash != expected_hash {
+            return Err(NodeError::BodyMismatch {
+                what: "block hash changed during staging",
+            });
+        }
+
+        self.stage_certificates(staged, body.finality_certificates.as_slice(), Some(writes))?;
+        Self::validate_checkpoint_binding(staged, header, &hash)?;
+        self.validate_body_at_parent(staged, bodies, header, &body)?;
+
+        let encoded = encode_body(&da_form_bytes(&body))?;
+        if encoded.shard_root().into_bytes() != header.body_da_root {
+            return Err(NodeError::RootMismatch {
+                field: "body_da_root",
+            });
+        }
+        staged.availability.record_encoded(&encoded);
+        let mut header_bytes = header.encode_canonical();
+        header_bytes.extend_from_slice(&ticket.encode());
+        writes.headers.push((key_header(&hash), Some(header_bytes)));
+        if !writes
+            .blobs
+            .iter()
+            .any(|blob| blob.hash == header.body_da_root)
+        {
+            writes.blobs.push(Blob {
                 hash: header.body_da_root,
                 bytes: body.encode_canonical(),
             });
-            let seq = self.port.commit(&ws)?;
-            self.metrics.set(&self.metrics.store_seq, seq);
-            ImportOutcome::SideChain { hash }
-        };
+        }
+        staged.orphan_blocks.remove(&hash);
+        bodies.insert(
+            hash,
+            StagedBody {
+                header: header.clone(),
+                body,
+            },
+        );
+        Ok(())
+    }
 
-        // Stage 7: finality processing from the body's certificates.
-        for cert in body.finality_certificates.as_slice() {
-            self.process_certificate(cert)?;
+    fn validate_body_at_parent(
+        &self,
+        staged: &StagedConsensus,
+        bodies: &BTreeMap<Hash32, StagedBody>,
+        header: &BlockHeaderV1,
+        body: &BlockBodyV1,
+    ) -> Result<(), NodeError> {
+        let mut ledger = if header.parent_hash == staged.exec_head {
+            staged.ledger.clone()
+        } else {
+            let mut path = Vec::new();
+            let mut cursor = header.parent_hash;
+            while cursor != staged.anchor.0 {
+                let stored = staged
+                    .dag
+                    .get(&cursor)
+                    .ok_or(NodeError::Dag(noos_braid::DagError::UnknownBlock))?;
+                if stored.header.height <= staged.anchor.1 {
+                    return Err(NodeError::Dag(noos_braid::DagError::ReorgAcrossFinality));
+                }
+                path.push(cursor);
+                cursor = stored.header.parent_hash;
+            }
+            path.reverse();
+            let mut ledger = staged.anchor.2.clone();
+            for hash in path {
+                let ancestor = self.staged_body(bodies, &hash)?;
+                Self::execute_and_verify_on(
+                    &mut ledger,
+                    self.chain_id,
+                    &self.engine,
+                    &ancestor.header,
+                    &ancestor.body,
+                )?;
+            }
+            ledger
+        };
+        Self::execute_and_verify_on(&mut ledger, self.chain_id, &self.engine, header, body)?;
+        Ok(())
+    }
+
+    fn stage_reachable_orphans(
+        &self,
+        staged: &mut StagedConsensus,
+        writes: &mut WriteSet,
+        bodies: &mut BTreeMap<Hash32, StagedBody>,
+        root: Hash32,
+    ) {
+        let mut queue = vec![root];
+        let mut cursor = 0;
+        while cursor < queue.len() {
+            let parent = queue[cursor];
+            cursor = cursor.saturating_add(1);
+            for orphan in staged.dag.take_orphans_waiting_on(&parent) {
+                let hash = orphan.hash;
+                let parked = staged.orphan_blocks.get(&hash).cloned();
+                let mut candidate = staged.clone();
+                candidate.orphan_blocks.remove(&hash);
+                let mut candidate_writes = writes.clone();
+                let mut candidate_bodies = bodies.clone();
+                let result = if let Some(parked) = parked {
+                    self.reconstruct_body(
+                        &parked.header,
+                        &parked.ticket,
+                        &parked.claim,
+                        &parked.shards,
+                    )
+                    .and_then(|body| {
+                        self.stage_connected_block(
+                            &mut candidate,
+                            &mut candidate_writes,
+                            &mut candidate_bodies,
+                            hash,
+                            &parked.header,
+                            &parked.ticket,
+                            body,
+                        )
+                    })
+                } else if orphan.header.finality_certificate_root != ZERO_ROOT {
+                    Err(NodeError::BodyMismatch {
+                        what: "finality certificate evidence absent",
+                    })
+                } else {
+                    self.validate_header_non_context(&orphan.header, &orphan.ticket)
+                        .and_then(|()| {
+                            self.validate_ticket_in_context_for(
+                                &candidate.dag,
+                                &orphan.header,
+                                &orphan.ticket,
+                            )
+                        })
+                        .and_then(|()| {
+                            candidate
+                                .dag
+                                .insert(orphan.header.clone(), &orphan.ticket)
+                                .map_err(NodeError::Dag)
+                                .map(|_| ())
+                        })
+                        .and_then(|()| {
+                            Self::validate_checkpoint_binding(&candidate, &orphan.header, &hash)
+                        })
+                };
+                if result.is_ok() {
+                    *staged = candidate;
+                    *writes = candidate_writes;
+                    *bodies = candidate_bodies;
+                    queue.push(hash);
+                } else {
+                    let mut dropped = staged.dag.drop_orphan_subtree(&hash);
+                    dropped.push(hash);
+                    for dropped_hash in dropped {
+                        staged.orphan_blocks.remove(&dropped_hash);
+                    }
+                }
+            }
+        }
+    }
+
+    fn staged_body(
+        &self,
+        bodies: &BTreeMap<Hash32, StagedBody>,
+        hash: &Hash32,
+    ) -> Result<StagedBody, NodeError> {
+        if let Some(body) = bodies.get(hash) {
+            return Ok(body.clone());
+        }
+        let (header, ticket) = self.load_header(hash)?;
+        let body = self.load_body(&header, &ticket)?;
+        Ok(StagedBody { header, body })
+    }
+
+    fn stage_fork_choice(
+        &self,
+        staged: &mut StagedConsensus,
+        writes: &mut WriteSet,
+        bodies: &BTreeMap<Hash32, StagedBody>,
+    ) -> Result<(bool, u64, u64), NodeError> {
+        let Some(best) = staged.dag.select_head() else {
+            return Ok((false, 0, 0));
+        };
+        if best == staged.exec_head {
+            return Ok((false, 0, 0));
+        }
+        for ancestor in staged.dag.ancestors(&best) {
+            if ancestor.hash == staged.exec_head || ancestor.header.height == 0 {
+                break;
+            }
+            if !staged
+                .availability
+                .body_available(&noos_crypto::Hash32::from_bytes(
+                    ancestor.header.body_da_root,
+                ))
+            {
+                return Ok((false, 0, 0));
+            }
         }
 
-        // Stage 6: fork choice (finality may have re-ranked branches).
-        self.apply_fork_choice()?;
-        self.refresh_finalized_anchor()?;
-        Ok(outcome)
+        let plan = staged.dag.plan_reorg(&staged.exec_head, &best)?;
+        let reorged = !plan.disconnect.is_empty();
+        let execution_path = if reorged {
+            let mut path = Vec::new();
+            let mut cursor = best;
+            while cursor != staged.anchor.0 {
+                let stored = staged
+                    .dag
+                    .get(&cursor)
+                    .ok_or(NodeError::Dag(noos_braid::DagError::UnknownBlock))?;
+                if stored.header.height <= staged.anchor.1 {
+                    return Err(NodeError::Dag(noos_braid::DagError::ReorgAcrossFinality));
+                }
+                path.push(cursor);
+                cursor = stored.header.parent_hash;
+            }
+            path.reverse();
+            staged.ledger = staged.anchor.2.clone();
+            path
+        } else {
+            plan.connect.clone()
+        };
+
+        let mut deltas = Vec::new();
+        let mut executed = BTreeMap::new();
+        for hash in execution_path {
+            let block = self.staged_body(bodies, &hash)?;
+            let exec = Self::execute_and_verify_on(
+                &mut staged.ledger,
+                self.chain_id,
+                &self.engine,
+                &block.header,
+                &block.body,
+            )?;
+            deltas.push(exec.merged_delta.clone());
+            executed.insert(hash, (block, exec));
+        }
+
+        for hash in &plan.disconnect {
+            if let Some(stored) = staged.dag.get(hash) {
+                staged.view.disconnect_block(stored.header.height);
+            }
+        }
+        let mut settled_txs = 0_u64;
+        for hash in &plan.connect {
+            let (block, exec) = executed.get(hash).ok_or(NodeError::BodyMismatch {
+                what: "staged execution result missing",
+            })?;
+            let settled: Vec<Hash32> = exec.receipts.iter().map(|r| r.txid).collect();
+            settled_txs = settled_txs.saturating_add(exec.receipts.len() as u64);
+            staged
+                .mempool
+                .on_block_connected(&settled, block.header.height.saturating_add(1));
+            staged
+                .view
+                .connect_block(&block.header, *hash, &exec.receipts);
+            writes
+                .indices
+                .push((key_height(block.header.height), Some(hash.to_vec())));
+            for receipt in &exec.receipts {
+                let mut value = block.header.height.to_le_bytes().to_vec();
+                value.extend_from_slice(&receipt.encode_canonical());
+                writes.receipts.push((receipt.txid.to_vec(), Some(value)));
+            }
+        }
+        staged.exec_head = best;
+        staged.exec_height = staged
+            .dag
+            .get(&best)
+            .ok_or(NodeError::Dag(noos_braid::DagError::UnknownBlock))?
+            .header
+            .height;
+        writes.delta = merge_deltas(deltas);
+        writes.roots = Some(staged.ledger.roots());
+        writes
+            .indices
+            .push((KEY_HEAD.to_vec(), Some(best.to_vec())));
+        Ok((reorged, plan.connect.len() as u64, settled_txs))
+    }
+
+    fn stage_refresh_anchor(
+        &self,
+        staged: &mut StagedConsensus,
+        bodies: &BTreeMap<Hash32, StagedBody>,
+    ) -> Result<(), NodeError> {
+        let finalized = staged.tracker.finalized_head();
+        let height = finalized
+            .expected_height()
+            .ok_or(NodeError::Dag(noos_braid::DagError::NotACheckpointHeight))?;
+        if height <= staged.anchor.1 || height > staged.exec_height {
+            return Ok(());
+        }
+        if staged
+            .dag
+            .ancestor_at_height(&staged.exec_head, height)
+            .is_none_or(|ancestor| ancestor.hash != finalized.checkpoint_hash)
+        {
+            return Ok(());
+        }
+        let mut path = Vec::new();
+        let mut cursor = finalized.checkpoint_hash;
+        while cursor != staged.anchor.0 {
+            let stored = staged
+                .dag
+                .get(&cursor)
+                .ok_or(NodeError::Dag(noos_braid::DagError::UnknownBlock))?;
+            path.push(cursor);
+            cursor = stored.header.parent_hash;
+        }
+        path.reverse();
+        let mut ledger = staged.anchor.2.clone();
+        for hash in path {
+            let block = self.staged_body(bodies, &hash)?;
+            Self::execute_and_verify_on(
+                &mut ledger,
+                self.chain_id,
+                &self.engine,
+                &block.header,
+                &block.body,
+            )?;
+        }
+        staged.anchor = (finalized.checkpoint_hash, height, ledger);
+        Ok(())
     }
 
     // -- execution --------------------------------------------------------------
@@ -921,13 +1445,22 @@ impl<P: StorePort> NodeCore<P> {
         header: &BlockHeaderV1,
         body: &BlockBodyV1,
     ) -> Result<ExecResult, NodeError> {
+        Self::execute_and_verify_on(&mut self.ledger, self.chain_id, &self.engine, header, body)
+    }
+
+    fn execute_and_verify_on(
+        ledger: &mut LumenLedger,
+        chain_id: Hash32,
+        engine: &GrainContractEngine,
+        header: &BlockHeaderV1,
+        body: &BlockBodyV1,
+    ) -> Result<ExecResult, NodeError> {
         let mut deltas: Vec<StateDelta> = Vec::new();
 
         // System transitions first (ch01 §9.3): parameter activation, then
         // the deterministic emission for this height.
-        deltas.push(self.ledger.activate_pending_params(header.height));
-        let prices = self
-            .ledger
+        deltas.push(ledger.activate_pending_params(header.height));
+        let prices = ledger
             .fee_state()
             .map(|s| s.prices())
             .ok_or(NodeError::RootMismatch { field: "fee_state" })?;
@@ -948,7 +1481,7 @@ impl<P: StorePort> NodeCore<P> {
             }
         }
         deltas.push(
-            self.ledger
+            ledger
                 .apply_emission(
                     header.height,
                     &PROPOSER_POOL_ACCOUNT,
@@ -960,10 +1493,9 @@ impl<P: StorePort> NodeCore<P> {
 
         // Ordered transactions (Lumen normative order per transaction).
         let ctx = BlockContext {
-            chain_id: self.chain_id,
+            chain_id,
             height: header.height,
         };
-        let engine = self.engine.clone();
         let auth = NodeAuthVerifier;
         let mut receipts: Vec<ReceiptV1> = Vec::with_capacity(body.transactions.len());
         for (tx, wits) in body
@@ -973,9 +1505,8 @@ impl<P: StorePort> NodeCore<P> {
         {
             let tx_bytes = tx.encode_canonical();
             let wit_bytes = wits.encode_canonical();
-            let outcome = self
-                .ledger
-                .apply_transaction(&ctx, &tx_bytes, &wit_bytes, &engine, &auth)
+            let outcome = ledger
+                .apply_transaction(&ctx, &tx_bytes, &wit_bytes, engine, &auth)
                 .map_err(NodeError::LumenReject)?;
             receipts.push(outcome.receipt().clone());
             match outcome {
@@ -998,13 +1529,13 @@ impl<P: StorePort> NodeCore<P> {
             return Err(NodeError::RootMismatch { field: "gas_used" });
         }
         deltas.push(
-            self.ledger
+            ledger
                 .end_block_fee_update(&usage)
                 .map_err(NodeError::LumenReject)?,
         );
 
         // Stage 5: ALL claimed roots (six Lumen + both receipt roots).
-        let roots = self.ledger.roots();
+        let roots = ledger.roots();
         let checks: [(&'static str, Hash32, Hash32); 7] = [
             ("notes_root", header.notes_root, roots.notes_root),
             (
@@ -1210,90 +1741,100 @@ impl<P: StorePort> NodeCore<P> {
 
     // -- finality -------------------------------------------------------------------
 
-    fn process_certificate(&mut self, cert: &FinalityCertificateV1) -> Result<(), NodeError> {
-        self.ensure_snapshot(cert.target.epoch)?;
-        let ancestry = DagAncestry { dag: &self.dag };
-        let outcome = self
-            .tracker
-            .ingest_certificate(cert, &self.registry, &ancestry)?;
-        let digest =
-            noos_witness::finality::certificate_digest(cert).map_err(NodeError::Witness)?;
-
-        let mut ws = WriteSet::default();
-        ws.indices.push((
-            key_certificate(cert.target.epoch, &digest),
-            Some(cert.encode_canonical()),
-        ));
-        match outcome {
-            IngestOutcome::Duplicate => return Ok(()),
-            IngestOutcome::Justified => {
-                let j = self.tracker.justified_head();
-                self.dag.set_justified(j)?;
-                ws.indices
-                    .push((KEY_JUSTIFIED.to_vec(), Some(j.encode_canonical())));
+    fn stage_certificates(
+        &self,
+        staged: &mut StagedConsensus,
+        certificates: &[FinalityCertificateV1],
+        mut writes: Option<&mut WriteSet>,
+    ) -> Result<(), NodeError> {
+        for cert in certificates {
+            self.ensure_snapshot_for(&mut staged.registry, cert.target.epoch)?;
+            let ancestry = DagAncestry { dag: &staged.dag };
+            let outcome = staged
+                .tracker
+                .ingest_certificate(cert, &staged.registry, &ancestry)?;
+            let digest =
+                noos_witness::finality::certificate_digest(cert).map_err(NodeError::Witness)?;
+            if !matches!(outcome, IngestOutcome::Duplicate) {
+                if let Some(ws) = writes.as_deref_mut() {
+                    ws.indices.push((
+                        key_certificate(cert.target.epoch, &digest),
+                        Some(cert.encode_canonical()),
+                    ));
+                }
             }
-            IngestOutcome::Finalized(cp) => {
-                let j = self.tracker.justified_head();
-                self.dag.set_finalized(cp)?;
-                self.dag.set_justified(j)?;
-                ws.indices
-                    .push((KEY_JUSTIFIED.to_vec(), Some(j.encode_canonical())));
-                ws.indices
-                    .push((KEY_FINALIZED.to_vec(), Some(cp.encode_canonical())));
+            match outcome {
+                IngestOutcome::Duplicate => {}
+                IngestOutcome::Justified => {
+                    staged.dag.set_justified(staged.tracker.justified_head())?;
+                }
+                IngestOutcome::Finalized(cp) => {
+                    staged.dag.set_finalized(cp)?;
+                    staged.dag.set_justified(staged.tracker.justified_head())?;
+                }
             }
         }
-        let seq = self.port.commit(&ws)?;
-        let m = &self.metrics;
-        m.set(&m.store_seq, seq);
-        m.set(&m.justified_epoch, self.tracker.justified_head().epoch);
-        m.set(&m.finalized_epoch, self.tracker.finalized_head().epoch);
-        self.view.heads.justified = self.tracker.justified_head();
-        self.view.heads.finalized = self.tracker.finalized_head();
         Ok(())
     }
 
-    /// Moves the rollback anchor up to the finalized checkpoint once it
-    /// lies on the executed canonical path.
-    fn refresh_finalized_anchor(&mut self) -> Result<(), NodeError> {
-        let finalized = self.tracker.finalized_head();
-        let height = finalized.epoch.saturating_mul(EPOCH_LENGTH);
-        if height <= self.anchor.1 || height > self.exec_height {
-            return Ok(());
+    /// A header is a snapshot of the finality state *after* its body
+    /// certificates have been applied in wire order. This exact ordering is
+    /// what permits a same-block certificate transition while making absent,
+    /// reordered, or mismatched evidence fail closed.
+    fn validate_checkpoint_binding(
+        staged: &StagedConsensus,
+        header: &BlockHeaderV1,
+        hash: &Hash32,
+    ) -> Result<(), NodeError> {
+        let justified = staged.tracker.justified_head();
+        let finalized = staged.tracker.finalized_head();
+        if header.justified_checkpoint != justified || header.finalized_checkpoint != finalized {
+            return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
         }
-        let on_path = self
-            .dag
-            .ancestor_at_height(&self.exec_head, height)
-            .is_some_and(|a| a.hash == finalized.checkpoint_hash);
-        if !on_path {
-            return Ok(());
-        }
-        // Replay anchor → checkpoint into a fresh anchor state.
-        let mut path: Vec<Hash32> = Vec::new();
-        let mut cursor = finalized.checkpoint_hash;
-        while cursor != self.anchor.0 {
-            let stored = self
-                .dag
-                .get(&cursor)
-                .ok_or(NodeError::Dag(noos_braid::DagError::UnknownBlock))?;
-            path.push(cursor);
-            if stored.header.height == 0 {
-                break;
+        for checkpoint in [finalized, justified] {
+            let Some(height) = checkpoint.expected_height() else {
+                return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
+            };
+            if height > header.height
+                || staged
+                    .dag
+                    .get(&checkpoint.checkpoint_hash)
+                    .is_none_or(|stored| stored.header.height != height)
+                || staged
+                    .dag
+                    .ancestor_at_height(hash, height)
+                    .is_none_or(|ancestor| ancestor.hash != checkpoint.checkpoint_hash)
+            {
+                return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
             }
-            cursor = stored.header.parent_hash;
         }
-        path.reverse();
-        let mut anchor_ledger = self.anchor.2.clone();
-        let mut anchor_exec = AnchorExec {
-            ledger: &mut anchor_ledger,
-            chain_id: self.chain_id,
-            engine: &self.engine,
-        };
-        for hash in path {
-            let (header, ticket) = self.load_header(&hash)?;
-            let body = self.load_body(&header, &ticket)?;
-            anchor_exec.replay(&header, &body)?;
+        if !(DagAncestry { dag: &staged.dag }).descends(&finalized, &justified) {
+            return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
         }
-        self.anchor = (finalized.checkpoint_hash, height, anchor_ledger);
+        Ok(())
+    }
+
+    fn process_certificate(&mut self, cert: &FinalityCertificateV1) -> Result<(), NodeError> {
+        let mut staged = self.staged_consensus();
+        let mut ws = WriteSet::default();
+        self.stage_certificates(&mut staged, std::slice::from_ref(cert), Some(&mut ws))?;
+        if ws.indices.is_empty() {
+            return Ok(());
+        }
+        let justified = staged.tracker.justified_head();
+        let finalized = staged.tracker.finalized_head();
+        ws.indices
+            .push((KEY_JUSTIFIED.to_vec(), Some(justified.encode_canonical())));
+        ws.indices
+            .push((KEY_FINALIZED.to_vec(), Some(finalized.encode_canonical())));
+        let seq = self.port.commit(&ws)?;
+        staged.view.heads.justified = justified;
+        staged.view.heads.finalized = finalized;
+        self.install_staged_consensus(staged);
+        let m = &self.metrics;
+        m.set(&m.store_seq, seq);
+        m.set(&m.justified_epoch, justified.epoch);
+        m.set(&m.finalized_epoch, finalized.epoch);
         Ok(())
     }
 
@@ -1369,8 +1910,13 @@ impl<P: StorePort> NodeCore<P> {
             // block is at least its own timestamp.
             self.now_ms = self.now_ms.max(header.timestamp_ms);
             // Trusted-store replay still re-validates: structure, ticket,
-            // execution, roots. (Certificates replay separately below.)
-            self.import_header_stages(&header, &ticket)?;
+            // execution, roots, and the same-block certificate/checkpoint
+            // ordering used during live import.
+            self.import_header_stages(
+                &header,
+                &ticket,
+                Some(body.finality_certificates.as_slice()),
+            )?;
             let exec = self.execute_and_verify(&header, &body).inspect_err(|_| {
                 // A replay failure is a corrupt/foreign store: startup stops.
             })?;
@@ -1673,9 +2219,13 @@ impl<P: StorePort> NodeCore<P> {
         header.proposer_signature = Bytes96(sig.into_bytes());
 
         // Connect + commit through the ordinary paths.
-        let outcome = self.import_header_stages(&header, &ticket)?;
+        let outcome = self.import_header_stages(
+            &header,
+            &ticket,
+            Some(body.finality_certificates.as_slice()),
+        )?;
         let hash = match outcome {
-            InsertOutcome::Inserted { hash, .. } => hash,
+            InsertOutcome::Inserted { hash } => hash,
             InsertOutcome::Orphaned { .. } => {
                 return Err(NodeError::Dag(noos_braid::DagError::UnknownBlock))
             }
@@ -1770,61 +2320,5 @@ pub fn merge_deltas(deltas: Vec<StateDelta>) -> StateDelta {
                 value,
             })
             .collect(),
-    }
-}
-
-/// Anchor-side replay executor: same normative order, no store writes.
-struct AnchorExec<'a> {
-    ledger: &'a mut LumenLedger,
-    chain_id: Hash32,
-    engine: &'a GrainContractEngine,
-}
-
-impl AnchorExec<'_> {
-    fn replay(&mut self, header: &BlockHeaderV1, body: &BlockBodyV1) -> Result<(), NodeError> {
-        self.ledger.activate_pending_params(header.height);
-        self.ledger
-            .apply_emission(
-                header.height,
-                &PROPOSER_POOL_ACCOUNT,
-                &WITNESS_POOL_ACCOUNT,
-                &TREASURY_ACCOUNT,
-            )
-            .map_err(NodeError::Emission)?;
-        let ctx = BlockContext {
-            chain_id: self.chain_id,
-            height: header.height,
-        };
-        let engine = self.engine.clone();
-        let auth = NodeAuthVerifier;
-        let mut receipts = Vec::with_capacity(body.transactions.len());
-        for (tx, wits) in body
-            .transactions
-            .iter()
-            .zip(body.segregated_witnesses.iter())
-        {
-            let outcome = self
-                .ledger
-                .apply_transaction(
-                    &ctx,
-                    &tx.encode_canonical(),
-                    &wits.encode_canonical(),
-                    &engine,
-                    &auth,
-                )
-                .map_err(NodeError::LumenReject)?;
-            receipts.push(outcome.receipt().clone());
-        }
-        let usage = sum_usage(&receipts)?;
-        self.ledger
-            .end_block_fee_update(&usage)
-            .map_err(NodeError::LumenReject)?;
-        let roots = self.ledger.roots();
-        if roots.accounts_root != header.accounts_root {
-            return Err(NodeError::RootMismatch {
-                field: "anchor accounts_root",
-            });
-        }
-        Ok(())
     }
 }

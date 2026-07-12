@@ -12,7 +12,7 @@ use noos_ground::{GroundError, GroundTicketV1};
 use crate::consensus::{ImportOutcome, NodeCore};
 use crate::genesis::{mine_ticket, DEVNET_PROPOSER_SEED};
 use crate::roots::body_ticket_root;
-use crate::store_port::InProcStore;
+use crate::store_port::{key_header, InProcStore, StorePort};
 use crate::view::ViewLookup;
 use crate::NodeError;
 
@@ -166,6 +166,49 @@ fn bad_state_root_rejects_and_leaves_importer_clean() {
         .expect("valid import after rejection");
     assert_eq!(outcome, ImportOutcome::Executed { hash: pb.hash });
     assert_eq!(b.ledger().roots(), a.ledger().roots());
+}
+
+#[test]
+fn bad_state_root_on_side_branch_is_rejected_before_visibility() {
+    let side_dir = test_dir("im-side-root-side");
+    let importer_dir = test_dir("im-side-root-importer");
+    let mut side = boot_node(&side_dir, node_config());
+    let mut importer = boot_node(&importer_dir, node_config());
+    let genesis_header = spec().build().expect("genesis").header;
+
+    // Keep the importer's two-block chain heavier so the candidate is
+    // unambiguously a side branch rooted at genesis.
+    produce_next(&mut importer);
+    produce_next(&mut importer);
+    let side_block = produce_full(&mut side);
+    importer.set_now(side_block.header.timestamp_ms);
+    let before_head = importer.head();
+    let before_roots = importer.ledger().roots();
+    let before_dag_len = importer.dag().len();
+    let before_store_seq = importer.port.store().applied_seq();
+
+    let mut header = side_block.header.clone();
+    header.accounts_root = [0xBC; 32];
+    let ticket = reissue(&importer.chain_id(), &genesis_header, &mut header);
+    let hash = *header.block_hash().expect("hash").as_bytes();
+    let err = importer
+        .import_block(&header, &ticket, &side_block.claim, &side_block.shards)
+        .expect_err("bad side-branch execution root");
+    assert!(matches!(
+        err,
+        NodeError::RootMismatch {
+            field: "accounts_root"
+        }
+    ));
+    assert_eq!(importer.head(), before_head);
+    assert_eq!(importer.ledger().roots(), before_roots);
+    assert_eq!(importer.dag().len(), before_dag_len);
+    assert_eq!(importer.port.store().applied_seq(), before_store_seq);
+    assert!(importer
+        .port
+        .get_header(&key_header(&hash))
+        .expect("header lookup")
+        .is_none());
 }
 
 #[test]

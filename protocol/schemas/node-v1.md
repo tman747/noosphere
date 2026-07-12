@@ -111,37 +111,37 @@ methods on `&mut self`. Exact stage order:
                                    block — pausing is NOT rejection — and
                                    feed_shards resumes it) + body/header
                                    cross-checks (§3)
-4. body execution                 (Lumen normative order; system steps
-                                   first: param activation, emission;
-                                   header base_prices must equal the
-                                   block-start controller state)
-5. root comparison                (six Lumen roots + execution_receipt_
-                                   root + lumen_receipts_state_root +
-                                   gas_used; first mismatch is the typed
-                                   RootMismatch)
-6. fork choice                    (braid ForkScore: finalized, justified,
-                                   cumulative work, inverse hash; reorg =
-                                   rollback to the finalized anchor +
-                                   replay of stored bodies)
-7. finality processing            (certificates from the body; justified/
-                                   finalized pointer advance; anchor
-                                   refresh)
+4. prospective finality           (verify every body certificate in wire
+                                   order; the header checkpoint pair MUST
+                                   exactly equal the resulting verified
+                                   tracker state and checkpoint ancestry)
+5. body execution + roots         (Lumen normative order against staged
+                                   state; every claimed root, gas_used, and
+                                   block-start base_prices is checked)
+6. orphan promotion + fork choice (full parent-context Ground/checkpoint
+                                   validation for every reachable orphan;
+                                   staged rollback/replay below finality)
+7. atomic commit                  (block, body, state, receipts, certificate
+                                   records, and finality/head pointers in one
+                                   write set), then install staged memory
 ```
 
-* A parent-unknown header enters the bounded orphan pool. A valid header
-  off the executed head persists as a side chain; execution is deferred
-  to fork choice.
-* A stage-4/5 failure may leave the live ledger dirty; the node rebuilds
-  it from the finalized anchor along the canonical path before returning
-  the typed error (rejection never corrupts state).
+* A parent-unknown header enters the bounded orphan pool but never enters
+  fork choice. Parent arrival deterministically re-runs the complete Ground
+  ticket/context and checkpoint-evidence laws for every reachable orphan;
+  invalid descendants are dropped within the bounded pool.
+* All validation and execution occurs against cloned prospective state.
+  Any error, including a later certificate in the same body, discards the
+  stage without changing memory, metrics, certificate indices, or durable
+  state. The store commit precedes installation of the staged memory.
 * Reorgs below finality roll back to the finalized anchor and replay
   stored bodies deterministically; a plan across finality is
   `ReorgAcrossFinality` — finalized checkpoints are never reverted by
   work (proven in §10.2).
 * Restart recovery replays the durable chain through the SAME pipeline
-  (structure, ticket, execution, roots re-verified block by block);
-  certificates replay afterwards in epoch order; recovered state is EXACT
-  or startup fails.
+  (structure, ticket, body certificates, exact checkpoint binding,
+  execution, and roots re-verified block by block); the certificate index
+  is replayed afterwards as a duplicate-checked consistency record.
 
 ### 4.4 Pulse anchor law
 

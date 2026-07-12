@@ -12,7 +12,9 @@
 //! * Bounded orphan pool: headers whose parent is unknown wait, keyed by
 //!   block hash and indexed by awaited parent. At capacity the orphan with
 //!   the numerically LARGEST block hash is evicted (the direction the fork
-//!   choice's final tiebreak already disfavors) — fully deterministic.
+//!   choice's final tiebreak already disfavors) — fully deterministic. The
+//!   DAG never auto-connects them: the consensus owner must take each newly
+//!   reachable orphan and rerun its full parent-context validation.
 //! * Checkpoint state: the local `(justified, finalized)` pair. Finality
 //!   never regresses; a chain conflicting with the local finalized
 //!   checkpoint is invalid regardless of work (ch01 §4.5).
@@ -52,20 +54,18 @@ pub struct StoredHeader {
 }
 
 #[derive(Clone, Debug)]
-struct OrphanEntry {
-    header: BlockHeaderV1,
-    ticket: GroundTicketV1,
+pub struct OrphanHeader {
+    pub hash: [u8; 32],
+    pub header: BlockHeaderV1,
+    pub ticket: GroundTicketV1,
 }
 
 /// Result of [`HeaderDag::insert`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum InsertOutcome {
-    /// Connected to the DAG; `connected_orphans` lists formerly orphaned
-    /// descendants connected in the same call, in connection order.
-    Inserted {
-        hash: [u8; 32],
-        connected_orphans: Vec<[u8; 32]>,
-    },
+    /// This header alone connected to the DAG. Newly reachable orphans
+    /// remain pooled for full validation by the consensus owner.
+    Inserted { hash: [u8; 32] },
     /// Parent unknown; pooled (or deterministically evicted when
     /// `retained == false`).
     Orphaned { hash: [u8; 32], retained: bool },
@@ -90,6 +90,9 @@ pub enum DagError {
     /// Child claims a lower justified/finalized checkpoint epoch than its
     /// parent: checkpoint views only grow along a chain.
     CheckpointRegression,
+    /// Header checkpoint references do not exactly match locally verified
+    /// finality state and its checkpoint ancestry.
+    UnverifiedCheckpoint,
     /// Ticket `profile_id` differs from the header's `ground_profile_id`.
     TicketProfileMismatch,
     /// `(proposer_pubkey, nonce, extra_nonce)` already appears in an
@@ -118,6 +121,9 @@ impl core::fmt::Display for DagError {
             }
             DagError::SlotRegression => f.write_str("slot below parent slot"),
             DagError::CheckpointRegression => f.write_str("checkpoint view regresses below parent"),
+            DagError::UnverifiedCheckpoint => {
+                f.write_str("header checkpoint view lacks exact verified finality evidence")
+            }
             DagError::TicketProfileMismatch => {
                 f.write_str("ticket profile_id differs from header ground_profile_id")
             }
@@ -152,7 +158,7 @@ pub struct HeaderDag {
     children: BTreeMap<[u8; 32], BTreeSet<[u8; 32]>>,
     by_height: BTreeMap<u64, BTreeSet<[u8; 32]>>,
     by_slot: BTreeMap<u64, BTreeSet<[u8; 32]>>,
-    orphans: BTreeMap<[u8; 32], OrphanEntry>,
+    orphans: BTreeMap<[u8; 32], OrphanHeader>,
     orphans_by_parent: BTreeMap<[u8; 32], BTreeSet<[u8; 32]>>,
     orphan_capacity: usize,
     genesis_hash: [u8; 32],
@@ -253,6 +259,11 @@ impl HeaderDag {
     #[must_use]
     pub fn orphan_count(&self) -> usize {
         self.orphans.len()
+    }
+
+    #[must_use]
+    pub fn is_orphan(&self, hash: &[u8; 32]) -> bool {
+        self.orphans.contains_key(hash)
     }
 
     #[must_use]
@@ -410,11 +421,7 @@ impl HeaderDag {
             return Ok(InsertOutcome::Orphaned { hash, retained });
         }
         self.connect(hash, header, ticket)?;
-        let connected_orphans = self.connect_orphans(hash);
-        Ok(InsertOutcome::Inserted {
-            hash,
-            connected_orphans,
-        })
+        Ok(InsertOutcome::Inserted { hash })
     }
 
     fn connect(
@@ -499,7 +506,8 @@ impl HeaderDag {
             .insert(hash);
         self.orphans.insert(
             hash,
-            OrphanEntry {
+            OrphanHeader {
+                hash,
                 header,
                 ticket: *ticket,
             },
@@ -507,7 +515,7 @@ impl HeaderDag {
         true
     }
 
-    fn remove_orphan(&mut self, hash: &[u8; 32]) -> Option<OrphanEntry> {
+    fn remove_orphan(&mut self, hash: &[u8; 32]) -> Option<OrphanHeader> {
         let entry = self.orphans.remove(hash)?;
         if let Some(set) = self.orphans_by_parent.get_mut(&entry.header.parent_hash) {
             set.remove(hash);
@@ -518,31 +526,36 @@ impl HeaderDag {
         Some(entry)
     }
 
-    /// Connects every pooled orphan now reachable from `root`, walking the
-    /// awaiting sets in deterministic order (per-parent ascending hash).
-    /// Orphans that fail connection rules are dropped (their proposer can
-    /// resubmit; the pool is a cache, not a promise).
-    fn connect_orphans(&mut self, root: [u8; 32]) -> Vec<[u8; 32]> {
-        let mut connected = Vec::new();
-        let mut queue: Vec<[u8; 32]> = vec![root];
-        while let Some(parent) = queue.pop() {
-            let Some(waiting) = self.orphans_by_parent.get(&parent).cloned() else {
-                continue;
-            };
-            for child_hash in waiting {
-                let Some(entry) = self.remove_orphan(&child_hash) else {
-                    continue;
-                };
-                if self
-                    .connect(child_hash, entry.header, &entry.ticket)
-                    .is_ok()
-                {
-                    connected.push(child_hash);
-                    queue.push(child_hash);
-                }
+    /// Removes and returns the direct orphans waiting on `parent`, ordered
+    /// by ascending block hash. The caller must fully validate each entry
+    /// before reinserting it now that parent context exists.
+    pub fn take_orphans_waiting_on(&mut self, parent: &[u8; 32]) -> Vec<OrphanHeader> {
+        let Some(waiting) = self.orphans_by_parent.get(parent).cloned() else {
+            return Vec::new();
+        };
+        waiting
+            .iter()
+            .filter_map(|hash| self.remove_orphan(hash))
+            .collect()
+    }
+
+    /// Drops `root` and every pooled descendant in deterministic breadth-
+    /// first, per-parent hash order. Work is bounded by the orphan capacity.
+    pub fn drop_orphan_subtree(&mut self, root: &[u8; 32]) -> Vec<[u8; 32]> {
+        let mut dropped = Vec::new();
+        let mut queue = vec![*root];
+        let mut cursor = 0;
+        while cursor < queue.len() {
+            let hash = queue[cursor];
+            cursor = cursor.saturating_add(1);
+            if self.remove_orphan(&hash).is_some() {
+                dropped.push(hash);
+            }
+            if let Some(children) = self.orphans_by_parent.get(&hash).cloned() {
+                queue.extend(children);
             }
         }
-        connected
+        dropped
     }
 
     // -- checkpoints ----------------------------------------------------------
@@ -607,8 +620,10 @@ impl HeaderDag {
 
     // -- fork choice -----------------------------------------------------------
 
-    /// Fork score of a connected tip (plan §6.4; ch01 §4.5): the tip
-    /// header's claimed finalized/justified checkpoint epochs, cumulative
+    /// Fork score of a connected tip (plan §6.4; ch01 §4.5): the locally
+    /// verified finalized epoch and the locally verified justified epoch
+    /// only when that checkpoint is on the tip's ancestry (otherwise the
+    /// finalized epoch baseline), cumulative
     /// normalized `G+L` on the path strictly above the local finalized
     /// checkpoint (saturating at `U256::MAX`), and the block hash for the
     /// inverse final tiebreak.
@@ -622,9 +637,18 @@ impl HeaderDag {
             }
             work = u256_saturating_add(&work, &anc.work);
         }
+        let justified_height = self.justified.epoch.saturating_mul(EPOCH_LENGTH);
+        let justified_epoch = if self
+            .ancestor_at_height(tip, justified_height)
+            .is_some_and(|ancestor| ancestor.hash == self.justified.checkpoint_hash)
+        {
+            self.justified.epoch
+        } else {
+            self.finalized.epoch
+        };
         Some(ForkScore {
-            finalized_epoch: stored.header.finalized_checkpoint.epoch,
-            justified_epoch: stored.header.justified_checkpoint.epoch,
+            finalized_epoch: self.finalized.epoch,
+            justified_epoch,
             work_since_finalized: work,
             block_hash: stored.hash,
         })

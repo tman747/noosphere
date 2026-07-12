@@ -51,8 +51,8 @@ pub use body::{
     MAX_TRANSACTIONS,
 };
 pub use dag::{
-    AncestorIter, AncestorTicketScan, DagError, HeaderDag, InsertOutcome, ReorgPlan, StoredHeader,
-    TicketTuple, DEFAULT_ORPHAN_CAPACITY,
+    AncestorIter, AncestorTicketScan, DagError, HeaderDag, InsertOutcome, OrphanHeader, ReorgPlan,
+    StoredHeader, TicketTuple, DEFAULT_ORPHAN_CAPACITY,
 };
 pub use fork::{u256_saturating_add, ForkScore};
 pub use header::{

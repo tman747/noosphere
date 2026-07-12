@@ -112,7 +112,7 @@ pub struct Heads {
 }
 
 /// Bounded chain view feeding the operator RPC.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct ChainView {
     retention_blocks: u64,
     pruned_before_height: u64,

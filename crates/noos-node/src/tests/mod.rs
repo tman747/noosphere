@@ -18,4 +18,5 @@ mod network_e2e;
 mod retention;
 mod rpc_supervisor;
 mod safety;
+mod security_import;
 mod sync_tests;

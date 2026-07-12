@@ -154,7 +154,7 @@ impl PoolEntry {
 }
 
 /// Bounded FIFO duplicate cache over txids.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 struct SeenCache {
     cap: usize,
     order: VecDeque<Hash32>,
@@ -179,6 +179,7 @@ impl SeenCache {
 }
 
 /// The mempool. Owned by the consensus task (single writer).
+#[derive(Clone)]
 pub struct Mempool {
     cfg: MempoolConfig,
     entries: BTreeMap<Hash32, PoolEntry>,
