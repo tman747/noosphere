@@ -74,6 +74,7 @@ def main() -> int:
         else:
             shutil.copy2(node, temp / "noosd")
             shutil.copy2(ROOT / "tools/operator_onboard.command", temp / "JOIN MINDCHAIN.command")
+            shutil.copy2(ROOT / "tools/node_status_dashboard.py", temp / "node_status_dashboard.py")
         members = sorted(path for path in temp.iterdir() if path.is_file())
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
             for path in members:
