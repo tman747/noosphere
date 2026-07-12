@@ -170,7 +170,8 @@ class AuthorizationFixtures:
                 self.last_packets[recipient_id].append(packet)
                 recipient_role = self.keyring[f"dkg-participant:{recipient_id}"]
                 reviews.append(pa.dkg_review_record(
-                    packet, contribution, recipient_role, self.private[recipient_role.role], self.keyring
+                    packet, contribution, descriptor, recipient_role,
+                    self.private[recipient_role.role], self.keyring
                 ))
         erasures = []
         for i, contribution in enumerate(contributions, 1):
@@ -310,6 +311,139 @@ class DkgTests(AuthorizationFixtures, unittest.TestCase):
         material = self.dkg_material(bad_dealers=("p1", "p2"))
         with self.assertRaisesRegex(pa.AuthorizationError, "threshold failure"):
             pa.finalize_dkg_transcript(*material, self.keyring, self.freeze, test_mode=True)
+
+    def test_share_packet_is_bound_to_descriptor_dealer_recipient_and_context(self):
+        descriptor, _, contributions, _, _, _ = self.dkg_material()
+        packet = self.last_packets["p2"][0]
+        self.assertTrue(pa.verify_share_against_contribution(
+            packet, contributions[0], descriptor, "p2", self.keyring
+        ))
+
+        participant_b = self.keyring["dkg-participant:p3"]
+        wrong_signer = pa._signed_record(
+            packet["payload"], participant_b, self.private[participant_b.role]
+        )
+        with self.assertRaisesRegex(
+            pa.AuthorizationError, "packet signer does not match descriptor dealer"
+        ):
+            pa.verify_share_against_contribution(
+                wrong_signer, contributions[0], descriptor, "p2", self.keyring
+            )
+
+        dealer = self.keyring["dkg-participant:p1"]
+        wrong_recipient_payload = dict(packet["payload"])
+        wrong_recipient_payload["recipient_id"] = "p3"
+        wrong_recipient = pa._signed_record(
+            wrong_recipient_payload, dealer, self.private[dealer.role]
+        )
+        with self.assertRaisesRegex(
+            pa.AuthorizationError, "recipient does not match expected recipient"
+        ):
+            pa.verify_share_against_contribution(
+                wrong_recipient, contributions[0], descriptor, "p2", self.keyring
+            )
+
+        spliced_contribution_payload = dict(contributions[0]["payload"])
+        spliced_contribution_payload["ceremony_id"] = "0" * 64
+        spliced_contribution = pa._signed_record(
+            spliced_contribution_payload, dealer, self.private[dealer.role]
+        )
+        spliced_packet_payload = dict(packet["payload"])
+        spliced_packet_payload["ceremony_id"] = "0" * 64
+        spliced_packet_payload["public_contribution_sha256"] = pa.sha256(
+            pa.canonical_json(spliced_contribution_payload)
+        )
+        spliced_packet = pa._signed_record(
+            spliced_packet_payload, dealer, self.private[dealer.role]
+        )
+        with self.assertRaisesRegex(
+            pa.AuthorizationError, "descriptor context mismatch at ceremony_id"
+        ):
+            pa.verify_share_against_contribution(
+                spliced_packet, spliced_contribution, descriptor, "p2", self.keyring
+            )
+
+    def test_forged_packet_cannot_create_complaint_or_exclude_honest_dealer(self):
+        descriptor, signatures, contributions, reviews, _, erasures = self.dkg_material()
+        honest_packet = self.last_packets["p2"][0]
+        forged_payload = dict(honest_packet["payload"])
+        forged_payload["share_scalar_hex"] = (
+            f"{int(forged_payload['share_scalar_hex'], 16) + 1:064x}"
+        )
+        participant_b = self.keyring["dkg-participant:p3"]
+        forged_packet = pa._signed_record(
+            forged_payload, participant_b, self.private[participant_b.role]
+        )
+        recipient = self.keyring["dkg-participant:p2"]
+        with self.assertRaisesRegex(
+            pa.AuthorizationError, "packet signer does not match descriptor dealer"
+        ):
+            pa.dkg_review_record(
+                forged_packet, contributions[0], descriptor, recipient,
+                self.private[recipient.role], self.keyring,
+            )
+
+        complaint_payload = dict(reviews[1]["payload"])
+        complaint_payload["packet_sha256"] = pa.sha256(pa.canonical_json(forged_packet))
+        complaint_payload["verdict"] = "COMPLAINT"
+        complaint_payload["complaint_packet"] = forged_packet
+        forged_reviews = copy.deepcopy(reviews)
+        forged_reviews[1] = pa._signed_record(
+            complaint_payload, recipient, self.private[recipient.role]
+        )
+        exclusions = [{
+            "dealer_id": "p1",
+            "complaint_hashes": [pa.sha256(pa.canonical_json(complaint_payload))],
+        }]
+        with self.assertRaisesRegex(
+            pa.AuthorizationError, "packet signer does not match descriptor dealer"
+        ):
+            pa.finalize_dkg_transcript(
+                descriptor, signatures, contributions, forged_reviews, exclusions, erasures,
+                self.keyring, self.freeze, test_mode=True,
+            )
+
+        dealer = self.keyring["dkg-participant:p1"]
+        other_recipient_payload = dict(self.last_packets["p3"][0]["payload"])
+        other_recipient_payload["share_scalar_hex"] = (
+            f"{int(other_recipient_payload['share_scalar_hex'], 16) + 1:064x}"
+        )
+        other_recipient_packet = pa._signed_record(
+            other_recipient_payload, dealer, self.private[dealer.role]
+        )
+        recipient_splice_payload = dict(reviews[1]["payload"])
+        recipient_splice_payload["packet_sha256"] = pa.sha256(
+            pa.canonical_json(other_recipient_packet)
+        )
+        recipient_splice_payload["verdict"] = "COMPLAINT"
+        recipient_splice_payload["complaint_packet"] = other_recipient_packet
+        recipient_splice_reviews = copy.deepcopy(reviews)
+        recipient_splice_reviews[1] = pa._signed_record(
+            recipient_splice_payload, recipient, self.private[recipient.role]
+        )
+        recipient_splice_exclusions = [{
+            "dealer_id": "p1",
+            "complaint_hashes": [pa.sha256(pa.canonical_json(recipient_splice_payload))],
+        }]
+        with self.assertRaisesRegex(
+            pa.AuthorizationError, "recipient does not match expected recipient"
+        ):
+            pa.finalize_dkg_transcript(
+                descriptor, signatures, contributions, recipient_splice_reviews,
+                recipient_splice_exclusions, erasures, self.keyring, self.freeze,
+                test_mode=True,
+            )
+
+    def test_invalid_dealer_signed_share_remains_a_valid_complaint(self):
+        material = self.dkg_material(bad_dealers=("p1",))
+        transcript = pa.finalize_dkg_transcript(
+            *material, self.keyring, self.freeze, test_mode=True
+        )
+        summary = pa.verify_dkg_transcript(
+            transcript, self.keyring, self.freeze, test_mode=True
+        )
+        self.assertEqual(summary["excluded_participants"], ["p1"])
+        self.assertEqual(summary["active_participants"], ["p2", "p3"])
 
     def test_rogue_contribution_transcript_splice_complaint_omission_and_reordering(self):
         transcript = self.valid_transcript()

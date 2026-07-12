@@ -43,10 +43,14 @@ an owner artifact based on `role-keyring.template.json`.
    `dkg-contribute` call creates only that participant's ephemeral polynomial
    through the OS CSPRNG and emits signed Feldman commitments plus a private
    state file. `dkg-share` creates a signed private packet for one recipient;
-   `dkg-review-share` emits a signed receipt or a verifiable complaint. The
-   transcript verifier requires every dealer/recipient pair, exact complaint
-   exclusions, a surviving threshold, ordered unspliced records, the summed
-   group key, and a reproducible `D-DKG-TRANSCRIPT` root.
+   `dkg-review-share` emits a signed receipt or a verifiable complaint. A share
+   packet is valid only when its signature role and key are exactly the dealer
+   identity fixed by the signed contribution and descriptor, and its recipient,
+   index, and ceremony context match that descriptor. The transcript verifier
+   applies the same rule to revealed complaint packets before any exclusion,
+   and also requires every dealer/recipient pair, exact complaint exclusions, a
+   surviving threshold, ordered unspliced records, the summed group key, and a
+   reproducible `D-DKG-TRANSCRIPT` root.
    `dkg-finalize-share` verifies one private packet from every active dealer,
    sums the recipient's long-lived threshold share, and checks its public
    share against the aggregate Feldman vector before writing secret state.

@@ -1105,16 +1105,68 @@ def _point_equal(a: Any, b: Any, normalize: Any) -> bool:
 
 
 def verify_share_against_contribution(
-    packet_record: Mapping[str, Any], contribution_record: Mapping[str, Any], keyring: Mapping[str, RoleKey]
+    packet_record: Mapping[str, Any], contribution_record: Mapping[str, Any],
+    descriptor: Mapping[str, Any], expected_recipient_id: str,
+    keyring: Mapping[str, RoleKey],
 ) -> bool:
     _, pubkey_to_G1, G1, Z1, add, curve_order, multiply, normalize = _bls_imports()
     packet = _verify_signed_record(packet_record, keyring)
     contribution = _verify_signed_record(contribution_record, keyring)
     if packet.get("kind") != "dkg-private-share-packet-v1" or contribution.get("kind") != "dkg-feldman-contribution-v1":
         raise AuthorizationError("DKG share/contribution record kind mismatch")
-    for key in ("ceremony_id", "exact_revision", "chain_id", "participant_set_sha256", "dealer_id", "dealer_index"):
-        if packet.get(key) != contribution.get(key):
-            raise AuthorizationError(f"DKG share transcript splice detected at {key}")
+    participants = descriptor.get("participants")
+    if not isinstance(participants, list):
+        raise AuthorizationError("DKG share descriptor participants malformed")
+    dealer_id = contribution.get("dealer_id")
+    dealer = next(
+        (p for p in participants if isinstance(p, dict) and p.get("participant_id") == dealer_id),
+        None,
+    )
+    recipient = next(
+        (p for p in participants if isinstance(p, dict) and p.get("participant_id") == expected_recipient_id),
+        None,
+    )
+    if dealer is None or recipient is None:
+        raise AuthorizationError("DKG share dealer/recipient absent from descriptor")
+    expected_dealer_role = f"dkg-participant:{dealer_id}"
+    if dealer.get("signing_role") != expected_dealer_role:
+        raise AuthorizationError("DKG share descriptor dealer role is not canonical")
+    dealer_key = keyring.get(expected_dealer_role)
+    if dealer_key is None:
+        raise AuthorizationError("DKG share descriptor dealer key absent from keyring")
+    for label, record in (("contribution", contribution_record), ("packet", packet_record)):
+        if (
+            record.get("signer_role") != expected_dealer_role
+            or record.get("key_id") != dealer_key.key_id
+        ):
+            raise AuthorizationError(f"DKG share {label} signer does not match descriptor dealer")
+    participant_set_sha256 = sha256(canonical_json(participants))
+    for key, expected in (
+        ("ceremony_id", descriptor.get("ceremony_id")),
+        ("exact_revision", descriptor.get("exact_revision")),
+        ("chain_id", descriptor.get("chain_id")),
+        ("participant_set_sha256", participant_set_sha256),
+    ):
+        if packet.get(key) != expected or contribution.get(key) != expected:
+            raise AuthorizationError(f"DKG share descriptor context mismatch at {key}")
+    if contribution.get("threshold") != descriptor.get("threshold"):
+        raise AuthorizationError("DKG share descriptor context mismatch at threshold")
+    if (
+        packet.get("is_test_fixture") != descriptor.get("is_test_fixture")
+        or contribution.get("is_test_fixture") != descriptor.get("is_test_fixture")
+    ):
+        raise AuthorizationError("DKG share descriptor context mismatch at is_test_fixture")
+    if packet.get("dealer_id") != dealer_id:
+        raise AuthorizationError("DKG share transcript splice detected at dealer_id")
+    if (
+        packet.get("dealer_index") != dealer.get("index")
+        or contribution.get("dealer_index") != dealer.get("index")
+    ):
+        raise AuthorizationError("DKG share dealer index does not match descriptor")
+    if packet.get("recipient_id") != expected_recipient_id:
+        raise AuthorizationError("DKG share recipient does not match expected recipient")
+    if packet.get("recipient_index") != recipient.get("index"):
+        raise AuthorizationError("DKG share recipient index does not match descriptor")
     if packet.get("public_contribution_sha256") != sha256(canonical_json(contribution)):
         raise AuthorizationError("DKG share contribution hash mismatch")
     try:
@@ -1143,15 +1195,18 @@ def verify_share_against_contribution(
 def dkg_review_record(
     packet_record: Mapping[str, Any],
     contribution_record: Mapping[str, Any],
+    descriptor: Mapping[str, Any],
     recipient_role: RoleKey,
     recipient_private: Ed25519PrivateKey,
     keyring: Mapping[str, RoleKey],
 ) -> dict[str, Any]:
     packet = _verify_signed_record(packet_record, keyring)
-    valid = verify_share_against_contribution(packet_record, contribution_record, keyring)
     expected_role = f"dkg-participant:{packet['recipient_id']}"
     if recipient_role.role != expected_role:
         raise AuthorizationError("DKG review signer is not the named recipient")
+    valid = verify_share_against_contribution(
+        packet_record, contribution_record, descriptor, packet["recipient_id"], keyring
+    )
     payload = {
         "kind": "dkg-share-review-v1",
         "ceremony_id": packet["ceremony_id"],
@@ -1292,7 +1347,9 @@ def verify_dkg_transcript(
                 raise AuthorizationError("DKG complaint omitted its signed disputed packet")
             if sha256(canonical_json(complaint_packet)) != payload.get("packet_sha256"):
                 raise AuthorizationError("DKG complaint packet hash mismatch")
-            if verify_share_against_contribution(complaint_packet, contribution_by_id[dealer], keyring):
+            if verify_share_against_contribution(
+                complaint_packet, contribution_by_id[dealer], descriptor, recipient, keyring
+            ):
                 raise AuthorizationError("DKG complaint is invalid: revealed share verifies")
             valid_complaints[dealer].append(sha256(canonical_json(payload)))
         else:
@@ -1431,7 +1488,9 @@ def dkg_finalize_participant_share(
             raise AuthorizationError("DKG final share has rogue, excluded, or duplicate dealer packet")
         if packet.get("recipient_id") != participant_id or packet.get("recipient_index") != participant["index"]:
             raise AuthorizationError("DKG final share packet belongs to another recipient")
-        if not verify_share_against_contribution(packet_record, contributions[dealer], keyring):
+        if not verify_share_against_contribution(
+            packet_record, contributions[dealer], descriptor, participant_id, keyring
+        ):
             raise AuthorizationError("DKG final share includes an invalid dealer share")
         total = (total + int(packet["share_scalar_hex"], 16)) % curve_order
         packets[dealer] = packet_record
@@ -1832,13 +1891,14 @@ def command_dkg_share(args: argparse.Namespace) -> None:
 
 def command_dkg_review(args: argparse.Namespace) -> None:
     packet = read_json(Path(args.packet)); payload = packet.get("payload", {})
+    descriptor = read_json(Path(args.descriptor))
     revision = require_revision(payload.get("exact_revision"))
     keyring = _load_keys_for_revision(Path(args.keyring), revision)
     role = keyring.get(f"dkg-participant:{payload.get('recipient_id')}")
     if role is None:
         raise AuthorizationError("recipient role absent from keyring")
     private = load_private_role_key(Path(args.participant_key), role)
-    review = dkg_review_record(packet, read_json(Path(args.contribution)), role, private, keyring)
+    review = dkg_review_record(packet, read_json(Path(args.contribution)), descriptor, role, private, keyring)
     write_new_json(Path(args.out), review)
 
 
@@ -2101,7 +2161,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--recipient-id", required=True); p.add_argument("--keyring", required=True)
     p.add_argument("--participant-key", required=True); p.add_argument("--out", required=True)
     p = sub.add_parser("dkg-review-share"); p.set_defaults(func=command_dkg_review)
-    p.add_argument("--packet", required=True); p.add_argument("--contribution", required=True)
+    p.add_argument("--descriptor", required=True); p.add_argument("--packet", required=True)
+    p.add_argument("--contribution", required=True)
     p.add_argument("--keyring", required=True); p.add_argument("--participant-key", required=True)
     p.add_argument("--out", required=True)
     p = sub.add_parser("dkg-confirm-erasure"); p.set_defaults(func=command_dkg_erasure)
