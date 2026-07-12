@@ -1,0 +1,10 @@
+{
+  "bundle": "MindChain-macOS-ARM64-Witness-3.zip",
+  "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+  "genesis_hash": "12bf2dfd11d8e819fd2e2dfb3a34d84fbb18f949778326e2fc1cb2dfc3107034",
+  "node_sha256": "57b914bd2cafda62aa9d79e1b93759701a3bfd39c8f30591382d9f1f0d617045",
+  "platform": "macos",
+  "schema": "noos/one-click-bundle-evidence/v1",
+  "sha256": "82b7cdbee475cad0b2b108ceb4243aed48d70659952361092c528a5490c230ec",
+  "witness_index": 3
+}

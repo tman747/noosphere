@@ -30,6 +30,7 @@ jobs:
           target/release/noosd --version
           target/release/noosd --help | grep -- "--devnet-witness"
           zsh -n tools/operator_onboard.command
+          zsh -n tools/install_macos_node.sh
           python tools/lan_testnet.py init --root "${RUNNER_TEMP}/mindchain-lan"
       - name: Record release evidence
         shell: bash
