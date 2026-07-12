@@ -85,7 +85,7 @@ fn assert_both_reject(
         "re-derivation path accepted or misclassified: {label}"
     );
     assert_eq!(
-        admit_span_certificate_freivalds(cert, a, b, c, c8, expected_payout),
+        admit_span_certificate_freivalds(cert, a, b, c, c8, expected_payout, CHALLENGE),
         Err(want_freivalds),
         "Freivalds path accepted or misclassified: {label}"
     );
@@ -103,7 +103,9 @@ fn honest_32_cubed_admits_on_both_paths() {
         Ok(())
     );
     assert_eq!(
-        admit_span_certificate_freivalds(&x.cert, &x.a, &x.b, &x.c, &x.c8, x.payout),
+        admit_span_certificate_freivalds(
+            &x.cert, &x.a, &x.b, &x.c, &x.c8, x.payout, CHALLENGE,
+        ),
         Ok(())
     );
 }
@@ -116,7 +118,9 @@ fn honest_64_cubed_admits_on_both_paths() {
         Ok(())
     );
     assert_eq!(
-        admit_span_certificate_freivalds(&x.cert, &x.a, &x.b, &x.c, &x.c8, x.payout),
+        admit_span_certificate_freivalds(
+            &x.cert, &x.a, &x.b, &x.c, &x.c8, x.payout, CHALLENGE,
+        ),
         Ok(())
     );
 }
@@ -302,7 +306,7 @@ fn gate_6_challenge_splice_rejects() {
         &x.c8,
         x.payout,
         CertificateError::Projection,
-        CertificateError::Projection,
+        CertificateError::Challenge,
     );
 }
 
@@ -358,7 +362,9 @@ fn forged_self_consistent_transcript_dies_on_the_span_relation() {
         "re-derivation path must reject the forgery when recomputing the true product"
     );
     assert_eq!(
-        admit_span_certificate_freivalds(&forged, &x.a, &x.b, &c, &c8, x.payout),
+        admit_span_certificate_freivalds(
+            &forged, &x.a, &x.b, &c, &c8, x.payout, CHALLENGE,
+        ),
         Err(CertificateError::Relation),
         "the Freivalds relation is the only gate left standing — it must hold"
     );
@@ -366,6 +372,38 @@ fn forged_self_consistent_transcript_dies_on_the_span_relation() {
     assert_eq!(
         freivalds_span_check(&x.a, &x.b, &c, 32, 32, 32, CHALLENGE),
         Err(CertificateError::Relation)
+    );
+}
+
+#[test]
+fn attacker_selected_zero_challenge_rejects_before_relation_check() {
+    // A zero challenge makes every Freivalds weight and projection zero.
+    // The attacker can therefore make a wrong product self-consistent with
+    // every certificate-owned field. Admission must compare against the
+    // independently supplied post-commit beacon before evaluating it.
+    let x = batch(32, 3);
+    let mut c = x.c.clone();
+    c[17] += 1;
+    let c8 = requant_w8a8(&c, MULT, SHIFT).unwrap();
+    let forged = SpanCertificate {
+        challenge: [0, 0],
+        commitment: commit_span_transcript(&x.a, &x.b, &c, &c8, 32, 32, 32, MULT, SHIFT, x.payout),
+        projections: project_span(&c, [0, 0]),
+        c32_hash: hash_c32(&c),
+        c8_hash: hash_c8(&c8),
+        ..x.cert.clone()
+    };
+    assert_eq!(
+        freivalds_span_check(&x.a, &x.b, &c, 32, 32, 32, [0, 0]),
+        Ok(2 * 3 * 32 * 32),
+        "mutation no longer reproduces the zero-weight relation bypass"
+    );
+    assert_eq!(
+        admit_span_certificate_freivalds(
+            &forged, &x.a, &x.b, &c, &c8, x.payout, CHALLENGE,
+        ),
+        Err(CertificateError::Challenge),
+        "certificate-selected challenge bypassed the post-commit beacon binding"
     );
 }
 
@@ -468,7 +506,9 @@ fn shape_gate_rejects_dimension_forgery() {
     let mut cert = x.cert.clone();
     cert.m = 16;
     assert!(matches!(
-        admit_span_certificate_freivalds(&cert, &x.a, &x.b, &x.c, &x.c8, x.payout),
+        admit_span_certificate_freivalds(
+            &cert, &x.a, &x.b, &x.c, &x.c8, x.payout, CHALLENGE,
+        ),
         Err(CertificateError::Shape)
     ));
     assert!(matches!(

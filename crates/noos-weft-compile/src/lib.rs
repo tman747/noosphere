@@ -910,6 +910,9 @@ pub enum CertificateError {
     Soundness,
     /// The certificate names a different ledger payout identity.
     Payout,
+    /// The certificate challenge is not the independently supplied
+    /// post-commit beacon challenge.
+    Challenge,
     Commitment,
     Projection,
     Output,
@@ -1108,13 +1111,15 @@ pub fn freivalds_span_check(
     Ok(macs)
 }
 
-/// Freivalds admission path: binds the claimed transcript (requant
-/// consistency, commitment, output hashes, projections) and then verifies
-/// the span relation in `O(n^2)` — it never re-runs the full GEMM. A fully
-/// self-consistent forged certificate over a wrong product passes every
-/// binding check and dies exactly on [`CertificateError::Relation`]; the
-/// re-derivation path [`admit_span_certificate`] must reject the same
-/// forgery at its commitment gate.
+/// Freivalds admission path: first binds the certificate challenge to the
+/// independently supplied post-commit beacon, then binds the claimed
+/// transcript (requant consistency, commitment, output hashes, projections)
+/// and verifies the span relation in `O(n^2)` — it never re-runs the full
+/// GEMM. A fully self-consistent forged certificate over a wrong product
+/// passes every binding check and dies exactly on
+/// [`CertificateError::Relation`]; the re-derivation path
+/// [`admit_span_certificate`] must reject the same forgery at its commitment
+/// gate.
 #[allow(clippy::arithmetic_side_effects)] // u16 products fit usize exactly
 pub fn admit_span_certificate_freivalds(
     cert: &SpanCertificate,
@@ -1123,7 +1128,11 @@ pub fn admit_span_certificate_freivalds(
     claimed_c: &[i32],
     claimed_c8: &[i8],
     expected_payout: [u8; 32],
+    expected_challenge: [u32; 2],
 ) -> Result<(), CertificateError> {
+    if cert.challenge != expected_challenge {
+        return Err(CertificateError::Challenge);
+    }
     if cert.reps != 2 || cert.rbits != 32 {
         return Err(CertificateError::Soundness);
     }
