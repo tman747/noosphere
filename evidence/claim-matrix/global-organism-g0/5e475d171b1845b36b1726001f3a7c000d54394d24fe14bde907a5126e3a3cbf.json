@@ -1,0 +1,123 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-swarm\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-swarm\"]}",
+      "id": "finite-component-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "no production threshold or preregistered global resilience, control, continuity, rights, and benefit observables exist",
+      "id": "global-observables-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-GLOBAL-ORGANISM": "fb13d6117a06c63895d569ae5202355a70f9d5bde3f88ee015b2182ef26ac3cd"
+  },
+  "claims": [
+    "S-GLOBAL-ORGANISM"
+  ],
+  "command": [
+    "tools/gates/run_dream_chorus_claim.py",
+    "--claim",
+    "S-GLOBAL-ORGANISM"
+  ],
+  "evidence_sha256": "5e475d171b1845b36b1726001f3a7c000d54394d24fe14bde907a5126e3a3cbf",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "global-organism-g0",
+  "limitations": [
+    "Finite component aggregation explicitly returns establishes_global_organism=false.",
+    "Component fixtures are not planet-scale, independently operated, or production evidence.",
+    "The aggregate has zero proposal and finality weight and remains at G0."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 287,
+        "git_blob": "893de867c77e51fab01a2551ff7eb8146acd1ce0",
+        "git_mode": "100644",
+        "path": "crates/noos-swarm/Cargo.toml",
+        "sha256": "8897e41f67566eeabd589cb57570cfdcec8a0ccf0f476b348856ec777b54ca1b"
+      },
+      {
+        "bytes": 10925,
+        "git_blob": "09366625fa523823d4d26fcdc6f0dea13f70cbeb",
+        "git_mode": "100644",
+        "path": "crates/noos-swarm/src/lib.rs",
+        "sha256": "0162526faaf321ffbf67ea38cd22b224f5a12c0b9a4f36e99838aeeaef74d547"
+      },
+      {
+        "bytes": 7463,
+        "git_blob": "b1ca4999687f281b57991de3835c5e0421dddf51",
+        "git_mode": "100644",
+        "path": "crates/noos-swarm/src/organism.rs",
+        "sha256": "57ca5355f4c001f6a178490a61bcc9facec667918d1fd0456759a0dcc6dd6795"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 11725,
+        "git_blob": "c40aa22c45c84be72b74723638d84ca43dd9b7c8",
+        "git_mode": "100644",
+        "path": "tools/gates/run_dream_chorus_claim.py",
+        "sha256": "2b5ddb6a16096bf01585884bade1febaef1061faeec4560ab6e64b556f05c6d1"
+      }
+    ],
+    "manifest_sha256": "0e95bd6de95caf5496c212b119d991075a123023ee9a6cbff5ec0bdb46e175c2",
+    "source_revision": "679bdd5caffa0357e0f82a092c00951acbc8d5e3",
+    "source_tree": "1893d69c8be8de15554b180650c3f48d35aa5892"
+  }
+}

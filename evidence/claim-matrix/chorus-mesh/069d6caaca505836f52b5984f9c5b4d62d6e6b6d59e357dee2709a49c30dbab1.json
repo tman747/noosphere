@@ -1,0 +1,116 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-chorus\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-chorus\"]}",
+      "id": "local-precursor",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "requires consenting physical devices, emulator farms, latency, bytes, battery, attrition, and real diversity observations",
+      "id": "physical-device-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-CHORUS": "7cfdb06825df0de5af4430aee8487ff9ff39cf7809f6063d5ea5cf733bf16335"
+  },
+  "claims": [
+    "S-CHORUS"
+  ],
+  "command": [
+    "tools/gates/run_dream_chorus_claim.py",
+    "--claim",
+    "S-CHORUS"
+  ],
+  "evidence_sha256": "069d6caaca505836f52b5984f9c5b4d62d6e6b6d59e357dee2709a49c30dbab1",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "chorus-mesh",
+  "limitations": [
+    "Software signatures are a local identity/profile-binding precursor, not hardware attestation.",
+    "No phone p95, 20 MB, battery, attrition, or real 10x Sybil influence result is claimed.",
+    "Chorus output is advisory with zero proposal/finality weight and zero slashing."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 273,
+        "git_blob": "7f4549fd0aa7d53e6ee5ff32138e5ac691f8e7c6",
+        "git_mode": "100644",
+        "path": "crates/noos-chorus/Cargo.toml",
+        "sha256": "5b0d521c7519e54073f251ea091ef731ff85e1c823fe9ff6c6a62b9655b225a7"
+      },
+      {
+        "bytes": 39089,
+        "git_blob": "36b51c53222bfac795b64be2beef12927cb44643",
+        "git_mode": "100644",
+        "path": "crates/noos-chorus/src/lib.rs",
+        "sha256": "e0a1e7ca1359998ec971b6c63c8cd8821c1404fdf15058fe700017aa73fb10c1"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 11725,
+        "git_blob": "c40aa22c45c84be72b74723638d84ca43dd9b7c8",
+        "git_mode": "100644",
+        "path": "tools/gates/run_dream_chorus_claim.py",
+        "sha256": "2b5ddb6a16096bf01585884bade1febaef1061faeec4560ab6e64b556f05c6d1"
+      }
+    ],
+    "manifest_sha256": "0fb3f41d26fb7e659f887f2dce0656ad143a0b65d7dd94e66e1631b53db5c671",
+    "source_revision": "679bdd5caffa0357e0f82a092c00951acbc8d5e3",
+    "source_tree": "1893d69c8be8de15554b180650c3f48d35aa5892"
+  }
+}

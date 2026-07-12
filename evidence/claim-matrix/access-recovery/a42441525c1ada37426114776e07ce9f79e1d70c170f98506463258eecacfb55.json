@@ -1,0 +1,123 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-loam\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-loam\"]}",
+      "id": "local-access-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "requires a partition drill across at least three independently operated recovery and artifact paths",
+      "id": "independent-operator-threshold",
+      "kind": "external_requirement",
+      "passed": false
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-ACCESS": "a2cbf58a693bf481cb1e7337fff2a72e092cef4e53f1a7b601ec10c10de0f0fd"
+  },
+  "claims": [
+    "S-ACCESS"
+  ],
+  "command": [
+    "tools/gates/run_dream_chorus_claim.py",
+    "--claim",
+    "S-ACCESS"
+  ],
+  "evidence_sha256": "a42441525c1ada37426114776e07ce9f79e1d70c170f98506463258eecacfb55",
+  "expected_result": "EXTERNAL_BLOCKED",
+  "gate": "access-recovery",
+  "limitations": [
+    "The manifest rejects repeated declared failure domains, repeated operators, missing path kinds, ambiguous content, and two-domain outages.",
+    "Fixture operator identifiers are declarations, not evidence of independently operated providers.",
+    "Inference remains typed off-consensus and no network-scale continuity result is claimed."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "EXTERNAL_BLOCKED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 184,
+        "git_blob": "9bc8c411f9866640c1b84347f9b4ff7942e8adbf",
+        "git_mode": "100644",
+        "path": "crates/noos-loam/Cargo.toml",
+        "sha256": "104e63c72cdfbe8e39c988576b7a8013d55393e419e3d9a66681b4aea0b27b25"
+      },
+      {
+        "bytes": 10227,
+        "git_blob": "00c2d621d22a8a2dd288ec81c1b5a7d76b87f37b",
+        "git_mode": "100644",
+        "path": "crates/noos-loam/src/access.rs",
+        "sha256": "3ae8f53b7159db98eed766f63bc913304196e5556473dada83b68b91a7870253"
+      },
+      {
+        "bytes": 17489,
+        "git_blob": "dd97616b9adf4e2cd15eb5e92123cb0c3d587800",
+        "git_mode": "100644",
+        "path": "crates/noos-loam/src/lib.rs",
+        "sha256": "6ba356ed923481ed982386b6865a4748c1ab377bdfc539b1ee7f8c23443f8df8"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17231,
+        "git_blob": "f0f5b6a103a2e54e76875b2fa03f549cbb49a470",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "aae3d806665104ccf870678ac15cb1310fd670a12a422e6100b782c23a9792bd"
+      },
+      {
+        "bytes": 11725,
+        "git_blob": "c40aa22c45c84be72b74723638d84ca43dd9b7c8",
+        "git_mode": "100644",
+        "path": "tools/gates/run_dream_chorus_claim.py",
+        "sha256": "2b5ddb6a16096bf01585884bade1febaef1061faeec4560ab6e64b556f05c6d1"
+      }
+    ],
+    "manifest_sha256": "f54037e62b13f9da8ca0b20391fe270c99367f5ce8298e2597b5dea23b2d26fe",
+    "source_revision": "679bdd5caffa0357e0f82a092c00951acbc8d5e3",
+    "source_tree": "1893d69c8be8de15554b180650c3f48d35aa5892"
+  }
+}
