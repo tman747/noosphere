@@ -8,3 +8,8 @@ __pycache__/
 .env
 /wallet/app/ui/dist/
 /wallet/app/src-tauri/gen/
+/wallet/app/src-tauri/icons/64x64.png
+/wallet/app/src-tauri/icons/Square*Logo.png
+/wallet/app/src-tauri/icons/StoreLogo.png
+/wallet/app/src-tauri/icons/android/
+/wallet/app/src-tauri/icons/ios/
