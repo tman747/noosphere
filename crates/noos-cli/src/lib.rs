@@ -16,10 +16,10 @@
 
 use noos_codec::{NoosDecode, NoosEncode};
 use noos_lumen::objects::{
-    asset_id as lumen_asset_id, object_id as lumen_object_id, pool_id as lumen_pool_id,
-    txid as lumen_txid, witness_root, AccessEntry, ActionV1, BoundedBytes, BoundedList,
-    FeeAuthorizationV1, NoteV1, OptionalHash32, OptionalObject, ResourceVector, SignedIntentV1,
-    TransactionV1, TransactionWitnessesV1,
+    asset_id as lumen_asset_id, compute_job_id as lumen_compute_job_id,
+    object_id as lumen_object_id, pool_id as lumen_pool_id, txid as lumen_txid, witness_root,
+    AccessEntry, ActionV1, BoundedBytes, BoundedList, FeeAuthorizationV1, NoteV1, OptionalHash32,
+    OptionalObject, ResourceVector, SignedIntentV1, TransactionV1, TransactionWitnessesV1,
 };
 use noos_wallet::{derive_authority, IdentityGate, NodeIdentity, Purpose};
 use serde_json::{json, Value};
@@ -286,6 +286,42 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
             amount_in: spec_u128(spec, "amount_in")?,
             min_amount_out: spec_u128(spec, "min_amount_out")?,
         },
+        "register_compute_worker" => ActionV1::RegisterComputeWorker {
+            worker: spec_hash(spec, "worker")?,
+            capabilities: spec_u8(spec, "capabilities")?,
+            cpu_threads: spec_u16(spec, "cpu_threads")?,
+            memory_mb: spec_u32(spec, "memory_mb")?,
+            gpu_memory_mb: spec_u32(spec, "gpu_memory_mb")?,
+            price_per_unit: spec_u128(spec, "price_per_unit")?,
+            endpoint_commitment: spec_hash(spec, "endpoint_commitment")?,
+        },
+        "open_compute_job" => ActionV1::OpenComputeJob {
+            requester: spec_hash(spec, "requester")?,
+            workload_kind: spec_u8(spec, "workload_kind")?,
+            input_root: spec_hash(spec, "input_root")?,
+            units: spec_u64(spec, "units")?,
+            unit_size: spec_u32(spec, "unit_size")?,
+            max_price_per_unit: spec_u128(spec, "max_price_per_unit")?,
+            deadline_height: spec_u64(spec, "deadline_height")?,
+        },
+        "claim_compute_job" => ActionV1::ClaimComputeJob {
+            worker: spec_hash(spec, "worker")?,
+            job_id: spec_hash(spec, "job_id")?,
+        },
+        "submit_compute_result" => ActionV1::SubmitComputeResult {
+            worker: spec_hash(spec, "worker")?,
+            job_id: spec_hash(spec, "job_id")?,
+            result_root: spec_hash(spec, "result_root")?,
+            completed_units: spec_u64(spec, "completed_units")?,
+        },
+        "accept_compute_result" => ActionV1::AcceptComputeResult {
+            requester: spec_hash(spec, "requester")?,
+            job_id: spec_hash(spec, "job_id")?,
+        },
+        "cancel_compute_job" => ActionV1::CancelComputeJob {
+            requester: spec_hash(spec, "requester")?,
+            job_id: spec_hash(spec, "job_id")?,
+        },
         other => {
             return Err(CliError::Malformed(format!(
                 "unsupported structured action type {other}"
@@ -515,6 +551,35 @@ pub fn tx_build(spec_json: &str) -> Result<Value> {
             }))
         })
         .collect();
+    let created_compute_jobs: Vec<Value> = tx
+        .actions
+        .as_slice()
+        .iter()
+        .enumerate()
+        .filter_map(|(index, bytes)| {
+            let ActionV1::OpenComputeJob {
+                workload_kind,
+                units,
+                unit_size,
+                max_price_per_unit,
+                deadline_height,
+                ..
+            } = ActionV1::decode_canonical(bytes.as_slice()).ok()?
+            else {
+                return None;
+            };
+            let action_index = u32::try_from(index).ok()?;
+            Some(json!({
+                "action_index": action_index,
+                "job_id": to_hex(&lumen_compute_job_id(&txid, action_index)),
+                "workload_kind": workload_kind,
+                "units": units.to_string(),
+                "unit_size": unit_size,
+                "max_price_per_unit": max_price_per_unit.to_string(),
+                "deadline_height": deadline_height.to_string(),
+            }))
+        })
+        .collect();
     Ok(json!({
         "tx": to_hex(&bytes),
         "txid": to_hex(&txid),
@@ -522,6 +587,7 @@ pub fn tx_build(spec_json: &str) -> Result<Value> {
         "created_objects": created_objects,
         "created_assets": created_assets,
         "created_pools": created_pools,
+        "created_compute_jobs": created_compute_jobs,
     }))
 }
 

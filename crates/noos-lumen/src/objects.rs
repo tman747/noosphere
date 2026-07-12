@@ -536,6 +536,58 @@ define_object! {
         7 => creator: [u8; 32],
     }
 }
+define_object! {
+    /// Compute worker advertisement used by the application-only rental
+    /// market. Capability bit 0 = CPU and bit 1 = GPU.
+    pub struct ComputeWorkerV1 {
+        version: 1;
+        1 => worker: [u8; 32],
+        2 => capabilities: u8,
+        3 => cpu_threads: u16,
+        4 => memory_mb: u32,
+        5 => gpu_memory_mb: u32,
+        6 => price_per_unit: u128,
+        7 => endpoint_commitment: [u8; 32],
+        8 => active: u8,
+        9 => jobs_completed: u64,
+        10 => units_completed: u64,
+    }
+}
+
+define_object! {
+    /// Escrowed V0 compute job. Result correctness is accepted explicitly by
+    /// the requester; `Submitted` alone can never release payment.
+    pub struct ComputeJobV1 {
+        version: 1;
+        1 => job_id: [u8; 32],
+        2 => requester: [u8; 32],
+        3 => worker: OptionalHash32,
+        4 => workload_kind: u8,
+        5 => input_root: [u8; 32],
+        6 => units: u64,
+        7 => unit_size: u32,
+        8 => max_price_per_unit: u128,
+        9 => agreed_price_per_unit: u128,
+        10 => escrow: u128,
+        11 => deadline_height: u64,
+        12 => state: u8,
+        13 => result_root: [u8; 32],
+        14 => completed_units: u64,
+    }
+}
+
+impl ComputeWorkerV1 {
+    pub const CAPABILITY_CPU: u8 = 1;
+    pub const CAPABILITY_GPU: u8 = 2;
+}
+
+impl ComputeJobV1 {
+    pub const STATE_OPEN: u8 = 0;
+    pub const STATE_CLAIMED: u8 = 1;
+    pub const STATE_SUBMITTED: u8 = 2;
+    pub const STATE_SETTLED: u8 = 3;
+    pub const STATE_CANCELLED: u8 = 4;
+}
 
 #[must_use]
 pub fn asset_id(creating_txid: &Hash32, action_index: u32) -> Hash32 {
@@ -553,6 +605,13 @@ pub fn pool_id(asset_a: &Hash32, asset_b: &Hash32) -> Hash32 {
         (asset_b, asset_a)
     };
     domain_hash("NOOS/POOL/ID/V1", &[asset_0, asset_1])
+}
+#[must_use]
+pub fn compute_job_id(creating_txid: &Hash32, action_index: u32) -> Hash32 {
+    domain_hash(
+        "NOOS/COMPUTE/JOB/ID/V1",
+        &[creating_txid, &action_index.to_le_bytes()],
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -654,10 +713,43 @@ pub enum ActionV1 {
         amount_in: u128,
         min_amount_out: u128,
     },
+    /// 15 — create or update a signed worker advertisement.
+    RegisterComputeWorker {
+        worker: Hash32,
+        capabilities: u8,
+        cpu_threads: u16,
+        memory_mb: u32,
+        gpu_memory_mb: u32,
+        price_per_unit: u128,
+        endpoint_commitment: Hash32,
+    },
+    /// 16 — lock requester NOOS for one independently executable shard.
+    OpenComputeJob {
+        requester: Hash32,
+        workload_kind: u8,
+        input_root: Hash32,
+        units: u64,
+        unit_size: u32,
+        max_price_per_unit: u128,
+        deadline_height: u64,
+    },
+    /// 17 — bind an open shard to a signed registered worker.
+    ClaimComputeJob { worker: Hash32, job_id: Hash32 },
+    /// 18 — commit delivery; payment remains locked pending requester review.
+    SubmitComputeResult {
+        worker: Hash32,
+        job_id: Hash32,
+        result_root: Hash32,
+        completed_units: u64,
+    },
+    /// 19 — requester accepts delivery and atomically settles worker payment.
+    AcceptComputeResult { requester: Hash32, job_id: Hash32 },
+    /// 20 — requester cancels an unclaimed or expired job and receives escrow.
+    CancelComputeJob { requester: Hash32, job_id: Hash32 },
 }
 
 impl ActionV1 {
-    pub const VARIANT_COUNT: u16 = 15;
+    pub const VARIANT_COUNT: u16 = 21;
 }
 
 impl NoosEncode for ActionV1 {
@@ -794,6 +886,69 @@ impl NoosEncode for ActionV1 {
                 w.put_u128(*amount_in);
                 w.put_u128(*min_amount_out);
             }
+            ActionV1::RegisterComputeWorker {
+                worker,
+                capabilities,
+                cpu_threads,
+                memory_mb,
+                gpu_memory_mb,
+                price_per_unit,
+                endpoint_commitment,
+            } => {
+                w.put_u16(15);
+                w.put_array32(worker);
+                w.put_u8(*capabilities);
+                w.put_u16(*cpu_threads);
+                w.put_u32(*memory_mb);
+                w.put_u32(*gpu_memory_mb);
+                w.put_u128(*price_per_unit);
+                w.put_array32(endpoint_commitment);
+            }
+            ActionV1::OpenComputeJob {
+                requester,
+                workload_kind,
+                input_root,
+                units,
+                unit_size,
+                max_price_per_unit,
+                deadline_height,
+            } => {
+                w.put_u16(16);
+                w.put_array32(requester);
+                w.put_u8(*workload_kind);
+                w.put_array32(input_root);
+                w.put_u64(*units);
+                w.put_u32(*unit_size);
+                w.put_u128(*max_price_per_unit);
+                w.put_u64(*deadline_height);
+            }
+            ActionV1::ClaimComputeJob { worker, job_id } => {
+                w.put_u16(17);
+                w.put_array32(worker);
+                w.put_array32(job_id);
+            }
+            ActionV1::SubmitComputeResult {
+                worker,
+                job_id,
+                result_root,
+                completed_units,
+            } => {
+                w.put_u16(18);
+                w.put_array32(worker);
+                w.put_array32(job_id);
+                w.put_array32(result_root);
+                w.put_u64(*completed_units);
+            }
+            ActionV1::AcceptComputeResult { requester, job_id } => {
+                w.put_u16(19);
+                w.put_array32(requester);
+                w.put_array32(job_id);
+            }
+            ActionV1::CancelComputeJob { requester, job_id } => {
+                w.put_u16(20);
+                w.put_array32(requester);
+                w.put_array32(job_id);
+            }
         }
     }
 }
@@ -873,6 +1028,42 @@ impl NoosDecode for ActionV1 {
                 asset_in: r.get_array32()?,
                 amount_in: r.get_u128()?,
                 min_amount_out: r.get_u128()?,
+            }),
+            15 => Ok(ActionV1::RegisterComputeWorker {
+                worker: r.get_array32()?,
+                capabilities: r.get_u8()?,
+                cpu_threads: r.get_u16()?,
+                memory_mb: r.get_u32()?,
+                gpu_memory_mb: r.get_u32()?,
+                price_per_unit: r.get_u128()?,
+                endpoint_commitment: r.get_array32()?,
+            }),
+            16 => Ok(ActionV1::OpenComputeJob {
+                requester: r.get_array32()?,
+                workload_kind: r.get_u8()?,
+                input_root: r.get_array32()?,
+                units: r.get_u64()?,
+                unit_size: r.get_u32()?,
+                max_price_per_unit: r.get_u128()?,
+                deadline_height: r.get_u64()?,
+            }),
+            17 => Ok(ActionV1::ClaimComputeJob {
+                worker: r.get_array32()?,
+                job_id: r.get_array32()?,
+            }),
+            18 => Ok(ActionV1::SubmitComputeResult {
+                worker: r.get_array32()?,
+                job_id: r.get_array32()?,
+                result_root: r.get_array32()?,
+                completed_units: r.get_u64()?,
+            }),
+            19 => Ok(ActionV1::AcceptComputeResult {
+                requester: r.get_array32()?,
+                job_id: r.get_array32()?,
+            }),
+            20 => Ok(ActionV1::CancelComputeJob {
+                requester: r.get_array32()?,
+                job_id: r.get_array32()?,
             }),
             _ => Err(CodecError::UnknownDiscriminant),
         }

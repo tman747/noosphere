@@ -16,9 +16,10 @@ use crate::engine::{AuthVerifier, ContractEngine, EngineOutcome, EngineTrap};
 use crate::fees::{self, FeeParamsV1, FeeStateV1};
 use crate::issuance::{EmissionSharesV1, IssuanceParamsV1};
 use crate::objects::{
-    asset_id, note_id, pool_id, txid, witness_root, AccessEntry, AccountV1, ActionV1, BoundedBytes,
-    BoundedList, CapabilityGrantV1, FeatureControlV1, IntentV1, NoteV1, ObjectV1, OptionalHash32,
-    OptionalObject, ResourceVector, SignedIntentV1, TransactionV1, TransactionWitnessesV1,
+    asset_id, compute_job_id, note_id, pool_id, txid, witness_root, AccessEntry, AccountV1,
+    ActionV1, BoundedBytes, BoundedList, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1,
+    FeatureControlV1, IntentV1, NoteV1, ObjectV1, OptionalHash32, OptionalObject, ResourceVector,
+    SignedIntentV1, TransactionV1, TransactionWitnessesV1,
 };
 use crate::state::{
     param_key, ApplyOutcome, BlockContext, FailCode, GenesisConfig, GenesisError, LumenLedger,
@@ -637,6 +638,161 @@ fn fixed_supply_launch_and_constant_product_swaps_are_atomic() {
 }
 
 #[test]
+fn compute_market_escrow_requires_requester_acceptance_before_payment() {
+    let mut ledger = genesis();
+    let worker = [0xA7; 32];
+
+    // First payment creates the worker's self-authenticating account.
+    let (fund, fund_witnesses, _) = build_tx(
+        1,
+        vec![],
+        vec![PAYER],
+        vec![
+            ActionV1::WithdrawFromAccount {
+                account_id: PAYER,
+                asset_id: NOOS_ASSET,
+                amount: 100_000,
+            },
+            ActionV1::DepositToAccount {
+                account_id: worker,
+                asset_id: NOOS_ASSET,
+                amount: 100_000,
+            },
+        ],
+        vec![],
+    );
+    assert!(matches!(
+        ledger
+            .apply_transaction(&ctx(1), &fund, &fund_witnesses, &StubEngine, &AcceptAll)
+            .unwrap(),
+        ApplyOutcome::Applied { .. }
+    ));
+
+    let (register, register_witnesses, _) = build_tx(
+        2,
+        vec![],
+        vec![PAYER, worker],
+        vec![ActionV1::RegisterComputeWorker {
+            worker,
+            capabilities: ComputeWorkerV1::CAPABILITY_CPU | ComputeWorkerV1::CAPABILITY_GPU,
+            cpu_threads: 8,
+            memory_mb: 16_384,
+            gpu_memory_mb: 8_192,
+            price_per_unit: 7,
+            endpoint_commitment: [0x44; 32],
+        }],
+        vec![],
+    );
+    assert!(matches!(
+        ledger
+            .apply_transaction(
+                &ctx(2),
+                &register,
+                &register_witnesses,
+                &StubEngine,
+                &AcceptAll,
+            )
+            .unwrap(),
+        ApplyOutcome::Applied { .. }
+    ));
+
+    let (open, open_witnesses, open_tx) = build_tx(
+        3,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::OpenComputeJob {
+            requester: PAYER,
+            workload_kind: 0,
+            input_root: [0x55; 32],
+            units: 100,
+            unit_size: 4096,
+            max_price_per_unit: 10,
+            deadline_height: 20,
+        }],
+        vec![],
+    );
+    let job_id = compute_job_id(&txid(&open_tx), 0);
+    assert!(matches!(
+        ledger
+            .apply_transaction(&ctx(3), &open, &open_witnesses, &StubEngine, &AcceptAll)
+            .unwrap(),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert_eq!(ledger.get_compute_job(&job_id).unwrap().escrow, 1_000);
+
+    let (claim, claim_witnesses, _) = build_tx(
+        4,
+        vec![],
+        vec![PAYER, worker],
+        vec![ActionV1::ClaimComputeJob { worker, job_id }],
+        vec![],
+    );
+    assert!(matches!(
+        ledger
+            .apply_transaction(&ctx(4), &claim, &claim_witnesses, &StubEngine, &AcceptAll)
+            .unwrap(),
+        ApplyOutcome::Applied { .. }
+    ));
+    let worker_before_submit = ledger.balance(&worker, &NOOS_ASSET);
+
+    let (submit, submit_witnesses, _) = build_tx(
+        5,
+        vec![],
+        vec![PAYER, worker],
+        vec![ActionV1::SubmitComputeResult {
+            worker,
+            job_id,
+            result_root: [0x66; 32],
+            completed_units: 100,
+        }],
+        vec![],
+    );
+    assert!(matches!(
+        ledger
+            .apply_transaction(&ctx(5), &submit, &submit_witnesses, &StubEngine, &AcceptAll,)
+            .unwrap(),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert_eq!(
+        ledger.balance(&worker, &NOOS_ASSET),
+        worker_before_submit,
+        "worker cannot self-release escrow"
+    );
+    assert_eq!(
+        ledger.get_compute_job(&job_id).unwrap().state,
+        ComputeJobV1::STATE_SUBMITTED
+    );
+
+    let (accept, accept_witnesses, _) = build_tx(
+        6,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::AcceptComputeResult {
+            requester: PAYER,
+            job_id,
+        }],
+        vec![],
+    );
+    assert!(matches!(
+        ledger
+            .apply_transaction(&ctx(6), &accept, &accept_witnesses, &StubEngine, &AcceptAll)
+            .unwrap(),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert_eq!(
+        ledger.balance(&worker, &NOOS_ASSET),
+        worker_before_submit + 700
+    );
+    let settled = ledger.get_compute_job(&job_id).unwrap();
+    assert_eq!(settled.state, ComputeJobV1::STATE_SETTLED);
+    assert_eq!(settled.escrow, 0);
+    assert_eq!(
+        ledger.get_compute_worker(&worker).unwrap().jobs_completed,
+        1
+    );
+}
+
+#[test]
 fn duplicate_nullifier_rejects_within_and_across_transactions() {
     let mut ledger = genesis();
     let seed = mint_note_via_withdraw(&mut ledger, 1, 5_000, 0x21);
@@ -780,6 +936,43 @@ fn supply_invariant_holds_under_seeded_random_traffic() {
     }
     assert!(fees_burned > 0, "battery must actually charge fees");
     assert!(!live_notes.is_empty(), "battery must leave live notes");
+}
+
+#[test]
+fn first_deposit_creates_a_self_authenticating_recipient_account() {
+    let mut ledger = genesis();
+    let recipient = [0xA7; 32];
+    assert!(ledger.get_account(&recipient).is_none());
+
+    let amount = 50_000u128;
+    let (fund, fund_witnesses, _) = build_tx(
+        1,
+        vec![],
+        vec![PAYER],
+        vec![
+            ActionV1::WithdrawFromAccount {
+                account_id: PAYER,
+                asset_id: NOOS_ASSET,
+                amount,
+            },
+            ActionV1::DepositToAccount {
+                account_id: recipient,
+                asset_id: NOOS_ASSET,
+                amount,
+            },
+        ],
+        vec![],
+    );
+    assert!(matches!(
+        ledger
+            .apply_transaction(&ctx(1), &fund, &fund_witnesses, &StubEngine, &AcceptAll)
+            .unwrap(),
+        ApplyOutcome::Applied { .. }
+    ));
+    let created = ledger.get_account(&recipient).expect("recipient account");
+    assert_eq!(created.account_id, recipient);
+    assert_eq!(created.auth_descriptor.as_slice(), recipient.as_slice());
+    assert_eq!(ledger.balance(&recipient, &NOOS_ASSET), amount);
 }
 
 // ---------------------------------------------------------------------------

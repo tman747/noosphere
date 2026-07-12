@@ -326,12 +326,12 @@ fn build_router(indexer: Indexer, submission_source: Option<ingest::LineProtocol
         .route("/api/v1/addresses/{address}/balance", get(address_resource))
         .route("/api/v1/addresses/{address}/history", get(address_page))
         .route("/api/v1/nodes", get(empty_page))
-        .route("/api/v1/workers", get(disabled_work))
+        .route("/api/v1/workers", get(compute_workers))
         .route("/api/v1/objects/{objectid}", get(hash_not_found))
         .route("/api/v1/models", get(disabled_neural))
-        .route("/api/v1/jobs", get(disabled_work))
+        .route("/api/v1/jobs", get(compute_jobs))
         .route("/api/v1/jobs/{jobid}/chunks", get(disabled_neural))
-        .route("/api/v1/receipts/{receiptid}", get(hash_not_found))
+        .route("/api/v1/receipts/{receiptid}", get(market_receipt))
         .route("/api/v1/disputes/{disputeid}", get(disabled_neural))
         .route("/api/v1/evidence/{mechanism_id}", get(evidence))
         .layer(DefaultBodyLimit::max(MAX_SUBMISSION_REQUEST_BYTES))
@@ -603,6 +603,14 @@ async fn market_pools(State(s): State<AppState>, headers: HeaderMap) -> ApiResul
     market_query(s, headers, "/pools".to_owned()).await
 }
 
+async fn compute_workers(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    market_query(s, headers, "/compute/workers".to_owned()).await
+}
+
+async fn compute_jobs(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    market_query(s, headers, "/compute/jobs".to_owned()).await
+}
+
 async fn market_balance(
     State(s): State<AppState>,
     headers: HeaderMap,
@@ -616,6 +624,21 @@ async fn market_balance(
         ));
     }
     market_query(s, headers, format!("/balance/{account}/{asset}")).await
+}
+
+async fn market_receipt(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    Path(receipt): Path<String>,
+) -> ApiResult<Response> {
+    if !is_hash(&receipt) {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "invalid_request",
+            "receipt id must be 32-byte lowercase hex",
+        ));
+    }
+    market_query(s, headers, format!("/receipt/{receipt}")).await
 }
 
 fn canonical_hex(value: &str) -> bool {
@@ -718,9 +741,6 @@ async fn address_page(Path(address): Path<String>) -> ApiResult<Response> {
 }
 async fn address_resource(Path(address): Path<String>) -> ApiResult<Response> {
     Err(reject_unfrozen_address(&address))
-}
-async fn disabled_work() -> ApiResult<Response> {
-    Err(ApiError::disabled("M-WORK-LOOM"))
 }
 async fn disabled_neural() -> ApiResult<Response> {
     Err(ApiError::disabled("M-NEL"))

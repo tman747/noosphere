@@ -21,10 +21,11 @@ use crate::engine::{AuthVerifier, ContractEngine};
 use crate::fees::{self, FeeParamsV1, FeeStateV1, Usage};
 use crate::issuance::{EmissionSharesV1, IssuanceParamsV1};
 use crate::objects::{
-    asset_id as derive_asset_id, pool_id as derive_pool_id, witness_root as derive_witness_root,
-    AccessEntry, AccountV1, ActionV1, AssetV1, CapabilityGrantV1, FeatureControlV1, NoteV1,
-    ObjectV1, ParamRecordV1, PendingParamV1, PoolV1, ReceiptV1, ResourceVector, TransactionV1,
-    TransactionWitnessesV1,
+    asset_id as derive_asset_id, compute_job_id as derive_compute_job_id,
+    pool_id as derive_pool_id, witness_root as derive_witness_root, AccessEntry, AccountV1,
+    ActionV1, AssetV1, BoundedBytes, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1,
+    FeatureControlV1, NoteV1, ObjectV1, ParamRecordV1, PendingParamV1, PoolV1, ReceiptV1,
+    ResourceVector, TransactionV1, TransactionWitnessesV1,
 };
 use crate::smt::Smt;
 use crate::Hash32;
@@ -442,6 +443,36 @@ impl LumenLedger {
         self.objects
             .iter()
             .filter_map(|(_, bytes)| PoolV1::decode_canonical(bytes).ok())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn get_compute_worker(&self, id: &Hash32) -> Option<ComputeWorkerV1> {
+        self.objects
+            .get(id)
+            .and_then(|bytes| ComputeWorkerV1::decode_canonical(bytes).ok())
+    }
+
+    #[must_use]
+    pub fn get_compute_job(&self, id: &Hash32) -> Option<ComputeJobV1> {
+        self.objects
+            .get(id)
+            .and_then(|bytes| ComputeJobV1::decode_canonical(bytes).ok())
+    }
+
+    #[must_use]
+    pub fn compute_workers(&self) -> Vec<ComputeWorkerV1> {
+        self.objects
+            .iter()
+            .filter_map(|(_, bytes)| ComputeWorkerV1::decode_canonical(bytes).ok())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn compute_jobs(&self) -> Vec<ComputeJobV1> {
+        self.objects
+            .iter()
+            .filter_map(|(_, bytes)| ComputeJobV1::decode_canonical(bytes).ok())
             .collect()
     }
 
@@ -1164,6 +1195,20 @@ impl LumenLedger {
                 ActionV1::SwapExactIn { trader, .. } if !signed(trader) => {
                     return Err(RejectReason::CapabilityDenied);
                 }
+                ActionV1::RegisterComputeWorker { worker, .. }
+                | ActionV1::ClaimComputeJob { worker, .. }
+                | ActionV1::SubmitComputeResult { worker, .. }
+                    if !signed(worker) =>
+                {
+                    return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::OpenComputeJob { requester, .. }
+                | ActionV1::AcceptComputeResult { requester, .. }
+                | ActionV1::CancelComputeJob { requester, .. }
+                    if !signed(requester) =>
+                {
+                    return Err(RejectReason::CapabilityDenied);
+                }
                 _ => {}
             }
         }
@@ -1321,7 +1366,26 @@ impl LumenLedger {
                     amount,
                 } => {
                     if overlay_account(&ov, self, account_id).is_none() {
-                        return Err(FailCode::PostconditionFailed);
+                        // Ed25519 accounts are self-authenticating: the account
+                        // id is the 32-byte verification key. Creating an empty
+                        // recipient account during its first deposit makes a
+                        // freshly derived wallet payable without a genesis or
+                        // governance registration transaction. No authority is
+                        // granted to the sender because later spends still
+                        // require a signature under these exact public bytes.
+                        let account = AccountV1 {
+                            account_id: *account_id,
+                            auth_descriptor: BoundedBytes::new(account_id.to_vec())
+                                .ok_or(FailCode::PostconditionFailed)?,
+                            nonce: 0,
+                            liquid_balances_root: crate::smt::empty_root(crate::smt::DEPTH),
+                            bond_refs_root: [0; 32],
+                            metadata_commitment: [0; 32],
+                            recovery_policy_root: [0; 32],
+                        };
+                        ov.accounts
+                            .insert(*account_id, Some(account.encode_canonical()));
+                        ov.write_count()?;
                     }
                     add_flow(&mut outflow, asset_id, *amount)?;
                     let current = overlay_balance(&ov, self, account_id, asset_id);
@@ -1620,6 +1684,226 @@ impl LumenLedger {
                     }
                     ov.objects.insert(*pool_id, Some(pool.encode_canonical()));
                     ov.write_count()?;
+                    ov.write_count()?;
+                    ov.write_count()?;
+                }
+                ActionV1::RegisterComputeWorker {
+                    worker,
+                    capabilities,
+                    cpu_threads,
+                    memory_mb,
+                    gpu_memory_mb,
+                    price_per_unit,
+                    endpoint_commitment,
+                } => {
+                    let known_capabilities =
+                        ComputeWorkerV1::CAPABILITY_CPU | ComputeWorkerV1::CAPABILITY_GPU;
+                    if *capabilities == 0
+                        || *capabilities & !known_capabilities != 0
+                        || (*capabilities & ComputeWorkerV1::CAPABILITY_CPU != 0
+                            && *cpu_threads == 0)
+                        || (*capabilities & ComputeWorkerV1::CAPABILITY_GPU != 0
+                            && *gpu_memory_mb == 0)
+                        || *memory_mb == 0
+                        || *price_per_unit == 0
+                        || overlay_account(&ov, self, worker).is_none()
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let prior = overlay_object(&ov, self, worker)
+                        .and_then(|bytes| ComputeWorkerV1::decode_canonical(&bytes).ok());
+                    let record = ComputeWorkerV1 {
+                        worker: *worker,
+                        capabilities: *capabilities,
+                        cpu_threads: *cpu_threads,
+                        memory_mb: *memory_mb,
+                        gpu_memory_mb: *gpu_memory_mb,
+                        price_per_unit: *price_per_unit,
+                        endpoint_commitment: *endpoint_commitment,
+                        active: 1,
+                        jobs_completed: prior.as_ref().map_or(0, |value| value.jobs_completed),
+                        units_completed: prior.as_ref().map_or(0, |value| value.units_completed),
+                    };
+                    ov.objects.insert(*worker, Some(record.encode_canonical()));
+                    ov.write_count()?;
+                }
+                ActionV1::OpenComputeJob {
+                    requester,
+                    workload_kind,
+                    input_root,
+                    units,
+                    unit_size,
+                    max_price_per_unit,
+                    deadline_height,
+                } => {
+                    if *workload_kind > 1
+                        || *units == 0
+                        || *units > 1_000_000_000
+                        || *unit_size == 0
+                        || *unit_size > 1_048_576
+                        || *max_price_per_unit == 0
+                        || *deadline_height <= ctx.height
+                        || overlay_account(&ov, self, requester).is_none()
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let escrow = u128::from(*units)
+                        .checked_mul(*max_price_per_unit)
+                        .ok_or(FailCode::Overflow)?;
+                    let balance = overlay_balance(&ov, self, requester, &NOOS_ASSET);
+                    ov.balances.insert(
+                        (*requester, NOOS_ASSET),
+                        balance
+                            .checked_sub(escrow)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    let idx = u32::try_from(index).map_err(|_| FailCode::Overflow)?;
+                    let id = derive_compute_job_id(txid, idx);
+                    if overlay_object(&ov, self, &id).is_some() {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let job = ComputeJobV1 {
+                        job_id: id,
+                        requester: *requester,
+                        worker: crate::objects::OptionalHash32(None),
+                        workload_kind: *workload_kind,
+                        input_root: *input_root,
+                        units: *units,
+                        unit_size: *unit_size,
+                        max_price_per_unit: *max_price_per_unit,
+                        agreed_price_per_unit: 0,
+                        escrow,
+                        deadline_height: *deadline_height,
+                        state: ComputeJobV1::STATE_OPEN,
+                        result_root: [0; 32],
+                        completed_units: 0,
+                    };
+                    ov.objects.insert(id, Some(job.encode_canonical()));
+                    ov.write_count()?;
+                    ov.write_count()?;
+                }
+                ActionV1::ClaimComputeJob { worker, job_id } => {
+                    let worker_raw =
+                        overlay_object(&ov, self, worker).ok_or(FailCode::PostconditionFailed)?;
+                    let worker_record = ComputeWorkerV1::decode_canonical(&worker_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let job_raw =
+                        overlay_object(&ov, self, job_id).ok_or(FailCode::PostconditionFailed)?;
+                    let mut job = ComputeJobV1::decode_canonical(&job_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if worker_record.active != 1
+                        || job.state != ComputeJobV1::STATE_OPEN
+                        || job.worker.0.is_some()
+                        || ctx.height > job.deadline_height
+                        || worker_record.price_per_unit > job.max_price_per_unit
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    job.worker = crate::objects::OptionalHash32(Some(*worker));
+                    job.agreed_price_per_unit = worker_record.price_per_unit;
+                    job.state = ComputeJobV1::STATE_CLAIMED;
+                    ov.objects.insert(*job_id, Some(job.encode_canonical()));
+                    ov.write_count()?;
+                }
+                ActionV1::SubmitComputeResult {
+                    worker,
+                    job_id,
+                    result_root,
+                    completed_units,
+                } => {
+                    let raw =
+                        overlay_object(&ov, self, job_id).ok_or(FailCode::PostconditionFailed)?;
+                    let mut job = ComputeJobV1::decode_canonical(&raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if job.state != ComputeJobV1::STATE_CLAIMED
+                        || job.worker.0 != Some(*worker)
+                        || *completed_units != job.units
+                        || *result_root == [0; 32]
+                        || ctx.height > job.deadline_height
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    job.result_root = *result_root;
+                    job.completed_units = *completed_units;
+                    job.state = ComputeJobV1::STATE_SUBMITTED;
+                    ov.objects.insert(*job_id, Some(job.encode_canonical()));
+                    ov.write_count()?;
+                }
+                ActionV1::AcceptComputeResult { requester, job_id } => {
+                    let raw =
+                        overlay_object(&ov, self, job_id).ok_or(FailCode::PostconditionFailed)?;
+                    let mut job = ComputeJobV1::decode_canonical(&raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if job.requester != *requester
+                        || job.state != ComputeJobV1::STATE_SUBMITTED
+                        || job.completed_units != job.units
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let worker_id = job.worker.0.ok_or(FailCode::PostconditionFailed)?;
+                    let worker_raw = overlay_object(&ov, self, &worker_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut worker_record = ComputeWorkerV1::decode_canonical(&worker_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let payment = u128::from(job.units)
+                        .checked_mul(job.agreed_price_per_unit)
+                        .ok_or(FailCode::Overflow)?;
+                    let refund = job
+                        .escrow
+                        .checked_sub(payment)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let worker_balance = overlay_balance(&ov, self, &worker_id, &NOOS_ASSET);
+                    let requester_balance = overlay_balance(&ov, self, requester, &NOOS_ASSET);
+                    ov.balances.insert(
+                        (worker_id, NOOS_ASSET),
+                        worker_balance
+                            .checked_add(payment)
+                            .ok_or(FailCode::Overflow)?,
+                    );
+                    ov.balances.insert(
+                        (*requester, NOOS_ASSET),
+                        requester_balance
+                            .checked_add(refund)
+                            .ok_or(FailCode::Overflow)?,
+                    );
+                    worker_record.jobs_completed = worker_record
+                        .jobs_completed
+                        .checked_add(1)
+                        .ok_or(FailCode::Overflow)?;
+                    worker_record.units_completed = worker_record
+                        .units_completed
+                        .checked_add(job.units)
+                        .ok_or(FailCode::Overflow)?;
+                    job.escrow = 0;
+                    job.state = ComputeJobV1::STATE_SETTLED;
+                    ov.objects
+                        .insert(worker_id, Some(worker_record.encode_canonical()));
+                    ov.objects.insert(*job_id, Some(job.encode_canonical()));
+                    ov.write_count()?;
+                    ov.write_count()?;
+                    ov.write_count()?;
+                    ov.write_count()?;
+                }
+                ActionV1::CancelComputeJob { requester, job_id } => {
+                    let raw =
+                        overlay_object(&ov, self, job_id).ok_or(FailCode::PostconditionFailed)?;
+                    let mut job = ComputeJobV1::decode_canonical(&raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let cancellable = job.state == ComputeJobV1::STATE_OPEN
+                        || (ctx.height > job.deadline_height
+                            && job.state != ComputeJobV1::STATE_SETTLED
+                            && job.state != ComputeJobV1::STATE_CANCELLED);
+                    if job.requester != *requester || !cancellable {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let balance = overlay_balance(&ov, self, requester, &NOOS_ASSET);
+                    ov.balances.insert(
+                        (*requester, NOOS_ASSET),
+                        balance.checked_add(job.escrow).ok_or(FailCode::Overflow)?,
+                    );
+                    job.escrow = 0;
+                    job.state = ComputeJobV1::STATE_CANCELLED;
+                    ov.objects.insert(*job_id, Some(job.encode_canonical()));
                     ov.write_count()?;
                     ov.write_count()?;
                 }

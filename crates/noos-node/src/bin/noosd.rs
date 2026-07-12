@@ -38,6 +38,11 @@ OPTIONS:
                            on a fixed cadence, and drives fixture finality
                            at epoch boundaries. Refused when the loaded
                            parameters set is_test_network = false.
+    --devnet-producer     Produce devnet blocks but require independently
+                           gossiped fixture witness votes for finality.
+    --devnet-witness <0..3>
+                           Operate exactly one fixture finality witness with
+                           persist-before-vote safety (TEST NETWORKS ONLY).
     --produce-interval-ms <ms>
                            Block production cadence for --validator
                            (default: 6000 = one block per devnet slot)
@@ -91,6 +96,8 @@ fn main() -> ExitCode {
     let mut rpc_token: Option<String> = None;
     let mut observer = false;
     let mut validator = false;
+    let mut devnet_producer = false;
+    let mut devnet_witness: Option<usize> = None;
     let mut produce_interval_ms: u64 = 6000;
     let mut devnet_accounts: Vec<noos_node::Hash32> = Vec::new();
     let mut devnet_contract_fixture = false;
@@ -162,6 +169,16 @@ fn main() -> ExitCode {
             },
             "--no-network" => network.enabled = false,
             "--validator" => validator = true,
+            "--devnet-producer" => devnet_producer = true,
+            "--devnet-witness" => {
+                match take("--devnet-witness").and_then(|value| value.parse().ok()) {
+                    Some(index) if index < 4 => devnet_witness = Some(index),
+                    _ => {
+                        eprintln!("error: --devnet-witness expects an index from 0 through 3");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
             "--produce-interval-ms" => {
                 match take("--produce-interval-ms").and_then(|v| v.parse().ok()) {
                     Some(v) => produce_interval_ms = v,
@@ -215,9 +232,9 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    if validator && !params.is_test_network {
+    if (validator || devnet_producer || devnet_witness.is_some()) && !params.is_test_network {
         // Fixture-refusal law (plan §2.5): fixture keys never run mainnet.
-        eprintln!("error: --validator is a devnet fixture mode; is_test_network = false");
+        eprintln!("error: devnet validator roles require is_test_network = true");
         return ExitCode::FAILURE;
     }
     if !devnet_accounts.is_empty() && !params.is_test_network {
@@ -239,17 +256,18 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     let min_bond = params.min_bond_micro;
-    let witness_bonds = if validator || devnet_witness_fixture {
-        match noos_node::devnet_fixture::fixture_witness_bonds(4) {
-            Ok(bonds) => bonds,
-            Err(e) => {
-                eprintln!("error: fixture witness set: {e}");
-                return ExitCode::FAILURE;
+    let witness_bonds =
+        if validator || devnet_producer || devnet_witness.is_some() || devnet_witness_fixture {
+            match noos_node::devnet_fixture::fixture_witness_bonds(4) {
+                Ok(bonds) => bonds,
+                Err(e) => {
+                    eprintln!("error: fixture witness set: {e}");
+                    return ExitCode::FAILURE;
+                }
             }
-        }
-    } else {
-        Vec::new()
-    };
+        } else {
+            Vec::new()
+        };
     devnet_accounts.sort_unstable();
     devnet_accounts.dedup();
     let mut spec = GenesisSpec::devnet(params, genesis_time_ms);
@@ -344,7 +362,7 @@ fn main() -> ExitCode {
     // Clock feeder + devnet production/finality driver + ctrl-c wait.
     let stop = Arc::new(AtomicBool::new(false));
     let stop_ctrl = Arc::clone(&stop);
-    let _ = ctrlc_handler(move || stop_ctrl.store(true, Ordering::SeqCst));
+    let _ = ctrlc::set_handler(move || stop_ctrl.store(true, Ordering::SeqCst));
     let mut last_produce_ms: u64 = 0;
     while !stop.load(Ordering::SeqCst) {
         let now_ms = std::time::SystemTime::now()
@@ -352,14 +370,25 @@ fn main() -> ExitCode {
             .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
             .unwrap_or(0);
         let _ = handle.set_now(now_ms);
-        if validator && now_ms.saturating_sub(last_produce_ms) >= produce_interval_ms {
+        if (validator || devnet_producer)
+            && now_ms.saturating_sub(last_produce_ms) >= produce_interval_ms
+        {
             last_produce_ms = now_ms;
             match handle.produce_block() {
                 Ok(_) => {
-                    // Advance the fixture FFG ladder as far as it reaches.
-                    while matches!(handle.devnet_finality_tick(), Ok(true)) {}
+                    if validator {
+                        // Legacy one-process fixture mode remains useful for
+                        // unit/dev smoke. Distributed LAN mode uses
+                        // --devnet-producer plus three independent witnesses.
+                        while matches!(handle.devnet_finality_tick(), Ok(true)) {}
+                    }
                 }
                 Err(e) => eprintln!("produce: {e}"),
+            }
+        }
+        if let Some(index) = devnet_witness {
+            if let Err(error) = handle.devnet_witness_vote_tick(index) {
+                eprintln!("witness vote: {error}");
             }
         }
         std::thread::sleep(std::time::Duration::from_millis(
@@ -368,17 +397,4 @@ fn main() -> ExitCode {
     }
     handle.shutdown();
     ExitCode::SUCCESS
-}
-
-/// Minimal ctrl-c hook without external crates: spawns a thread that waits
-/// on stdin EOF as a fallback stop signal alongside process signals.
-fn ctrlc_handler(f: impl FnOnce() + Send + 'static) -> std::io::Result<()> {
-    std::thread::Builder::new()
-        .name("noosd-stop".into())
-        .spawn(move || {
-            let mut sink = String::new();
-            let _ = std::io::stdin().read_line(&mut sink);
-            f();
-        })
-        .map(|_| ())
 }

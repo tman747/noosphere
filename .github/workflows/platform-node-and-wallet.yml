@@ -1,0 +1,108 @@
+name: platform node and wallet verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "crates/**"
+      - "wallet/**"
+      - "tools/lan_testnet.py"
+      - ".github/workflows/platform-node-and-wallet.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            platform: windows
+          - runner: macos-14
+            platform: macos
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.4.1"
+          cache: false
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.1 --profile minimal
+          rustup default 1.96.1
+          rustc -vV
+      - name: Build and test native node surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked --release -p noos-node --bin noosd
+          cargo build --locked --release -p noos-indexer --bin noos-indexer
+          cargo build --locked --release -p noos-cli --bin noos-cli
+          cargo test --locked -p noos-node --lib -- --test-threads=1
+          cargo test --locked -p noos-lumen
+          cargo test --locked -p noos-cli
+      - name: Run native node boot smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          suffix=""
+          if [[ "${{ runner.os }}" == "Windows" ]]; then suffix=".exe"; fi
+          "target/release/noosd${suffix}" --version
+          "target/release/noosd${suffix}" --help | grep -- "--devnet-witness"
+          python tools/lan_testnet.py init --root "${RUNNER_TEMP}/mindchain-lan"
+      - name: Validate macOS one-click onboarding
+        if: runner.os == 'macOS'
+        shell: zsh {0}
+        run: zsh -n tools/operator_onboard.command
+      - name: Build native desktop wallet UI
+        shell: bash
+        run: node wallet/app/build.mjs
+      - name: Install Tauri CLI
+        shell: bash
+        run: cargo install tauri-cli --version 2.9.6 --locked
+      - name: Build native wallet bundle
+        shell: bash
+        working-directory: wallet/app/src-tauri
+        run: cargo tauri build --features gui
+      - name: Record platform evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "platform-evidence/${{ matrix.platform }}"
+          rustc -vV > "platform-evidence/${{ matrix.platform }}/rustc.txt"
+          uname -a > "platform-evidence/${{ matrix.platform }}/uname.txt" || ver > "platform-evidence/${{ matrix.platform }}/uname.txt"
+          python - <<'PY'
+          import hashlib, json, os, pathlib, platform
+          root = pathlib.Path("target/release")
+          suffix = ".exe" if os.name == "nt" else ""
+          files = []
+          for name in ("noosd", "noos-indexer", "noos-cli"):
+              path = root / (name + suffix)
+              files.append({"file": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+          out = {"schema": "noos/platform-build-evidence/v1", "platform": platform.platform(),
+                 "machine": platform.machine(), "binaries": files}
+          pathlib.Path("platform-evidence/${{ matrix.platform }}/evidence.json").write_text(json.dumps(out, indent=2) + "\n")
+          PY
+      - name: Collect wallet bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "platform-evidence/${{ matrix.platform }}/wallet"
+          if [[ -d wallet/app/src-tauri/target/release/bundle ]]; then
+            cp -R wallet/app/src-tauri/target/release/bundle/. "platform-evidence/${{ matrix.platform }}/wallet/"
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mindchain-${{ matrix.platform }}-${{ github.sha }}
+          path: platform-evidence/${{ matrix.platform }}/
+          if-no-files-found: error
+          retention-days: 30

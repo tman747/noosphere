@@ -141,13 +141,21 @@ transaction at step 1.
 12 CreateAsset { issuer, symbol, name, decimals, total_supply } — fixed supply
 13 CreatePool { provider, asset_a, asset_b, amount_a, amount_b, fee_bps }
 14 SwapExactIn { trader, pool_id, asset_in, amount_in, min_amount_out }
+15 RegisterComputeWorker { worker, capabilities, cpu_threads, memory_mb,
+     gpu_memory_mb, price_per_unit, endpoint_commitment }
+16 OpenComputeJob { requester, workload_kind, input_root, units, unit_size,
+     max_price_per_unit, deadline_height }
+17 ClaimComputeJob { worker, job_id }
+18 SubmitComputeResult { worker, job_id, result_root, completed_units }
+19 AcceptComputeResult { requester, job_id }
+20 CancelComputeJob { requester, job_id }
 ```
 
 **Closed action law (plan §4.7).** `CreateAsset` issues only a new,
 domain-derived user asset once; it cannot mint NOOS or increase an existing
 asset supply. The enum contains no variant that seizes user state, reverts
 finalized state, forges finality, admits code outside the registry path,
-exceeds caps, or activates a disabled suite. Discriminant 15+ rejects
+exceeds caps, or activates a disabled suite. Discriminant 21+ rejects
 (`unknown_discriminant`).
 
 ### 5.1 fixed-supply launch and constant-product swap
@@ -172,6 +180,29 @@ The full input `a` enters the reserve, so the fee remains in the pool and
 `x × y` is nondecreasing. Zero output, insufficient balance,
 `amount_out < min_amount_out`, overflow, or an asset/pool mismatch fails
 atomically.
+
+### 5.2 self-authenticating recipients and compute escrow
+
+A `DepositToAccount` whose recipient does not exist creates an empty
+`AccountV1` with `account_id = auth_descriptor = recipient`, nonce zero, and
+empty balance root before applying the deposit. The recipient is therefore an
+Ed25519 verification key; later declaration as an account input still requires
+the corresponding transaction signature. Existing account authentication is
+never replaced by a deposit.
+
+Compute worker capability bits are `1 = CPU` and `2 = GPU`; unknown or zero
+capabilities reject. A registered worker has positive price and coherent
+nonzero hardware bounds. `compute_job_id =
+H("NOOS/COMPUTE/JOB/ID/V1" || creating_txid || action_index_u32_le)`.
+Opening a job debits `units × max_price_per_unit` NOOS from the signed
+requester into job escrow, with checked integer arithmetic and a future
+deadline. Claiming binds one active signed worker whose registered price does
+not exceed the maximum. Submission binds the full unit count and nonzero result
+root but does not pay. The signed requester alone accepts a submitted result;
+acceptance pays `units × agreed_price_per_unit`, refunds the difference, zeros
+escrow, and increments worker counters atomically. The requester may cancel an
+open job, or any nonterminal unfinished job after its deadline, for a complete
+escrow refund.
 
 ## 6. Transaction application (normative order, arch §6.6)
 

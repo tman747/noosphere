@@ -1,0 +1,24 @@
+{
+  "account": "e4153ab01251e825c33b2fef7baaa9f2dfa1f02f3d591ff81329a3f92f6a2f50",
+  "blocks_used": 1,
+  "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+  "completed_unix_ms": 1783868108807,
+  "end_height": 873,
+  "environment": {
+    "note": "local measured result; no production/WAN extrapolation"
+  },
+  "genesis_hash": "454a89a8db5e775ebd356ab26bce09d10187cf5589b35311b67aab961f158e20",
+  "observed_end_to_end_tps": 7.7712529819604494,
+  "schema": "noos/tps-benchmark/v1",
+  "settlement_latency_seconds": {
+    "max": 6.379214900080115,
+    "median": 5.434841299953405,
+    "min": 4.4495924999937415,
+    "p95": 6.279628599993885
+  },
+  "settlement_seconds": 6.433968900004402,
+  "start_height": 872,
+  "submission_seconds": 1.927123500034213,
+  "transaction_count": 50,
+  "transactions_per_observed_block": 50.0
+}

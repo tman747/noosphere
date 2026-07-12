@@ -1,27 +1,27 @@
-/* Foundry — MindChain token launch
-   Palette: charcoal #121412, bone #f1f0e8, acid #a8d65e (only accent). */
+/* Foundry — mindchain.network paper, ink, and signal-red system. */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg: #121412;
-  --bg-raised: #181b18;
-  --bg-inset: #0d0f0d;
-  --line: #262b25;
-  --line-strong: #333a31;
-  --ink: #f1f0e8;
-  --ink-dim: #8f958a;
-  --ink-faint: #5c6157;
-  --acid: #a8d65e;
-  --acid-dim: #7fa348;
-  --danger: #d67e5e;
-  --sans: "Geist", "Geist Sans", ui-sans-serif, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --mono: "Geist Mono", ui-monospace, "Cascadia Code", "JetBrains Mono", Consolas, monospace;
-  --radius: 3px;
+  --bg: #f7f2e5;
+  --bg-raised: #eee6d4;
+  --bg-inset: #f2ecde;
+  --line: rgba(28, 24, 17, .13);
+  --line-strong: rgba(28, 24, 17, .28);
+  --ink: #3a352b;
+  --ink-dim: #706a5c;
+  --ink-faint: #96907f;
+  --acid: #b8340f;
+  --acid-dim: #8f290c;
+  --danger: #b8340f;
+  --sans: "Space Grotesk", system-ui, sans-serif;
+  --mono: "Fira Code", ui-monospace, "Cascadia Code", Consolas, monospace;
+  --radius: 8px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 * { box-sizing: border-box; }
 
-html { color-scheme: dark; }
+html { color-scheme: light; }
 
 body {
   margin: 0;
@@ -31,6 +31,11 @@ body {
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-image: radial-gradient(rgba(28, 24, 17, .05) .55px, transparent .55px);
+  background-size: 7px 7px;
 }
 
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }

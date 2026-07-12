@@ -1,0 +1,10 @@
+{
+  "bundle": "MindChain-Windows-Witness-1.zip",
+  "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+  "genesis_hash": "12bf2dfd11d8e819fd2e2dfb3a34d84fbb18f949778326e2fc1cb2dfc3107034",
+  "node_sha256": "81ac8ff8f7c74619cb7cc0841d180cba6268634368f23863dbe36576508356e9",
+  "platform": "windows",
+  "schema": "noos/one-click-bundle-evidence/v1",
+  "sha256": "3d6c5e638bff31193a3048ac8b451109b4b2f7e43c35ced2e41cdc584d1a8491",
+  "witness_index": 1
+}

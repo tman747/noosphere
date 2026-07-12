@@ -222,6 +222,8 @@ fn handle_connection(
         }
         ("GET", "/assets") => assets_route(consensus_tx),
         ("GET", "/pools") => pools_route(consensus_tx),
+        ("GET", "/compute/workers") => compute_workers_route(consensus_tx),
+        ("GET", "/compute/jobs") => compute_jobs_route(consensus_tx),
         _ if method == "GET" && path.starts_with("/balance/") => {
             balance_route(consensus_tx, &path["/balance/".len()..])
         }
@@ -489,6 +491,87 @@ fn pools_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
                 pool.reserve_1,
                 pool.fee_bps,
                 hex(&pool.creator),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    http(
+        "200 OK",
+        "application/json",
+        &format!(r#"{{"items":[{entries}]}}"#),
+    )
+}
+
+fn compute_workers_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
+    let Some(workers) = round_trip(consensus_tx, |reply| ConsensusMsg::GetComputeWorkers {
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no compute worker registry reply",
+        );
+    };
+    let entries = workers
+        .iter()
+        .map(|worker| {
+            format!(
+                r#"{{"worker":"{}","capabilities":{},"cpu_threads":{},"memory_mb":{},"gpu_memory_mb":{},"price_per_unit":"{}","endpoint_commitment":"{}","active":{},"jobs_completed":"{}","units_completed":"{}"}}"#,
+                hex(&worker.worker),
+                worker.capabilities,
+                worker.cpu_threads,
+                worker.memory_mb,
+                worker.gpu_memory_mb,
+                worker.price_per_unit,
+                hex(&worker.endpoint_commitment),
+                worker.active,
+                worker.jobs_completed,
+                worker.units_completed,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    http(
+        "200 OK",
+        "application/json",
+        &format!(r#"{{"items":[{entries}]}}"#),
+    )
+}
+
+fn compute_jobs_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
+    let Some(jobs) = round_trip(consensus_tx, |reply| ConsensusMsg::GetComputeJobs { reply })
+    else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no compute job registry reply",
+        );
+    };
+    let entries = jobs
+        .iter()
+        .map(|job| {
+            let worker = job
+                .worker
+                .0
+                .as_ref()
+                .map(|value| format!(r#""{}""#, hex(value)))
+                .unwrap_or_else(|| "null".into());
+            format!(
+                r#"{{"job_id":"{}","requester":"{}","worker":{},"workload_kind":{},"input_root":"{}","units":"{}","unit_size":{},"max_price_per_unit":"{}","agreed_price_per_unit":"{}","escrow":"{}","deadline_height":"{}","state":{},"result_root":"{}","completed_units":"{}"}}"#,
+                hex(&job.job_id),
+                hex(&job.requester),
+                worker,
+                job.workload_kind,
+                hex(&job.input_root),
+                job.units,
+                job.unit_size,
+                job.max_price_per_unit,
+                job.agreed_price_per_unit,
+                job.escrow,
+                job.deadline_height,
+                job.state,
+                hex(&job.result_root),
+                job.completed_units,
             )
         })
         .collect::<Vec<_>>()

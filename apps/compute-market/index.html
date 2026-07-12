@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#171916">
+  <meta name="description" content="Rent CPU and GPU capacity through MindChain escrowed compute jobs.">
+  <title>Relay — MindChain Compute Market</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <a class="wordmark" href="/">RELAY<span>／MINDCHAIN</span></a>
+    <div class="chain-state"><i></i><span id="chain-state">CONNECTING</span></div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">APPLICATION COMPUTE MARKET / V0 DELIVERY</p>
+        <h1>Put idle machines<br>on paid work.</h1>
+        <p class="dek">Split deterministic jobs across Windows, macOS, Linux, and browser helpers. Escrow stays locked until the requester independently verifies and accepts each result.</p>
+      </div>
+      <dl class="hero-metrics">
+        <div><dt>ACTIVE WORKERS</dt><dd id="worker-count">—</dd></div>
+        <div><dt>OPEN SHARDS</dt><dd id="open-count">—</dd></div>
+        <div><dt>SETTLED SHARDS</dt><dd id="settled-count">—</dd></div>
+      </dl>
+    </section>
+
+    <section class="workspace">
+      <article class="commission">
+        <header><span>01</span><div><h2>Commission a batch</h2><p>Every shard becomes a separate on-chain escrow so independent machines can claim in parallel.</p></div></header>
+        <form id="job-form">
+          <label>Admin token<input id="admin-token" type="password" autocomplete="off" required><small>Read from the coordinator’s private token file.</small></label>
+          <div class="form-grid">
+            <label>Shards<input id="shards" type="number" min="1" max="64" value="3" required></label>
+            <label>Units / shard<input id="units" type="number" min="1" max="1000000" value="2048" required></label>
+            <label>Rounds / unit<input id="rounds" type="number" min="1" max="1048576" value="4096" required></label>
+            <label>Max micro-NOOS / unit<input id="price" type="number" min="1" value="2" required></label>
+          </div>
+          <button class="primary" type="submit"><span>Open escrowed shards</span><b>OPEN</b></button>
+          <p class="form-status" id="form-status" role="status"></p>
+        </form>
+      </article>
+
+      <aside class="helper">
+        <div class="helper-index">02</div>
+        <p class="eyebrow">PHONE / BROWSER HELPER</p>
+        <h2>Contribute this device.</h2>
+        <p>Uses WebGPU when available, then falls back to bounded CPU work. The coordinator signs a test-network helper identity; no wallet seed enters the browser.</p>
+        <div class="device-line"><span>ENGINE</span><strong id="engine">DETECTING</strong></div>
+        <div class="device-line"><span>THROUGHPUT</span><strong id="throughput">—</strong></div>
+        <button class="helper-button" id="helper-toggle" type="button">Start helping</button>
+        <p class="helper-log" id="helper-log">Idle. Keep this tab open while contributing.</p>
+      </aside>
+    </section>
+
+    <section class="ledger-section">
+      <header class="section-heading"><div><p class="eyebrow">LIVE CONSENSUS STATE</p><h2>Jobs and operators</h2></div><button id="refresh" type="button">Refresh</button></header>
+      <div class="ledger-grid">
+        <div class="table-wrap"><h3>JOB SHARDS</h3><div id="jobs" class="data-list loading"><span></span><span></span><span></span></div></div>
+        <div class="table-wrap workers"><h3>WORKERS</h3><div id="workers" class="data-list loading"><span></span><span></span></div></div>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

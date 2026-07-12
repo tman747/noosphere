@@ -30,7 +30,7 @@ use noos_braid::{BlockHeaderV1, CheckpointRef, FinalityCertificateV1, MAX_FINALI
 use noos_codec::NoosDecode;
 use noos_da::{encode_body, BodyDaClaimV1, ShardCandidateV1, BODY_TOTAL_SHARDS};
 use noos_ground::GroundTicketV1;
-use noos_lumen::objects::{AssetV1, BoundedList, PoolV1, ReceiptV1};
+use noos_lumen::objects::{AssetV1, BoundedList, ComputeJobV1, ComputeWorkerV1, PoolV1, ReceiptV1};
 use noos_lumen::state::LumenRoots;
 use noos_p2p::{
     BodyReplyV1, ChainIdentity, InboundItem, Multiaddr, P2pConfig, P2pEvent, P2pHandle, P2pNode,
@@ -258,6 +258,12 @@ pub enum ConsensusMsg {
     DevnetFinalityTick {
         reply: Reply<Result<bool, String>>,
     },
+    /// One independently operated fixture witness vote. The core persists its
+    /// anti-double-vote record before the p2p task can observe the result.
+    DevnetWitnessVoteTick {
+        witness_index: usize,
+        reply: Reply<Result<bool, String>>,
+    },
     Status {
         reply: Reply<StatusSnapshot>,
     },
@@ -281,6 +287,12 @@ pub enum ConsensusMsg {
     GetPools {
         reply: Reply<Vec<PoolV1>>,
     },
+    GetComputeWorkers {
+        reply: Reply<Vec<ComputeWorkerV1>>,
+    },
+    GetComputeJobs {
+        reply: Reply<Vec<ComputeJobV1>>,
+    },
     GetBalance {
         account: Hash32,
         asset: Hash32,
@@ -297,6 +309,7 @@ pub enum ConsensusMsg {
 pub enum OutboundGossip {
     Header(Box<BlockHeaderV1>, GroundTicketV1),
     Tx(Vec<u8>, Vec<u8>),
+    Vote(FinalityVoteV1),
 }
 
 fn status_of<P: StorePort>(core: &NodeCore<P>, observer: bool) -> StatusSnapshot {
@@ -391,6 +404,18 @@ fn core_loop<P: StorePort>(
             ConsensusMsg::DevnetFinalityTick { reply } => {
                 let _ = reply.send(core.devnet_finality_tick().map_err(|e| e.to_string()));
             }
+            ConsensusMsg::DevnetWitnessVoteTick {
+                witness_index,
+                reply,
+            } => {
+                let result = core
+                    .devnet_witness_vote_tick(witness_index)
+                    .map_err(|error| error.to_string());
+                if let (Ok(Some(vote)), Some(gossip)) = (&result, gossip) {
+                    let _ = gossip.try_send(OutboundGossip::Vote(vote.clone()));
+                }
+                let _ = reply.send(result.map(|vote| vote.is_some()));
+            }
             ConsensusMsg::Status { reply } => {
                 let _ = reply.send(status_of(core, observer));
             }
@@ -430,6 +455,12 @@ fn core_loop<P: StorePort>(
             }
             ConsensusMsg::GetPools { reply } => {
                 let _ = reply.send(core.ledger().pools());
+            }
+            ConsensusMsg::GetComputeWorkers { reply } => {
+                let _ = reply.send(core.ledger().compute_workers());
+            }
+            ConsensusMsg::GetComputeJobs { reply } => {
+                let _ = reply.send(core.ledger().compute_jobs());
             }
             ConsensusMsg::GetBalance {
                 account,
@@ -703,6 +734,9 @@ fn spawn_network(
                                 Some(OutboundGossip::Tx(tx_bytes, wit_bytes)) => {
                                     edge.push_tx(&tx_bytes, &wit_bytes).await;
                                 }
+                                Some(OutboundGossip::Vote(vote)) => {
+                                    edge.push_vote(&vote).await;
+                                }
                                 None => {}
                             }
                         }
@@ -840,6 +874,15 @@ impl NodeHandle {
     pub fn devnet_finality_tick(&self) -> Result<bool, NodeError> {
         self.round_trip(|reply| ConsensusMsg::DevnetFinalityTick { reply })?
             .map_err(NodeError::Config)
+    }
+
+    /// Signs and gossips one vote as a single fixture witness operator.
+    pub fn devnet_witness_vote_tick(&self, witness_index: usize) -> Result<bool, NodeError> {
+        self.round_trip(|reply| ConsensusMsg::DevnetWitnessVoteTick {
+            witness_index,
+            reply,
+        })?
+        .map_err(NodeError::Config)
     }
 
     pub fn set_now(&self, now_ms: u64) -> Result<(), NodeError> {

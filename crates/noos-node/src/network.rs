@@ -236,6 +236,14 @@ impl P2pNetworkEdge {
             let _ = self.handle.push_tx(peer, bytes.clone()).await;
         }
     }
+
+    /// Async finality-vote push to every ready peer.
+    pub async fn push_vote(&self, vote: &FinalityVoteV1) {
+        let bytes = vote.encode_canonical();
+        for peer in self.peers() {
+            let _ = self.handle.push_vote(peer, bytes.clone()).await;
+        }
+    }
 }
 
 impl NetworkEdge for P2pNetworkEdge {

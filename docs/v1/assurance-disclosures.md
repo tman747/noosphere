@@ -13,7 +13,7 @@ status: PREPRODUCTION_OWNER_BLOCKED
 
 ## Work Loom
 
-Loom may settle ordinary application work through escrow, receipts, disputes, and DA without minting or consensus influence. At genesis and now: `work_loom_credit_enabled=false`, `work_loom_weight_cap=0`, proofpower disabled, and duplex reallocation zero. Zero jobs yields zero Loom contribution. Demand classification is descriptive telemetry only. E-DEMAND-WASH-01 is binding; proposal credit/proofpower/duplex require a new claim and preregistered absolute attack-payoff result.
+Loom may settle ordinary application work through escrow, receipts, disputes, and DA without minting or consensus influence. The current Lumen V0 compute market implements signed worker registration, exact integer escrow, claim, result commitment, requester acceptance, settlement, refund, and timeout cancellation for deterministic MIX32 shards. The requester/coordinator recomputes the result before accepting it; this is paid acknowledgement, not a general correctness proof, confidential execution, arbitrary-code sandbox, or NEL activation. At genesis and now: `work_loom_credit_enabled=false`, `work_loom_weight_cap=0`, proofpower disabled, and duplex reallocation zero. Zero jobs yields zero Loom contribution. Demand classification is descriptive telemetry only. E-DEMAND-WASH-01 is binding; proposal credit/proofpower/duplex require a new claim and preregistered absolute attack-payoff result.
 
 ## Neural Execution Lane (NEL)
 

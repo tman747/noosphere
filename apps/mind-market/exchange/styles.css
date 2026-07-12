@@ -1,37 +1,37 @@
-/* Current — MindChain exchange
-   Palette: charcoal #121412, bone #f1f0e8, acid #a8d65e (sole accent). */
+/* Current — mindchain.network paper, ink, and signal-red system. */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
-  --charcoal: #121412;
-  --charcoal-raise: #1a1d19;
-  --charcoal-panel: #171a16;
-  --charcoal-inset: #0e100d;
-  --line: #262a24;
-  --line-soft: #1f231d;
-  --bone: #f1f0e8;
-  --bone-dim: #a9a99e;
-  --bone-faint: #6e6f66;
-  --acid: #a8d65e;
-  --acid-dim: #7ea344;
-  --acid-ink: #16200a;
-  --danger: #d6785e;
-  --sans: "Geist", "Geist Sans", "Inter Tight", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
-  --mono: "Geist Mono", ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
-  --radius: 10px;
-  --radius-sm: 7px;
+  --charcoal: #f7f2e5;
+  --charcoal-raise: #eee6d4;
+  --charcoal-panel: #f2ecde;
+  --charcoal-inset: #e9e1cf;
+  --line: rgba(28, 24, 17, .2);
+  --line-soft: rgba(28, 24, 17, .1);
+  --bone: #3a352b;
+  --bone-dim: #706a5c;
+  --bone-faint: #96907f;
+  --acid: #b8340f;
+  --acid-dim: #8f290c;
+  --acid-ink: #f7f2e5;
+  --danger: #b8340f;
+  --sans: "Space Grotesk", system-ui, sans-serif;
+  --mono: "Fira Code", ui-monospace, "Cascadia Code", Consolas, monospace;
+  --radius: 8px;
+  --radius-sm: 6px;
   --ease: cubic-bezier(0.19, 1, 0.22, 1);
 }
 
 * { box-sizing: border-box; }
 
-html { color-scheme: dark; }
+html { color-scheme: light; }
 
 body {
   margin: 0;
-  min-height: 100vh;
-  background:
-    radial-gradient(1100px 480px at 85% -10%, rgba(168, 214, 94, 0.05), transparent 60%),
-    var(--charcoal);
+  min-height: 100dvh;
+  background-color: var(--charcoal);
+  background-image: radial-gradient(rgba(28, 24, 17, .05) .55px, transparent .55px);
+  background-size: 7px 7px;
   color: var(--bone);
   font-family: var(--sans);
   font-size: 15px;

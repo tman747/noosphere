@@ -1,0 +1,23 @@
+﻿{
+    "schema":  "noos/windows-installer-signatures/v1",
+    "artifacts":  [
+                      {
+                          "file":  "MindChain Wallet_0.1.0_x64-setup.exe",
+                          "sha256":  "33c3be302ad816184e49727fa73015e0b26c7674c7acdeb2a90185a935e4ef1a",
+                          "signer":  "CN=MindChain Development Installer",
+                          "thumbprint":  "89a55f79afd27752338870d6d970e21c417048a8",
+                          "timestamp":  "CN=DigiCert SHA256 RSA4096 Timestamp Responder 2025 1, O=\"DigiCert, Inc.\", C=US",
+                          "trust_status":  "UnknownError",
+                          "production_trusted":  false
+                      },
+                      {
+                          "file":  "MindChain Wallet_0.1.0_x64_en-US.msi",
+                          "sha256":  "87d4b268959ca0b2d8b40e66167dc5dbd88eebd3f94b55960db82f9b0b1ae370",
+                          "signer":  "CN=MindChain Development Installer",
+                          "thumbprint":  "89a55f79afd27752338870d6d970e21c417048a8",
+                          "timestamp":  "CN=DigiCert SHA256 RSA4096 Timestamp Responder 2025 1, O=\"DigiCert, Inc.\", C=US",
+                          "trust_status":  "UnknownError",
+                          "production_trusted":  false
+                      }
+                  ]
+}

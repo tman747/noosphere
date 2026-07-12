@@ -149,6 +149,66 @@ fn tx_and_block_propagate_between_two_real_nodes() {
     a.shutdown();
 }
 
+/// Three independently persisted fixture witness roles reach a real 3-of-4
+/// quorum over QUIC. The producer owns only witness 0; peers B and C own
+/// witnesses 1 and 2, so no single process can manufacture the certificate.
+#[test]
+fn three_machine_fixture_witnesses_finalize_by_gossiped_quorum() {
+    let _network_guard = network_test_guard();
+    let a = supervisor::start(
+        networked_config(0x71, Vec::new()),
+        spec(),
+        test_dir("net-three-validator-a"),
+    )
+    .expect("start producer/witness 0");
+    let addr_a = a.p2p_addr.clone().expect("producer listens");
+    let b = supervisor::start(
+        networked_config(0x72, vec![addr_a.clone()]),
+        spec(),
+        test_dir("net-three-validator-b"),
+    )
+    .expect("start witness 1");
+    let c = supervisor::start(
+        networked_config(0x73, vec![addr_a]),
+        spec(),
+        test_dir("net-three-validator-c"),
+    )
+    .expect("start witness 2");
+
+    // Let both remote handshakes become operational before the checkpoint.
+    a.set_now(GENESIS_TIME_MS + 1).expect("clock");
+    a.produce_block().expect("handshake block");
+    wait_until("both witness peers import the handshake block", || {
+        (status(&b).head_height == 1 && status(&c).head_height == 1).then_some(())
+    });
+
+    for height in 2..=noos_braid::EPOCH_LENGTH {
+        a.set_now(GENESIS_TIME_MS + height).expect("clock");
+        a.produce_block().expect("checkpoint chain block");
+        wait_until("both witnesses follow checkpoint chain", || {
+            (status(&b).head_height == height && status(&c).head_height == height).then_some(())
+        });
+    }
+    assert!(a.devnet_witness_vote_tick(0).expect("witness 0 vote"));
+    assert!(b.devnet_witness_vote_tick(1).expect("witness 1 vote"));
+    assert!(c.devnet_witness_vote_tick(2).expect("witness 2 vote"));
+
+    wait_until(
+        "producer aggregates three independently gossiped votes",
+        || (status(&a).justified.epoch == 1).then_some(()),
+    );
+    a.set_now(GENESIS_TIME_MS + noos_braid::EPOCH_LENGTH + 1)
+        .expect("clock");
+    a.produce_block().expect("certificate carrying block");
+    wait_until("both witnesses verify the quorum certificate", || {
+        (status(&b).justified.epoch == 1 && status(&c).justified.epoch == 1).then_some(())
+    });
+
+    c.shutdown();
+    b.shutdown();
+    a.shutdown();
+}
+
 /// Pull sync must continue across protocol-sized range pages. This guards
 /// against recovering only the first page while reporting a healthy peer.
 #[test]

@@ -86,31 +86,38 @@ pub fn sign_and_release_vote<P: StorePort>(
     membership_root: Hash32,
     secret: &BlsSecretKey,
 ) -> Result<FinalityVoteV1, VoteRefused> {
-    // 1. Double-vote guard over the durable history.
+    // 1. Scan durable history. Releasing the exact same vote after restart is
+    // safe and does not append duplicate WAL records; any source or target
+    // change for an already-signed epoch is refused before signing.
     let records = port
         .safety_records(SAFETY_KIND_VOTE)
         .map_err(|e| VoteRefused::Store(e.to_string()))?;
+    let mut already_persisted = false;
     for raw in records {
         let Ok(rec) = VoteSafetyRecordV1::decode_canonical(&raw) else {
-            // Malformed persisted safety state is fatal-shaped; refuse.
             return Err(VoteRefused::Store("malformed vote safety record".into()));
         };
-        if rec.validator_id == validator_id && rec.epoch == epoch && rec.target != target {
-            return Err(VoteRefused::Slashable {
-                existing_target: rec.target,
-            });
+        if rec.validator_id == validator_id && rec.epoch == epoch {
+            if rec.source != source || rec.target != target {
+                return Err(VoteRefused::Slashable {
+                    existing_target: rec.target,
+                });
+            }
+            already_persisted = true;
         }
     }
 
-    // 2. Persist BEFORE any signable artifact exists outside this frame.
-    let record = VoteSafetyRecordV1 {
-        validator_id,
-        epoch,
-        source,
-        target,
-    };
-    port.persist_safety(SAFETY_KIND_VOTE, &record.encode_canonical())
-        .map_err(|e| VoteRefused::Barrier(e.to_string()))?;
+    // 2. Persist BEFORE any new signable artifact exists outside this frame.
+    if !already_persisted {
+        let record = VoteSafetyRecordV1 {
+            validator_id,
+            epoch,
+            source,
+            target,
+        };
+        port.persist_safety(SAFETY_KIND_VOTE, &record.encode_canonical())
+            .map_err(|e| VoteRefused::Barrier(e.to_string()))?;
+    }
 
     // 3. Sign; the caller receives the vote only past the barrier.
     FinalityVoteV1::sign(

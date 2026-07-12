@@ -62,6 +62,7 @@ use noos_witness::membership::{build_snapshot, SnapshotOutcome};
 use noos_witness::vote::{validate_vote, CheckpointView, FinalityVoteV1};
 
 use crate::auth::{GrainContractEngine, NodeAuthVerifier};
+use crate::devnet_fixture::fixture_witness_secret;
 use crate::genesis::{
     BuiltGenesis, GenesisSpec, DEVNET_PROPOSER_SEED, PROPOSER_POOL_ACCOUNT, TREASURY_ACCOUNT,
     WITNESS_POOL_ACCOUNT,
@@ -76,6 +77,7 @@ use crate::store_port::{
     key_certificate, key_header, key_height, StorePort, KEY_FINALIZED, KEY_HEAD, KEY_JUSTIFIED,
 };
 use crate::view::ChainView;
+use crate::witness_role::sign_and_release_vote;
 use crate::{Hash32, NodeError};
 
 /// Devnet beacon-randomness fixture feeding reserve sampling until the
@@ -548,6 +550,68 @@ impl<P: StorePort> NodeCore<P> {
             build_certificate(&votes, &self.chain_id, &snapshot).map_err(NodeError::Witness)?;
         self.queue_certificate(cert)?;
         Ok(true)
+    }
+    /// Emits one independently signed fixture witness vote for a distributed
+    /// engineering testnet. Unlike [`Self::devnet_finality_tick`], this signs
+    /// only the selected member and relies on votes from distinct network
+    /// peers to reach quorum. The vote safety record is durable before return.
+    ///
+    /// `witness_index` is intentionally restricted to the frozen four-member
+    /// test fixture and is refused by `noosd` for non-test parameters.
+    pub fn devnet_witness_vote_tick(
+        &mut self,
+        witness_index: usize,
+    ) -> Result<Option<FinalityVoteV1>, NodeError> {
+        let source = self.tracker.justified_head();
+        let next_epoch = source.epoch.saturating_add(1);
+        let boundary_height = next_epoch.saturating_mul(EPOCH_LENGTH);
+        if self.exec_height < boundary_height {
+            return Ok(None);
+        }
+        let target = CheckpointRef {
+            epoch: next_epoch,
+            checkpoint_hash: self
+                .dag
+                .ancestor_at_height(&self.exec_head, boundary_height)
+                .ok_or(NodeError::BodyMismatch {
+                    what: "epoch boundary block missing from dag",
+                })?
+                .hash,
+        };
+        self.ensure_snapshot(next_epoch)?;
+        let snapshot = self
+            .registry
+            .get(next_epoch)
+            .cloned()
+            .ok_or(NodeError::Witness(
+                noos_witness::WitnessError::UnknownSnapshot,
+            ))?;
+        let member = snapshot
+            .members()
+            .get(witness_index)
+            .ok_or_else(|| NodeError::Config("devnet witness index outside fixture set".into()))?;
+        if self.pending_votes.iter().any(|known| {
+            known.epoch == next_epoch
+                && known.source == source
+                && known.target == target
+                && known.validator_id == member.validator_id
+        }) {
+            return Ok(None);
+        }
+        let secret = fixture_witness_secret(witness_index).map_err(|_| NodeError::Crypto)?;
+        let vote = sign_and_release_vote(
+            &mut self.port,
+            self.chain_id,
+            next_epoch,
+            source,
+            target,
+            member.validator_id,
+            snapshot.root(),
+            &secret,
+        )
+        .map_err(|error| NodeError::Config(format!("devnet witness vote refused: {error:?}")))?;
+        self.ingest_network_vote(vote.clone())?;
+        Ok(Some(vote))
     }
 
     /// Validates and aggregates an inbound checkpoint vote. A quorum is

@@ -35,6 +35,17 @@ endpoint, and public API endpoint are written to `local-devnet.json`. These are
 test-network fixtures. `noosd` refuses them when
 `is_test_network = false`; never reuse them for valuable state.
 
+For a three-computer engineering LAN, `tools/lan_testnet.py init` freezes one
+manifest and private operator token. Computer A runs `run-validator`; computers
+B and C run `run-observer` with distinct witness indices 1 and 2. Computer A
+owns fixture witness 0 and block production but cannot independently reach the
+3-of-4 finality quorum. Each witness persists its anti-double-vote record before
+gossiping its vote. `tools/build_join_bundle.py` creates role-specific Windows
+or macOS double-click invitations; they verify the parameters checksum, install
+the node under the platform user-data root, configure automatic restart, join
+the declared QUIC peer, and open the browser compute helper. These roles remain
+test fixtures with public fixture witness keys, not production validator keys.
+
 `noos-cli tx build --spec <json>` accepts canonical action hex and two typed
 contract forms:
 
@@ -87,6 +98,16 @@ deployed with its fixture seed.
 
 Before balance, planning, signing, or submission, compare expected chain ID, genesis hash, and API version with `/api/status`; mismatch fails before reading wallet state or signing. Use purpose-separated hardened sign/view/Umbra/agent/recovery paths. Never grant spend authority to view or agent keys. Construct canonical transaction bodies and segregated witnesses, show maximum/actual five-resource fee, expiry, effects, capability use, and change before consent. Report `MEMPOOL`, `INCLUDED`, `JUSTIFIED`, `FINALIZED`, `REVERTED`, and `REJECTED` distinctly; inclusion is not finality.
 
+`tools/wallet_transfer.py` is the cross-device engineering-wallet path. It
+derives the sender locally from a hidden prompt or permission-restricted seed
+file, verifies chain and genesis identity twice, builds canonical
+`WithdrawFromAccount`/`DepositToAccount` actions, signs the txid locally, posts
+only transaction and witness bytes, and waits for inclusion. A first deposit to
+a 32-byte Ed25519 verification key creates that empty self-authenticating
+recipient account atomically; later spending still requires the corresponding
+private key. Plain HTTP profiles are restricted to loopback and RFC1918 LAN
+addresses. Internet profiles require HTTPS.
+
 ## Agent guide
 
 An `AgentID` acts only through explicit, narrow, revocable `CapabilityGrant` objects. Bind grants to chain, subject, actions, object/value/resource ceilings, expiry, nonce/replay scope, and approval policy. Simulate and show postconditions before authority use. Fail closed on unknown rights, stale state, identity mismatch, exceeded limits, or non-final prerequisites. Agent output is not a signature unless a spending authority separately authorizes the exact canonical intent.
@@ -94,6 +115,28 @@ An `AgentID` acts only through explicit, narrow, revocable `CapabilityGrant` obj
 ## Contract guide
 
 Contract admission binds canonical Grain formula bytes/hash, version, manifest, declared effects/rights, resources, and certificate references. Programs must be total within declared bounds or deterministically trap. Do not depend on map iteration, wall clock, host floating point, network calls, optional jet output, or mutable external code. Tests should cover canonical/invalid encoding, resource boundary, trap rollback, capability denial, fee failure, version rejection, and slow-Grain/jet equivalence.
+
+## Compute rental market
+
+The application-only V0 market uses consensus-owned worker and job records.
+`RegisterComputeWorker` advertises bounded CPU/GPU capability and an integer
+price. `OpenComputeJob` removes the maximum payment from the signed requester
+and locks it in the job. A signed worker may claim once and commit a result, but
+submission never releases payment. Only the signed requester can accept a
+matching submitted result; settlement pays the agreed price and refunds unused
+escrow atomically. Open jobs and expired unfinished jobs can be cancelled by
+the requester.
+
+`tools/compute_market.py` opens deterministic MIX32 shards and independently
+recomputes each result root before acceptance. `tools/compute_worker.py` keeps a
+worker seed local, executes CPU shards, and signs claim/result transactions.
+The `/apps/compute-market` browser helper uses WebGPU when available and a
+bounded CPU fallback otherwise; it is suitable for a phone or laptop browser.
+Browser helpers use the coordinator's explicitly custodial test-network worker
+identity, so rewards accrue to that identity rather than to a browser-held
+wallet. The workload is deliberately registered and deterministic: arbitrary
+native code, neural-model rental, confidential inputs, production dispute
+proofs, and permissionless GPU kernels are not claimed.
 
 ## Neural execution reality
 
