@@ -28,7 +28,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::time::Duration;
 
 /// Epoch length in block heights (ch01 §4.1; `noos-braid` `EPOCH_LENGTH`).
@@ -40,6 +40,8 @@ const EPOCH_LENGTH: u64 = 256;
 const RETAINED_POINTS: usize = 64;
 const CHECKPOINT_FILE: &str = "ingest-checkpoint-v1.json";
 const CHECKPOINT_SCHEMA: &str = "noos-ingest-checkpoint-v1";
+const MAX_OPERATOR_RESPONSE_BYTES: usize = 64 * 1024;
+const MAX_OPERATOR_HEADER_BYTES: usize = 16 * 1024;
 
 /// Node `/status` view (identity + unsafe head only; justified/finalized
 /// are epoch-keyed there and deliberately not consumed by ingestion).
@@ -322,6 +324,7 @@ fn find_ancestor<S: NodeSource>(source: &mut S, cp: &Checkpoint) -> Result<u64> 
 /// Blocking client for the noos-node operator line protocol on localhost.
 /// One request per connection, `connection: close`, bearer auth — the exact
 /// contract of `noos-node/src/rpc.rs`.
+#[derive(Clone)]
 pub struct LineProtocolSource {
     addr: String,
     token: String,
@@ -339,11 +342,99 @@ impl LineProtocolSource {
     }
 
     fn get(&self, path: &str) -> Result<(u16, Value)> {
-        let (code, body) = http_get(&self.addr, path, &self.token, self.timeout)?;
+        let (code, body) = http_request(&self.addr, "GET", path, &self.token, None, self.timeout)?;
         let value = serde_json::from_str(&body)
             .map_err(|_| IndexerError::Source(format!("non-JSON body from {path}")))?;
         Ok((code, value))
     }
+
+    /// Checks the configured node identity immediately before forwarding the
+    /// caller's exact canonical submission envelope. This deliberately does
+    /// not mutate index state: only the ingestion path owns indexed truth.
+    pub fn forward_submission(
+        &self,
+        expected: &Identity,
+        envelope: &[u8],
+    ) -> std::result::Result<NodeSubmission, ForwardError> {
+        let (status_code, status_body) = http_request(
+            &self.addr,
+            "GET",
+            "/status",
+            &self.token,
+            None,
+            self.timeout,
+        )
+        .map_err(|_| ForwardError::Unavailable)?;
+        if status_code != 200 {
+            return Err(ForwardError::Unavailable);
+        }
+        let status: Value =
+            serde_json::from_str(&status_body).map_err(|_| ForwardError::MalformedResponse)?;
+        let actual = Identity {
+            chain_id: status["chain_id"]
+                .as_str()
+                .ok_or(ForwardError::MalformedResponse)?
+                .to_owned(),
+            genesis_hash: status["genesis_hash"]
+                .as_str()
+                .ok_or(ForwardError::MalformedResponse)?
+                .to_owned(),
+            api_version: crate::API_VERSION.to_owned(),
+        };
+        expected
+            .require(&actual)
+            .map_err(|_| ForwardError::WrongProtocolIdentity)?;
+
+        let (code, body) = http_request(
+            &self.addr,
+            "POST",
+            "/submit_tx",
+            &self.token,
+            Some(envelope),
+            self.timeout,
+        )
+        .map_err(|_| ForwardError::Unavailable)?;
+        if code != 200 && code != 202 {
+            let (node_code, detail) = node_error(&body);
+            return Err(ForwardError::Refused {
+                status: code,
+                node_code,
+                detail,
+            });
+        }
+        let value: Value =
+            serde_json::from_str(&body).map_err(|_| ForwardError::MalformedResponse)?;
+        if value["accepted"].as_bool() != Some(true) {
+            return Err(ForwardError::MalformedResponse);
+        }
+        let txid = value["txid"]
+            .as_str()
+            .filter(|value| is_hash(value))
+            .ok_or(ForwardError::MalformedResponse)?
+            .to_owned();
+        Ok(NodeSubmission { txid })
+    }
+}
+
+/// Successful noosd protocol admission. The public API exposes this txid but
+/// does not claim an indexed mempool state until ingestion observes it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NodeSubmission {
+    pub txid: String,
+}
+
+/// Fail-closed forwarding outcomes safe to translate to the public API. No
+/// variant contains the configured bearer token or transaction bytes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ForwardError {
+    Unavailable,
+    WrongProtocolIdentity,
+    Refused {
+        status: u16,
+        node_code: String,
+        detail: String,
+    },
+    MalformedResponse,
 }
 
 impl NodeSource for LineProtocolSource {
@@ -425,28 +516,130 @@ fn u64_field(v: &Value, key: &str) -> Result<u64> {
         .ok_or_else(|| IndexerError::Source(format!("missing numeric field {key}")))
 }
 
-fn http_get(addr: &str, path: &str, token: &str, timeout: Duration) -> Result<(u16, String)> {
+fn node_error(body: &str) -> (String, String) {
+    let Ok(value) = serde_json::from_str::<Value>(body) else {
+        return (
+            "malformed_node_error".into(),
+            "node refused submission".into(),
+        );
+    };
+    let error = &value["error"];
+    let code = error["code"]
+        .as_str()
+        .filter(|value| value.len() <= 128)
+        .unwrap_or("unknown_node_error")
+        .to_owned();
+    let detail = error["detail"]
+        .as_str()
+        .filter(|value| value.len() <= 512)
+        .unwrap_or("node refused submission")
+        .to_owned();
+    (code, detail)
+}
+
+fn http_request(
+    endpoint: &str,
+    method: &str,
+    path: &str,
+    token: &str,
+    body: Option<&[u8]>,
+    timeout: Duration,
+) -> Result<(u16, String)> {
     let source_err = |e: std::io::Error| IndexerError::Source(e.to_string());
-    let mut stream = TcpStream::connect(addr).map_err(source_err)?;
+    let addr = endpoint
+        .strip_prefix("http://")
+        .unwrap_or(endpoint)
+        .trim_end_matches('/');
+    if addr.is_empty()
+        || addr.contains(['/', '\r', '\n'])
+        || token.is_empty()
+        || token.contains(['\r', '\n'])
+    {
+        return Err(IndexerError::Source(
+            "invalid operator RPC configuration".into(),
+        ));
+    }
+    let socket = addr
+        .to_socket_addrs()
+        .map_err(source_err)?
+        .next()
+        .ok_or_else(|| IndexerError::Source("operator RPC did not resolve".into()))?;
+    let mut stream = TcpStream::connect_timeout(&socket, timeout).map_err(source_err)?;
     stream.set_read_timeout(Some(timeout)).map_err(source_err)?;
     stream
         .set_write_timeout(Some(timeout))
         .map_err(source_err)?;
+    let content_length = body.map_or(0, <[u8]>::len);
     let request = format!(
-        "GET {path} HTTP/1.1\r\nhost: {addr}\r\nauthorization: Bearer {token}\r\nconnection: close\r\n\r\n"
+        "{method} {path} HTTP/1.1\r\nhost: {addr}\r\nauthorization: Bearer {token}\r\ncontent-type: application/json\r\ncontent-length: {content_length}\r\nconnection: close\r\n\r\n"
     );
     stream.write_all(request.as_bytes()).map_err(source_err)?;
-    let mut raw = Vec::new();
-    stream.read_to_end(&mut raw).map_err(source_err)?;
-    let text = String::from_utf8_lossy(&raw);
-    let (head, body) = text
-        .split_once("\r\n\r\n")
-        .ok_or_else(|| IndexerError::Source("truncated HTTP response".into()))?;
+    if let Some(body) = body {
+        stream.write_all(body).map_err(source_err)?;
+    }
+
+    let mut raw = Vec::with_capacity(4096);
+    let mut chunk = [0_u8; 4096];
+    let header_end = loop {
+        let read = stream.read(&mut chunk).map_err(source_err)?;
+        if read == 0 {
+            return Err(IndexerError::Source("truncated HTTP response".into()));
+        }
+        raw.extend_from_slice(&chunk[..read]);
+        if let Some(end) = raw
+            .windows(4)
+            .position(|window| window == b"\r\n\r\n")
+            .map(|position| position + 4)
+        {
+            break end;
+        }
+        if raw.len() > MAX_OPERATOR_HEADER_BYTES {
+            return Err(IndexerError::Source(
+                "operator response headers too large".into(),
+            ));
+        }
+    };
+    let head = std::str::from_utf8(&raw[..header_end])
+        .map_err(|_| IndexerError::Source("malformed HTTP response headers".into()))?;
     let code = head
         .lines()
         .next()
         .and_then(|line| line.split_whitespace().nth(1))
         .and_then(|c| c.parse::<u16>().ok())
         .ok_or_else(|| IndexerError::Source("malformed status line".into()))?;
-    Ok((code, body.to_string()))
+    let response_length = head.lines().skip(1).find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        name.trim()
+            .eq_ignore_ascii_case("content-length")
+            .then(|| value.trim().parse::<usize>().ok())
+            .flatten()
+    });
+    if response_length.is_some_and(|length| length > MAX_OPERATOR_RESPONSE_BYTES) {
+        return Err(IndexerError::Source(
+            "operator response body too large".into(),
+        ));
+    }
+    let target = response_length.map(|length| header_end.saturating_add(length));
+    loop {
+        if target.is_some_and(|target| raw.len() >= target) {
+            break;
+        }
+        let read = stream.read(&mut chunk).map_err(source_err)?;
+        if read == 0 {
+            break;
+        }
+        raw.extend_from_slice(&chunk[..read]);
+        if raw.len().saturating_sub(header_end) > MAX_OPERATOR_RESPONSE_BYTES {
+            return Err(IndexerError::Source(
+                "operator response body too large".into(),
+            ));
+        }
+    }
+    if target.is_some_and(|target| raw.len() < target) {
+        return Err(IndexerError::Source("truncated HTTP response body".into()));
+    }
+    let body_end = target.unwrap_or(raw.len());
+    let body = std::str::from_utf8(&raw[header_end..body_end])
+        .map_err(|_| IndexerError::Source("non-UTF-8 operator response".into()))?;
+    Ok((code, body.to_owned()))
 }

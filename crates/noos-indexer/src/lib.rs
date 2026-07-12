@@ -3,16 +3,13 @@
 
 use axum::{
     body::Bytes,
-    extract::{Path, Query, State},
+    extract::{rejection::BytesRejection, DefaultBodyLimit, Path, Query, State},
     http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
-use base64::{
-    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
-    Engine,
-};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -28,6 +25,7 @@ pub mod ingest;
 
 pub const API_VERSION: &str = "v1";
 pub const MEDIA_TYPE: &str = "application/vnd.noos.v1+json";
+pub const MAX_SUBMISSION_REQUEST_BYTES: usize = 1_048_576;
 const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
 pub type Result<T, E = IndexerError> = std::result::Result<T, E>;
@@ -298,8 +296,22 @@ impl TelemetryParser {
 #[derive(Clone)]
 struct AppState {
     indexer: Indexer,
+    submission_source: Option<ingest::LineProtocolSource>,
 }
 pub fn router(indexer: Indexer) -> Router {
+    build_router(indexer, None)
+}
+
+/// Public API router with authenticated noosd transaction forwarding enabled.
+/// The source's bearer token remains private to the line-protocol client.
+pub fn router_with_operator(
+    indexer: Indexer,
+    submission_source: ingest::LineProtocolSource,
+) -> Router {
+    build_router(indexer, Some(submission_source))
+}
+
+fn build_router(indexer: Indexer, submission_source: Option<ingest::LineProtocolSource>) -> Router {
     Router::new()
         .route("/api/status", get(status))
         .route("/api/v1/blocks", get(blocks))
@@ -319,37 +331,48 @@ pub fn router(indexer: Indexer) -> Router {
         .route("/api/v1/receipts/{receiptid}", get(hash_not_found))
         .route("/api/v1/disputes/{disputeid}", get(disabled_neural))
         .route("/api/v1/evidence/{mechanism_id}", get(evidence))
-        .with_state(AppState { indexer })
+        .layer(DefaultBodyLimit::max(MAX_SUBMISSION_REQUEST_BYTES))
+        .with_state(AppState {
+            indexer,
+            submission_source,
+        })
 }
 
 #[derive(Debug)]
 struct ApiError {
     status: StatusCode,
-    code: &'static str,
+    code: String,
     message: String,
+    details: Value,
     mechanism: Option<&'static str>,
 }
 impl ApiError {
     fn new(status: StatusCode, code: &'static str, message: impl Into<String>) -> Self {
         Self {
             status,
-            code,
+            code: code.into(),
             message: message.into(),
+            details: json!({}),
             mechanism: None,
         }
+    }
+    fn with_details(mut self, details: Value) -> Self {
+        self.details = details;
+        self
     }
     fn disabled(mechanism: &'static str) -> Self {
         Self {
             status: StatusCode::CONFLICT,
-            code: "feature_disabled",
+            code: "feature_disabled".into(),
             message: "mechanism disabled".into(),
+            details: json!({}),
             mechanism: Some(mechanism),
         }
     }
 }
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        let mut body = json!({"code":self.code,"message":self.message,"request_id":"noos-indexer","details":{}});
+        let mut body = json!({"code":self.code,"message":self.message,"request_id":"noos-indexer","details":self.details});
         if let Some(m) = self.mechanism {
             body["mechanism_id"] = json!(m);
             body["evidence_ref"] = json!(format!("/api/v1/evidence/{m}"));
@@ -469,16 +492,15 @@ async fn entity_transaction(
         .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "not_found", "transaction not found"))
 }
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Submit {
-    chain_id: String,
-    genesis_hash: String,
-    api_version: String,
-    transaction: String,
+    tx: String,
+    witnesses: String,
 }
 async fn submit_transaction(
     State(s): State<AppState>,
     headers: HeaderMap,
-    body: Bytes,
+    body: std::result::Result<Bytes, BytesRejection>,
 ) -> ApiResult<Response> {
     if headers
         .get(header::CONTENT_TYPE)
@@ -491,61 +513,109 @@ async fn submit_transaction(
             "Content-Type must be application/json",
         ));
     }
-    if body.len() > 1_048_576 {
+    let body = body.map_err(|_| {
+        ApiError::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "payload_too_large",
+            "request exceeds 1048576 bytes",
+        )
+    })?;
+    if body.len() > MAX_SUBMISSION_REQUEST_BYTES {
         return Err(ApiError::new(
             StatusCode::PAYLOAD_TOO_LARGE,
             "payload_too_large",
             "request exceeds 1048576 bytes",
         ));
     }
-    let req: Submit = serde_json::from_slice(&body)
-        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "invalid_request", "invalid JSON"))?;
-    let actual = Identity {
-        chain_id: req.chain_id,
-        genesis_hash: req.genesis_hash,
-        api_version: req.api_version,
-    };
-    s.indexer.identity.require(&actual).map_err(|_| {
+    let req: Submit = serde_json::from_slice(&body).map_err(|_| {
         ApiError::new(
             StatusCode::BAD_REQUEST,
-            "wrong_protocol_identity",
-            "chain, genesis, or API version mismatch",
+            "invalid_request",
+            "expected exactly {tx,witnesses} as JSON strings",
         )
     })?;
-    let tx = STANDARD.decode(req.transaction).map_err(|_| {
-        ApiError::new(
+    if !canonical_hex(&req.tx) || !canonical_hex(&req.witnesses) {
+        return Err(ApiError::new(
             StatusCode::UNPROCESSABLE_ENTITY,
             "validation_failed",
-            "transaction is not canonical base64",
-        )
-    })?;
-    if tx.len() > 524_288 {
-        return Err(ApiError::new(
-            StatusCode::PAYLOAD_TOO_LARGE,
-            "payload_too_large",
-            "transaction exceeds 524288 bytes",
+            "tx and witnesses must be lowercase even-length hex",
         ));
     }
-    let txid = format!("{:x}", Sha256::digest(&tx));
-    let mut state = s.indexer.inner.write().await;
-    let duplicate = state.transactions.contains_key(&txid);
-    state.transactions.entry(txid.clone()).or_insert_with(
-        || json!({"txid":txid,"wtxid":txid,"state":"MEMPOOL","fee":"0","resource_counters":{}}),
-    );
-    let status = if duplicate {
-        StatusCode::OK
-    } else {
-        StatusCode::ACCEPTED
-    };
-    let mut response = (
-        status,
-        Json(json!({"txid":txid,"state":"MEMPOOL","duplicate":duplicate})),
-    )
-        .into_response();
+    let source = s.submission_source.ok_or_else(|| {
+        ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unavailable",
+            "transaction forwarding is unavailable; configure NOOS_NODE_RPC and NOOS_NODE_TOKEN",
+        )
+    })?;
+    let expected = s.indexer.identity.clone();
+    let envelope = body.to_vec();
+    let submission =
+        tokio::task::spawn_blocking(move || source.forward_submission(&expected, &envelope))
+            .await
+            .map_err(|_| {
+                ApiError::new(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "unavailable",
+                    "node submission task unavailable",
+                )
+            })?
+            .map_err(forward_error)?;
+    let mut response =
+        (StatusCode::ACCEPTED, Json(json!({"txid":submission.txid}))).into_response();
     response
         .headers_mut()
         .insert(header::CONTENT_TYPE, HeaderValue::from_static(MEDIA_TYPE));
     Ok(response)
+}
+
+fn canonical_hex(value: &str) -> bool {
+    value.len() % 2 == 0
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn forward_error(error: ingest::ForwardError) -> ApiError {
+    match error {
+        ingest::ForwardError::Unavailable => ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unavailable",
+            "configured node is unavailable",
+        ),
+        ingest::ForwardError::WrongProtocolIdentity => ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "wrong_protocol_identity",
+            "configured node identity does not match the indexer",
+        ),
+        ingest::ForwardError::MalformedResponse => ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unavailable",
+            "configured node returned a malformed response",
+        ),
+        ingest::ForwardError::Refused {
+            status,
+            node_code,
+            detail,
+        } => {
+            let node_status = status;
+            let (status, public_code) = match StatusCode::from_u16(node_status).ok() {
+                Some(StatusCode::PAYLOAD_TOO_LARGE) => {
+                    (StatusCode::PAYLOAD_TOO_LARGE, "payload_too_large")
+                }
+                Some(StatusCode::TOO_MANY_REQUESTS) => {
+                    (StatusCode::TOO_MANY_REQUESTS, "rate_limited")
+                }
+                Some(status) if status.is_client_error() && status != StatusCode::UNAUTHORIZED => {
+                    (StatusCode::CONFLICT, "node_refused")
+                }
+                _ => (StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
+            };
+            ApiError::new(status, public_code, "node refused transaction submission").with_details(
+                json!({"node_code":node_code,"node_detail":detail,"node_status":node_status}),
+            )
+        }
+    }
 }
 async fn empty_page(headers: HeaderMap, Query(q): Query<PageQuery>) -> ApiResult<Response> {
     accepted(&headers)?;

@@ -80,7 +80,7 @@ async fn independent_heads_never_infer_finality() {
 }
 
 #[tokio::test]
-async fn disabled_routes_and_wrong_chain_submission_match_contract() {
+async fn disabled_routes_and_unconfigured_submission_match_contract() {
     let dir = tempfile::tempdir().unwrap();
     let app = router(Indexer::open(dir.path(), identity(), identity()).unwrap());
     let response = app
@@ -99,7 +99,7 @@ async fn disabled_routes_and_wrong_chain_submission_match_contract() {
     assert_eq!(error["code"], "feature_disabled");
     assert_eq!(error["mechanism_id"], "M-NEL");
 
-    let request = serde_json::json!({"chain_id":hash('c'),"genesis_hash":hash('b'),"api_version":"v1","transaction":"AA=="});
+    let request = serde_json::json!({"tx":"00","witnesses":"00"});
     let response = app
         .clone()
         .oneshot(
@@ -112,10 +112,10 @@ async fn disabled_routes_and_wrong_chain_submission_match_contract() {
         )
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     let error: serde_json::Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
-    assert_eq!(error["code"], "wrong_protocol_identity");
+    assert_eq!(error["code"], "unavailable");
 
     let response = app
         .oneshot(
