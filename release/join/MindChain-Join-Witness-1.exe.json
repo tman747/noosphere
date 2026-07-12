@@ -1,0 +1,10 @@
+﻿{
+    "schema":  "noos/windows-join-installer/v1",
+    "file":  "MindChain-Join-Witness-1.exe",
+    "sha256":  "d1118697a3f1c1950940a636537764917037920f93ec8d7cbfc8569c5d6a6a34",
+    "signer":  "CN=MindChain Development Installer",
+    "thumbprint":  "89a55f79afd27752338870d6d970e21c417048a8",
+    "trust_status":  "UnknownError",
+    "production_trusted":  false,
+    "timestamped":  true
+}
