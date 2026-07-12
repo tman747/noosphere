@@ -13,6 +13,9 @@
 //! - `query` — the frozen indexer public API v1.
 
 #![forbid(unsafe_code)]
+mod manifest;
+
+pub use manifest::manifest_verify;
 
 use noos_codec::{NoosDecode, NoosEncode};
 use noos_lumen::objects::{
@@ -25,7 +28,7 @@ use noos_wallet::{derive_authority, IdentityGate, NodeIdentity, Purpose};
 use serde_json::{json, Value};
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Signature suite id carried by every `lumen-tx-v1` intent fixture
 /// (64-byte ed25519 signatures).
@@ -801,6 +804,7 @@ pub const USAGE: &str = "noos-cli <command>\n\
   tx sign   --tx <hex> --seed <hex> --account <n> --index <n> --chain-id <hex32> --genesis-hash <hex32> [--scope <n>] [--lock-reveal <hex>]...\n\
   tx submit --node <addr> --token <t> --chain-id <hex32> --genesis-hash <hex32> --tx <hex> --witnesses <hex>\n\
   query     block <height|hash> --indexer <addr> | tx <txid> --indexer <addr>\n\
+  manifest  verify --file <path> --public-key <hex32> [--now-unix-ms <u64>]\n\
   status    --node <addr> --token <t> | --indexer <addr>";
 
 /// Runs one CLI invocation; returns the exact stdout payload.
@@ -857,6 +861,29 @@ pub fn run(args: &[String]) -> Result<String> {
         }
         [q, kind, id, rest @ ..] if q == "query" && kind == "tx" => {
             pretty(query_tx(&required(rest, "--indexer")?, id)?)
+        }
+        [manifest, verify, rest @ ..] if manifest == "manifest" && verify == "verify" => {
+            let path = required(rest, "--file")?;
+            let encoded = std::fs::read_to_string(&path)
+                .map_err(|error| CliError::Usage(format!("--file {path}: {error}")))?;
+            let now_unix_ms = match flag(rest, "--now-unix-ms") {
+                Some(value) => value
+                    .parse()
+                    .map_err(|_| CliError::Usage("--now-unix-ms must be a u64".into()))?,
+                None => SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map_err(|_| CliError::Malformed("system clock precedes Unix epoch".into()))?
+                    .as_millis()
+                    .try_into()
+                    .map_err(|_| {
+                        CliError::Malformed("system clock does not fit u64 milliseconds".into())
+                    })?,
+            };
+            pretty(manifest_verify(
+                &encoded,
+                &required(rest, "--public-key")?,
+                now_unix_ms,
+            )?)
         }
         [cmd, rest @ ..] if cmd == "status" => match flag(rest, "--indexer") {
             Some(indexer) => pretty(indexer_status(&indexer)?),
