@@ -15,7 +15,7 @@ import re
 import subprocess
 import sys
 
-from experimental_gate import ROOT, base_continuity, emit
+from experimental_gate import ROOT, base_continuity, emit, evidence_check
 
 CLAIMS = (
     "A-KEYLESS-CONSENSUS",
@@ -172,7 +172,13 @@ def main() -> int:
         claims=[args.claim],
         result=result,
         expected=result,
-        checks=[{"name": "deterministic behavior/falsifier precursor", "passed": True, "detail": item} for item in checks],
+        checks=[
+            evidence_check("claim-implementation", "implementation", True, checks),
+            evidence_check("claim-falsifiers", "falsifier", True, checks),
+        ] if implemented else [
+            evidence_check("local-precursor", "falsifier", True, checks),
+            evidence_check("external-pass-threshold", "external_requirement", False, limitations),
+        ],
         sources=sources,
         limitations=limitations,
     )

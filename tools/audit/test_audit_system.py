@@ -4,7 +4,7 @@ from __future__ import annotations
 import base64
 import copy
 import json
-import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -17,8 +17,16 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from common import AuditError, canonical_bytes, sha256_bytes  # noqa: E402
-from build_handoff import templates  # noqa: E402
+from common import (  # noqa: E402
+    AuditError,
+    canonical_bytes,
+    git_entry,
+    git_tree,
+    sha256_bytes,
+    verify_bundle_against_git,
+    verify_bundle_dir,
+)
+from build_handoff import RISC0_TCB_PATHS, templates, validate_scope  # noqa: E402
 from ingest_report import TEST_KEY_USE, validate_submission  # noqa: E402
 
 AS_OF = datetime(2026, 7, 11, 18, 0, 0, tzinfo=timezone.utc)
@@ -92,6 +100,7 @@ class AuditSystemTests(unittest.TestCase):
             "bundle_kind": "noosphere-independent-audit-handoff",
             "bundle_id": self.bundle_id,
             "source_revision": self.revision,
+            "source_tree": "2" * 40,
             "binding": binding,
             "files": {name: sha256_bytes(data) for name, data in payloads.items()},
             "external_audit_complete": False,
@@ -202,6 +211,137 @@ class AuditSystemTests(unittest.TestCase):
         independence = json.loads(rendered["templates/auditor-independence.template.json"])
         self.assertFalse(any(independence["declarations"].values()))
         self.assertIn(b"not an audit verdict", rendered["AUDITOR-INSTRUCTIONS.md"])
+
+    def _trusted_git_bundle(self) -> tuple[Path, Path, str]:
+        repo = self.root / "trusted-repo"
+        bundle = self.root / "trusted-bundle"
+        repo.mkdir()
+        bundle.mkdir()
+        subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True)
+        subprocess.run(["git", "config", "user.name", "Test Fixture"], cwd=repo, check=True)
+        source_path = repo / "src/security.rs"
+        source_path.parent.mkdir()
+        source_path.write_bytes(b"trusted source bytes\n")
+        subprocess.run(["git", "add", "."], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "--quiet", "-m", "trusted source"], cwd=repo, check=True)
+        revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+        mode, object_type, blob = git_entry(revision, "src/security.rs", repo)
+        data = source_path.read_bytes()
+        archive_path = "source/src/security.rs"
+        packaged = bundle / archive_path
+        packaged.parent.mkdir(parents=True)
+        packaged.write_bytes(data)
+        source_manifest = {
+            "schema_version": 2,
+            "manifest_kind": "noosphere-audit-source-manifest",
+            "source_revision": revision,
+            "source_tree": git_tree(revision, repo),
+            "hash_algorithm": "sha256",
+            "entries": [{
+                "path": "src/security.rs",
+                "archive_path": archive_path,
+                "git_mode": mode,
+                "git_type": object_type,
+                "git_blob": blob,
+                "sha256": sha256_bytes(data),
+                "bytes": len(data),
+                "role": "audited_source",
+                "workstreams": ["cryptography-cryptanalysis"],
+            }],
+        }
+        payloads = {
+            "audit-scope.json": canonical_bytes({"schema_version": 1}),
+            "source-manifest.json": canonical_bytes(source_manifest),
+            "threat-model-inventory.json": canonical_bytes({"schema_version": 1}),
+            archive_path: data,
+        }
+        for name, payload in payloads.items():
+            path = bundle / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
+        binding = {
+            "scope_sha256": sha256_bytes(payloads["audit-scope.json"]),
+            "source_manifest_sha256": sha256_bytes(payloads["source-manifest.json"]),
+            "threat_inventory_sha256": sha256_bytes(payloads["threat-model-inventory.json"]),
+        }
+        identity = {"source_revision": revision, **binding}
+        manifest = {
+            "schema_version": 1,
+            "bundle_kind": "noosphere-independent-audit-handoff",
+            "bundle_id": "sha256:" + sha256_bytes(canonical_bytes(identity)),
+            "source_revision": revision,
+            "source_tree": git_tree(revision, repo),
+            "binding": binding,
+            "files": {name: sha256_bytes(payload) for name, payload in payloads.items()},
+            "external_audit_complete": False,
+            "promotion_effect": "none",
+        }
+        (bundle / "bundle-manifest.json").write_bytes(canonical_bytes(manifest))
+        return bundle, repo, revision
+
+    def test_handoff_requires_external_git_trust_root_and_exact_bytes(self) -> None:
+        bundle, repo, revision = self._trusted_git_bundle()
+        manifest = verify_bundle_dir(bundle)
+        self.assertEqual(verify_bundle_against_git(bundle, manifest, repo, revision), revision)
+
+        packaged = bundle / "source/src/security.rs"
+        packaged.write_bytes(b"attacker replacement\n")
+        manifest["files"]["source/src/security.rs"] = sha256_bytes(packaged.read_bytes())
+        (bundle / "bundle-manifest.json").write_bytes(canonical_bytes(manifest))
+        self.assertEqual(verify_bundle_dir(bundle)["source_revision"], revision)
+        with self.assertRaisesRegex(AuditError, "packaged source bytes differ"):
+            verify_bundle_against_git(bundle, verify_bundle_dir(bundle), repo, revision)
+
+    def test_self_consistent_bundle_cannot_relabel_trusted_revision(self) -> None:
+        bundle, repo, revision = self._trusted_git_bundle()
+        manifest = verify_bundle_dir(bundle)
+        manifest["source_revision"] = "1" * 40
+        identity = {"source_revision": manifest["source_revision"], **manifest["binding"]}
+        manifest["bundle_id"] = "sha256:" + sha256_bytes(canonical_bytes(identity))
+        (bundle / "bundle-manifest.json").write_bytes(canonical_bytes(manifest))
+        self.assertEqual(verify_bundle_dir(bundle)["source_revision"], "1" * 40)
+        with self.assertRaisesRegex(AuditError, "bundle revision mismatch"):
+            verify_bundle_against_git(bundle, verify_bundle_dir(bundle), repo, revision)
+
+    def test_external_git_binding_rejects_extra_and_retyped_source_paths(self) -> None:
+        bundle, repo, revision = self._trusted_git_bundle()
+        manifest = verify_bundle_dir(bundle)
+        extra = bundle / "source/extra.rs"
+        extra.write_bytes(b"unmanifested source\n")
+        manifest["files"]["source/extra.rs"] = sha256_bytes(extra.read_bytes())
+        (bundle / "bundle-manifest.json").write_bytes(canonical_bytes(manifest))
+        self.assertEqual(verify_bundle_dir(bundle)["source_revision"], revision)
+        with self.assertRaisesRegex(AuditError, "packaged source set mismatch"):
+            verify_bundle_against_git(bundle, verify_bundle_dir(bundle), repo, revision)
+
+        extra.unlink()
+        del manifest["files"]["source/extra.rs"]
+        source_path = bundle / "source-manifest.json"
+        source_manifest = json.loads(source_path.read_text(encoding="utf-8"))
+        source_manifest["entries"][0]["git_mode"] = "100755"
+        source_path.write_bytes(canonical_bytes(source_manifest))
+        source_hash = sha256_bytes(source_path.read_bytes())
+        manifest["files"]["source-manifest.json"] = source_hash
+        manifest["binding"]["source_manifest_sha256"] = source_hash
+        identity = {"source_revision": revision, **manifest["binding"]}
+        manifest["bundle_id"] = "sha256:" + sha256_bytes(canonical_bytes(identity))
+        (bundle / "bundle-manifest.json").write_bytes(canonical_bytes(manifest))
+        self.assertEqual(verify_bundle_dir(bundle)["source_revision"], revision)
+        with self.assertRaisesRegex(AuditError, "source Git identity/type mismatch"):
+            verify_bundle_against_git(bundle, verify_bundle_dir(bundle), repo, revision)
+
+    def test_scope_requires_complete_declared_proving_backend(self) -> None:
+        scope = json.loads((HERE.parents[1] / "protocol/audit/audit-scope-v1.json").read_text(encoding="utf-8"))
+        registry = json.loads((HERE.parents[1] / "protocol/claims/registry.json").read_text(encoding="utf-8"))
+        tracked = subprocess.check_output(["git", "ls-files"], cwd=HERE.parents[1], text=True).splitlines()
+        paths = sorted(set(tracked) | RISC0_TCB_PATHS)
+        validate_scope(scope, registry, paths)
+        with self.assertRaisesRegex(AuditError, "omits RISC Zero proving TCB"):
+            validate_scope(scope, registry, [path for path in paths if not path.endswith("artifacts/jet_proof.bin")])
+        future = [*paths, "crates/noos-jet/future-methods/Cargo.toml", "crates/noos-jet/future-methods/src/lib.rs"]
+        with self.assertRaisesRegex(AuditError, "every tracked proving-method backend"):
+            validate_scope(scope, registry, future)
 
     def test_forged_signature_is_refused(self) -> None:
         signature_path = self.submission / "audit-report.signature.json"

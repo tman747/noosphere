@@ -14,7 +14,7 @@ import hashlib
 import struct
 import subprocess
 
-from experimental_gate import ROOT, base_continuity, cargo_test, emit
+from experimental_gate import ROOT, base_continuity, cargo_test, emit, evidence_check, require_disabled_controls
 
 CLAIMS = (
     "M-CLOCK",
@@ -176,21 +176,10 @@ def main() -> int:
     args = parser.parse_args()
 
     local = cargo_test(("noos-reflex",))
-    checks: list[dict[str, object]] = [
-        {
-            "name": "claim-cluster deterministic behavior and falsifier tests",
-            "passed": True,
-            "detail": local,
-        }
-    ]
+    observations: list[object] = [local]
     if args.claim == "M-CLOCK":
         differential = run_clock_differential()
-        checks.append(
-            {
-                "name": "Rust/Go shared-corpus fork-ordering differential",
-                **differential,
-            }
-        )
+        observations.append(differential)
 
     if args.rollback_check:
         continuity = base_continuity()
@@ -210,6 +199,21 @@ def main() -> int:
     else:
         result = "EXTERNAL_BLOCKED"
         limitations = LIMITATIONS[args.claim]
+    if result == "IMPLEMENTED":
+        checks = [
+            evidence_check("claim-implementation", "implementation", True, observations),
+            evidence_check("claim-falsifiers", "falsifier", True, observations),
+        ]
+    elif result == "DISABLED":
+        checks = [
+            require_disabled_controls(["reflex_lane_enabled"]),
+            evidence_check("withdrawn-v1-falsifier", "falsifier", True, observations),
+        ]
+    else:
+        checks = [
+            evidence_check("local-precursor", "falsifier", True, observations),
+            evidence_check("external-pass-threshold", "external_requirement", False, limitations),
+        ]
     emit(
         gate="implementation-" + args.claim.lower().replace(".", "-"),
         claims=[args.claim],

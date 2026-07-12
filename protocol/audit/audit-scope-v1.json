@@ -24,6 +24,17 @@
     "waivers_permitted": false,
     "ingest_has_promotion_authority": false
   },
+  "proving_backends": [
+    {
+      "id": "risc0-jet-proof",
+      "root": "crates/noos-jet/risc0-methods",
+      "host_verifier": "crates/noos-jet/src/risc0.rs",
+      "method_artifact": "crates/noos-jet/risc0-methods/artifacts/jet_proof.bin",
+      "method_id_source": "crates/noos-jet/risc0-methods/src/lib.rs",
+      "proof_vectors": "protocol/vectors/jet/jet-risc0-proof-v1.json",
+      "rebuild_script": "crates/noos-jet/risc0-methods/rebuild-guest.ps1"
+    }
+  ],
   "workstreams": [
     {
       "id": "consensus",
@@ -50,7 +61,7 @@
       "id": "cryptography-cryptanalysis",
       "title": "Exact-revision cryptography and cryptanalysis audit",
       "claim_ids": ["A-TX", "A-RING", "A-DA", "A-UMBRA-BASE", "M-RECURSIVE-VERIFIER", "M-PROOF-CARRYING-REFRESH", "A-KEYLESS-CONSENSUS"],
-      "source_globs": ["crates/noos-crypto/**/*.rs", "crates/noos-witness/**/*.rs", "crates/noos-umbra/**/*.rs", "crates/noos-private-besi/**/*.rs", "crates/noos-jet/**/*.rs", "protocol/spec/crypto-domains-v1.csv", "protocol/vectors/crypto/**", "protocol/schemas/identity-v1.md", "protocol/spec/genesis-identity-v1.md"],
+      "source_globs": ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/noos-crypto/**/*.rs", "crates/noos-witness/**/*.rs", "crates/noos-umbra/**/*.rs", "crates/noos-private-besi/**/*.rs", "crates/noos-jet/**", "protocol/spec/crypto-domains-v1.csv", "protocol/vectors/crypto/**", "protocol/vectors/jet/jet-risc0-proof-v1.json", "protocol/schemas/identity-v1.md", "protocol/spec/genesis-identity-v1.md"],
       "required_questions": ["domain separation and canonical preimages", "signature threshold and proof verification", "key lifecycle DKG and recovery", "cryptanalytic assumptions and parameter adequacy", "test-fixture versus production-key separation"]
     },
     {

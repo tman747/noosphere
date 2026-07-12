@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from experimental_gate import cargo_test, emit, require_disabled_controls
+from experimental_gate import cargo_test, emit, evidence_check, require_disabled_controls
 
 
 def main() -> int:
@@ -14,7 +14,7 @@ def main() -> int:
         test = cargo_test(["noos-agent-class"])
         checks = [
             require_disabled_controls(["class_gate_irreversible_budget"]),
-            {"name": "v1 laundering/foreign-receipt/budget-crossing falsifier", "passed": True, "detail": test},
+            evidence_check("registered-falsifier", "falsifier", True, test),
         ]
         sources = [
             "crates/noos-agent-class/Cargo.toml",
@@ -25,7 +25,7 @@ def main() -> int:
         test = cargo_test(["noos-work-loom", "noos-analytics"])
         checks = [
             require_disabled_controls(["work_loom_credit_enabled", "work_loom_weight_cap", "witness_proofpower_bonus_enabled"]),
-            {"name": "demand-wash zero-credit falsifier", "passed": True, "detail": test},
+            evidence_check("registered-falsifier", "falsifier", True, test),
         ]
         sources = [
             "crates/noos-work-loom/Cargo.toml",

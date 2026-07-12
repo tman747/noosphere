@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shlex
 import subprocess
 import sys
 from pathlib import Path
-from experimental_gate import ROOT, canonical_hash, claim_fingerprint, sha256
+from experimental_gate import (
+    PROMOTABLE_RESULTS,
+    ROOT,
+    canonical_hash,
+    claim_fingerprint,
+    sha256,
+    validate_checks,
+)
 
 EVIDENCE_RE = re.compile(r"^EVIDENCE (?P<path>\S+) sha256=(?P<sha>[0-9a-f]{64}) content_sha256=(?P<content>[0-9a-f]{64})$", re.M)
 RESULTS = {"IMPLEMENTED", "PASSED", "KILLED", "DISABLED", "EXTERNAL_BLOCKED", "LOCAL_MISSING"}
@@ -91,6 +99,107 @@ def audit_row(row: dict) -> list[str]:
         problem = command_problem(reproduction)
         if problem:
             errors.append(f"{cid}: negative result lacks executable falsifier: {problem}")
+    if evidence == "VERIFIED" and expected not in PROMOTABLE_RESULTS:
+        errors.append(f"{cid}: {expected} evidence cannot be VERIFIED")
+    if evidence == "VERIFIED" and local != "IMPLEMENTED":
+        errors.append(f"{cid}: incomplete local claim cannot have VERIFIED evidence")
+    return errors
+
+
+def _git(*args: str, binary: bool = False, repo: Path = ROOT) -> str | bytes:
+    completed = subprocess.run(
+        ["git", *args], cwd=repo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
+    )
+    if completed.returncode:
+        detail = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise ValueError(f"git {' '.join(args)} failed: {detail}")
+    return completed.stdout if binary else completed.stdout.decode("utf-8").strip()
+
+
+def _tree_entry(revision: str, rel: str, repo: Path = ROOT) -> tuple[str, str, str]:
+    raw = str(_git("ls-tree", revision, "--", rel, repo=repo))
+    metadata, listed = raw.split("\t", 1)
+    mode, object_type, blob = metadata.split(" ", 2)
+    if listed != rel or object_type != "blob":
+        raise ValueError(f"{rel} is not an exact Git blob")
+    return mode, object_type, blob
+
+
+def validate_source_binding(binding: object, trusted_revision: str, repo: Path = ROOT) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(binding, dict) or set(binding) != {
+        "source_revision", "source_tree", "manifest_sha256", "entries"
+    }:
+        return ["source binding has missing or unknown fields"]
+    revision = binding["source_revision"]
+    tree = binding["source_tree"]
+    entries = binding["entries"]
+    if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+        return ["source revision is not a full Git commit"]
+    try:
+        if str(_git("rev-parse", f"{revision}^{{commit}}", repo=repo)) != revision:
+            errors.append("source revision does not resolve exactly")
+        if str(_git("rev-parse", f"{revision}^{{tree}}", repo=repo)) != tree:
+            errors.append("source tree mismatch")
+        ancestor = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", revision, trusted_revision], cwd=repo, check=False
+        )
+        if ancestor.returncode != 0:
+            errors.append("source revision is not an ancestor of trusted revision")
+    except ValueError as exc:
+        return [str(exc)]
+    if not isinstance(entries, list) or not entries:
+        return errors + ["source manifest entries must be non-empty"]
+    if binding["manifest_sha256"] != canonical_hash(entries):
+        errors.append("source manifest fingerprint invalid")
+    seen: set[str] = set()
+    required = {
+        "protocol/claims/experimental-evidence-schema-v2.json",
+        "tools/gates/experimental_gate.py",
+        "tools/gates/run_claim_matrix.py",
+    }
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict) or set(entry) != {"path", "git_mode", "git_blob", "bytes", "sha256"}:
+            errors.append(f"source entry {index} has missing or unknown fields")
+            continue
+        rel = entry["path"]
+        if (
+            not isinstance(rel, str)
+            or not rel
+            or "\\" in rel
+            or Path(rel).is_absolute()
+            or ".." in Path(rel).parts
+            or rel in seen
+        ):
+            errors.append(f"source entry {index} has unsafe/duplicate path")
+            continue
+        seen.add(rel)
+        if not isinstance(entry["bytes"], int) or isinstance(entry["bytes"], bool) or entry["bytes"] < 0:
+            errors.append(f"source entry {rel} has invalid byte count")
+            continue
+        try:
+            old_mode, _, old_blob = _tree_entry(revision, rel, repo)
+            trusted_mode, _, trusted_blob = _tree_entry(trusted_revision, rel, repo)
+            data = bytes(_git("show", f"{revision}:{rel}", binary=True, repo=repo))
+            trusted_data = bytes(_git("show", f"{trusted_revision}:{rel}", binary=True, repo=repo))
+        except (ValueError, UnicodeError) as exc:
+            errors.append(str(exc))
+            continue
+        if (entry["git_mode"], entry["git_blob"]) != (old_mode, old_blob):
+            errors.append(f"source Git identity mismatch: {rel}")
+        if entry["bytes"] != len(data) or entry["sha256"] != hashlib.sha256(data).hexdigest():
+            errors.append(f"source size/hash mismatch: {rel}")
+        if (trusted_mode, trusted_blob, trusted_data) != (old_mode, old_blob, data):
+            errors.append(f"stale relevant source at trusted revision: {rel}")
+        working = repo / rel
+        dirty = subprocess.run(
+            ["git", "diff", "--quiet", trusted_revision, "--", rel], cwd=repo, check=False
+        )
+        if not working.is_file() or dirty.returncode != 0:
+            errors.append(f"dirty/replaced relevant source: {rel}")
+    missing = sorted(required - seen)
+    if missing:
+        errors.append("source manifest omits evidence infrastructure: " + ", ".join(missing))
     return errors
 
 
@@ -101,6 +210,7 @@ def validate_evidence(
     registry_version: str,
     require_binding: bool,
     allow_rebind: bool,
+    trusted_revision: str,
 ) -> list[str]:
     cid = row["claim_id"]
     errors: list[str] = []
@@ -108,6 +218,13 @@ def validate_evidence(
         doc = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
         return [f"{cid}: unreadable evidence {path}: {exc}"]
+    expected_fields = {
+        "schema_version", "registry_schema_version", "gate", "claims", "claim_fingerprints",
+        "command", "result", "expected_result", "checks", "limitations", "source_binding",
+        "base_continuity", "evidence_sha256",
+    }
+    if set(doc) != expected_fields or doc.get("schema_version") != "noos.experimental-evidence.v2":
+        errors.append(f"{cid}: evidence record has wrong schema or unknown fields")
     actual_file_sha = sha256(path)
     if actual_file_sha != expected_file_sha:
         errors.append(f"{cid}: command-reported evidence hash mismatch")
@@ -129,19 +246,34 @@ def validate_evidence(
     embedded = content.pop("evidence_sha256", None)
     if embedded != canonical_hash(content):
         errors.append(f"{cid}: evidence content hash invalid")
-    checks = doc.get("checks")
-    if not isinstance(checks, list) or not checks or all(c.get("name") == "registered disposition" for c in checks if isinstance(c, dict)):
-        errors.append(f"{cid}: evidence contains no substantive implementation/falsifier check")
-    if row.get("expected_result") == "KILLED" and not any("falsifier" in str(c.get("name", "")).lower() or "regression" in str(c.get("name", "")).lower() for c in checks if isinstance(c, dict)):
-        errors.append(f"{cid}: KILLED evidence did not execute a falsifier")
-    for rel, digest in doc.get("source_sha256", {}).items():
-        source = ROOT / rel
-        if not source.is_file() or sha256(source) != digest:
-            errors.append(f"{cid}: stale/missing source {rel}")
+    for error in validate_checks(str(doc.get("result")), doc.get("checks")):
+        errors.append(f"{cid}: {error}")
+    for error in validate_source_binding(doc.get("source_binding"), trusted_revision):
+        errors.append(f"{cid}: {error}")
     continuity = doc.get("base_continuity", {})
     if continuity.get("ordinary_base_live") is not True or continuity.get("rollback_verified") is not True:
         errors.append(f"{cid}: ordinary base continuity/rollback not proven")
     return errors
+
+
+def write_bindings_if_valid(
+    registry_path: Path,
+    doc: dict,
+    bindings: dict[str, str],
+    errors: list[str],
+) -> bool:
+    if errors:
+        return False
+    for row in doc["claims"]:
+        if row["claim_id"] in bindings:
+            row["evidence_sha256"] = bindings[row["claim_id"]]
+            row["local_evidence_state"] = "VERIFIED"
+    registry_path.write_text(
+        json.dumps(doc, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    return True
 
 
 def main() -> int:
@@ -149,6 +281,7 @@ def main() -> int:
     registry_path = args.registry if args.registry.is_absolute() else ROOT / args.registry
     doc = json.loads(registry_path.read_text(encoding="utf-8"))
     rows = doc["claims"]
+    trusted_revision = str(_git("rev-parse", "HEAD^{commit}"))
     errors: list[str] = []
     if len(rows) != 136:
         errors.append(f"registry claim count changed: expected 136, got {len(rows)}")
@@ -200,6 +333,7 @@ def main() -> int:
                 doc["schema_version"],
                 args.require_evidence,
                 args.update_evidence_hashes,
+                trusted_revision,
             )
         )
         if len(errors) == before_validation:
@@ -220,12 +354,7 @@ def main() -> int:
             errors.append(f"{cid}: release evidence is {str(row.get('local_evidence_state')).lower()}")
     if local_missing and not args.implemented_only:
         errors.append(f"release blocked by {local_missing} local incomplete claim(s)")
-    if args.update_evidence_hashes:
-        for row in rows:
-            if row["claim_id"] in bindings:
-                row["evidence_sha256"] = bindings[row["claim_id"]]
-                row["local_evidence_state"] = "VERIFIED"
-        registry_path.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+    if args.update_evidence_hashes and write_bindings_if_valid(registry_path, doc, bindings, errors):
         print(f"UPDATED {len(bindings)} freshly executed evidence bindings")
     counts = {state.lower(): sum(1 for r in rows if r.get("local_implementation_state") == state) for state in sorted(LOCAL_STATES)}
     counts["external"] = sum(1 for r in rows if r.get("external_blockers"))

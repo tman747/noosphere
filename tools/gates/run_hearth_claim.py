@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from experimental_gate import ROOT, base_continuity, cargo_test, emit
+from experimental_gate import ROOT, base_continuity, cargo_test, emit, evidence_check
 
 
 CLAIMS = (
@@ -142,18 +142,8 @@ def main() -> int:
         result="EXTERNAL_BLOCKED",
         expected="EXTERNAL_BLOCKED",
         checks=[
-            {
-                "name": "deterministic local precursor and falsifier tests",
-                "passed": True,
-                "contract": CONTRACTS[args.claim],
-                "detail": test,
-            },
-            {
-                "name": "exact registry pass threshold",
-                "passed": False,
-                "status": "EXTERNAL_BLOCKED",
-                "reason": BLOCKERS[args.claim],
-            },
+            evidence_check("local-precursor", "falsifier", True, {"contract": CONTRACTS[args.claim], "test": test}),
+            evidence_check("external-pass-threshold", "external_requirement", False, BLOCKERS[args.claim]),
         ],
         sources=source_paths(args.claim),
         limitations=[

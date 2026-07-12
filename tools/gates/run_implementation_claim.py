@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from experimental_gate import ROOT, base_continuity, cargo_test, emit
+from experimental_gate import ROOT, base_continuity, cargo_test, emit, evidence_check
 
 # Audited bindings from claim to the crate(s) that implement its local
 # contract live in the versioned registry sidecar so the claim matrix,
@@ -42,7 +42,10 @@ def main() -> int:
         claims=[args.claim],
         result="IMPLEMENTED",
         expected="IMPLEMENTED",
-        checks=[{"name": "claim-specific crate tests", "passed": True, "detail": test}],
+        checks=[
+            evidence_check("claim-implementation", "implementation", True, test),
+            evidence_check("claim-falsifiers", "falsifier", True, test),
+        ],
         sources=sources,
         limitations=["This is local implementation evidence, not independent or production evidence."],
     )

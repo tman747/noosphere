@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://noosphere.invalid/schemas/experimental-evidence-v2.json",
+  "title": "NOOSPHERE experimental evidence v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "registry_schema_version", "gate", "claims", "claim_fingerprints", "command", "result", "expected_result", "checks", "limitations", "source_binding", "base_continuity", "evidence_sha256"],
+  "properties": {
+    "schema_version": {"const": "noos.experimental-evidence.v2"},
+    "registry_schema_version": {"type": "string", "minLength": 1},
+    "gate": {"type": "string", "minLength": 1},
+    "claims": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "claim_fingerprints": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+    "command": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "result": {"enum": ["IMPLEMENTED", "PASSED", "KILLED", "DISABLED", "PARTIAL", "EXTERNAL_BLOCKED"]},
+    "expected_result": {"enum": ["IMPLEMENTED", "PASSED", "KILLED", "DISABLED", "PARTIAL", "EXTERNAL_BLOCKED"]},
+    "checks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/check"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "source_binding": {"$ref": "#/$defs/sourceBinding"},
+    "base_continuity": {"type": "object"},
+    "evidence_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "passed", "detail"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,79}$"},
+        "kind": {"enum": ["implementation", "falsifier", "rollback", "disabled_control", "external_requirement"]},
+        "passed": {"type": "boolean"},
+        "detail": {"type": "string", "minLength": 1}
+      }
+    },
+    "sourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_revision", "source_tree", "manifest_sha256", "entries"],
+      "properties": {
+        "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "source_tree": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "git_mode", "git_blob", "bytes", "sha256"],
+            "properties": {
+              "path": {"type": "string", "minLength": 1},
+              "git_mode": {"type": "string", "pattern": "^[0-7]{6}$"},
+              "git_blob": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+              "bytes": {"type": "integer", "minimum": 0},
+              "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

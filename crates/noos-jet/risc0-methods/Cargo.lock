@@ -1185,6 +1185,7 @@ dependencies = [
 name = "noos-jet-risc0-methods"
 version = "0.1.0"
 dependencies = [
+ "risc0-binfmt",
  "risc0-build",
 ]
 

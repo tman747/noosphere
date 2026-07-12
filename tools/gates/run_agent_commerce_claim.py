@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from experimental_gate import ROOT, base_continuity, cargo_test, emit
+from experimental_gate import ROOT, base_continuity, cargo_test, emit, evidence_check
 
 CLAIM_BINDINGS = {
     "S-AGENT": (
@@ -135,19 +135,20 @@ def main() -> int:
 
     packages, modules = CLAIM_BINDINGS[args.claim]
     test = cargo_test(packages)
-    checks: list[dict[str, object]] = [
-        {
-            "name": "claim-specific deterministic falsifier tests",
-            "passed": True,
-            "detail": test,
-        }
-    ]
+    observations: list[object] = [test]
     if args.claim == "I-AGENT":
-        checks.extend(run_fixture(*fixture) for fixture in FIXTURES)
+        observations.extend(run_fixture(*fixture) for fixture in FIXTURES)
     sources = ["tools/gates/run_agent_commerce_claim.py"]
     sources.extend(f"crates/{package}/Cargo.toml" for package in packages)
     sources.extend(modules)
     result = "IMPLEMENTED" if args.claim in LOCAL_IMPLEMENTED else "EXTERNAL_BLOCKED"
+    checks = [
+        evidence_check("claim-implementation", "implementation", True, observations),
+        evidence_check("claim-falsifiers", "falsifier", True, observations),
+    ] if result == "IMPLEMENTED" else [
+        evidence_check("local-precursor", "falsifier", True, observations),
+        evidence_check("external-pass-threshold", "external_requirement", False, LIMITATIONS[args.claim]),
+    ]
     emit(
         gate="implementation-" + args.claim.lower().replace(".", "-"),
         claims=[args.claim],

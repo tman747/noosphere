@@ -13,7 +13,7 @@ import re
 import subprocess
 import sys
 
-from experimental_gate import ROOT, base_continuity, emit
+from experimental_gate import ROOT, base_continuity, emit, evidence_check
 
 
 CLAIMS = {
@@ -182,7 +182,13 @@ def main() -> int:
         claims=[args.claim],
         result=result,
         expected=result,
-        checks=[{"name": "claim-specific behavior and falsifier tests", "passed": True, "detail": test}],
+        checks=[
+            evidence_check("claim-implementation", "implementation", True, test),
+            evidence_check("claim-falsifiers", "falsifier", True, test),
+        ] if implemented else [
+            evidence_check("local-precursor", "implementation", True, test),
+            evidence_check("external-pass-threshold", "external_requirement", False, binding["limitations"]),
+        ],
         sources=sources,
         limitations=list(binding["limitations"]),
     )

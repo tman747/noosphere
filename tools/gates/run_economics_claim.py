@@ -9,7 +9,7 @@ import os
 import subprocess
 import sys
 
-from experimental_gate import ROOT, base_continuity, cargo_test, emit
+from experimental_gate import ROOT, base_continuity, cargo_test, emit, evidence_check
 
 CLAIMS = {
     "A-LOOM-MARKET",
@@ -142,16 +142,8 @@ def main() -> int:
         result="IMPLEMENTED",
         expected="IMPLEMENTED",
         checks=[
-            {
-                "name": "seeded terminal-state model, conservation, and mutation falsifiers",
-                "passed": True,
-                "detail": local,
-            },
-            {
-                "name": "rollback timeout releases requester, worker, and challenger escrow",
-                "passed": True,
-                "detail": "unresolved dispute timeout and all 4096 seeded traces end terminal with locked=0",
-            },
+            evidence_check("claim-implementation", "implementation", True, local),
+            evidence_check("claim-falsifiers", "falsifier", True, local),
         ],
         sources=[
             "crates/noos-work-loom/Cargo.toml",

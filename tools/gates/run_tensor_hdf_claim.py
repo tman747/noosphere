@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 
-from experimental_gate import ROOT, base_continuity, cargo_test, emit
+from experimental_gate import ROOT, base_continuity, cargo_test, emit, evidence_check
 
 RUNNER = "tools/gates/run_tensor_hdf_claim.py"
 
@@ -114,11 +114,10 @@ def main() -> int:
         result=result,
         expected=result,
         checks=[
-            {
-                "name": "claim-specific deterministic behavior and falsifier tests",
-                "passed": True,
-                "detail": test,
-            }
+            evidence_check("claim-falsifiers", "falsifier", True, test),
+        ] if result == "KILLED" else [
+            evidence_check("local-precursor", "implementation", True, test),
+            evidence_check("external-pass-threshold", "external_requirement", False, limitations),
         ],
         sources=sources,
         limitations=["This is local precursor evidence, not independent or production evidence."]

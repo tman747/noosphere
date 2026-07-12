@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 
-from experimental_gate import ROOT, base_continuity, emit
+from experimental_gate import ROOT, base_continuity, emit, evidence_check
 
 
 CLAIMS = {
@@ -160,16 +160,8 @@ def main() -> int:
         result="EXTERNAL_BLOCKED",
         expected="EXTERNAL_BLOCKED",
         checks=[
-            {
-                "name": "exact local precursor tests",
-                "passed": True,
-                "detail": runs,
-            },
-            {
-                "name": "frozen pass threshold honesty check",
-                "passed": True,
-                "detail": "Local precursors passed; external threshold components are explicitly unsatisfied.",
-            },
+            evidence_check("local-precursor", "falsifier", True, runs),
+            evidence_check("external-pass-threshold", "external_requirement", False, config["limitations"]),
         ],
         sources=SOURCES,
         limitations=list(config["limitations"]),

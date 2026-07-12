@@ -9,8 +9,15 @@ publish = false
 resolver = "2"
 members = ["guest", "shared"]
 
+[dependencies]
+risc0-binfmt = "=3.0.4"
+
 [target.'cfg(unix)'.build-dependencies]
 risc0-build = { version = "=3.0.5", features = ["docker"] }
 
 [package.metadata.risc0]
 methods = ["guest"]
+
+[[bin]]
+name = "risc0-method-id"
+path = "src/bin/risc0-method-id.rs"

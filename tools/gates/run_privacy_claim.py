@@ -8,7 +8,7 @@ EXTERNAL_BLOCKED with claim-specific limitations.
 from __future__ import annotations
 
 import argparse
-from experimental_gate import ROOT, base_continuity, cargo_test, emit
+from experimental_gate import ROOT, base_continuity, cargo_test, emit, evidence_check
 
 # Audited bindings from claim to the crate(s) implementing its local contract, plus the
 # module files that carry it and whether the local state is complete.
@@ -97,7 +97,13 @@ def main() -> int:
         claims=[args.claim],
         result=result,
         expected=result,
-        checks=[{"name": "claim-specific crate tests with falsifiers", "passed": True, "detail": test}],
+        checks=[
+            evidence_check("claim-implementation", "implementation", True, test),
+            evidence_check("claim-falsifiers", "falsifier", True, test),
+        ] if implemented else [
+            evidence_check("local-precursor", "implementation", True, test),
+            evidence_check("external-pass-threshold", "external_requirement", False, PARTIAL_LIMITATIONS[args.claim]),
+        ],
         sources=sources,
         limitations=limitations,
     )

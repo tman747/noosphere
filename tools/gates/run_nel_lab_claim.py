@@ -13,7 +13,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from experimental_gate import ROOT, base_continuity, cargo_test, emit
+from experimental_gate import ROOT, base_continuity, cargo_test, emit, evidence_check
 
 CLAIMS = (
     "N-PROFILE",
@@ -206,33 +206,11 @@ def main() -> int:
     metrics = local["metrics"]
     assert isinstance(metrics, dict)
     validate_local(args.claim, metrics)
-    checks: list[dict[str, object]] = [
-        {
-            "name": "noos-nel tests including deterministic falsifiers",
-            "passed": True,
-            "detail": cargo_test(("noos-nel",)),
-        },
-        {
-            "name": "claim-specific machine-readable local harness",
-            "passed": True,
-            "detail": local,
-        },
-        {
-            "name": "external prerequisite schema",
-            "passed": True,
-            "detail": requirement,
-        },
-    ]
+    observations: list[object] = [cargo_test(("noos-nel",)), local, requirement]
     if args.claim == "E-NEL-01a":
         handshake = validate_handshake()
         require(handshake.get("available") is True, "required handshake artifacts unavailable")
-        checks.append(
-            {
-                "name": "existing measured handshake artifacts validated without asserting independence",
-                "passed": handshake.get("available") is True,
-                "detail": handshake,
-            }
-        )
+        observations.append(handshake)
     limitations = [
         "Local deterministic evidence only; it is not independent, cross-vendor, public-duration, or production evidence.",
         *requirement.get("required_external", []),
@@ -241,6 +219,10 @@ def main() -> int:
         limitations.append(
             "The three existing C:/tmp measured artifacts match the frozen row, but this runner does not certify independent authorship."
         )
+    checks = [
+        evidence_check("local-precursor", "falsifier", True, observations),
+        evidence_check("external-pass-threshold", "external_requirement", False, requirement.get("required_external", ["independent evidence remains unavailable"])),
+    ]
     emit(
         gate="implementation-" + args.claim.lower().replace(".", "-"),
         claims=[args.claim],

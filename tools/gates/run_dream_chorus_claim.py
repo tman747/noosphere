@@ -13,6 +13,7 @@ from experimental_gate import (
     base_continuity,
     cargo_test,
     emit,
+    evidence_check,
     require_disabled_controls,
 )
 
@@ -135,17 +136,8 @@ def main() -> int:
             result="EXTERNAL_BLOCKED",
             expected="EXTERNAL_BLOCKED",
             checks=[
-                {
-                    "name": "signed deterministic advisory mesh precursor",
-                    "passed": True,
-                    "detail": local,
-                },
-                {
-                    "name": "physical low-end device and 10x Sybil threshold",
-                    "passed": False,
-                    "status": "EXTERNAL_BLOCKED",
-                    "reason": "requires consenting physical devices, emulator farms, latency, bytes, battery, attrition, and real diversity observations",
-                },
+                evidence_check("local-precursor", "falsifier", True, local),
+                evidence_check("physical-device-threshold", "external_requirement", False, "requires consenting physical devices, emulator farms, latency, bytes, battery, attrition, and real diversity observations"),
             ],
             sources=[
                 "crates/noos-chorus/Cargo.toml",
@@ -176,14 +168,9 @@ def main() -> int:
             result="EXTERNAL_BLOCKED",
             expected="EXTERNAL_BLOCKED",
             checks=[
-                {"name": "consent, revocation, authority firewall, and receipts", "passed": True, "detail": local},
+                evidence_check("local-precursor", "falsifier", True, local),
                 disabled,
-                {
-                    "name": "forecast gain and protected-group harm threshold",
-                    "passed": False,
-                    "status": "EXTERNAL_BLOCKED",
-                    "reason": "requires preregistered held-out events, non-persona baseline, proper scoring, and protected-group evaluation",
-                },
+                evidence_check("forecast-harm-threshold", "external_requirement", False, "requires preregistered held-out events, non-persona baseline, proper scoring, and protected-group evaluation"),
             ],
             sources=dream_sources,
             limitations=[
@@ -200,14 +187,8 @@ def main() -> int:
             result="DISABLED",
             expected="DISABLED",
             checks=[
-                {"name": "payout-free causally insulated notebook lifecycle", "passed": True, "detail": local},
+                evidence_check("notebook-lifecycle-falsifier", "falsifier", True, local),
                 disabled,
-                {
-                    "name": "90-day external paid-demand and causal-insulation production threshold",
-                    "passed": False,
-                    "status": "EXTERNAL_BLOCKED",
-                    "reason": "the general market was killed; no public-duration or external paid-demand result can be inferred from local tests",
-                },
             ],
             sources=dream_sources,
             limitations=[
@@ -225,9 +206,8 @@ def main() -> int:
         result="KILLED",
         expected="KILLED",
         checks=[
-            {"name": "integer preregistration evaluator and disabled lifecycle", "passed": True, "detail": local},
+            evidence_check("registered-falsifier", "falsifier", True, {"local": local, "sweep": sweep}),
             disabled,
-            sweep,
         ],
         sources=dream_sources,
         limitations=[
