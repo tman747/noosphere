@@ -87,6 +87,11 @@
   "artifact_hashes": {
     "example/replace-me": "PENDING_HASH"
   },
+  "reproducibility": {
+    "target": "windows-x86_64",
+    "trusted_repro_builders_sha256": "OWNER_BLOCKED",
+    "assurance_report_sha256": "OWNER_BLOCKED"
+  },
   "gate_verdicts": [
     {
       "gate": "G0",

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -65,6 +66,66 @@ class ReleaseAuthorizationTests(unittest.TestCase):
         errors, blocked = [], []
         verify_release.verify_signatures(self.manifest, errors, blocked, None, test_mode=True)
         self.assertIn("signed release manifest requires externally supplied pinned role keyring", errors)
+
+    def test_repro_assurance_requires_exact_shipped_builder_bytes_and_paths(self):
+        original_root = verify_release.ROOT
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                verify_release.ROOT = root
+                artifacts = root / "artifacts"
+                artifacts.mkdir()
+                artifact = artifacts / "a"
+                artifact.write_bytes(b"A")
+                digest = verify_release.sha(artifact)
+                artifact_map = {"artifacts/a": digest}
+                report = {
+                    "schema": "noos/repro-assurance-report/v2",
+                    "verdict": "QUALIFYING_EXTERNAL_ATTESTATIONS_VERIFIED",
+                    "source": {"revision": self.manifest["source"]["repo_revision"], "tree": "4" * 40},
+                    "trusted_repro_builders_sha256": "5" * 64,
+                    "artifact_hashes_by_target": {"linux-x86_64": artifact_map},
+                    "builder_artifact_hashes": [
+                        {"key_id": "builder-a", "target": "linux-x86_64", "artifact_hashes": artifact_map},
+                        {"key_id": "builder-b", "target": "linux-x86_64", "artifact_hashes": artifact_map},
+                    ],
+                }
+                report_path = root / "assurance.json"
+                report_path.write_text(verify_release.json.dumps(report), encoding="utf-8")
+                manifest = copy.deepcopy(self.manifest)
+                manifest["artifact_hashes"] = artifact_map
+                manifest["reproducibility"] = {
+                    "target": "linux-x86_64",
+                    "trusted_repro_builders_sha256": "5" * 64,
+                    "assurance_report_sha256": verify_release.sha(report_path),
+                }
+                errors: list[str] = []
+                verify_release.verify_repro_assurance(manifest, report_path, errors)
+                self.assertEqual(errors, [])
+
+                cases = {}
+                ships_b = copy.deepcopy(manifest)
+                ships_b["artifact_hashes"]["artifacts/a"] = "6" * 64
+                cases["substituted-bytes"] = ships_b
+                missing = copy.deepcopy(manifest)
+                missing["artifact_hashes"] = {}
+                cases["missing"] = missing
+                renamed = copy.deepcopy(manifest)
+                renamed["artifact_hashes"] = {"artifacts/renamed": digest}
+                cases["renamed"] = renamed
+                for name, mutated in cases.items():
+                    with self.subTest(name=name):
+                        errors = []
+                        verify_release.verify_repro_assurance(mutated, report_path, errors)
+                        self.assertTrue(errors)
+                extra = artifacts / "extra"
+                extra.write_bytes(b"extra")
+                errors = []
+                verify_release.verify_repro_assurance(manifest, report_path, errors)
+                self.assertTrue(any("extra" in error for error in errors))
+        finally:
+            verify_release.ROOT = original_root
+
 
 
 if __name__ == "__main__":

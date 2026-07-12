@@ -105,6 +105,19 @@ jobs:
           GOPROXY=off GOSUMDB=off go mod verify
           GOPROXY=off GOSUMDB=off go list -mod=readonly -m all >/dev/null
 
+      - name: Provision isolated offline dependency homes
+        shell: bash
+        run: |
+          set -euo pipefail
+          controlled="release/candidates/${{ matrix.target }}/.controlled-build"
+          mkdir -p "$controlled/cargo-home" "$controlled/go-home/pkg"
+          cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+          for cache in registry git; do
+            if [[ -d "$cargo_home/$cache" ]]; then cp -a "$cargo_home/$cache" "$controlled/cargo-home/$cache"; fi
+          done
+          go_mod_cache="$(go env GOMODCACHE)"
+          if [[ -d "$go_mod_cache" ]]; then cp -a "$go_mod_cache" "$controlled/go-home/pkg/mod"; fi
+
       - name: Build offline deterministic candidate bundle
         shell: bash
         run: |
@@ -117,6 +130,15 @@ jobs:
             --revision "$GITHUB_SHA" \
             --builder-profile github-hosted-owner-smoke \
             --smoke
+        env:
+          CARGO_HOME:
+          RUSTFLAGS:
+          CARGO_ENCODED_RUSTFLAGS:
+          GOFLAGS:
+          GOENV:
+          GOWORK:
+          GOMODCACHE:
+          GOCACHE:
 
       - name: Publish public candidate artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

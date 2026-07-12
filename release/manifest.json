@@ -22,6 +22,11 @@
     "path": "release/provenance.intoto.jsonl",
     "sha256": "7714e9067b5a272ae314d289ba7fff120e21bd7e2ba9de31777c5258288686b5"
   },
+  "reproducibility": {
+    "target": "windows-x86_64",
+    "trusted_repro_builders_sha256": "OWNER_BLOCKED",
+    "assurance_report_sha256": "OWNER_BLOCKED"
+  },
   "release": {
     "api_version": "v1",
     "channel": "devnet",

@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import json
 import sys
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,6 +18,10 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+GENESIS_TOOLS = Path(__file__).resolve().parents[1] / "genesis"
+if str(GENESIS_TOOLS) not in sys.path:
+    sys.path.insert(0, str(GENESIS_TOOLS))
+import production_authorization as pa
 import repro_build
 
 
@@ -52,6 +57,7 @@ class AttestationFixture:
             "schema": "noos/trusted-repro-builders/v1", "exact_revision": REVISION,
             "builders": [builder[1] for builder in self.builders]
         }))
+        self.roster_digest = repro_build.sha256_file(self.trust_path)
         self.payloads: dict[tuple[int, str], dict] = {}
         locks = repro_build.load_toolchains()
         tools = repro_build.locked_toolchain_identities(locks)
@@ -68,6 +74,7 @@ class AttestationFixture:
                         "toolchain_lock_sha256": repro_build.sha256_file(repro_build.TOOLCHAINS),
                         "toolchains": tools,
                         "source_date_epoch": SOURCE["source_date_epoch"],
+                        "trusted_repro_builders_sha256": self.roster_digest,
                     },
                     "artifact_hashes": {
                         name: repro_build.sha256_bytes(f"{target}:{name}".encode("ascii"))
@@ -95,9 +102,9 @@ class AttestationFixture:
             (self.attestations / f"{stem}.signature.json").write_bytes(repro_build.canonical_json(signature))
 
     def verify(self, *, allow_test_keys: bool = True) -> dict:
-        return repro_build.verify_attestation_set(
+        return repro_build._verify_attestation_set_pinned(
             self.attestations, self.trust_path, REVISION,
-            trusted_builders_sha256=repro_build.sha256_file(self.trust_path),
+            trusted_builders_sha256=self.roster_digest,
             allow_test_keys=allow_test_keys,
         )
 
@@ -105,7 +112,7 @@ class AttestationFixture:
 class ReproBuildMutationTests(unittest.TestCase):
     def test_external_input_template_is_blocked_not_malformed(self):
         with tempfile.TemporaryDirectory() as directory:
-            report = repro_build.verify_attestation_set(
+            report = repro_build._verify_attestation_set_pinned(
                 Path(directory),
                 repro_build.ROOT / "protocol/release/trusted-repro-builders-template.json",
                 REVISION,
@@ -166,6 +173,9 @@ class ReproBuildMutationTests(unittest.TestCase):
                 "schema": "noos/trusted-repro-builders/v1", "exact_revision": REVISION,
                 "builders": [builder[1] for builder in fixture.builders]
             }))
+            fixture.roster_digest = repro_build.sha256_file(fixture.trust_path)
+            for payload in fixture.payloads.values():
+                payload["build"]["trusted_repro_builders_sha256"] = fixture.roster_digest
             fixture.write_all()
             report = fixture.verify()
             self.assertEqual(report["verdict"], "EXTERNAL_BLOCKED")
@@ -175,10 +185,111 @@ class ReproBuildMutationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             fixture = AttestationFixture(Path(directory))
             with self.assertRaisesRegex(repro_build.AssuranceError, "externally supplied trust root"):
-                repro_build.verify_attestation_set(
+                repro_build._verify_attestation_set_pinned(
                     fixture.attestations, fixture.trust_path, REVISION,
                     trusted_builders_sha256="0" * 64, allow_test_keys=True,
                 )
+
+
+    def test_attacker_roster_and_matching_self_digest_cannot_replace_signed_roster(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = AttestationFixture(root)
+            honest = fixture.trust_path
+            attacker = root / "attacker.json"
+            attacker_doc = json.loads(honest.read_text("utf-8"))
+            attacker_doc["builders"][0]["operator"] = "attacker-selected"
+            attacker.write_bytes(repro_build.canonical_json(attacker_doc))
+            keys = {}
+            entries = []
+            for index, role in enumerate(pa.FINAL_ROLES, 1):
+                private = Ed25519PrivateKey.from_private_bytes(bytes([index + 20]) * 32)
+                public = private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+                key_id = f"fixture-{index}"
+                keys[role] = (private, key_id)
+                entries.append({"role": role, "key_id": key_id, "public_key_ed25519_hex": public.hex()})
+            keyring = {
+                "schema_version": 1, "kind": "noosphere-role-keyring-v1",
+                "exact_revision": REVISION, "is_test_fixture": True, "keys": entries,
+                "role_label_notice": "A cryptographic role label does not establish human identity or independence.",
+            }
+            keyring_path = root / "keyring.json"
+            keyring_path.write_bytes(pa.canonical_json(keyring) + b"\n")
+            freeze = {
+                "exact_revision": REVISION,
+                "role_keyring_sha256": pa.file_sha256(keyring_path),
+                "trusted_repro_builders_sha256": repro_build.sha256_file(honest),
+            }
+            payload = pa.canonical_json(freeze)
+            message = pa.signature_message(pa.DOMAIN_FINAL_FREEZE, payload)
+            signatures = {
+                "schema_version": 1, "kind": "noosphere-detached-role-signatures-v1",
+                "algorithm": "ed25519", "domain": pa.DOMAIN_FINAL_FREEZE,
+                "payload_sha256": pa.sha256(payload), "exact_revision": REVISION,
+                "required_roles": list(pa.FINAL_ROLES),
+                "role_label_notice": "Signatures authorize bytes for named roles; they do not prove that a signer is an independent human.",
+                "signatures": [
+                    {"role": role, "key_id": keys[role][1], "signature_ed25519_hex": keys[role][0].sign(message).hex()}
+                    for role in pa.FINAL_ROLES
+                ],
+            }
+            freeze_path = root / "freeze.json"
+            signatures_path = root / "freeze.signatures.json"
+            freeze_path.write_bytes(payload + b"\n")
+            signatures_path.write_bytes(pa.canonical_json(signatures) + b"\n")
+            report = repro_build.verify_attestation_set(
+                fixture.attestations, honest, keyring_path, freeze_path, signatures_path,
+                allow_test_keys=True,
+            )
+            self.assertEqual(report["verdict"], "SMOKE_ONLY_TEST_KEYS")
+            with self.assertRaisesRegex(repro_build.AssuranceError, "signed final freeze"):
+                repro_build.authenticated_repro_binding(
+                    attacker, keyring_path, freeze_path, signatures_path, allow_test_keys=True,
+                )
+
+
+class SourceIsolationTests(unittest.TestCase):
+    def make_repo(self, root: Path) -> str:
+        subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=root, check=True)
+        subprocess.run(["git", "config", "user.name", "Repro Test"], cwd=root, check=True)
+        (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
+        (root / ".gitignore").write_text(".cargo/\n", encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=root, check=True)
+        subprocess.run(["git", "commit", "-qm", "fixture"], cwd=root, check=True)
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=root, check=True, text=True, capture_output=True,
+        ).stdout.strip()
+
+    def test_wrong_head_and_every_source_configuration_channel_fail_closed(self):
+        mutations = {
+            "wrong-head": lambda root: "0" * 40,
+            "tracked": lambda root: ((root / "Cargo.toml").write_text("[workspace]\nmembers=[]\n"), None)[1],
+            "staged": lambda root: (
+                (root / "Cargo.toml").write_text("[workspace]\nmembers=[]\n"),
+                subprocess.run(["git", "add", "Cargo.toml"], cwd=root, check=True),
+                None,
+            )[-1],
+            "untracked-rust": lambda root: ((root / "evil.rs").write_text("fn main(){}\n"), None)[1],
+            "untracked-go": lambda root: ((root / "evil.go").write_text("package evil\n"), None)[1],
+            "ignored-config": lambda root: (
+                (root / ".cargo").mkdir(),
+                (root / ".cargo/config.toml").write_text("[build]\nrustflags=['--cfg','evil']\n"),
+                None,
+            )[-1],
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                revision = self.make_repo(root)
+                replacement = mutate(root)
+                with self.assertRaises(repro_build.AssuranceError):
+                    repro_build.validate_build_source(root, replacement or revision, {})
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            revision = self.make_repo(root)
+            with self.assertRaisesRegex(repro_build.AssuranceError, "ambient build-affecting"):
+                repro_build.validate_build_source(root, revision, {"RUSTFLAGS": "--cfg attacker"})
 
 
 if __name__ == "__main__":

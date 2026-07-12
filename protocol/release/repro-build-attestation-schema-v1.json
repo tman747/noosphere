@@ -21,12 +21,13 @@
     "build": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source_revision", "source_tree", "target", "host_architecture", "toolchain_lock_sha256", "toolchains", "source_date_epoch"],
+      "required": ["source_revision", "source_tree", "target", "host_architecture", "trusted_repro_builders_sha256", "toolchain_lock_sha256", "toolchains", "source_date_epoch"],
       "properties": {
         "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
         "source_tree": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
         "target": {"enum": ["windows-x86_64", "linux-x86_64", "linux-aarch64"]},
         "host_architecture": {"enum": ["x86_64", "aarch64"]},
+        "trusted_repro_builders_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
         "toolchain_lock_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
         "toolchains": {
           "type": "object",

@@ -180,9 +180,15 @@ class ReleaseCiTests(unittest.TestCase):
         self.assertIn("GOPROXY=off GOSUMDB=off go list -mod=readonly -m all", candidate)
         self.assertIn("--builder-profile github-hosted-owner-smoke", candidate)
         self.assertIn("promotion effect NONE", candidate)
-        repro_source = (repro_build.ROOT / "tools/gates/repro_build.py").read_text("utf-8")
-        self.assertGreaterEqual(repro_source.count("cwd=GO_MODULE"), 3)
-        self.assertIn('"module_root": "go"', repro_source)
+        self.assertIn("Provision isolated offline dependency homes", candidate)
+        with tempfile.TemporaryDirectory() as directory:
+            target_dir = Path(directory)
+            env = repro_build.deterministic_environment(
+                repro_build.ROOT, target_dir, "linux-x86_64", 1,
+            )
+            self.assertEqual(Path(env["CARGO_HOME"]), target_dir / "cargo-home")
+            self.assertEqual(Path(env["GOMODCACHE"]), target_dir / "go-home/pkg/mod")
+            self.assertEqual(env["GOENV"], "off")
         for target, locked in repro_build.load_toolchains()["targets"].items():
             self.assertIn(f"target: {target}", candidate)
             self.assertIn(f"runner: {locked['runner']}", candidate)

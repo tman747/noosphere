@@ -18,7 +18,7 @@ HASH=re.compile(r"^[0-9a-f]{64}$")
 PLACEHOLDER=re.compile(r"^(PENDING|OWNER_BLOCKED)(_[A-Z0-9_]+)?$")
 PLATFORMS={"windows-x86_64","linux-x86_64","linux-aarch64"}
 RAW_CLASSES={"unsigned_binary","library","data","schema","api_schema_or_vector","telemetry_schema_or_vector","conformance_vector","genesis","archive"}
-MANIFEST_TOP={"schema_version","manifest_kind","_comment","release","source","identity","clients","verifiers","toolchain_locks","schema_roots","artifact_hashes","gate_verdicts","unresolved_findings","signatures","evidence_appendix"}
+MANIFEST_TOP={"schema_version","manifest_kind","_comment","release","source","identity","clients","verifiers","toolchain_locks","schema_roots","artifact_hashes","reproducibility","gate_verdicts","unresolved_findings","signatures","evidence_appendix"}
 SCHEMA_ROOTS={"claim_registry_root","crypto_domains_root","constants_root","openapi_v1_root","api_vectors_root","telemetry_v1_root","telemetry_fixtures_root","conformance_vector_root","genesis_vector_root"}
 
 def parse_toml_subset(text):
@@ -114,6 +114,8 @@ def validate_manifest(m,instance=False):
   if not hashish(v,allow):e.append(f"schema_roots.{k}: invalid hash")
  for k,v in m.get("artifact_hashes",{}).items():
   if not k or not hashish(v,allow):e.append(f"artifact hash invalid: {k}")
+ repro=m.get("reproducibility",{})
+ if repro.get("target") not in PLATFORMS or not hashish(repro.get("trusted_repro_builders_sha256"),allow) or not hashish(repro.get("assurance_report_sha256"),allow):e.append("reproducibility binding invalid")
  if not isinstance(m.get("clients"),list) or len(m.get("clients",[]))<2:e.append("two client families required")
  if not isinstance(m.get("verifiers"),list) or not m.get("verifiers"):e.append("verifier revisions required")
  if not isinstance(m.get("gate_verdicts"),list) or not m.get("gate_verdicts"):e.append("gate verdicts required")

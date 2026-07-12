@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import contextlib
 import hashlib
 import json
 import os
@@ -18,8 +19,9 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Iterator, Mapping
 
 try:
     import tomllib
@@ -117,6 +119,82 @@ def source_identity(revision: str | None = None) -> dict[str, Any]:
     except (subprocess.CalledProcessError, ValueError) as exc:
         raise AssuranceError(f"cannot resolve source revision {revision}") from exc
     return {"revision": revision, "tree": tree, "source_date_epoch": epoch}
+
+BUILD_INPUT_NAMES = {
+    "Cargo.toml", "Cargo.lock", "build.rs", "rust-toolchain", "rust-toolchain.toml",
+    "go.mod", "go.sum", "go.work", "go.work.sum", "Makefile", "CMakeLists.txt",
+}
+BUILD_INPUT_SUFFIXES = {".rs", ".go", ".c", ".cc", ".cpp", ".h", ".hpp", ".s", ".S", ".asm", ".toml"}
+AMBIENT_BUILD_VARIABLES = {
+    "RUSTFLAGS", "CARGO_BUILD_RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_TARGET_DIR",
+    "CARGO_CONFIG", "CARGO_HOME", "GOENV", "GOFLAGS", "GOWORK", "GOMODCACHE", "GOCACHE",
+    "CC", "CXX", "AR", "LD", "PKG_CONFIG", "PKG_CONFIG_PATH",
+}
+
+
+def _is_build_input(relative: str) -> bool:
+    path = Path(relative)
+    lowered = relative.replace("\\", "/").lower()
+    return (
+        path.name in BUILD_INPUT_NAMES
+        or path.suffix in BUILD_INPUT_SUFFIXES
+        or lowered.startswith(("tools/", "scripts/", ".github/workflows/"))
+    )
+
+
+def validate_build_source(root: Path, revision: str, environ: Mapping[str, str] | None = None) -> None:
+    """Reject caller-selected source/configuration before invoking a compiler."""
+    env = os.environ if environ is None else environ
+    ambient = sorted(name for name in AMBIENT_BUILD_VARIABLES if env.get(name))
+    if ambient:
+        raise AssuranceError("ambient build-affecting environment is forbidden: " + ", ".join(ambient))
+    head = command(["git", "rev-parse", "HEAD"], cwd=root)
+    if head != revision:
+        raise AssuranceError(f"checkout HEAD {head} does not equal requested revision {revision}")
+    porcelain = command(
+        ["git", "status", "--porcelain=v1", "--untracked-files=all", "--ignored=matching"],
+        cwd=root,
+    )
+    violations: list[str] = []
+    for line in porcelain.splitlines():
+        if len(line) < 4:
+            continue
+        state, relative = line[:2], line[3:].split(" -> ")[-1]
+        normalized = relative.replace("\\", "/")
+        if state == "!!":
+            if normalized.lower() in {".cargo/config", ".cargo/config.toml"}:
+                violations.append(f"ignored Cargo configuration {normalized}")
+        elif state == "??":
+            if _is_build_input(normalized):
+                violations.append(f"untracked build input {normalized}")
+        else:
+            violations.append(f"tracked/staged source change {normalized}")
+    for config in (root / ".cargo/config", root / ".cargo/config.toml"):
+        if config.exists() and f"ignored Cargo configuration {config.relative_to(root).as_posix()}" not in violations:
+            violations.append(f"repository Cargo configuration {config.relative_to(root).as_posix()}")
+    if violations:
+        raise AssuranceError("source checkout is not hermetic: " + "; ".join(sorted(violations)))
+
+
+@contextlib.contextmanager
+def materialized_revision(revision: str) -> Iterator[Path]:
+    """Yield a detached, clean checkout containing exactly ``revision``."""
+    validate_build_source(ROOT, revision)
+    with tempfile.TemporaryDirectory(prefix="noos-repro-source-") as directory:
+        checkout = Path(directory) / "source"
+        try:
+            command(["git", "worktree", "add", "--detach", str(checkout), revision], cwd=ROOT)
+            if command(["git", "rev-parse", "HEAD"], cwd=checkout) != revision:
+                raise AssuranceError("isolated source checkout resolved the wrong HEAD")
+            if command(["git", "status", "--porcelain=v1", "--untracked-files=all"], cwd=checkout):
+                raise AssuranceError("isolated source checkout is dirty")
+            yield checkout
+        finally:
+            if checkout.exists():
+                subprocess.run(
+                    ["git", "worktree", "remove", "--force", str(checkout)],
+                    cwd=ROOT, text=True, capture_output=True, check=False,
+                )
 
 
 def load_toolchains() -> dict[str, Any]:
@@ -345,14 +423,21 @@ def deterministic_environment(
     root: Path, target_dir: Path, target: str, epoch: int,
     *, windows_toolchain: dict[str, Any] | None = None,
 ) -> dict[str, str]:
-    """Create a small deterministic environment; timestamp normalization is pre-build only."""
-    keep = ("PATH", "SystemRoot", "COMSPEC", "PATHEXT", "TEMP", "TMP", "HOME", "USERPROFILE", "CARGO_HOME", "RUSTUP_HOME")
+    """Create a closed build environment with repository-independent homes."""
+    keep = ("PATH", "SystemRoot", "COMSPEC", "PATHEXT", "TEMP", "TMP", "RUSTUP_HOME")
     env = {key: os.environ[key] for key in keep if key in os.environ}
     cfg = TARGETS[target]
+    cargo_home = target_dir / "cargo-home"
+    go_home = target_dir / "go-home"
+    cargo_home.mkdir(parents=True, exist_ok=True)
+    go_home.mkdir(parents=True, exist_ok=True)
+    # The build is offline. Dependency caches must be provisioned into these
+    # explicit homes by the release runner; no user/global configuration is read.
     env.update({
-        "CARGO_HOME": env.get("CARGO_HOME", str(Path.home() / ".cargo")),
-        "RUSTUP_HOME": env.get("RUSTUP_HOME", str(Path.home() / ".rustup")),
-        "CARGO_TARGET_DIR": str(target_dir),
+        "HOME": str(target_dir / "home"),
+        "USERPROFILE": str(target_dir / "home"),
+        "CARGO_HOME": str(cargo_home),
+        "CARGO_TARGET_DIR": str(target_dir / "cargo-target"),
         "CARGO_INCREMENTAL": "0",
         "CARGO_NET_OFFLINE": "true",
         "SOURCE_DATE_EPOCH": str(epoch),
@@ -363,11 +448,13 @@ def deterministic_environment(
         "GOPROXY": "off",
         "GOSUMDB": "off",
         "GOENV": "off",
+        "GO111MODULE": "on",
         "GOOS": cfg["goos"],
         "GOARCH": cfg["goarch"],
         "CGO_ENABLED": "0",
         "GOFLAGS": "-mod=readonly -trimpath -buildvcs=false",
         "GOCACHE": str(target_dir / "go-build-cache"),
+        "GOMODCACHE": str(go_home / "pkg/mod"),
     })
     rustflags = [f"--remap-path-prefix={root}=/workspace/noosphere", "-C", "debuginfo=0"]
     if target == "windows-x86_64":
@@ -384,7 +471,7 @@ def deterministic_environment(
         env["UCRTVersion"] = windows_toolchain["windows_sdk_version"]
         env["WindowsSdkDir"] = str(sdk_root) + os.sep
         env["WindowsSDKVersion"] = windows_toolchain["windows_sdk_version"] + os.sep
-        rust_sysroot = Path(command(["rustc", "--print", "sysroot"]).strip())
+        rust_sysroot = Path(command(["rustc", "--print", "sysroot"], env=env).strip())
         rust_lld = rust_sysroot / "lib" / "rustlib" / "x86_64-pc-windows-msvc" / "bin" / "rust-lld.exe"
         if not rust_lld.is_file():
             raise AssuranceError(f"pinned Rust linker missing: {rust_lld}")
@@ -392,21 +479,19 @@ def deterministic_environment(
         windows_toolchain["rust_linker_sha256"] = sha256_file(rust_lld)
         env["CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER"] = str(rust_lld)
         rustflags.extend(["-C", "link-arg=/Brepro", "-C", "link-arg=/PDBALTPATH:noos-transition.pdb"])
-    # Unit-separator encoding preserves path arguments even when an external
-    # builder checks the repository out below a directory containing spaces.
     env["CARGO_ENCODED_RUSTFLAGS"] = "\x1f".join(rustflags)
     return env
 
 
-def go_modules(env: dict[str, str]) -> list[dict[str, str]]:
+def go_modules(env: dict[str, str], module_root: Path = GO_MODULE) -> list[dict[str, str]]:
     """Read the complete, already-downloaded module graph without network access."""
     args = ["go", "list", "-mod=readonly", "-m", "-json", "all"]
     try:
         completed = subprocess.run(
-            args, cwd=GO_MODULE, env=env, check=True, text=True, capture_output=True,
+            args, cwd=module_root, env=env, check=True, text=True, capture_output=True,
         )
     except subprocess.CalledProcessError as exc:
-        raise _command_failure(exc, GO_MODULE) from exc
+        raise _command_failure(exc, module_root) from exc
     decoder = json.JSONDecoder()
     text = completed.stdout
     offset = 0
@@ -438,61 +523,105 @@ def build_target(target: str, out: Path, *, revision: str | None = None, smoke: 
 
     out = safe_repository_output(out)
     out.mkdir(parents=True, exist_ok=True)
-    target_dir = out / ".cargo-target"
+    target_dir = out / ".controlled-build"
     windows_toolchain = resolve_windows_toolchain(locks) if target == "windows-x86_64" else None
-    env = deterministic_environment(
-        ROOT, target_dir, target, identity["source_date_epoch"], windows_toolchain=windows_toolchain,
-    )
-    subprocess.run(["go", "mod", "verify"], cwd=GO_MODULE, env=env, check=True)
-    module_count = len(go_modules(env))
-    subprocess.run(
-        ["cargo", "build", "--locked", "--offline", "--frozen", "--release", "--target", cfg["rust"],
-         "-p", "noos-lumen", "--bin", "noos-transition"],
-        cwd=ROOT, env=env, check=True,
-    )
-    suffix = cfg["suffix"]
-    rust_output = target_dir / cfg["rust"] / "release" / f"noos-transition{suffix}"
-    artifacts = out / "artifacts"
-    artifacts.mkdir(exist_ok=True)
-    shutil.copyfile(rust_output, artifacts / f"noos-transition-rust{suffix}")
-    for name, package in (("noos-transition-go", "./cmd/noos-transition"), ("noos-verify", "./cmd/noos-verify")):
-        destination = artifacts / f"{name}{suffix}"
-        destination.unlink(missing_ok=True)
-        subprocess.run(["go", "build", "-o", str(destination), package], cwd=GO_MODULE, env=env, check=True)
+    with materialized_revision(identity["revision"]) as source_root:
+        source_go = source_root / "go"
+        env = deterministic_environment(
+            source_root, target_dir, target, identity["source_date_epoch"], windows_toolchain=windows_toolchain,
+        )
+        subprocess.run(["go", "mod", "verify"], cwd=source_go, env=env, check=True)
+        module_count = len(go_modules(env, source_go))
+        subprocess.run(
+            ["cargo", "build", "--locked", "--offline", "--frozen", "--release", "--target", cfg["rust"],
+             "-p", "noos-lumen", "--bin", "noos-transition"],
+            cwd=source_root, env=env, check=True,
+        )
+        suffix = cfg["suffix"]
+        rust_output = Path(env["CARGO_TARGET_DIR"]) / cfg["rust"] / "release" / f"noos-transition{suffix}"
+        artifacts = out / "artifacts"
+        artifacts.mkdir(exist_ok=True)
+        shutil.copyfile(rust_output, artifacts / f"noos-transition-rust{suffix}")
+        for name, package in (("noos-transition-go", "./cmd/noos-transition"), ("noos-verify", "./cmd/noos-verify")):
+            destination = artifacts / f"{name}{suffix}"
+            destination.unlink(missing_ok=True)
+            subprocess.run(["go", "build", "-o", str(destination), package], cwd=source_go, env=env, check=True)
 
-    binary_hashes = {f"artifacts/{path.name}": sha256_file(path) for path in sorted(artifacts.iterdir()) if path.is_file()}
-    result = {
-        "schema": "noos/repro-build-details/v1",
-        "evidence_class": "same-machine-smoke" if smoke else "candidate-build-not-independent-attestation",
-        "target": target,
-        "host": {"os": host_os, "architecture": host_arch},
-        "source": identity,
-        "toolchain_lock_sha256": sha256_file(TOOLCHAINS),
-        "toolchains": locked_toolchain_identities(locks),
-        "installed_toolchain_provenance": installed_toolchains,
-        "windows_toolchain_provenance": windows_toolchain_provenance(windows_toolchain) if windows_toolchain else None,
-        "dependency_locks": {
-            "Cargo.lock": sha256_file(ROOT / "Cargo.lock"),
-            "go/go.mod": sha256_file(GO_MODULE / "go.mod"),
-            "go/go.sum": sha256_file(GO_MODULE / "go.sum"),
-        },
-        "go_module_provenance": {
-            "module_root": "go",
-            "locked_download_command": "go mod download all",
-            "offline_list_command": "go list -mod=readonly -m -json all",
-            "offline_graph_verified": True,
-            "module_count": module_count,
-        },
-        "deterministic_environment": locks["deterministic_environment"],
-        "post_build_normalization": "forbidden-and-not-performed",
-        "offline_build": True,
-        "binary_hashes": binary_hashes,
-        "policy_signature_errors": policy_errors,
-        "toolchain_errors": toolchain_errors,
-    }
+        binary_hashes = {f"artifacts/{path.name}": sha256_file(path) for path in sorted(artifacts.iterdir()) if path.is_file()}
+        result = {
+            "schema": "noos/repro-build-details/v1",
+            "evidence_class": "same-machine-smoke" if smoke else "candidate-build-not-independent-attestation",
+            "target": target,
+            "host": {"os": host_os, "architecture": host_arch},
+            "source": identity,
+            "toolchain_lock_sha256": sha256_file(source_root / "protocol/release/repro-toolchains-v1.json"),
+            "toolchains": locked_toolchain_identities(locks),
+            "installed_toolchain_provenance": installed_toolchains,
+            "windows_toolchain_provenance": windows_toolchain_provenance(windows_toolchain) if windows_toolchain else None,
+            "dependency_locks": {
+                "Cargo.lock": sha256_file(source_root / "Cargo.lock"),
+                "go/go.mod": sha256_file(source_go / "go.mod"),
+                "go/go.sum": sha256_file(source_go / "go.sum"),
+            },
+            "go_module_provenance": {
+                "module_root": "go",
+                "locked_download_command": "go mod download all",
+                "offline_list_command": "go list -mod=readonly -m -json all",
+                "offline_graph_verified": True,
+                "module_count": module_count,
+            },
+            "deterministic_environment": locks["deterministic_environment"],
+            "post_build_normalization": "forbidden-and-not-performed",
+            "offline_build": True,
+            "binary_hashes": binary_hashes,
+            "policy_signature_errors": policy_errors,
+            "toolchain_errors": toolchain_errors,
+        }
     (out / "build-details.json").write_bytes(canonical_json(result))
-    shutil.rmtree(target_dir)
+    shutil.rmtree(target_dir, ignore_errors=True)
     return result
+
+
+def authenticated_repro_binding(
+    trusted_builders: Path,
+    keyring_path: Path,
+    final_freeze_path: Path,
+    final_freeze_signatures_path: Path,
+    *,
+    allow_test_keys: bool = False,
+) -> tuple[str, str]:
+    """Derive revision and roster digest only from a verified final freeze."""
+    genesis_tools = ROOT / "tools/genesis"
+    if str(genesis_tools) not in sys.path:
+        sys.path.insert(0, str(genesis_tools))
+    try:
+        from production_authorization import (
+            DOMAIN_FINAL_FREEZE, FINAL_ROLES, canonical_json as authorization_json,
+            file_sha256, load_keyring, read_json, verify_detached_signatures,
+        )
+        keyring, keyring_doc = load_keyring(keyring_path, test_mode=allow_test_keys)
+        freeze = read_json(final_freeze_path)
+        revision = freeze.get("exact_revision")
+        if keyring_doc.get("exact_revision") != revision:
+            raise AssuranceError("final freeze/keyring revision mismatch")
+        if freeze.get("role_keyring_sha256") != file_sha256(keyring_path):
+            raise AssuranceError("final freeze does not pin supplied role keyring bytes")
+        roster_digest = freeze.get("trusted_repro_builders_sha256")
+        if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+            raise AssuranceError("final freeze exact revision is invalid")
+        if not isinstance(roster_digest, str) or not HEX64.fullmatch(roster_digest):
+            raise AssuranceError("final freeze does not pin trusted reproducibility builders")
+        verify_detached_signatures(
+            authorization_json(freeze), read_json(final_freeze_signatures_path),
+            DOMAIN_FINAL_FREEZE, revision, FINAL_ROLES, keyring,
+        )
+        if sha256_file(trusted_builders) != roster_digest:
+            raise AssuranceError("trusted builder roster does not match signed final freeze")
+        return revision, roster_digest
+    except AssuranceError:
+        raise
+    except Exception as exc:
+        raise AssuranceError(f"signed reproducibility trust verification failed: {exc}") from exc
 
 
 def _trusted_builders(
@@ -554,6 +683,8 @@ def _validate_attestation(payload: dict[str, Any], trust: dict[str, Any], expect
     if target not in REQUIRED_TARGETS or target not in set(trust.get("authorized_targets", [])):
         errors.append("target is not authorized for builder")
     build = payload.get("build", {})
+    if build.get("trusted_repro_builders_sha256") != expected_source["trusted_repro_builders_sha256"]:
+        errors.append("trusted builder roster digest mismatch")
     if build.get("source_revision") != expected_source["revision"]:
         errors.append("source revision mismatch")
     if build.get("source_tree") != expected_source["tree"]:
@@ -577,7 +708,7 @@ def _validate_attestation(payload: dict[str, Any], trust: dict[str, Any], expect
     return errors
 
 
-def verify_attestation_set(
+def _verify_attestation_set_pinned(
     attestations: Path,
     trusted_builders: Path,
     expected_revision: str,
@@ -601,6 +732,7 @@ def verify_attestation_set(
     )
     locks = load_toolchains()
     expected_source = source_identity(expected_revision)
+    expected_source["trusted_repro_builders_sha256"] = trusted_builders_sha256
     policy_signature_errors = verify_policy_signatures()
     if not allow_test_keys:
         errors.extend(policy_signature_errors)
@@ -627,7 +759,7 @@ def verify_attestation_set(
             item_errors = _validate_attestation(payload, record, expected_source, locks)
             if item_errors:
                 raise AssuranceError("; ".join(item_errors))
-            accepted.append({"path": payload_path.name, "key_id": key_id, "payload": payload, "trust": record})
+            accepted.append({"path": payload_path.name, "key_id": key_id, "payload_sha256": signature["payload_sha256"], "payload": payload, "trust": record})
         except Exception as exc:
             errors.append(f"{payload_path.name}: {exc}")
 
@@ -657,13 +789,37 @@ def verify_attestation_set(
     if len(complete_keys) < 2:
         errors.append("two externally signed builder identities must each cover every required target")
 
+    agreed_artifacts = {
+        target: (dict(sorted(items[0]["payload"]["artifact_hashes"].items())) if items else {})
+        for target, items in sorted(by_target.items())
+    }
     report = {
-        "schema": "noos/repro-assurance-report/v1",
+        "schema": "noos/repro-assurance-report/v2",
         "promotion_ledger_mutation": "PROHIBITED",
         "registry_claim_state_mutation": "PROHIBITED",
-        "expected_revision": expected_revision,
+        "source": expected_source,
+        "trusted_repro_builders_sha256": trusted_builders_sha256,
         "required_targets": sorted(REQUIRED_TARGETS),
-        "accepted_attestations": [{"path": item["path"], "key_id": item["key_id"], "target": item["payload"]["build"]["target"]} for item in accepted],
+        "artifact_hashes_by_target": agreed_artifacts,
+        "toolchain_lock_sha256": sha256_file(TOOLCHAINS),
+        "toolchains": locked_toolchain_identities(locks),
+        "accepted_attestations": [
+            {
+                "path": item["path"], "key_id": item["key_id"],
+                "target": item["payload"]["build"]["target"],
+                "signed_payload_sha256": item["payload_sha256"],
+                "artifact_hashes_sha256": sha256_bytes(canonical_json(item["payload"]["artifact_hashes"])),
+            }
+            for item in accepted
+        ],
+        "builder_artifact_hashes": [
+            {
+                "key_id": item["key_id"],
+                "target": item["payload"]["build"]["target"],
+                "artifact_hashes": dict(sorted(item["payload"]["artifact_hashes"].items())),
+            }
+            for item in accepted
+        ],
         "complete_external_builder_identities": complete_keys,
         "comparison_law": "raw_bytes_witnessed_by_sha256",
         "policy_sha256": sha256_file(POLICY),
@@ -680,6 +836,25 @@ def verify_attestation_set(
     return report
 
 
+def verify_attestation_set(
+    attestations: Path,
+    trusted_builders: Path,
+    keyring: Path,
+    final_freeze: Path,
+    final_freeze_signatures: Path,
+    *,
+    allow_test_keys: bool = False,
+) -> dict[str, Any]:
+    revision, roster_digest = authenticated_repro_binding(
+        trusted_builders, keyring, final_freeze, final_freeze_signatures,
+        allow_test_keys=allow_test_keys,
+    )
+    return _verify_attestation_set_pinned(
+        attestations, trusted_builders, revision,
+        trusted_builders_sha256=roster_digest, allow_test_keys=allow_test_keys,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
@@ -692,8 +867,9 @@ def main(argv: list[str] | None = None) -> int:
     verify = sub.add_parser("verify-attestations", help="verify an external two-builder attestation quorum")
     verify.add_argument("--attestations", required=True)
     verify.add_argument("--trusted-builders", required=True)
-    verify.add_argument("--trusted-builders-sha256", required=True, help="externally supplied pinned roster root")
-    verify.add_argument("--revision", required=True)
+    verify.add_argument("--keyring", required=True)
+    verify.add_argument("--final-freeze", required=True)
+    verify.add_argument("--final-freeze-signatures", required=True)
     verify.add_argument("--out", required=True)
     args = parser.parse_args(argv)
     try:
@@ -707,8 +883,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"RESULT repro_build={'SMOKE_ONLY' if args.smoke else 'CANDIDATE_BUILT'} target={args.target} binaries={len(result['binary_hashes'])}")
             return 0
         report = verify_attestation_set(
-            Path(args.attestations), Path(args.trusted_builders), args.revision,
-            trusted_builders_sha256=args.trusted_builders_sha256,
+            Path(args.attestations), Path(args.trusted_builders), Path(args.keyring),
+            Path(args.final_freeze), Path(args.final_freeze_signatures),
         )
         out = Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)

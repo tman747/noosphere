@@ -165,9 +165,8 @@ if ($FuzzHeavy -or $Release) {
 if ($Release) {
     Invoke-Step 'run_claim_matrix_release' @('python', 'tools/gates/run_claim_matrix.py', '--registry', 'protocol/claims/registry.json', '--all-actionable', '--include-negative-results', '--require-command', '--require-evidence', '--require-rollback', '--fail-on-missing') $Root
     Invoke-Step 'client_matrix' @('python', 'tools/e2e/run_network.py', '--scenario', 'client-matrix', '--pairs', 'AA,AB,BA,BB') $Root
-    $revision = (& git -C $Root rev-parse HEAD).Trim()
-    Invoke-Step 'repro_external_attestations' @('python', 'tools/gates/repro_build.py', 'verify-attestations', '--attestations', 'release/attestations', '--trusted-builders', 'protocol/release/trusted-repro-builders.json', '--revision', $revision, '--out', 'release/repro-assurance.json') $Root
-    Invoke-Step 'verify_release' @('python', 'tools/gates/verify_release.py', 'release/manifest.json') $Root
+    Invoke-Step 'repro_external_attestations' @('python', 'tools/gates/repro_build.py', 'verify-attestations', '--attestations', 'release/attestations', '--trusted-builders', 'protocol/release/trusted-repro-builders.json', '--keyring', 'release/role-keyring.json', '--final-freeze', 'release/final-freeze.json', '--final-freeze-signatures', 'release/final-freeze.signatures.json', '--out', 'release/repro-assurance.json') $Root
+    Invoke-Step 'verify_release' @('python', 'tools/gates/verify_release.py', 'release/manifest.json', '--keyring', 'release/role-keyring.json', '--final-freeze', 'release/final-freeze.json', '--final-freeze-signatures', 'release/final-freeze.signatures.json', '--repro-assurance', 'release/repro-assurance.json') $Root
 }
 
 # --- Verdict ----------------------------------------------------------------

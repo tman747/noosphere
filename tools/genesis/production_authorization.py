@@ -2381,7 +2381,7 @@ def make_final_freeze_bundle(
     publication_file: Path, publication_signatures_file: Path,
     anchor_file: Path, anchor_signatures_file: Path, transcript_file: Path,
     body_file: Path, rebuild_file: Path, rebuild_signatures_file: Path, role_keyring_file: Path,
-    exact_revision: str,
+    trusted_repro_builders_file: Path, exact_revision: str,
 ) -> dict[str, Any]:
     transcript = read_json(transcript_file)
     return {
@@ -2393,6 +2393,7 @@ def make_final_freeze_bundle(
         "dkg_root": transcript.get("dkg_root"),
         "dkg_holder_set_root": transcript.get("holder_set_root"),
         "role_keyring_sha256": file_sha256(role_keyring_file),
+        "trusted_repro_builders_sha256": file_sha256(trusted_repro_builders_file),
         "canonical_final_body_bytes_sha256": sha256(bytes.fromhex(identity["canonical_final_body_bytes_hex"])),
         "ledger_snapshot_sha256": identity["ledger_snapshot_sha256"],
         "genesis_block_sha256": identity["genesis_block_sha256"],
@@ -2854,7 +2855,8 @@ def command_freeze_final(args: argparse.Namespace) -> None:
         identity, freeze_path, Path(args.freeze_signatures),
         Path(args.publication), Path(args.publication_signatures),
         anchor_path, Path(args.anchor_signatures), transcript_path, body_path,
-        rebuild_path, Path(args.rebuild_signatures), Path(args.keyring), revision,
+        rebuild_path, Path(args.rebuild_signatures), Path(args.keyring),
+        Path(args.trusted_repro_builders), revision,
     )
     signatures = make_detached_signatures(
         canonical_json(bundle), DOMAIN_FINAL_FREEZE, revision, FINAL_ROLES,
@@ -3000,6 +3002,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--anchor-signatures", required=True); p.add_argument("--transcript", required=True)
     p.add_argument("--final-body", required=True); p.add_argument("--rebuild-record", required=True)
     p.add_argument("--rebuild-signatures", required=True); p.add_argument("--keyring", required=True)
+    p.add_argument("--trusted-repro-builders", required=True)
     p.add_argument("--out", required=True); p.add_argument("--signatures-out", required=True); role_keys(p)
     p = sub.add_parser("sign-cutover"); p.set_defaults(func=command_sign_cutover)
     p.add_argument("--authorization", required=True); p.add_argument("--keyring", required=True)

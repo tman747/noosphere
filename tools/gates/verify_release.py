@@ -35,8 +35,44 @@ def verify_signatures(manifest:dict,errors:list[str],blocked:list[str],keyring=N
   except Exception as exc:errors.append(f"manifest signature invalid for {role}: {exc}")
  for role in required:
   if role not in roles:errors.append(f"missing manifest signature role {role}")
+def verify_repro_assurance(manifest:dict,report_path:Path,errors:list[str])->None:
+ binding=manifest.get("reproducibility",{})
+ try:report=json.loads(report_path.read_text("utf-8"))
+ except Exception as exc:errors.append(f"repro assurance parse failed: {exc}");return
+ if report.get("schema")!="noos/repro-assurance-report/v2" or report.get("verdict")!="QUALIFYING_EXTERNAL_ATTESTATIONS_VERIFIED":
+  errors.append("repro assurance report is not qualifying")
+ if binding.get("assurance_report_sha256")!=sha(report_path):errors.append("release does not bind exact assurance report bytes")
+ if binding.get("trusted_repro_builders_sha256")!=report.get("trusted_repro_builders_sha256"):
+  errors.append("release/repro assurance roster digest mismatch")
+ source=report.get("source",{})
+ if manifest.get("source",{}).get("repo_revision")!=source.get("revision"):
+  errors.append("release/repro assurance revision mismatch")
+ target=binding.get("target");expected=report.get("artifact_hashes_by_target",{}).get(target)
+ shipped=manifest.get("artifact_hashes",{})
+ if not isinstance(expected,dict) or shipped!=expected:
+  errors.append("shipped artifact path/hash map does not exactly match reproducibility assurance")
+ witnesses=[
+  item for item in report.get("builder_artifact_hashes",[])
+  if item.get("target")==target
+ ]
+ if len({item.get("key_id") for item in witnesses})<2:
+  errors.append("release target lacks two independent builder artifact maps")
+ for item in witnesses:
+  if item.get("artifact_hashes")!=shipped:
+   errors.append(f"shipped artifacts differ from builder {item.get('key_id')}")
+ roots={Path(name).parts[0] for name in shipped if isinstance(name,str) and Path(name).parts}
+ if len(roots)==1:
+  artifact_root=safe(next(iter(roots)))
+  actual={
+   path.relative_to(ROOT).as_posix()
+   for path in artifact_root.rglob("*") if path.is_file()
+  } if artifact_root.is_dir() else set()
+  if actual!=set(shipped):errors.append("shipped artifact directory has missing, extra, or renamed paths")
+ else:errors.append("shipped artifacts do not share one canonical root")
+
+
 def main()->int:
- p=argparse.ArgumentParser();p.add_argument("manifest");p.add_argument("--allow-external-blocked",action="store_true");p.add_argument("--keyring");p.add_argument("--final-freeze");p.add_argument("--final-freeze-signatures");a=p.parse_args();mp=safe(a.manifest)
+ p=argparse.ArgumentParser();p.add_argument("manifest");p.add_argument("--allow-external-blocked",action="store_true");p.add_argument("--keyring");p.add_argument("--final-freeze");p.add_argument("--final-freeze-signatures");p.add_argument("--repro-assurance");a=p.parse_args();mp=safe(a.manifest)
  try:m=json.loads(mp.read_text("utf-8"))
  except Exception as exc:print(f"manifest parse failed: {exc}",file=sys.stderr);return 1
  errors=[];blocked=[];keyring=None
@@ -54,9 +90,10 @@ def main()->int:
    if freeze.get("role_keyring_sha256")!=file_sha256(kp):raise ValueError("final freeze does not pin supplied role keyring bytes")
    if freeze.get("chain_id")!=m.get("identity",{}).get("chain_id") or freeze.get("genesis_hash")!=m.get("identity",{}).get("genesis_hash"):raise ValueError("release/final-freeze identity mismatch")
    verify_detached_signatures(canonical_json(freeze),read_json(sp),DOMAIN_FINAL_FREEZE,revision,FINAL_ROLES,keyring)
+   if freeze.get("trusted_repro_builders_sha256")!=m.get("reproducibility",{}).get("trusted_repro_builders_sha256"):raise ValueError("release does not bind final-freeze reproducibility roster")
   except Exception as exc:errors.append(f"trusted release keyring/final-freeze verification failed: {exc}")
  if m.get("schema_version")!=1 or m.get("manifest_kind")!="noosphere-release-manifest":errors.append("wrong manifest schema/kind")
- for section in ("release","source","identity","toolchain_locks","artifact_hashes","checksums","sbom","provenance","gate_verdicts","unresolved_findings","signatures"):
+ for section in ("release","source","identity","toolchain_locks","artifact_hashes","checksums","sbom","provenance","reproducibility","gate_verdicts","unresolved_findings","signatures"):
   if section not in m:errors.append(f"missing section {section}")
  for rel,digest in m.get("artifact_hashes",{}).items():
   try:path=safe(rel)
@@ -108,6 +145,10 @@ def main()->int:
   if deps.get("Cargo.lock",{}).get("sha256")!=sha(ROOT/"Cargo.lock"):errors.append("provenance Cargo.lock digest stale")
   if deps.get("go.sum",{}).get("sha256")!=sha(ROOT/"go/go.sum"):errors.append("provenance go.sum digest stale")
  except Exception as exc:errors.append(f"SBOM/provenance parse failed: {exc}")
+ if a.repro_assurance:
+  verify_repro_assurance(m,safe(a.repro_assurance),errors)
+ else:
+  blocked.append("MISSING_REPRO_ASSURANCE_REPORT")
  policy=tomllib.loads((ROOT/"protocol/release/repro-policy-v1.toml").read_text("utf-8"))
  if policy.get("state")!="SIGNED":blocked.append("UNSIGNED_REPRO_POLICY")
  if m.get("toolchain_locks",{}).get("repro_policy_hash")!=sha(ROOT/"protocol/release/repro-policy-v1.toml"):errors.append("repro policy hash mismatch")
