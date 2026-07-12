@@ -34,6 +34,7 @@ use noos_lumen::objects::ReceiptV1;
 use noos_lumen::state::LumenRoots;
 use noos_p2p::{
     BodyReplyV1, ChainIdentity, InboundItem, Multiaddr, P2pConfig, P2pEvent, P2pHandle, P2pNode,
+    MAX_RANGE_HEADERS,
 };
 use noos_store::WriteSet;
 use noos_witness::vote::FinalityVoteV1;
@@ -397,39 +398,55 @@ async fn import_wire_block(
     p2p: &P2pHandle,
     peer: noos_p2p::PeerId,
     announced: &[u8],
-) {
-    let Ok((header, ticket)) = decode_header_announce(announced) else {
-        return;
-    };
-    let Ok(BodyReplyV1::Body(body)) = p2p.request_body(peer, header.body_da_root).await else {
-        return;
+) -> Result<ImportOutcome, String> {
+    let (header, ticket) = decode_header_announce(announced)
+        .map_err(|error| format!("decode header announce: {error:?}"))?;
+    let BodyReplyV1::Body(body) = p2p
+        .request_body(peer, header.body_da_root)
+        .await
+        .map_err(|error| format!("request body: {error}"))?
+    else {
+        return Err("body not found".to_owned());
     };
     // The blob lane serves the CANONICAL body encoding; the DA commitment
     // is over the padded DA form (ch01 §4.3 step 5) — re-derive it exactly.
-    let Ok(body_v1) = noos_braid::BlockBodyV1::decode_canonical(&body.0) else {
-        return;
-    };
-    let Ok(encoded) = encode_body(&crate::roots::da_form_bytes(&body_v1)) else {
-        return;
-    };
+    let body_v1 = noos_braid::BlockBodyV1::decode_canonical(&body.0)
+        .map_err(|error| format!("decode canonical body: {error}"))?;
+    let encoded = encode_body(&crate::roots::da_form_bytes(&body_v1))
+        .map_err(|error| format!("encode DA body: {error}"))?;
     if encoded.shard_root().as_bytes() != &header.body_da_root {
-        return;
+        return Err("DA root mismatch".to_owned());
     }
     let mut shards = Vec::with_capacity(BODY_TOTAL_SHARDS);
     for index in 0..u32::try_from(BODY_TOTAL_SHARDS).unwrap_or(0) {
-        let Ok(candidate) = encoded.candidate(index) else {
-            return;
-        };
-        shards.push(candidate);
+        shards.push(
+            encoded
+                .candidate(index)
+                .map_err(|error| format!("build DA candidate: {error}"))?,
+        );
     }
-    let (reply, _) = sync_channel(1);
-    let _ = consensus.try_send(ConsensusMsg::ImportBlock {
-        header: Box::new(header),
-        ticket,
-        claim: *encoded.claim(),
-        shards,
-        reply,
-    });
+    let (reply, reply_rx) = sync_channel(1);
+    // Pull sync is the recovery path for best-effort gossip. It must apply
+    // backpressure and observe every result; dropping either silently loses
+    // blocks once the bounded consensus inbox fills.
+    consensus
+        .send(ConsensusMsg::ImportBlock {
+            header: Box::new(header),
+            ticket,
+            claim: *encoded.claim(),
+            shards,
+            reply,
+        })
+        .map_err(|_| "consensus inbox closed".to_owned())?;
+    reply_rx
+        .recv()
+        .map_err(|_| "consensus reply closed".to_owned())?
+}
+
+fn consensus_status(consensus: &SyncSender<ConsensusMsg>) -> Option<StatusSnapshot> {
+    let (reply, reply_rx) = sync_channel(1);
+    consensus.send(ConsensusMsg::Status { reply }).ok()?;
+    reply_rx.recv().ok()
 }
 
 async fn sync_ready_peer(
@@ -437,11 +454,35 @@ async fn sync_ready_peer(
     p2p: &P2pHandle,
     peer: noos_p2p::PeerId,
 ) {
-    let Ok(range) = p2p.request_range(peer, 1, 256).await else {
-        return;
-    };
-    for header in range.headers.0 {
-        import_wire_block(consensus, p2p, peer, &header.0).await;
+    loop {
+        let Some(before) = consensus_status(consensus) else {
+            return;
+        };
+        let Some(start_height) = before.head_height.checked_add(1) else {
+            return;
+        };
+        let Ok(range) = p2p
+            .request_range(peer, start_height, MAX_RANGE_HEADERS)
+            .await
+        else {
+            return;
+        };
+        if range.headers.0.is_empty() {
+            return;
+        }
+        for header in range.headers.0 {
+            if let Err(_error) = import_wire_block(consensus, p2p, peer, &header.0).await {
+                #[cfg(test)]
+                eprintln!("range-sync import stopped: {_error}");
+                return;
+            }
+        }
+        let Some(after) = consensus_status(consensus) else {
+            return;
+        };
+        if after.head_height <= before.head_height || !range.more.0 {
+            return;
+        }
     }
 }
 
@@ -567,7 +608,30 @@ fn spawn_network(
                                 }
                                 P2pEvent::Inbound { peer, item } => match item {
                                     InboundItem::HeaderAnnounce { header } => {
-                                        import_wire_block(&consensus, &p2p, peer, &header).await;
+                                        let heights = decode_header_announce(&header)
+                                            .ok()
+                                            .and_then(|(announced, _)| {
+                                                consensus_status(&consensus).map(|local| {
+                                                    (announced.height, local.head_height)
+                                                })
+                                            });
+                                        match heights {
+                                            Some((announced, local)) if announced <= local => {}
+                                            Some((announced, local))
+                                                if local
+                                                    .checked_add(1)
+                                                    .is_some_and(|next| announced > next) =>
+                                            {
+                                                sync_ready_peer(&consensus, &p2p, peer).await;
+                                            }
+                                            Some(_) => {
+                                                let _ = import_wire_block(
+                                                    &consensus, &p2p, peer, &header,
+                                                )
+                                                .await;
+                                            }
+                                            None => {}
+                                        }
                                     }
                                     InboundItem::Tx { tx } => {
                                         if let Ok((tx_bytes, wit_bytes)) = decode_tx_push(&tx) {

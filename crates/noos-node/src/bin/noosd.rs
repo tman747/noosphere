@@ -1,17 +1,21 @@
 //! noosd — the MindChain/NOOSPHERE reference node (identity-v1.md naming
 //! law: binary `noosd`; state under the platform noosphere root).
 
+use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use noos_grain::{encode_noun, Noun};
 use noos_node::consensus::{NodeConfig, NodeMode};
 use noos_node::genesis::{DevnetParams, GenesisSpec};
 use noos_node::network::NetworkSettings;
 use noos_node::rpc::{self, RpcConfig};
 use noos_node::supervisor;
+
+const DEVNET_CONTRACT_CODE_HASH: noos_node::Hash32 = [0xC0; 32];
 
 const HELP: &str = "\
 noosd — MindChain (NOOSPHERE) reference node
@@ -40,6 +44,9 @@ OPTIONS:
     --devnet-account <account-id-hex>
                            Pre-provision a zero-balance account in genesis
                            (repeatable; TEST NETWORKS ONLY)
+    --devnet-contract-fixture
+                           Register the deterministic [0 1] Grain identity
+                           contract at code hash c0...c0 (TEST NETWORKS ONLY)
     --observer             Observer mode: transaction submission disabled
                            (explicit feature_disabled, never empty success)
     --p2p-listen <multiaddr>
@@ -83,6 +90,7 @@ fn main() -> ExitCode {
     let mut validator = false;
     let mut produce_interval_ms: u64 = 6000;
     let mut devnet_accounts: Vec<noos_node::Hash32> = Vec::new();
+    let mut devnet_contract_fixture = false;
     let mut light = false;
     let mut retention: u64 = 0;
     let mut social: Option<noos_braid::CheckpointRef> = None;
@@ -168,6 +176,7 @@ fn main() -> ExitCode {
                     }
                 }
             }
+            "--devnet-contract-fixture" => devnet_contract_fixture = true,
             "--observer" => observer = true,
             "--light" => light = true,
             "--retention" => match take("--retention").and_then(|v| v.parse().ok()) {
@@ -210,6 +219,13 @@ fn main() -> ExitCode {
         eprintln!("error: --devnet-account is a devnet fixture; is_test_network = false");
         return ExitCode::FAILURE;
     }
+    if devnet_contract_fixture && !params.is_test_network {
+        eprintln!(
+            "error: --devnet-contract-fixture is a devnet fixture; \
+             is_test_network = false"
+        );
+        return ExitCode::FAILURE;
+    }
     let min_bond = params.min_bond_micro;
     let witness_bonds = if validator {
         match noos_node::devnet_fixture::fixture_witness_bonds(4) {
@@ -229,6 +245,18 @@ fn main() -> ExitCode {
         .into_iter()
         .map(|account| (account, 0))
         .collect();
+    let contract_codes = if devnet_contract_fixture {
+        let formula = match Noun::cell(Noun::atom_u64(0), Noun::atom_u64(1)) {
+            Ok(formula) => formula,
+            Err(error) => {
+                eprintln!("error: build devnet contract fixture: {error}");
+                return ExitCode::FAILURE;
+            }
+        };
+        BTreeMap::from([(DEVNET_CONTRACT_CODE_HASH, encode_noun(&formula))])
+    } else {
+        BTreeMap::new()
+    };
     let cfg = NodeConfig {
         mode: if light {
             NodeMode::Light
@@ -237,6 +265,7 @@ fn main() -> ExitCode {
         },
         observer,
         view_retention_blocks: retention,
+        contract_codes,
         social_checkpoint: social,
         network,
         witness_bonds,

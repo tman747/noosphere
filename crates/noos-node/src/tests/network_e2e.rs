@@ -20,7 +20,7 @@ use crate::Hash32;
 
 use super::util::*;
 
-const DEADLINE: Duration = Duration::from_secs(30);
+const DEADLINE: Duration = Duration::from_secs(120);
 static NETWORK_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn network_test_guard() -> MutexGuard<'static, ()> {
@@ -135,8 +135,36 @@ fn tx_and_block_propagate_between_two_real_nodes() {
         "relayed tx settled on B via the propagated block"
     );
 
-    a.shutdown();
     b.shutdown();
+    a.shutdown();
+}
+
+/// Pull sync must continue across protocol-sized range pages. This guards
+/// against recovering only the first page while reporting a healthy peer.
+#[test]
+fn peer_ready_pull_syncs_more_than_one_range_page() {
+    let _network_guard = network_test_guard();
+    let dir_a = test_dir("net-e2e-range-a");
+    let dir_b = test_dir("net-e2e-range-b");
+    let a = supervisor::start(networked_config(0xD1, Vec::new()), spec(), dir_a).expect("start a");
+    let addr_a = a.p2p_addr.clone().expect("a listens");
+    let target_height = u64::from(noos_p2p::MAX_RANGE_HEADERS) + 1;
+    let mut target_hash = status(&a).head_hash;
+    for height in 1..=target_height {
+        a.set_now(GENESIS_TIME_MS + height).expect("advance clock");
+        target_hash = a.produce_block().expect("produce range-sync block");
+    }
+
+    let b =
+        supervisor::start(networked_config(0xD2, vec![addr_a]), spec(), dir_b).expect("start b");
+    let imported = wait_until("multi-page peer-ready pull sync", || {
+        let s = status(&b);
+        (s.head_height == target_height).then_some(s.head_hash)
+    });
+    assert_eq!(imported, target_hash, "B imported every range page");
+
+    b.shutdown();
+    a.shutdown();
 }
 
 /// A node with a different genesis identity must be rejected at the
@@ -179,6 +207,6 @@ fn identity_mismatch_is_rejected_at_handshake() {
         std::thread::sleep(Duration::from_millis(150));
     }
 
-    a.shutdown();
     c.shutdown();
+    a.shutdown();
 }

@@ -16,9 +16,9 @@
 
 use noos_codec::{NoosDecode, NoosEncode};
 use noos_lumen::objects::{
-    txid as lumen_txid, witness_root, AccessEntry, BoundedBytes, BoundedList, FeeAuthorizationV1,
-    NoteV1, OptionalHash32, OptionalObject, ResourceVector, SignedIntentV1, TransactionV1,
-    TransactionWitnessesV1,
+    object_id as lumen_object_id, txid as lumen_txid, witness_root, AccessEntry, ActionV1,
+    BoundedBytes, BoundedList, FeeAuthorizationV1, NoteV1, OptionalHash32, OptionalObject,
+    ResourceVector, SignedIntentV1, TransactionV1, TransactionWitnessesV1,
 };
 use noos_wallet::{derive_authority, IdentityGate, NodeIdentity, Purpose};
 use serde_json::{json, Value};
@@ -202,6 +202,11 @@ fn spec_u128(v: &Value, key: &str) -> Result<u128> {
         .map_err(|_| CliError::Malformed(format!("spec field {key} must be a u128 string")))
 }
 
+fn spec_u32(v: &Value, key: &str) -> Result<u32> {
+    u32::try_from(spec_u64(v, key)?)
+        .map_err(|_| CliError::Malformed(format!("spec field {key} must be u32")))
+}
+
 fn spec_hash(v: &Value, key: &str) -> Result<[u8; 32]> {
     from_hex32(spec_str(v, key)?)
 }
@@ -220,6 +225,37 @@ fn spec_hash_list<const MAX: u32>(v: &Value, key: &str) -> Result<BoundedList<[u
         _ => return Err(CliError::Malformed(format!("{key} must be an array"))),
     };
     BoundedList::new(items).ok_or_else(|| CliError::Malformed(format!("{key} exceeds bound")))
+}
+
+fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
+    let action = match spec_str(spec, "type")? {
+        "call_object" => {
+            let input =
+                BoundedBytes::new(from_hex(spec_str(spec, "input")?)?).ok_or_else(|| {
+                    CliError::Malformed("call_object input exceeds 65536 bytes".into())
+                })?;
+            ActionV1::CallObject {
+                object_id: spec_hash(spec, "object_id")?,
+                input,
+            }
+        }
+        "create_object" => ActionV1::CreateObject {
+            class_id: spec_u32(spec, "class_id")?,
+            owner_or_policy_root: spec_hash(spec, "owner_or_policy_root")?,
+            code_hash: spec_hash(spec, "code_hash")?,
+            state_root: spec_hash(spec, "state_root")?,
+            storage_words: spec_u64(spec, "storage_words")?,
+            rent_deposit: spec_u128(spec, "rent_deposit")?,
+            flags: spec_u32(spec, "flags")?,
+        },
+        other => {
+            return Err(CliError::Malformed(format!(
+                "unsupported structured action type {other}"
+            )))
+        }
+    };
+    BoundedBytes::new(action.encode_canonical())
+        .ok_or_else(|| CliError::Malformed("action exceeds 65536 bytes".into()))
 }
 
 fn spec_resources(v: &Value) -> Result<ResourceVector> {
@@ -300,13 +336,13 @@ fn tx_from_spec(spec: &Value) -> Result<(TransactionV1, BoundedList<BoundedBytes
         Value::Null => Vec::new(),
         Value::Array(a) => a
             .iter()
-            .map(|e| {
-                let bytes = e
-                    .as_str()
-                    .ok_or_else(|| CliError::Malformed("actions entries must be hex".into()))
-                    .and_then(from_hex)?;
-                BoundedBytes::new(bytes)
-                    .ok_or_else(|| CliError::Malformed("action exceeds 65536 bytes".into()))
+            .map(|entry| match entry {
+                Value::String(hex) => BoundedBytes::new(from_hex(hex)?)
+                    .ok_or_else(|| CliError::Malformed("action exceeds 65536 bytes".into())),
+                Value::Object(_) => structured_action(entry),
+                _ => Err(CliError::Malformed(
+                    "actions entries must be hex strings or structured objects".into(),
+                )),
             })
             .collect::<Result<Vec<_>>>()?,
         _ => return Err(CliError::Malformed("actions must be an array".into())),
@@ -372,10 +408,31 @@ pub fn tx_build(spec_json: &str) -> Result<Value> {
     let bytes = tx.encode_canonical();
     // Round-trip self-check: what we emit MUST decode canonically.
     TransactionV1::decode_canonical(&bytes)?;
+    let txid = lumen_txid(&tx);
+    let created_objects: Vec<Value> = tx
+        .actions
+        .as_slice()
+        .iter()
+        .enumerate()
+        .filter_map(|(index, bytes)| {
+            let ActionV1::CreateObject { class_id, .. } =
+                ActionV1::decode_canonical(bytes.as_slice()).ok()?
+            else {
+                return None;
+            };
+            let action_index = u32::try_from(index).ok()?;
+            Some(json!({
+                "action_index": action_index,
+                "class_id": class_id,
+                "object_id": to_hex(&lumen_object_id(&txid, action_index, class_id)),
+            }))
+        })
+        .collect();
     Ok(json!({
         "tx": to_hex(&bytes),
-        "txid": to_hex(&lumen_txid(&tx)),
+        "txid": to_hex(&txid),
         "witness_root": to_hex(&tx.witness_root),
+        "created_objects": created_objects,
     }))
 }
 

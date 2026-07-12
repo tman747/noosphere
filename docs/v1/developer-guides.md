@@ -11,6 +11,49 @@ status: PREPRODUCTION_OWNER_BLOCKED
 
 > **OWNER_BLOCKED / NOT A PRODUCTION RELEASE.** See [bundle status](index.md). Use only valueless engineering networks until signed promotion.
 
+## Local developer network
+
+Run the persistent three-process developer network from the repository root:
+
+```text
+python tools/e2e/local_devnet.py run
+python tools/e2e/local_devnet.py status
+```
+
+The foreground `run` process owns a validator, a QUIC-peered full observer,
+and the public indexer API. Durable state and generated connection metadata
+live under `C:/tmp/noosphere-local-devnet` by default. `status` exits
+successfully only when all three services report the expected chain and
+genesis identity and the observer/indexer heads remain within their declared
+lag bounds. Restarts recover validator and observer state; the local indexer
+rebuilds its in-memory query view from height 1 before reporting ready.
+
+The local runner provisions and funds one deterministic development account
+and registers one deterministic Grain identity formula (`[0 1]`) at code hash
+`c0c0...c0`. Its seed, verifying key, contract hash, authenticated operator
+endpoint, and public API endpoint are written to `local-devnet.json`. These are
+test-network fixtures. `noosd` refuses them when
+`is_test_network = false`; never reuse them for valuable state.
+
+`noos-cli tx build --spec <json>` accepts canonical action hex and two typed
+contract forms:
+
+```json
+{"type":"create_object","class_id":7,"owner_or_policy_root":"<hex32>","code_hash":"<hex32>","state_root":"<hex32>","storage_words":0,"rent_deposit":"0","flags":0}
+{"type":"call_object","object_id":"<hex32>","input":"<canonical-grain-noun-hex>"}
+```
+
+Build output includes every deterministically derived `created_objects[]`
+identifier. Sign with the development seed and submit through either the
+authenticated node RPC or the indexer's transaction-forwarding endpoint.
+Calls must declare the object in `object_access_list` with `read_write` mode
+when the formula may update state.
+
+This is an execution and application-development path, not permissionless
+code deployment. The running fixture exposes one registered formula. Adding
+arbitrary immutable formula bytes still requires the versioned registry /
+governance path and is not exposed as a local CLI command.
+
 ## Wallet guide
 
 Before balance, planning, signing, or submission, compare expected chain ID, genesis hash, and API version with `/api/status`; mismatch fails before reading wallet state or signing. Use purpose-separated hardened sign/view/Umbra/agent/recovery paths. Never grant spend authority to view or agent keys. Construct canonical transaction bodies and segregated witnesses, show maximum/actual five-resource fee, expiry, effects, capability use, and change before consent. Report `MEMPOOL`, `INCLUDED`, `JUSTIFIED`, `FINALIZED`, `REVERTED`, and `REJECTED` distinctly; inclusion is not finality.
@@ -22,6 +65,32 @@ An `AgentID` acts only through explicit, narrow, revocable `CapabilityGrant` obj
 ## Contract guide
 
 Contract admission binds canonical Grain formula bytes/hash, version, manifest, declared effects/rights, resources, and certificate references. Programs must be total within declared bounds or deterministically trap. Do not depend on map iteration, wall clock, host floating point, network calls, optional jet output, or mutable external code. Tests should cover canonical/invalid encoding, resource boundary, trap rollback, capability denial, fee failure, version rejection, and slow-Grain/jet equivalence.
+
+## Neural execution reality
+
+The Neural Execution Lane (`noos-nel`) implements deterministic integer
+inference primitives, model/token state, data-availability commitments,
+chunk claims, Freivalds checks, disputes/bisection, and settlement
+integration. Exercise the implemented path with:
+
+```text
+cargo test -p noos-nel --locked
+cargo test -p noos-nel --test settlement --locked
+```
+
+NEL is disabled in the genesis feature controls
+(`neural_lane_enabled = false`). It has zero consensus weight, issuance, and
+ProofPower contribution. The registered first-activation specification is a
+494M-parameter P0_OPEN/W8A8 test fixture; the repository's executable tests
+use deterministic compact models, not a hosted or decentralized production
+LLM. No local-devnet model/job API is advertised while the control remains
+disabled.
+
+A production decentralized LLM path still needs governance activation,
+published immutable model artifacts, GPU/accelerator kernels with
+cross-implementation vectors, independent operators, live DA, adversarial
+dispute evidence, and activation evidence. Do not describe the current
+implementation as an operating decentralized LLM network.
 
 ## Weft guide
 

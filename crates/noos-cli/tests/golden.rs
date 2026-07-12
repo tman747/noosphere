@@ -9,6 +9,8 @@
 )]
 
 use noos_cli::{from_hex, to_hex, CliError};
+use noos_codec::{NoosDecode, NoosEncode};
+use noos_lumen::objects::{object_id, ActionV1, BoundedBytes, TransactionV1};
 use serde_json::{json, Value};
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -190,6 +192,86 @@ fn tx_build_reproduces_frozen_lumen_vectors_byte_for_byte() {
             "{name}: canonical bytes must match the frozen vector"
         );
     }
+}
+
+#[test]
+fn tx_build_encodes_structured_contract_actions_canonically() {
+    let mut spec = minimal_spec();
+    spec["actions"] = json!([
+        {
+            "type": "create_object",
+            "class_id": 7,
+            "owner_or_policy_root": h(0x21),
+            "code_hash": h(0x22),
+            "state_root": h(0x23),
+            "storage_words": "4096",
+            "rent_deposit": "9000",
+            "flags": 3
+        },
+        {
+            "type": "call_object",
+            "object_id": h(0x31),
+            "input": "deadbeef"
+        }
+    ]);
+    let built = noos_cli::tx_build(&spec.to_string()).unwrap();
+    let tx =
+        TransactionV1::decode_canonical(&from_hex(built["tx"].as_str().unwrap()).unwrap()).unwrap();
+    let txid: [u8; 32] = from_hex(built["txid"].as_str().unwrap())
+        .unwrap()
+        .try_into()
+        .unwrap();
+    assert_eq!(
+        built["created_objects"][0]["object_id"],
+        to_hex(&object_id(&txid, 0, 7))
+    );
+    assert_eq!(
+        tx.actions.as_slice()[0].as_slice(),
+        ActionV1::CreateObject {
+            class_id: 7,
+            owner_or_policy_root: [0x21; 32],
+            code_hash: [0x22; 32],
+            state_root: [0x23; 32],
+            storage_words: 4096,
+            rent_deposit: 9000,
+            flags: 3,
+        }
+        .encode_canonical()
+        .as_slice()
+    );
+    assert_eq!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[1].as_slice()).unwrap(),
+        ActionV1::CallObject {
+            object_id: [0x31; 32],
+            input: BoundedBytes::new(vec![0xde, 0xad, 0xbe, 0xef]).unwrap(),
+        }
+    );
+}
+
+#[test]
+fn tx_build_rejects_malformed_structured_actions() {
+    let mut unknown = minimal_spec();
+    unknown["actions"] = json!([{"type": "deploy_magic"}]);
+    assert!(matches!(
+        noos_cli::tx_build(&unknown.to_string()),
+        Err(CliError::Malformed(_))
+    ));
+
+    let mut overflow = minimal_spec();
+    overflow["actions"] = json!([{
+        "type": "create_object",
+        "class_id": u64::from(u32::MAX) + 1,
+        "owner_or_policy_root": h(0x21),
+        "code_hash": h(0x22),
+        "state_root": h(0x23),
+        "storage_words": 1,
+        "rent_deposit": "1",
+        "flags": 0
+    }]);
+    assert!(matches!(
+        noos_cli::tx_build(&overflow.to_string()),
+        Err(CliError::Malformed(_))
+    ));
 }
 
 #[test]

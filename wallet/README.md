@@ -1,12 +1,14 @@
 # Desktop wallet live submission
 
-The desktop shell reads its immutable chain identities from
+The desktop shell reads immutable chain identities from
 [`chain-profiles.json`](chain-profiles.json). The checked-in
-`local-live-devnet` profile matches the live-devnet smoke topology at
-`127.0.0.1:18080`; a different deployment must add a concrete profile with
-its actual chain ID, genesis hash, API version, HTTPS public/indexer origin,
-and maximum acceptable status age. Runtime identity fields are never entered
-or overridden in the transaction form.
+`local-live-devnet` profile matches `python tools/e2e/local_devnet.py run`
+at `127.0.0.1:18080`. The runner uses a fixed developer genesis identity and
+retains state under `C:/tmp/noosphere-local-devnet`, so wallets do not silently
+switch chains across restarts. A different deployment must add a concrete
+profile with its actual chain ID, genesis hash, API version, HTTPS
+public/indexer origin, and maximum acceptable status age. Runtime identity
+fields are never entered or overridden in the transaction form.
 
 Before signing, the shell fetches `/api/status`, matches the full configured
 identity, checks freshness, and reads every `/api/v1/notes/{noteid}` input.
