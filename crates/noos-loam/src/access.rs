@@ -361,5 +361,17 @@ mod tests {
             missing_kind.validate(),
             Err(AccessError::InsufficientIndependentPaths)
         );
+        let mut omitted_operators = manifest();
+        for path in &mut omitted_operators.recovery_paths {
+            path.provider = None;
+        }
+        for replica in &mut omitted_operators.artifact_replicas {
+            replica.provider = None;
+        }
+        omitted_operators.manifest_id = omitted_operators.derive_id();
+        assert_eq!(
+            omitted_operators.validate(),
+            Err(AccessError::InsufficientIndependentPaths)
+        );
     }
 }

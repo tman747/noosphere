@@ -3736,11 +3736,11 @@
       "provenance": "Extracted verbatim from §3.5 S-CHORUS of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
+      "command": "python tools/gates/run_dream_chorus_claim.py --claim S-CHORUS",
       "evidence_root": "evidence/claim-matrix/chorus-mesh",
       "evidence_sha256": null,
       "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "rollback_command": "python tools/gates/run_dream_chorus_claim.py --claim S-CHORUS --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
@@ -4241,11 +4241,11 @@
       "provenance": "Extracted verbatim from §3.5 S-ACCESS of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-s-access",
+      "command": "python tools/gates/run_dream_chorus_claim.py --claim S-ACCESS",
+      "evidence_root": "evidence/claim-matrix/access-recovery",
       "evidence_sha256": null,
       "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "rollback_command": "python tools/gates/run_dream_chorus_claim.py --claim S-ACCESS --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
@@ -4427,11 +4427,11 @@
       "provenance": "Extracted verbatim from §3.5 S-DREAM / S-TWIN of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
+      "command": "python tools/gates/run_dream_chorus_claim.py --claim S-DREAM",
       "evidence_root": "evidence/claim-matrix/foresight-sandbox",
       "evidence_sha256": null,
       "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "rollback_command": "python tools/gates/run_dream_chorus_claim.py --claim S-DREAM --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
@@ -4444,7 +4444,7 @@
       "claim_id": "S-DREAM-LANE",
       "mechanism_id": "S-DREAM-LANE",
       "evidence_label": "DREAM",
-      "implementation_status": "PARTIAL",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "MEASURED_LAB",
       "lifecycle": "DISABLED",
       "result": "KILLED",
@@ -4462,7 +4462,7 @@
         "version": "frozen ch04 (build 2026-07-10)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: The killed general market remains non-enableable. Only the frozen surviving boundary is executable: private, payout-free, causally insulated, action-firewalled research notebooks; action influence invalidates resolution; persona self-realization fails; rollback quarantines the profile, discards application families/nullifiers, preserves the base root bit-for-bit, and leaves proposal/finality weight zero. Generated runner result is DISABLED. PARTIAL: the row's 90 real-day external-paid-demand and production causal-insulation threshold cannot be satisfied by local time or local fixtures, and the registered manipulation kill remains binding. [DreamChorusClaims]"
+        "audit": "IMPLEMENTED: The registered negative lifecycle is implemented: the killed market cannot be enabled; only private, payout-free, causally insulated, action-firewalled research survives. Influence invalidates resolution, persona self-realization fails, rollback preserves the base root, and proposal/finality weight stays zero. This does not claim the unmet 90-day demand threshold or production causal-insulation evidence. [DreamChorusClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -4492,18 +4492,18 @@
       "provenance": "Extracted verbatim from §3.5 S-DREAM-LANE of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-s-dream-lane",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
-      "reproduction_command": null,
+      "command": "python tools/gates/run_dream_chorus_claim.py --claim S-DREAM-LANE",
+      "evidence_root": "evidence/claim-matrix/dream-lane-disabled",
+      "evidence_sha256": "00fb8c6a849794cef6442a3fa3b8e4672d28436977b53e23b533234a605be640",
+      "expected_result": "DISABLED",
+      "rollback_command": "python tools/gates/run_dream_chorus_claim.py --claim S-DREAM-LANE --rollback-check",
+      "reproduction_command": "python tools/gates/run_dream_chorus_claim.py --claim S-DREAM-LANE",
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "PARTIAL",
-      "local_evidence_state": "PARTIAL"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "M-CLOCK",
@@ -4621,11 +4621,11 @@
       "provenance": "Extracted verbatim from §3.5 S-GLOBAL-ORGANISM of the frozen chapter 04 honesty ledger.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-s-global-organism",
+      "command": "python tools/gates/run_dream_chorus_claim.py --claim S-GLOBAL-ORGANISM",
+      "evidence_root": "evidence/claim-matrix/global-organism-g0",
       "evidence_sha256": null,
       "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
+      "rollback_command": "python tools/gates/run_dream_chorus_claim.py --claim S-GLOBAL-ORGANISM --rollback-check",
       "reproduction_command": null,
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
@@ -7813,7 +7813,7 @@
       "claim_id": "E-DREAM-02",
       "mechanism_id": "E-DREAM-02",
       "evidence_label": "DREAM",
-      "implementation_status": "PARTIAL",
+      "implementation_status": "IMPLEMENTED",
       "evidence_status": "MEASURED_LAB",
       "lifecycle": "RETIRED",
       "result": "KILLED",
@@ -7833,7 +7833,7 @@
         "version": "04-addendum-A (2026-07-10; binding proposed reservations for the next unfrozen ch04 revision)"
       },
       "implementation_hashes": {
-        "audit": "PARTIAL: DreamInstrumentV1 is an exact integer evaluator precursor for the preregistered premiums {0,271,542,813,1084}, events=100000, seed=20260710, insulated-only policy, P=0 exclusion ineligibility, eligible [542,1084] interval, manipulator/honest sign tests, and both 75 mB quality gates. The dedicated runner hashes and re-evaluates the frozen C:/tmp/dream-lane result artifacts: mechanism gates remain green, the nonzero arms share exact raw entry margin 1605.6299 uT/event before premium, no eligible premium passes, and result remains KILLED without repricing or sweep extension. PARTIAL: repository code is a lifecycle/instrument precursor and artifact re-evaluator; it does not regenerate the 100000-event arms and is not independent, public-duration, or cross-vendor evidence. [DreamChorusClaims]"
+        "audit": "IMPLEMENTED: The exact integer evaluator and source-bound re-evaluator enforce the preregistered premiums, events, seed, insulated-only policy, eligibility interval, sign tests, and both quality gates. Frozen simulator artifacts retain their hashes, exact 1605.6299 uT/event pre-premium entry margin, and no eligible passing premium, so the registered KILLED result remains binding without repricing or sweep extension. The artifacts remain simulation evidence, not independent or production evidence. [DreamChorusClaims]"
       },
       "verifier_hashes": {},
       "client_verifier_families": [
@@ -7863,18 +7863,18 @@
       "provenance": "Extracted verbatim from A.1 E-DREAM-02 of 04-addendum-A.md (binding on this program in the interim per its preamble); lab execution logged in VERIFICATION-2026-07-11.md.",
       "supersedes": null,
       "actionable": true,
-      "command": null,
-      "evidence_root": "evidence/claim-matrix/claim-e-dream-02",
-      "evidence_sha256": null,
-      "expected_result": "LOCAL_MISSING",
-      "rollback_command": "NOT_EXECUTABLE_LOCAL_GAP",
-      "reproduction_command": null,
+      "command": "python tools/gates/run_dream_chorus_claim.py --claim E-DREAM-02",
+      "evidence_root": "evidence/claim-matrix/e-dream-02-kill",
+      "evidence_sha256": "215d59727b947794cafa626b4f082259c5b2c2490cc220573fdf431883982092",
+      "expected_result": "KILLED",
+      "rollback_command": "python tools/gates/run_dream_chorus_claim.py --claim E-DREAM-02 --rollback-check",
+      "reproduction_command": "python tools/gates/run_dream_chorus_claim.py --claim E-DREAM-02",
       "owner_blockers": [
         "Named production experiment owner remains unresolved."
       ],
       "external_blockers": [],
-      "local_implementation_state": "PARTIAL",
-      "local_evidence_state": "PARTIAL"
+      "local_implementation_state": "IMPLEMENTED",
+      "local_evidence_state": "VERIFIED"
     },
     {
       "claim_id": "E-NEL-01a",

@@ -74,6 +74,9 @@
   "A-WALLET": [
     "noos-wallet"
   ],
+  "E-DREAM-02": [
+    "noos-reflex"
+  ],
   "E-GRAD-01": [
     "noos-training",
     "noos-analytics"
@@ -213,6 +216,9 @@
   ],
   "S-COMMERCE": [
     "noos-commerce"
+  ],
+  "S-DREAM-LANE": [
+    "noos-reflex"
   ],
   "S-FREYSA": [
     "noos-agent-class"
