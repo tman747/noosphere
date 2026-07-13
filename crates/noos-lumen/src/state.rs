@@ -312,6 +312,53 @@ impl ApplyOutcome {
     }
 }
 
+/// Result of executing the full admission and state-transition pipeline
+/// against a discardable overlay. No tree, nonce, balance, receipt, or
+/// mempool state is mutated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SimulationOutcome {
+    Applied { receipt: ReceiptV1 },
+    Failed { receipt: ReceiptV1, code: FailCode },
+}
+
+impl SimulationOutcome {
+    #[must_use]
+    pub fn receipt(&self) -> &ReceiptV1 {
+        match self {
+            Self::Applied { receipt } | Self::Failed { receipt, .. } => receipt,
+        }
+    }
+}
+
+struct PreparedTransaction {
+    tx: TransactionV1,
+    actions: Vec<ActionV1>,
+    txid: Hash32,
+    input_notes: Vec<(Hash32, NoteV1)>,
+    input_accounts: Vec<(Hash32, AccountV1)>,
+    planned_outputs: Vec<(Hash32, NoteV1)>,
+    fee_params: FeeParamsV1,
+    prices: fees::Prices,
+    max_fee: u128,
+    encoded_len: u64,
+}
+
+enum EvaluatedTransaction {
+    Applied {
+        overlay: Overlay,
+        receipt: ReceiptV1,
+    },
+    Failed {
+        receipt: ReceiptV1,
+        code: FailCode,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MigrationError {
+    ConflictingSafetyObject,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EmissionError {
     /// Emission for this height was already minted or the height is not
@@ -539,6 +586,14 @@ impl LumenLedger {
     }
 
     #[must_use]
+    pub fn stable_safeties(&self) -> Vec<StableSafetyV1> {
+        self.objects
+            .iter()
+            .filter_map(|(_, bytes)| StableSafetyV1::decode_canonical(bytes).ok())
+            .collect()
+    }
+
+    #[must_use]
     pub fn get_debt_position(&self, market: &Hash32, owner: &Hash32) -> Option<DebtPositionV1> {
         self.objects
             .get(&derive_debt_position_id(market, owner))
@@ -574,6 +629,11 @@ impl LumenLedger {
             .iter()
             .filter_map(|(_, bytes)| AssetV1::decode_canonical(bytes).ok())
             .collect()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn remove_stable_safety_for_test(&mut self, market: &Hash32) {
+        self.objects.remove(&derive_stable_safety_id(market));
     }
 
     #[must_use]
@@ -921,6 +981,49 @@ impl LumenLedger {
         Ok(StateDelta::from_map(delta))
     }
 
+    /// Idempotent activation migration for the stable-safety protocol
+    /// extension. At or after `activation_height`, every pre-existing lending
+    /// market receives the same zero-funded safety object created for new
+    /// markets. A conflicting object at the derived id fails closed.
+    pub fn activate_stable_safety_upgrade(
+        &mut self,
+        height: u64,
+        activation_height: u64,
+    ) -> Result<StateDelta, MigrationError> {
+        if height < activation_height {
+            return Ok(StateDelta::default());
+        }
+        let markets = self.lending_markets();
+        let mut delta = BTreeMap::new();
+        for market in markets {
+            let safety_id = derive_stable_safety_id(&market.market_id);
+            if let Some(raw) = self.objects.get(&safety_id) {
+                let safety = StableSafetyV1::decode_canonical(raw)
+                    .map_err(|_| MigrationError::ConflictingSafetyObject)?;
+                if safety.safety_id != safety_id
+                    || safety.market_id != market.market_id
+                    || safety.psm_fee_bps > 500
+                {
+                    return Err(MigrationError::ConflictingSafetyObject);
+                }
+                continue;
+            }
+            let safety = StableSafetyV1 {
+                safety_id,
+                market_id: market.market_id,
+                stable_reserve: 0,
+                collateral_reserve: 0,
+                psm_debt: 0,
+                uncovered_bad_debt: 0,
+                psm_fee_bps: DEFAULT_PSM_FEE_BPS,
+            };
+            let bytes = safety.encode_canonical();
+            self.objects.insert(safety_id, bytes.clone());
+            delta.insert((TreeId::Objects, safety_id, None), Some(bytes));
+        }
+        Ok(StateDelta::from_map(delta))
+    }
+
     /// Activate every pending parameter whose activation height has arrived.
     /// Deterministic key-order walk; called by consensus at block start.
     pub fn activate_pending_params(&mut self, height: u64) -> StateDelta {
@@ -985,7 +1088,44 @@ impl LumenLedger {
         engine: &dyn ContractEngine,
         auth: &dyn AuthVerifier,
     ) -> Result<ApplyOutcome, RejectReason> {
-        // ---- step 1: decode; reject noncanonical / unknown mandatory ----
+        let prepared = self.prepare_transaction(ctx, tx_bytes, witness_bytes, auth)?;
+        match self.evaluate_transaction(ctx, &prepared, engine) {
+            EvaluatedTransaction::Applied { overlay, receipt } => {
+                let delta = self.commit_overlay(overlay);
+                Ok(ApplyOutcome::Applied { receipt, delta })
+            }
+            EvaluatedTransaction::Failed { receipt, code } => {
+                Ok(self.commit_failure_receipt(&prepared.tx, receipt, code))
+            }
+        }
+    }
+
+    /// Execute the exact admission, authorization, fee, and action pipeline
+    /// used by [`Self::apply_transaction`] without committing any mutation.
+    pub fn simulate_transaction(
+        &self,
+        ctx: &BlockContext,
+        tx_bytes: &[u8],
+        witness_bytes: &[u8],
+        engine: &dyn ContractEngine,
+        auth: &dyn AuthVerifier,
+    ) -> Result<SimulationOutcome, RejectReason> {
+        let prepared = self.prepare_transaction(ctx, tx_bytes, witness_bytes, auth)?;
+        Ok(match self.evaluate_transaction(ctx, &prepared, engine) {
+            EvaluatedTransaction::Applied { receipt, .. } => SimulationOutcome::Applied { receipt },
+            EvaluatedTransaction::Failed { receipt, code } => {
+                SimulationOutcome::Failed { receipt, code }
+            }
+        })
+    }
+
+    fn prepare_transaction(
+        &self,
+        ctx: &BlockContext,
+        tx_bytes: &[u8],
+        witness_bytes: &[u8],
+        auth: &dyn AuthVerifier,
+    ) -> Result<PreparedTransaction, RejectReason> {
         let tx =
             TransactionV1::decode_canonical(tx_bytes).map_err(|_| RejectReason::Noncanonical)?;
         let witnesses = TransactionWitnessesV1::decode_canonical(witness_bytes)
@@ -997,8 +1137,6 @@ impl LumenLedger {
             actions.push(action);
         }
         let txid = crate::objects::txid(&tx);
-
-        // ---- step 2: chain / version / expiry / resource envelope ----
         if tx.chain_id != ctx.chain_id {
             return Err(RejectReason::WrongChain);
         }
@@ -1020,20 +1158,14 @@ impl LumenLedger {
         let encoded_len = u64::try_from(tx_bytes.len())
             .ok()
             .zip(u64::try_from(witness_bytes.len()).ok())
-            .and_then(|(t, w)| t.checked_add(w))
+            .and_then(|(transaction, witness)| transaction.checked_add(witness))
             .ok_or(RejectReason::OversizedEncoding)?;
         if encoded_len > tx.resource_limits.bytes {
             return Err(RejectReason::OversizedEncoding);
         }
-        // Replay guard: the settled-receipt index rejects a settled txid.
         if self.receipts.contains(&txid) {
             return Err(RejectReason::TxAlreadySettled);
         }
-
-        // ---- step 3: resolve declared inputs ----
-        // Duplicate declarations reject: a note declared twice would count
-        // its value twice in the conservation ledger, and a duplicated
-        // account would collapse two nonce consumptions into one write.
         if has_duplicates(tx.note_inputs.as_slice()) || has_duplicates(tx.account_inputs.as_slice())
         {
             return Err(RejectReason::DuplicateDeclaredInput);
@@ -1058,24 +1190,26 @@ impl LumenLedger {
         let mut input_accounts: Vec<(Hash32, AccountV1)> =
             Vec::with_capacity(tx.account_inputs.len());
         for account_id in tx.account_inputs.iter() {
-            let acct = self
+            let account = self
                 .get_account(account_id)
                 .ok_or(RejectReason::UnknownAccountInput)?;
-            input_accounts.push((*account_id, acct));
+            input_accounts.push((*account_id, account));
         }
         for entry in tx.object_access_list.iter() {
-            let obj = self
+            let object = self
                 .get_object(&entry.object_id)
                 .ok_or(RejectReason::UnknownObject)?;
-            if obj.flags & ObjectV1::FLAG_QUARANTINED != 0 {
+            if object.flags & ObjectV1::FLAG_QUARANTINED != 0 {
                 return Err(RejectReason::ObjectQuarantined);
             }
         }
-        if !tx.account_inputs.iter().any(|a| *a == tx.fee_payer) {
+        if !tx
+            .account_inputs
+            .iter()
+            .any(|account| *account == tx.fee_payer)
+        {
             return Err(RejectReason::FeePayerNotDeclared);
         }
-
-        // ---- step 4: signatures, lock reveals, capabilities, proofs ----
         if tx.witness_root != derive_witness_root(&witnesses.lock_reveals) {
             return Err(RejectReason::WitnessRootMismatch);
         }
@@ -1089,13 +1223,13 @@ impl LumenLedger {
                 return Err(RejectReason::LockRevealInvalid);
             }
         }
-        for ((_, acct), intent) in input_accounts.iter().zip(witnesses.intents.iter()) {
+        for ((_, account), intent) in input_accounts.iter().zip(witnesses.intents.iter()) {
             if intent.tx_commitment != txid {
                 return Err(RejectReason::SignatureInvalid);
             }
             if !auth.verify_signature(
                 intent.signature_suite,
-                acct.auth_descriptor.as_slice(),
+                account.auth_descriptor.as_slice(),
                 &txid,
                 intent.signature.as_slice(),
             ) {
@@ -1110,115 +1244,129 @@ impl LumenLedger {
                 return Err(RejectReason::ProofProfileInvalid);
             }
         }
-        // Governance/emergency and capability preconditions that require an
-        // authorized signer are validated against the signed account set.
         self.validate_action_authority(ctx, &actions, &tx, &fee_params)?;
-
-        // Output notes: birth height must be the current height; duplicate
-        // note ids inside one transaction reject.
         let mut planned_outputs: Vec<(Hash32, NoteV1)> = Vec::with_capacity(tx.outputs.len());
         for (index, note) in tx.outputs.iter().enumerate() {
             if note.birth_height != ctx.height {
                 return Err(RejectReason::OutputBirthHeightMismatch);
             }
-            let idx = u32::try_from(index).map_err(|_| RejectReason::Noncanonical)?;
-            let id = crate::objects::note_id(&txid, idx, note);
-            if self.notes.contains(&id) || planned_outputs.iter().any(|(x, _)| *x == id) {
+            let index = u32::try_from(index).map_err(|_| RejectReason::Noncanonical)?;
+            let id = crate::objects::note_id(&txid, index, note);
+            if self.notes.contains(&id) || planned_outputs.iter().any(|(other, _)| *other == id) {
                 return Err(RejectReason::DuplicateOutputNote);
             }
             planned_outputs.push((id, note.clone()));
         }
-
-        // ---- step 5: reserve the maximum fee ----
         let prices = fee_state.prices();
         let max_fee = fees::fee(&prices, &declared).ok_or(RejectReason::FeeOverflow)?;
-        let payer_balance = self.balance(&tx.fee_payer, &NOOS_ASSET);
-        if payer_balance < max_fee {
+        if self.balance(&tx.fee_payer, &NOOS_ASSET) < max_fee {
             return Err(RejectReason::InsufficientFeeBalance);
         }
-        // Reservation is committed from here on: failures below charge the
-        // frozen deterministic failure fee instead of rejecting.
+        Ok(PreparedTransaction {
+            tx,
+            actions,
+            txid,
+            input_notes,
+            input_accounts,
+            planned_outputs,
+            fee_params,
+            prices,
+            max_fee,
+            encoded_len,
+        })
+    }
 
-        // ---- steps 6-7: execute actions + conservation in the overlay ----
+    fn evaluate_transaction(
+        &self,
+        ctx: &BlockContext,
+        prepared: &PreparedTransaction,
+        engine: &dyn ContractEngine,
+    ) -> EvaluatedTransaction {
         let exec = self.execute_in_overlay(
             ctx,
-            &tx,
-            &txid,
-            &actions,
-            &input_notes,
-            &input_accounts,
-            &planned_outputs,
-            max_fee,
+            &prepared.tx,
+            &prepared.txid,
+            &prepared.actions,
+            &prepared.input_notes,
+            &prepared.input_accounts,
+            &prepared.planned_outputs,
+            prepared.max_fee,
             engine,
         );
-
         match exec {
             Ok((mut overlay, grain_steps, storage_words)) => {
-                // ---- step 8: charge measured resources, refund the rest ----
                 let measured = ResourceVector {
-                    bytes: encoded_len,
+                    bytes: prepared.encoded_len,
                     grain_steps,
-                    proof_units: u64::try_from(tx.evidence_refs.len()).unwrap_or(u64::MAX),
+                    proof_units: u64::try_from(prepared.tx.evidence_refs.len()).unwrap_or(u64::MAX),
                     state_reads: overlay.state_reads,
                     state_writes: overlay.state_writes.max(storage_words),
                     blob_bytes: 0,
                 };
-                if !measured.fits_within(&tx.resource_limits) {
-                    return Ok(self.commit_failure(
-                        &tx,
-                        &txid,
-                        FailCode::ResourceOverrun,
-                        max_fee,
-                        &fee_params,
-                        encoded_len,
-                    ));
+                if !measured.fits_within(&prepared.tx.resource_limits) {
+                    return EvaluatedTransaction::Failed {
+                        receipt: failure_receipt(
+                            &prepared.txid,
+                            FailCode::ResourceOverrun,
+                            prepared.max_fee,
+                            &prepared.fee_params,
+                            prepared.encoded_len,
+                        ),
+                        code: FailCode::ResourceOverrun,
+                    };
                 }
                 let used = fees::usage_from_resources(&measured);
-                let Some(actual_fee) = fees::fee(&prices, &used) else {
-                    return Ok(self.commit_failure(
-                        &tx,
-                        &txid,
-                        FailCode::Overflow,
-                        max_fee,
-                        &fee_params,
-                        encoded_len,
-                    ));
+                let Some(actual_fee) = fees::fee(&prepared.prices, &used) else {
+                    return EvaluatedTransaction::Failed {
+                        receipt: failure_receipt(
+                            &prepared.txid,
+                            FailCode::Overflow,
+                            prepared.max_fee,
+                            &prepared.fee_params,
+                            prepared.encoded_len,
+                        ),
+                        code: FailCode::Overflow,
+                    };
                 };
-                debug_assert!(actual_fee <= max_fee, "fee is monotone in usage");
-                let charged = actual_fee.min(max_fee);
-                // Deduct the actual fee (reservation minus refund) inside the
-                // overlay so the commit is atomic.
-                let payer_now = overlay_balance(&overlay, self, &tx.fee_payer, &NOOS_ASSET);
+                let charged = actual_fee.min(prepared.max_fee);
+                let payer_now =
+                    overlay_balance(&overlay, self, &prepared.tx.fee_payer, &NOOS_ASSET);
                 let Some(after_fee) = payer_now.checked_sub(charged) else {
-                    return Ok(self.commit_failure(
-                        &tx,
-                        &txid,
-                        FailCode::InsufficientBalance,
-                        max_fee,
-                        &fee_params,
-                        encoded_len,
-                    ));
+                    return EvaluatedTransaction::Failed {
+                        receipt: failure_receipt(
+                            &prepared.txid,
+                            FailCode::InsufficientBalance,
+                            prepared.max_fee,
+                            &prepared.fee_params,
+                            prepared.encoded_len,
+                        ),
+                        code: FailCode::InsufficientBalance,
+                    };
                 };
                 overlay
                     .balances
-                    .insert((tx.fee_payer, NOOS_ASSET), after_fee);
-
-                // ---- step 9-10: atomic commit + receipt ----
+                    .insert((prepared.tx.fee_payer, NOOS_ASSET), after_fee);
                 let receipt = ReceiptV1 {
-                    txid,
+                    txid: prepared.txid,
                     status: 0,
                     fee_charged: charged,
                     resources_used: measured,
                 };
                 overlay
                     .receipts
-                    .insert(txid, Some(receipt.encode_canonical()));
-                let delta = self.commit_overlay(overlay);
-                Ok(ApplyOutcome::Applied { receipt, delta })
+                    .insert(prepared.txid, Some(receipt.encode_canonical()));
+                EvaluatedTransaction::Applied { overlay, receipt }
             }
-            Err(code) => {
-                Ok(self.commit_failure(&tx, &txid, code, max_fee, &fee_params, encoded_len))
-            }
+            Err(code) => EvaluatedTransaction::Failed {
+                receipt: failure_receipt(
+                    &prepared.txid,
+                    code,
+                    prepared.max_fee,
+                    &prepared.fee_params,
+                    prepared.encoded_len,
+                ),
+                code,
+            },
         }
     }
 
@@ -3342,39 +3490,25 @@ impl LumenLedger {
     /// deterministic failure charge (min(failure_fee, reservation)) against
     /// the fee payer, its nonce increment, and the failure receipt.
     /// notes/nullifiers/objects/params roots stay byte-identical.
-    fn commit_failure(
+    fn commit_failure_receipt(
         &mut self,
         tx: &TransactionV1,
-        txid: &Hash32,
+        receipt: ReceiptV1,
         code: FailCode,
-        max_fee: u128,
-        fee_params: &FeeParamsV1,
-        encoded_len: u64,
     ) -> ApplyOutcome {
-        let charge = fee_params.failure_fee.min(max_fee);
         let mut delta = BTreeMap::new();
         let balance = self.balance(&tx.fee_payer, &NOOS_ASSET);
-        // The reservation guaranteed balance >= max_fee >= charge.
-        let after = balance.saturating_sub(charge);
+        let after = balance.saturating_sub(receipt.fee_charged);
         self.set_balance_direct(&tx.fee_payer, &NOOS_ASSET, after, &mut delta);
-        if let Some(mut acct) = self.get_account(&tx.fee_payer) {
-            acct.nonce = acct.nonce.saturating_add(1);
-            let bytes = acct.encode_canonical();
+        if let Some(mut account) = self.get_account(&tx.fee_payer) {
+            account.nonce = account.nonce.saturating_add(1);
+            let bytes = account.encode_canonical();
             self.accounts.insert(tx.fee_payer, bytes.clone());
             delta.insert((TreeId::Accounts, tx.fee_payer, None), Some(bytes));
         }
-        let receipt = ReceiptV1 {
-            txid: *txid,
-            status: code.status(),
-            fee_charged: charge,
-            resources_used: ResourceVector {
-                bytes: encoded_len,
-                ..ResourceVector::default()
-            },
-        };
         let receipt_bytes = receipt.encode_canonical();
-        self.receipts.insert(*txid, receipt_bytes.clone());
-        delta.insert((TreeId::Receipts, *txid, None), Some(receipt_bytes));
+        self.receipts.insert(receipt.txid, receipt_bytes.clone());
+        delta.insert((TreeId::Receipts, receipt.txid, None), Some(receipt_bytes));
         ApplyOutcome::Failed {
             receipt,
             delta: StateDelta::from_map(delta),
@@ -3415,6 +3549,24 @@ impl LumenLedger {
             self.set_balance_direct(&account, &asset, amount, &mut delta);
         }
         StateDelta::from_map(delta)
+    }
+}
+
+fn failure_receipt(
+    txid: &Hash32,
+    code: FailCode,
+    max_fee: u128,
+    fee_params: &FeeParamsV1,
+    encoded_len: u64,
+) -> ReceiptV1 {
+    ReceiptV1 {
+        txid: *txid,
+        status: code.status(),
+        fee_charged: fee_params.failure_fee.min(max_fee),
+        resources_used: ResourceVector {
+            bytes: encoded_len,
+            ..ResourceVector::default()
+        },
     }
 }
 
@@ -3475,7 +3627,7 @@ fn deviation_bps(current: u128, reference: u128) -> Result<u16, FailCode> {
         .checked_mul(10_000)
         .and_then(|value| value.checked_div(reference))
         .ok_or(FailCode::Overflow)?;
-    Ok(u16::try_from(scaled.min(u128::from(u16::MAX))).map_err(|_| FailCode::Overflow)?)
+    u16::try_from(scaled.min(u128::from(u16::MAX))).map_err(|_| FailCode::Overflow)
 }
 
 fn update_twap(

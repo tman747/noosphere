@@ -29,6 +29,9 @@ use std::sync::LazyLock;
 
 /// Tree depth in bits (= key bits).
 pub const DEPTH: usize = 256;
+const PARALLEL_ROOT_MIN_LEAVES: usize = 512;
+const ROOT_PREFIX_BITS: usize = 8;
+const ROOT_PREFIX_BUCKETS: usize = 1 << ROOT_PREFIX_BITS;
 
 /// `EMPTY_ROOTS[h]` = root of an empty subtree of height `h` (`0..=256`).
 static EMPTY_ROOTS: LazyLock<[Hash32; DEPTH + 1]> = LazyLock::new(|| {
@@ -70,6 +73,59 @@ pub fn node_hash(left: &Hash32, right: &Hash32) -> Hash32 {
 pub fn key_bit(key: &Hash32, d: usize) -> bool {
     debug_assert!(d < DEPTH);
     (key[d / 8] >> (7 - (d % 8))) & 1 == 1
+}
+
+// All index arithmetic is bounded by fixed 256-bucket arrays and slices
+// returned by `chunks_mut`; the loop invariants make overflow impossible.
+#[allow(clippy::arithmetic_side_effects)]
+fn root_from_sorted_entries(entries: &[(&Hash32, &Vec<u8>)]) -> Hash32 {
+    if entries.len() < PARALLEL_ROOT_MIN_LEAVES {
+        return subtree_root(entries, 0);
+    }
+
+    // Split at a fixed byte boundary so each worker owns a disjoint,
+    // lexicographically contiguous subtree. The 256 bucket roots are folded
+    // back through the first eight levels in canonical left/right order.
+    let mut ranges = [(0_usize, 0_usize); ROOT_PREFIX_BUCKETS];
+    let mut cursor = 0_usize;
+    for (prefix, range) in ranges.iter_mut().enumerate() {
+        let start = cursor;
+        while cursor < entries.len() && usize::from(entries[cursor].0[0]) == prefix {
+            cursor += 1;
+        }
+        *range = (start, cursor);
+    }
+    debug_assert_eq!(cursor, entries.len());
+
+    let workers = std::thread::available_parallelism()
+        .map_or(1, usize::from)
+        .min(ROOT_PREFIX_BUCKETS);
+    if workers == 1 {
+        return subtree_root(entries, 0);
+    }
+    let chunk_size = ROOT_PREFIX_BUCKETS.div_ceil(workers);
+    let mut roots = [[0_u8; 32]; ROOT_PREFIX_BUCKETS];
+    std::thread::scope(|scope| {
+        for (chunk_index, root_chunk) in roots.chunks_mut(chunk_size).enumerate() {
+            let range_start = chunk_index * chunk_size;
+            let ranges = &ranges;
+            scope.spawn(move || {
+                for (offset, root) in root_chunk.iter_mut().enumerate() {
+                    let (lo, hi) = ranges[range_start + offset];
+                    *root = subtree_root(&entries[lo..hi], ROOT_PREFIX_BITS);
+                }
+            });
+        }
+    });
+
+    let mut width = ROOT_PREFIX_BUCKETS;
+    while width > 1 {
+        for index in 0..(width / 2) {
+            roots[index] = node_hash(&roots[index * 2], &roots[index * 2 + 1]);
+        }
+        width /= 2;
+    }
+    roots[0]
 }
 
 /// In-memory sparse Merkle tree. Deterministic: leaves live in a `BTreeMap`;
@@ -123,11 +179,13 @@ impl Smt {
         self.leaves.iter()
     }
 
-    /// Current root. Pure function of the leaf map; O(n·depth) hashing.
+    /// Current root. Pure function of the leaf map. Large trees divide at a
+    /// fixed prefix boundary and hash disjoint subtrees in parallel; the
+    /// canonical fold is byte-identical to the sequential definition.
     #[must_use]
     pub fn root(&self) -> Hash32 {
         let entries: Vec<(&Hash32, &Vec<u8>)> = self.leaves.iter().collect();
-        subtree_root(&entries, 0)
+        root_from_sorted_entries(&entries)
     }
 
     /// Merkle proof for `key` (inclusion when present, non-inclusion when
@@ -322,6 +380,20 @@ mod tests {
             hx("c778c81de2cfa37714bcf2df91c49879269198e5e037a34715ca922637564975")
         );
         assert_ne!(domain_hash(domains::TX_WID, &[&payload]), under_txid);
+    }
+
+    #[test]
+    fn parallel_root_is_identical_to_the_sequential_definition() {
+        let mut rng = SplitMix64(0x0050_4152_524F_4F54_u64);
+        let mut tree = Smt::new();
+        for index in 0..2_048_u32 {
+            tree.insert(rng.next_hash(), index.to_le_bytes().to_vec());
+        }
+        let entries: Vec<(&Hash32, &Vec<u8>)> = tree.leaves.iter().collect();
+        assert_eq!(
+            root_from_sorted_entries(&entries),
+            subtree_root(&entries, 0)
+        );
     }
 
     #[test]

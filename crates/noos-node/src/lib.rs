@@ -95,6 +95,8 @@ pub enum NodeError {
     LumenReject(noos_lumen::state::RejectReason),
     /// Emission law violation while executing a block.
     Emission(noos_lumen::state::EmissionError),
+    /// Deterministic activation migration failed due to conflicting state.
+    Migration(noos_lumen::state::MigrationError),
     /// Witness Ring failure (vote/certificate/membership).
     Witness(noos_witness::WitnessError),
     /// Durable store failure.
@@ -137,6 +139,7 @@ impl fmt::Display for NodeError {
             NodeError::Da(e) => write!(f, "da: {e}"),
             NodeError::LumenReject(e) => write!(f, "lumen reject: {e:?}"),
             NodeError::Emission(e) => write!(f, "emission: {e:?}"),
+            NodeError::Migration(e) => write!(f, "migration: {e:?}"),
             NodeError::Witness(e) => write!(f, "witness: {e:?}"),
             NodeError::Store(e) => write!(f, "store: {e}"),
             NodeError::StoreFatal(e) => write!(f, "store fatal: {e}"),

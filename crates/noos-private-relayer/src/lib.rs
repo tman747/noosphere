@@ -87,6 +87,14 @@ impl RelayIntent {
         key.verify(&self.signing_bytes()?, &Signature::from_bytes(signature))
             .map_err(|_| RelayError::InvalidSignature)
     }
+
+    pub fn validate_policy(
+        &self,
+        policy: &RelayPolicy,
+        now_unix: u64,
+    ) -> Result<(), RelayError> {
+        validate_intent(policy, now_unix, self)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

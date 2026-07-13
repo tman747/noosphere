@@ -457,6 +457,12 @@ fn template_respects_per_payer_fifo_nonce_order_and_capacity() {
     let template = mp.template(&capacity);
     let order: Vec<Hash32> = template.iter().map(|e| e.txid).collect();
     assert_eq!(order, vec![first_low.2, second_high.2], "per-payer FIFO");
+    let payer = faucet_key().public_key().into_bytes();
+    assert_eq!(
+        template[0].signature_authorizations,
+        vec![(payer, payer.to_vec())],
+        "admission must bind the exact descriptor used for signature verification"
+    );
 
     // Capacity that only fits the head of the queue: exactly one entry.
     let one = template[0].usage;

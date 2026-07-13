@@ -9,7 +9,7 @@ const VAULT_KEY = "primary";
 const RECOVERY_KEY = "passkey-recovery";
 const PBKDF2_ROUNDS = 310000;
 const NOOS = "00".repeat(32);
-const state = { privateKey: null, account: null, vault: null, config: null, assets: [], installPrompt: null, busy: false };
+const state = { privateKey: null, account: null, vault: null, config: null, assets: [], defi: null, psmMarkets: [], installPrompt: null, busy: false };
 
 function bytesToHex(bytes) { return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join(""); }
 function hexToBytes(hex) { if (!/^(?:[0-9a-f]{2})+$/.test(hex)) throw new Error("Invalid canonical hex"); return Uint8Array.from(hex.match(/../g), (value) => parseInt(value, 16)); }
@@ -72,17 +72,65 @@ async function post(path, body) { return json(await fetch(path, { method: "POST"
 function format(value) { try { return BigInt(value).toLocaleString("en-US"); } catch { return "—"; } }
 function short(value) { return `${value.slice(0, 8)}…${value.slice(-6)}`; }
 
+function assetName(assetId) {
+  const asset = state.assets.find((item) => item.asset_id === assetId);
+  return asset ? `${asset.symbol || "ASSET"} · ${short(assetId)}` : short(assetId);
+}
+
+function selectedPsmMarket() {
+  return state.psmMarkets.find((item) => item.market_id === $("#psm-market").value) || null;
+}
+
+async function refreshPsmView() {
+  const safetyByMarket = new Map((state.defi?.stable_safety || []).map((item) => [item.market_id, item]));
+  state.psmMarkets = (state.defi?.lending_markets || [])
+    .filter((market) => safetyByMarket.has(market.market_id))
+    .map((market) => ({ ...market, safety: safetyByMarket.get(market.market_id) }));
+  const marketSelect = $("#psm-market");
+  const previous = marketSelect.value;
+  marketSelect.replaceChildren(...state.psmMarkets.map((market) => {
+    const option = document.createElement("option");
+    option.value = market.market_id;
+    option.textContent = `${assetName(market.collateral_asset)} → ${assetName(market.stable_asset)}`;
+    return option;
+  }));
+  if (state.psmMarkets.some((market) => market.market_id === previous)) marketSelect.value = previous;
+  $("#psm-empty").classList.toggle("hidden", state.psmMarkets.length !== 0);
+  await updatePsmSelection();
+}
+
+async function updatePsmSelection() {
+  const market = selectedPsmMarket();
+  const minting = $("#psm-kind").value === "psm_mint";
+  $("#psm-stable-reserve").textContent = market ? format(market.safety.stable_reserve) : "—";
+  $("#psm-collateral-reserve").textContent = market ? format(market.safety.collateral_reserve) : "—";
+  $("#psm-debt").textContent = market ? format(market.safety.psm_debt) : "—";
+  $("#psm-fee").textContent = market ? `${format(market.safety.psm_fee_bps)} bps` : "—";
+  $("#psm-output-asset").textContent = market ? assetName(minting ? market.stable_asset : market.collateral_asset) : "—";
+  $("#psm-input-balance").textContent = "—";
+  if (!market || !state.account) return;
+  const inputAsset = minting ? market.collateral_asset : market.stable_asset;
+  try {
+    const balance = await json(await fetch(`/api/balance?account=${state.account}&asset=${inputAsset}`, { cache: "no-store" }));
+    $("#psm-input-balance").textContent = `${format(balance.amount || balance.balance || 0)} · ${assetName(inputAsset)}`;
+  } catch {
+    $("#psm-input-balance").textContent = "Unavailable";
+  }
+}
+
 async function loadNetwork() {
   state.config = await json(await fetch("/api/config", { cache: "no-store" }));
   const [assets, defi] = await Promise.all([json(await fetch("/api/assets", { cache: "no-store" })), json(await fetch("/api/defi", { cache: "no-store" }))]);
+  state.defi = defi;
   state.assets = [{ asset_id: NOOS, symbol: "NOOS", name: "MindChain native asset" }, ...assets.items, ...defi.stable_assets];
   const unique = new Map(state.assets.map((asset) => [asset.asset_id, asset])); state.assets = [...unique.values()];
   const select = $("#asset"); select.replaceChildren(...state.assets.map((asset) => { const option = document.createElement("option"); option.value = asset.asset_id; option.textContent = `${asset.symbol || "ASSET"} · ${short(asset.asset_id)}`; return option; }));
   $("#height").textContent = format(state.config.head.height);
   $("#network").classList.add("online"); $("#network span").textContent = `Height ${state.config.head.height}`;
+  await refreshPsmView();
 }
 async function refresh() {
-  if (!state.account || state.busy) return;
+  if (!state.account) return;
   setBusy(true); notice("Reading account state from the identity-bound indexer…");
   try {
     await loadNetwork();
@@ -95,9 +143,10 @@ async function refresh() {
 function showWallet() { $("#unlock-view").classList.add("hidden"); $("#wallet-view").classList.remove("hidden"); $("#account").textContent = state.account; queueMicrotask(refresh); }
 function showAuth(tab = "unlock") { $("#wallet-view").classList.add("hidden"); $("#unlock-view").classList.remove("hidden"); document.querySelector(`[data-tab=${tab}]`)?.click(); }
 
-async function reviewTransfer(build, values) {
+async function reviewTransaction(title, entries) {
   const review = $("#review"); review.replaceChildren();
-  for (const [label, value] of [["From", state.account], ["To", values.recipient], ["Asset", values.asset], ["Amount", values.amount], ["Transaction ID", build.txid], ["Chain", build.chain_id]]) {
+  $("#review-title").textContent = title;
+  for (const [label, value] of entries) {
     const dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = label; dd.textContent = value; review.append(dt, dd);
   }
   const dialog = $("#confirm-dialog");
@@ -106,6 +155,18 @@ async function reviewTransfer(build, values) {
   dialog.showModal();
   return new Promise((resolve) => dialog.addEventListener("close", () => resolve(dialog.returnValue === "confirm"), { once: true }));
 }
+
+async function signSimulateSubmit(built) {
+  notice("Signing transaction locally for exact state simulation…");
+  const signature = bytesToHex(await crypto.subtle.sign({ name: "Ed25519" }, state.privateKey, hexToBytes(built.signing_message)));
+  const envelope = { account: state.account, tx: built.tx, txid: built.txid, signature };
+  const prediction = await post("/api/wallet/simulate", envelope);
+  if (prediction.txid !== built.txid || prediction.accepted !== true || Number(prediction.status) !== 0) {
+    throw new Error(`Simulation refused this transaction (status ${prediction.status ?? "unknown"}). No transaction was submitted.`);
+  }
+  notice(`Simulation passed. Predicted fee ${format(prediction.fee_charged)}. Submitting…`);
+  return post("/api/wallet/submit", envelope);
+}
 async function sendPayment(form) {
   if (!state.config) await loadNetwork();
   const values = Object.fromEntries(new FormData(form).entries());
@@ -113,11 +174,42 @@ async function sendPayment(form) {
   notice("Building unsigned canonical transaction…");
   const built = await post("/api/wallet/build", { account: state.account, recipient: values.recipient, asset: values.asset, amount: values.amount });
   if (built.chain_id !== state.config.chain_id || built.genesis_hash !== state.config.genesis_hash) throw new Error("Unsigned builder returned the wrong chain identity");
-  if (!await reviewTransfer(built, values)) { notice("Transaction cancelled before signing."); return; }
-  notice("Signing transaction locally…");
-  const signature = await crypto.subtle.sign({ name: "Ed25519" }, state.privateKey, hexToBytes(built.signing_message));
-  const settled = await post("/api/wallet/submit", { account: state.account, tx: built.tx, txid: built.txid, signature: bytesToHex(signature) });
+  if (!await reviewTransaction("Sign this transfer?", [["From", state.account], ["To", values.recipient], ["Asset", values.asset], ["Amount", values.amount], ["Transaction ID", built.txid], ["Chain", built.chain_id]])) { notice("Transaction cancelled before signing."); return; }
+  const settled = await signSimulateSubmit(built);
   notice(`Settled ${short(settled.txid)}. Recipient account is payable immediately.`); form.reset(); await refresh();
+}
+
+async function convertPsm(form) {
+  if (!state.config) await loadNetwork();
+  const values = Object.fromEntries(new FormData(form).entries());
+  const market = selectedPsmMarket();
+  if (!market || market.market_id !== values.market_id) throw new Error("Selected stability market is unavailable");
+  if (!/^[0-9]+$/.test(values.amount) || BigInt(values.amount) < 1n || !/^[0-9]+$/.test(values.min_output) || BigInt(values.min_output) < 1n) {
+    throw new Error("Input and minimum output must be positive base-unit amounts");
+  }
+  notice("Building unsigned reserve conversion…");
+  const built = await post("/api/wallet/build-action", {
+    account: state.account,
+    type: values.type,
+    market_id: values.market_id,
+    amount: values.amount,
+    min_output: values.min_output,
+  });
+  if (built.chain_id !== state.config.chain_id || built.genesis_hash !== state.config.genesis_hash) throw new Error("Unsigned builder returned the wrong chain identity");
+  const minting = values.type === "psm_mint";
+  const expectedAction = minting
+    ? { type: "psm_mint", owner: state.account, market_id: values.market_id, collateral_in: values.amount, min_stable_out: values.min_output }
+    : { type: "psm_redeem", owner: state.account, market_id: values.market_id, stable_in: values.amount, min_collateral_out: values.min_output };
+  if (JSON.stringify(built.action) !== JSON.stringify(expectedAction)) throw new Error("Unsigned builder changed the requested reserve conversion");
+  const direction = minting ? "Collateral → stable" : "Stable → collateral";
+  if (!await reviewTransaction("Sign this reserve conversion?", [["Account", state.account], ["Direction", direction], ["Market", values.market_id], ["Input", values.amount], ["Minimum output", values.min_output], ["Transaction ID", built.txid], ["Chain", built.chain_id]])) {
+    notice("Reserve conversion cancelled before signing.");
+    return;
+  }
+  const settled = await signSimulateSubmit(built);
+  notice(`Reserve conversion ${short(settled.txid)} settled after successful simulation.`);
+  form.reset();
+  await refresh();
 }
 
 document.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => { document.querySelectorAll("[data-tab]").forEach((item) => item.classList.toggle("active", item === button)); for (const id of ["create", "unlock", "import"]) $(`#${id}-form`).classList.toggle("hidden", id !== button.dataset.tab); status(""); }));
@@ -160,6 +252,9 @@ $("#passkey-enroll").addEventListener("click", async () => {
   finally { passwordInput.value = ""; setBusy(false); }
 });
 $("#send-form").addEventListener("submit", async (event) => { event.preventDefault(); if (state.busy) return; setBusy(true); try { await sendPayment(event.currentTarget); } catch (error) { notice(error.message, true); } finally { setBusy(false); } });
+$("#psm-form").addEventListener("submit", async (event) => { event.preventDefault(); if (state.busy) return; setBusy(true); try { await convertPsm(event.currentTarget); } catch (error) { notice(error.message, true); } finally { setBusy(false); } });
+$("#psm-market").addEventListener("change", updatePsmSelection);
+$("#psm-kind").addEventListener("change", updatePsmSelection);
 $("#faucet").addEventListener("click", async () => { setBusy(true); try { const result = await post("/api/wallet/faucet", { account: state.account, amount: "1000000" }); notice(`Valueless test funding settled: ${short(result.txid)}`); await refresh(); } catch (error) { notice(error.message, true); } finally { setBusy(false); } });
 $("#refresh").addEventListener("click", refresh);
 $("#copy-account").addEventListener("click", async () => { await navigator.clipboard.writeText(state.account); notice("Account public key copied."); });

@@ -29,6 +29,9 @@ OPTIONS:
     --data-dir <path>      Durable state root (default: ./noosd-data)
     --genesis-time <ms>    Genesis time origin, unix milliseconds
                            (devnet fixture; default: 1760000000000)
+    --stable-safety-activation-height <height>
+                           Consensus height for deterministic StableSafetyV1
+                           backfill (omit until the upgrade is scheduled)
     --rpc <addr:port>      Operator RPC bind (loopback only;
                            default: 127.0.0.1:8632)
     --rpc-token <token>    Bearer token for the operator RPC (required to
@@ -109,6 +112,7 @@ fn main() -> ExitCode {
     let mut light = false;
     let mut retention: u64 = 0;
     let mut social: Option<noos_braid::CheckpointRef> = None;
+    let mut stable_safety_activation_height: Option<u64> = None;
     let mut network = NetworkSettings::default();
 
     let mut it = args.iter();
@@ -146,6 +150,17 @@ fn main() -> ExitCode {
                     return ExitCode::from(2);
                 }
             },
+            "--stable-safety-activation-height" => {
+                match take("--stable-safety-activation-height").and_then(|v| v.parse().ok()) {
+                    Some(v) => stable_safety_activation_height = Some(v),
+                    None => {
+                        eprintln!(
+                            "error: --stable-safety-activation-height expects a block height"
+                        );
+                        return ExitCode::from(2);
+                    }
+                }
+            }
             "--rpc" => match take("--rpc").and_then(|v| v.parse().ok()) {
                 Some(v) => rpc_bind = v,
                 None => {
@@ -331,6 +346,7 @@ fn main() -> ExitCode {
         witness_bonds,
         min_bond,
         devnet_fixture_finality: validator,
+        stable_safety_activation_height,
         ..NodeConfig::default()
     };
 

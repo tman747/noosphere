@@ -95,6 +95,28 @@ fn rpc_status_reports_the_three_heads_separately_and_auth_gates_routes() {
     assert!(!body.contains(r#""latest""#), "merged latest is prohibited");
     assert!(body.contains(r#""observer":false"#));
 
+    // Consensus-owned reserve state is served directly; genesis has no markets.
+    let (safety_status, safety_body) =
+        http_request(addr, "GET", "/stable/safety", token, None);
+    assert_eq!(safety_status, 200, "{safety_body}");
+    assert!(safety_body.contains(r#""items":[]"#), "{safety_body}");
+
+    // Wallets can resolve the authoritative nonce and authorization descriptor.
+    let faucet = hex(&faucet_key().public_key().into_bytes());
+    let (account_status, account_body) = http_request(
+        addr,
+        "GET",
+        &format!("/account/{faucet}"),
+        token,
+        None,
+    );
+    assert_eq!(account_status, 200, "{account_body}");
+    assert!(account_body.contains(r#""nonce":"0""#), "{account_body}");
+    assert!(
+        account_body.contains(r#""auth_descriptor""#),
+        "{account_body}"
+    );
+
     // Unknown routes are typed 404s.
     let (nf, body) = http_request(addr, "GET", "/nope", token, None);
     assert_eq!(nf, 404);
@@ -119,6 +141,22 @@ fn rpc_submission_settles_and_receipts_are_served() {
         4_242,
     );
     let payload = format!(r#"{{"tx":"{}","witnesses":"{}"}}"#, hex(&tx), hex(&wit));
+    let (code, body) = http_request(addr, "POST", "/simulate_tx", token, Some(&payload));
+    assert_eq!(code, 200, "{body}");
+    assert!(body.contains(r#""accepted":true"#), "{body}");
+    assert!(body.contains(&hex(&txid)), "{body}");
+    let (code, repeated) =
+        http_request(addr, "POST", "/simulate_tx", token, Some(&payload));
+    assert_eq!(code, 200, "{repeated}");
+    assert!(repeated.contains(r#""accepted":true"#), "{repeated}");
+    let (code, _) = http_request(
+        addr,
+        "GET",
+        &format!("/receipt/{}", hex(&txid)),
+        token,
+        None,
+    );
+    assert_eq!(code, 404, "simulation must not persist a receipt");
     let (code, body) = http_request(addr, "POST", "/submit_tx", token, Some(&payload));
     assert_eq!(code, 200, "{body}");
     assert!(body.contains(r#""accepted":true"#));

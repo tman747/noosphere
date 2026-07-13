@@ -7,6 +7,10 @@ on:
     paths:
       - "crates/**"
       - "wallet/**"
+      - "apps/mind-market/wallet/**"
+      - "tools/e2e/market_gateway.py"
+      - "tools/gates/check_throughput.py"
+      - "tools/operations/**"
       - "tools/lan_testnet.py"
       - ".github/workflows/platform-node-and-wallet.yml"
 
@@ -49,6 +53,21 @@ jobs:
           cargo test --locked -p noos-node --lib -- --test-threads=1
           cargo test --locked -p noos-lumen
           cargo test --locked -p noos-cli
+      - name: Enforce sustained transaction throughput
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked --release -p noos-node --bin noos-throughput
+          mkdir -p platform-evidence/windows
+          python tools/gates/check_throughput.py \
+            --binary target/release/noos-throughput.exe \
+            --samples 2 \
+            --transactions 10000 \
+            --accounts 1024 \
+            --minimum-validator-tps 7500 \
+            --minimum-producer-tps 10000 \
+            --out platform-evidence/windows/throughput.json
       - name: Run native node boot smoke
         shell: bash
         run: |

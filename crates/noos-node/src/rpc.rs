@@ -215,6 +215,7 @@ fn handle_connection(
     match (method.as_str(), path.as_str()) {
         ("GET", "/status") => status_route(consensus_tx),
         ("POST", "/submit_tx") => submit_route(cfg, consensus_tx, &body),
+        ("POST", "/simulate_tx") => simulate_route(consensus_tx, &body),
         _ if method == "GET" && path.starts_with("/blocks/") => {
             blocks_route(consensus_tx, &path["/blocks/".len()..])
         }
@@ -231,10 +232,14 @@ fn handle_connection(
         ("GET", "/oracle/reports") => oracle_reports_route(consensus_tx),
         ("GET", "/lending/markets") => lending_markets_route(consensus_tx),
         ("GET", "/stable/assets") => stable_assets_route(consensus_tx),
+        ("GET", "/stable/safety") => stable_safety_route(consensus_tx),
         ("GET", "/lending/positions") => debt_positions_route(consensus_tx),
         ("GET", "/payments/private") => private_payments_route(consensus_tx),
         ("GET", "/compute/workers") => compute_workers_route(consensus_tx),
         ("GET", "/compute/jobs") => compute_jobs_route(consensus_tx),
+        _ if method == "GET" && path.starts_with("/account/") => {
+            account_route(consensus_tx, &path["/account/".len()..])
+        }
         _ if method == "GET" && path.starts_with("/balance/") => {
             balance_route(consensus_tx, &path["/balance/".len()..])
         }
@@ -313,21 +318,12 @@ fn submit_route(cfg: &RpcConfig, consensus_tx: &SyncSender<ConsensusMsg>, body: 
             "observer mode: transaction submission is disabled on this node",
         );
     }
-    let Ok(text) = std::str::from_utf8(body) else {
-        return json_error("400 Bad Request", "malformed", "body is not utf-8");
-    };
-    let (Some(tx_hex), Some(wit_hex)) = (
-        json_str_field(text, "tx"),
-        json_str_field(text, "witnesses"),
-    ) else {
+    let Ok((tx_bytes, wit_bytes)) = decode_envelope(body) else {
         return json_error(
             "400 Bad Request",
             "malformed",
-            "expected {\"tx\",\"witnesses\"}",
+            "expected canonical hex {\"tx\",\"witnesses\"}",
         );
-    };
-    let (Some(tx_bytes), Some(wit_bytes)) = (unhex(&tx_hex), unhex(&wit_hex)) else {
-        return json_error("400 Bad Request", "malformed", "bad hex payload");
     };
     let result = round_trip(consensus_tx, |reply| ConsensusMsg::SubmitTx {
         tx_bytes,
@@ -348,6 +344,67 @@ fn submit_route(cfg: &RpcConfig, consensus_tx: &SyncSender<ConsensusMsg>, body: 
             "no reply",
         ),
     }
+}
+
+fn simulate_route(consensus_tx: &SyncSender<ConsensusMsg>, body: &[u8]) -> String {
+    let Ok((tx_bytes, wit_bytes)) = decode_envelope(body) else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "expected canonical hex {\"tx\",\"witnesses\"}",
+        );
+    };
+    let result = round_trip(consensus_tx, |reply| ConsensusMsg::SimulateTx {
+        tx_bytes,
+        wit_bytes,
+        reply,
+    });
+    match result {
+        Some(Ok(outcome)) => {
+            let receipt = outcome.receipt();
+            let applied = matches!(
+                outcome,
+                noos_lumen::state::SimulationOutcome::Applied { .. }
+            );
+            let body = format!(
+                concat!(
+                    r#"{{"accepted":{},"txid":"{}","status":{},"fee_charged":"{}","#,
+                    r#""resources":{{"bytes":"{}","grain_steps":"{}","proof_units":"{}","#,
+                    r#""state_reads":"{}","state_writes":"{}","blob_bytes":"{}"}}}}"#
+                ),
+                applied,
+                hex(&receipt.txid),
+                receipt.status,
+                receipt.fee_charged,
+                receipt.resources_used.bytes,
+                receipt.resources_used.grain_steps,
+                receipt.resources_used.proof_units,
+                receipt.resources_used.state_reads,
+                receipt.resources_used.state_writes,
+                receipt.resources_used.blob_bytes,
+            );
+            http("200 OK", "application/json", &body)
+        }
+        Some(Err(reason)) => json_error(
+            "409 Conflict",
+            "simulation_rejected",
+            &format!("pre-reservation rejection {}", reason as u16),
+        ),
+        None => json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no reply",
+        ),
+    }
+}
+
+fn decode_envelope(body: &[u8]) -> Result<(Vec<u8>, Vec<u8>), ()> {
+    let text = std::str::from_utf8(body).map_err(|_| ())?;
+    let tx_hex = json_str_field(text, "tx").ok_or(())?;
+    let witness_hex = json_str_field(text, "witnesses").ok_or(())?;
+    let tx_bytes = unhex(&tx_hex).ok_or(())?;
+    let witness_bytes = unhex(&witness_hex).ok_or(())?;
+    Ok((tx_bytes, witness_bytes))
 }
 
 fn block_route(consensus_tx: &SyncSender<ConsensusMsg>, id_raw: &str) -> String {
@@ -721,6 +778,39 @@ fn stable_assets_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
     )
 }
 
+fn stable_safety_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
+    let Some(items) = round_trip(consensus_tx, |reply| ConsensusMsg::GetStableSafety {
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no stable safety reply",
+        );
+    };
+    let entries = items
+        .iter()
+        .map(|safety| {
+            format!(
+                r#"{{"safety_id":"{}","market_id":"{}","stable_reserve":"{}","collateral_reserve":"{}","psm_debt":"{}","uncovered_bad_debt":"{}","psm_fee_bps":{}}}"#,
+                hex(&safety.safety_id),
+                hex(&safety.market_id),
+                safety.stable_reserve,
+                safety.collateral_reserve,
+                safety.psm_debt,
+                safety.uncovered_bad_debt,
+                safety.psm_fee_bps,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    http(
+        "200 OK",
+        "application/json",
+        &format!(r#"{{"items":[{entries}]}}"#),
+    )
+}
+
 fn debt_positions_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
     let Some(items) = round_trip(consensus_tx, |reply| ConsensusMsg::GetDebtPositions {
         reply,
@@ -868,6 +958,39 @@ fn compute_jobs_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
         "200 OK",
         "application/json",
         &format!(r#"{{"items":[{entries}]}}"#),
+    )
+}
+
+fn account_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> String {
+    let Some(account) = unhex32(raw) else {
+        return json_error("400 Bad Request", "malformed", "bad account id");
+    };
+    let Some(value) = round_trip(consensus_tx, |reply| ConsensusMsg::GetAccount {
+        account,
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no account reply",
+        );
+    };
+    let Some(account) = value else {
+        return json_error("404 Not Found", "not_found", "account not found");
+    };
+    http(
+        "200 OK",
+        "application/json",
+        &format!(
+            r#"{{"account_id":"{}","nonce":"{}","auth_descriptor":"{}","liquid_balances_root":"{}","bond_refs_root":"{}","metadata_commitment":"{}","recovery_policy_root":"{}"}}"#,
+            hex(&account.account_id),
+            account.nonce,
+            hex(account.auth_descriptor.as_slice()),
+            hex(&account.liquid_balances_root),
+            hex(&account.bond_refs_root),
+            hex(&account.metadata_commitment),
+            hex(&account.recovery_policy_root),
+        ),
     )
 }
 

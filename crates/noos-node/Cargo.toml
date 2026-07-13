@@ -26,6 +26,7 @@ noos-lumen = { path = "../noos-lumen" }
 noos-p2p = { path = "../noos-p2p" }
 noos-store = { path = "../noos-store" }
 noos-witness = { path = "../noos-witness" }
+serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
 
 [lints]

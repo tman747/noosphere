@@ -332,6 +332,7 @@ fn build_router(indexer: Indexer, submission_source: Option<ingest::LineProtocol
         .route("/api/v1/blocks", get(blocks))
         .route("/api/v1/blocks/{hash_or_height}", get(block))
         .route("/api/v1/transactions", post(submit_transaction))
+        .route("/api/v1/transactions/simulate", post(simulate_transaction))
         .route("/api/v1/transactions/{txid}", get(entity_transaction))
         .route("/api/v1/assets", get(market_assets))
         .route("/api/v1/pools", get(market_pools))
@@ -340,8 +341,10 @@ fn build_router(indexer: Indexer, submission_source: Option<ingest::LineProtocol
         .route("/api/v1/oracle-reports", get(oracle_reports))
         .route("/api/v1/lending-markets", get(lending_markets))
         .route("/api/v1/stable-assets", get(stable_assets))
+        .route("/api/v1/stable-safety", get(stable_safety))
         .route("/api/v1/debt-positions", get(debt_positions))
         .route("/api/v1/private-payments", get(private_payments))
+        .route("/api/v1/accounts/{account}", get(market_account))
         .route("/api/v1/balances/{account}/{asset}", get(market_balance))
         .route("/api/v1/notes/{noteid}", get(hash_not_found))
         .route("/api/v1/addresses/{address}/notes", get(address_page))
@@ -529,10 +532,70 @@ async fn submit_transaction(
     headers: HeaderMap,
     body: std::result::Result<Bytes, BytesRejection>,
 ) -> ApiResult<Response> {
+    let (_request, envelope) = parse_submission(&headers, body)?;
+    let source = s.submission_source.ok_or_else(|| {
+        ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unavailable",
+            "transaction forwarding is unavailable; configure NOOS_NODE_RPC and NOOS_NODE_TOKEN",
+        )
+    })?;
+    let expected = s.indexer.identity.clone();
+    let submission =
+        tokio::task::spawn_blocking(move || source.forward_submission(&expected, &envelope))
+            .await
+            .map_err(|_| {
+                ApiError::new(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "unavailable",
+                    "node submission task unavailable",
+                )
+            })?
+            .map_err(forward_error)?;
+    let mut response =
+        (StatusCode::ACCEPTED, Json(json!({"txid":submission.txid}))).into_response();
+    response
+        .headers_mut()
+        .insert(header::CONTENT_TYPE, HeaderValue::from_static(MEDIA_TYPE));
+    Ok(response)
+}
+
+async fn simulate_transaction(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    body: std::result::Result<Bytes, BytesRejection>,
+) -> ApiResult<Response> {
+    let (_request, envelope) = parse_submission(&headers, body)?;
+    let source = s.submission_source.ok_or_else(|| {
+        ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unavailable",
+            "transaction simulation is unavailable; configure NOOS_NODE_RPC and NOOS_NODE_TOKEN",
+        )
+    })?;
+    let expected = s.indexer.identity.clone();
+    let value =
+        tokio::task::spawn_blocking(move || source.forward_simulation(&expected, &envelope))
+            .await
+            .map_err(|_| {
+                ApiError::new(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "unavailable",
+                    "node simulation task unavailable",
+                )
+            })?
+            .map_err(forward_error)?;
+    Ok(api_json(value))
+}
+
+fn parse_submission(
+    headers: &HeaderMap,
+    body: std::result::Result<Bytes, BytesRejection>,
+) -> ApiResult<(Submit, Vec<u8>)> {
     if headers
         .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .is_none_or(|v| !v.starts_with("application/json"))
+        .and_then(|value| value.to_str().ok())
+        .is_none_or(|value| !value.starts_with("application/json"))
     {
         return Err(ApiError::new(
             StatusCode::UNSUPPORTED_MEDIA_TYPE,
@@ -554,46 +617,21 @@ async fn submit_transaction(
             "request exceeds 1048576 bytes",
         ));
     }
-    let req: Submit = serde_json::from_slice(&body).map_err(|_| {
+    let request: Submit = serde_json::from_slice(&body).map_err(|_| {
         ApiError::new(
             StatusCode::BAD_REQUEST,
             "invalid_request",
             "expected exactly {tx,witnesses} as JSON strings",
         )
     })?;
-    if !canonical_hex(&req.tx) || !canonical_hex(&req.witnesses) {
+    if !canonical_hex(&request.tx) || !canonical_hex(&request.witnesses) {
         return Err(ApiError::new(
             StatusCode::UNPROCESSABLE_ENTITY,
             "validation_failed",
             "tx and witnesses must be lowercase even-length hex",
         ));
     }
-    let source = s.submission_source.ok_or_else(|| {
-        ApiError::new(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "unavailable",
-            "transaction forwarding is unavailable; configure NOOS_NODE_RPC and NOOS_NODE_TOKEN",
-        )
-    })?;
-    let expected = s.indexer.identity.clone();
-    let envelope = body.to_vec();
-    let submission =
-        tokio::task::spawn_blocking(move || source.forward_submission(&expected, &envelope))
-            .await
-            .map_err(|_| {
-                ApiError::new(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "unavailable",
-                    "node submission task unavailable",
-                )
-            })?
-            .map_err(forward_error)?;
-    let mut response =
-        (StatusCode::ACCEPTED, Json(json!({"txid":submission.txid}))).into_response();
-    response
-        .headers_mut()
-        .insert(header::CONTENT_TYPE, HeaderValue::from_static(MEDIA_TYPE));
-    Ok(response)
+    Ok((request, body.to_vec()))
 }
 
 async fn market_query(s: AppState, headers: HeaderMap, path: String) -> ApiResult<Response> {
@@ -647,6 +685,10 @@ async fn stable_assets(State(s): State<AppState>, headers: HeaderMap) -> ApiResu
     market_query(s, headers, "/stable/assets".to_owned()).await
 }
 
+async fn stable_safety(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    market_query(s, headers, "/stable/safety".to_owned()).await
+}
+
 async fn debt_positions(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
     market_query(s, headers, "/lending/positions".to_owned()).await
 }
@@ -661,6 +703,21 @@ async fn compute_workers(State(s): State<AppState>, headers: HeaderMap) -> ApiRe
 
 async fn compute_jobs(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
     market_query(s, headers, "/compute/jobs".to_owned()).await
+}
+
+async fn market_account(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    Path(account): Path<String>,
+) -> ApiResult<Response> {
+    if !is_hash(&account) {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "invalid_request",
+            "account must be 32-byte lowercase hex",
+        ));
+    }
+    market_query(s, headers, format!("/account/{account}")).await
 }
 
 async fn market_balance(

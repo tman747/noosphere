@@ -157,17 +157,21 @@ fn configured_app(node: &FakeNode) -> (tempfile::TempDir, Router) {
     (dir, router_with_operator(indexer, source))
 }
 
-async fn post(app: Router, body: Vec<u8>) -> axum::response::Response {
+async fn post_to(app: Router, path: &str, body: Vec<u8>) -> axum::response::Response {
     app.oneshot(
         Request::builder()
             .method("POST")
-            .uri("/api/v1/transactions")
+            .uri(path)
             .header("content-type", "application/json")
             .body(Body::from(body))
             .unwrap(),
     )
     .await
     .unwrap()
+}
+
+async fn post(app: Router, body: Vec<u8>) -> axum::response::Response {
+    post_to(app, "/api/v1/transactions", body).await
 }
 
 async fn response_json(response: axum::response::Response) -> serde_json::Value {
@@ -306,6 +310,96 @@ async fn lending_state_is_identity_checked_and_forwarded_read_only() {
     assert_eq!(requests.len(), 2);
     assert!(requests[0].starts_with(b"GET /status HTTP/1.1\r\n"));
     assert!(requests[1].starts_with(b"GET /lending/markets HTTP/1.1\r\n"));
+}
+
+#[tokio::test]
+async fn simulation_forwards_exact_envelope_without_creating_indexed_truth() {
+    let prediction = serde_json::json!({
+        "accepted": true,
+        "txid": hash('8'),
+        "receipt": {"status": "success", "fee_charged": "12"}
+    });
+    let node = FakeNode::spawn(vec![
+        (200, status_body(&identity())),
+        (200, prediction.to_string()),
+    ]);
+    let (_dir, app) = configured_app(&node);
+    let envelope = br#"{"tx":"00aa","witnesses":"11bb"}"#.to_vec();
+    let response = post_to(
+        app.clone(),
+        "/api/v1/transactions/simulate",
+        envelope.clone(),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response_json(response).await, prediction);
+    assert_not_indexed(app, &hash('8')).await;
+
+    let requests = node.requests();
+    assert_eq!(requests.len(), 2);
+    assert!(requests[0].starts_with(b"GET /status HTTP/1.1\r\n"));
+    assert!(requests[1].starts_with(b"POST /simulate_tx HTTP/1.1\r\n"));
+    let forwarded = requests[1]
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .map(|position| &requests[1][position + 4..])
+        .unwrap();
+    assert_eq!(forwarded, envelope);
+}
+
+#[tokio::test]
+async fn reserve_safety_and_account_state_are_identity_checked_read_throughs() {
+    let account = hash('6');
+    let safety = serde_json::json!({
+        "items": [{
+            "market_id": hash('1'),
+            "reserve_account": account,
+            "reserve_balance": "9000",
+            "psm_minted": "4000"
+        }]
+    });
+    let account_state = serde_json::json!({
+        "account": account,
+        "nonce": "17",
+        "authorization": {"kind": "single_key"}
+    });
+    let node = FakeNode::spawn(vec![
+        (200, status_body(&identity())),
+        (200, safety.to_string()),
+        (200, status_body(&identity())),
+        (200, account_state.to_string()),
+    ]);
+    let (_dir, app) = configured_app(&node);
+
+    let safety_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/stable-safety")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(safety_response.status(), StatusCode::OK);
+    assert_eq!(response_json(safety_response).await, safety);
+
+    let account_response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/accounts/{account}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(account_response.status(), StatusCode::OK);
+    assert_eq!(response_json(account_response).await, account_state);
+
+    let requests = node.requests();
+    assert_eq!(requests.len(), 4);
+    assert!(requests[1].starts_with(b"GET /stable/safety HTTP/1.1\r\n"));
+    assert!(requests[3].starts_with(format!("GET /account/{account} HTTP/1.1\r\n").as_bytes()));
 }
 
 #[tokio::test]

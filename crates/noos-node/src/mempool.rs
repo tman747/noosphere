@@ -132,6 +132,10 @@ pub struct PoolEntry {
     pub tx: TransactionV1,
     pub tx_bytes: Vec<u8>,
     pub wit_bytes: Vec<u8>,
+    /// Account authorization descriptors against which every signature was
+    /// verified at admission. Execution may reuse that result only while all
+    /// descriptors remain byte-identical.
+    pub signature_authorizations: Vec<(Hash32, Vec<u8>)>,
     /// Declared maximum fee under admission-time prices.
     pub fee: u128,
     /// Fee density: `fee * 1000 / encoded_len` (micro-NOOS per KB-ish;
@@ -308,6 +312,7 @@ impl Mempool {
             return Err(AdmitError::WitnessMismatch);
         }
         let verifier = NodeAuthVerifier;
+        let mut signature_authorizations = Vec::with_capacity(tx.account_inputs.len());
         for (account_id, intent) in tx.account_inputs.iter().zip(wits.intents.iter()) {
             if intent.tx_commitment != id {
                 return Err(AdmitError::WitnessMismatch);
@@ -327,6 +332,8 @@ impl Mempool {
             ) {
                 return Err(AdmitError::SignatureInvalid);
             }
+            signature_authorizations
+                .push((*account_id, account.auth_descriptor.as_slice().to_vec()));
         }
 
         // 7. bounded-resource caps.
@@ -364,6 +371,7 @@ impl Mempool {
             tx,
             tx_bytes: tx_bytes.to_vec(),
             wit_bytes: wit_bytes.to_vec(),
+            signature_authorizations,
             fee,
             density,
             payer,

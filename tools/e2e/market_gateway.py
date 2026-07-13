@@ -76,6 +76,29 @@ def request_json(addr: str, path: str, token: str | None = None, timeout: float 
     with urlopen(request, timeout=timeout) as response:
         return json.loads(response.read())
 
+def post_json(addr: str, path: str, token: str, value: dict, timeout: float = 5) -> dict:
+    encoded = json.dumps(value, separators=(",", ":")).encode()
+    request = Request(
+        f"http://{addr}{path}",
+        data=encoded,
+        headers={
+            "Accept": "application/json",
+            "Authorization": "Bearer " + token,
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read())
+    except HTTPError as error:
+        try:
+            detail = json.loads(error.read()).get("error", {})
+            message = detail.get("detail") or detail.get("code")
+        except (AttributeError, json.JSONDecodeError):
+            message = None
+        raise RuntimeError(message or f"node refused request with HTTP {error.code}") from error
+
 
 def cli_json(exe: Path, *args: str) -> dict:
     completed = subprocess.run(
@@ -271,6 +294,7 @@ def defi_state(metadata: dict) -> dict:
         "lending_markets": request_json(indexer, "/api/v1/lending-markets").get("items", []),
         "stable_assets": request_json(indexer, "/api/v1/stable-assets").get("items", []),
         "debt_positions": request_json(indexer, "/api/v1/debt-positions").get("items", []),
+        "stable_safety": request_json(indexer, "/api/v1/stable-safety").get("items", []),
         "private_payments": request_json(indexer, "/api/v1/private-payments").get("items", []),
     }
 
@@ -409,6 +433,58 @@ def wallet_build(metadata: dict, exe: Path, body: dict) -> dict:
         "signing_message": (b"NOOS/SIG/TX/V1" + bytes.fromhex(built["txid"])).hex(),
     }
 
+def wallet_build_action(metadata: dict, exe: Path, body: dict) -> dict:
+    account = str(body.get("account", ""))
+    market = str(body.get("market_id", ""))
+    kind = str(body.get("type", ""))
+    if not HEX32.fullmatch(account) or not HEX32.fullmatch(market):
+        raise ValueError("account and market_id must be 32-byte lowercase hex")
+    amount = integer(body.get("amount"), "amount", 1)
+    min_output = integer(body.get("min_output"), "min_output", 1)
+    if kind == "psm_mint":
+        action = {
+            "type": kind,
+            "owner": account,
+            "market_id": market,
+            "collateral_in": str(amount),
+            "min_stable_out": str(min_output),
+        }
+    elif kind == "psm_redeem":
+        action = {
+            "type": kind,
+            "owner": account,
+            "market_id": market,
+            "stable_in": str(amount),
+            "min_collateral_out": str(min_output),
+        }
+    else:
+        raise ValueError("wallet action must be psm_mint or psm_redeem")
+    status = request_json(metadata["validator_rpc"], "/status", metadata["rpc_token"])
+    spec = {
+        "chain_id": metadata["chain_id"],
+        "expiry_height": int(status["unsafe_head"]["height"]) + 1000,
+        "fee_payer": account,
+        "resource_limits": {
+            "bytes": 4096,
+            "grain_steps": 0,
+            "proof_units": 0,
+            "state_reads": 32,
+            "state_writes": 32,
+            "blob_bytes": 0,
+        },
+        "account_inputs": [account],
+        "actions": [action],
+    }
+    built = cli_json(exe, "tx", "build", "--spec", json.dumps(spec, separators=(",", ":")))
+    return {
+        "tx": built["tx"],
+        "txid": built["txid"],
+        "chain_id": metadata["chain_id"],
+        "genesis_hash": metadata["genesis_hash"],
+        "signing_message": (b"NOOS/SIG/TX/V1" + bytes.fromhex(built["txid"])).hex(),
+        "action": action,
+    }
+
 
 def _tag(value: int) -> bytes:
     return struct.pack("<H", value)
@@ -426,15 +502,18 @@ def _wallet_witness(txid: bytes, signature: bytes) -> str:
     witnesses += _tag(2) + struct.pack("<I", 0)
     return witnesses.hex()
 
-
-def wallet_submit(metadata: dict, exe: Path, body: dict) -> dict:
+def wallet_envelope(body: dict) -> tuple[str, str, str]:
     account = str(body.get("account", ""))
     tx = str(body.get("tx", ""))
     txid = str(body.get("txid", ""))
     signature_hex = str(body.get("signature", ""))
     if not HEX32.fullmatch(account) or not HEX32.fullmatch(txid):
         raise ValueError("account and txid must be 32-byte lowercase hex")
-    if not re.fullmatch(r"(?:[0-9a-f]{2})+", tx) or len(signature_hex) != 128 or not re.fullmatch(r"[0-9a-f]+", signature_hex):
+    if (
+        not re.fullmatch(r"(?:[0-9a-f]{2})+", tx)
+        or len(signature_hex) != 128
+        or not re.fullmatch(r"[0-9a-f]+", signature_hex)
+    ):
         raise ValueError("tx and signature must be canonical lowercase hex")
     signature = bytes.fromhex(signature_hex)
     try:
@@ -443,11 +522,29 @@ def wallet_submit(metadata: dict, exe: Path, body: dict) -> dict:
         )
     except (ValueError, InvalidSignature) as error:
         raise ValueError("signature does not authorize this transaction id") from error
+    return tx, txid, _wallet_witness(bytes.fromhex(txid), signature)
+
+
+def wallet_simulate(metadata: dict, body: dict) -> dict:
+    tx, txid, witnesses = wallet_envelope(body)
+    result = post_json(
+        metadata["validator_rpc"],
+        "/simulate_tx",
+        metadata["rpc_token"],
+        {"tx": tx, "witnesses": witnesses},
+    )
+    if result.get("txid") != txid:
+        raise RuntimeError("node simulated a different transaction id")
+    return result
+
+
+def wallet_submit(metadata: dict, exe: Path, body: dict) -> dict:
+    tx, txid, witnesses = wallet_envelope(body)
     submitted = cli_json(
         exe, "tx", "submit",
         "--node", metadata["validator_rpc"], "--token", metadata["rpc_token"],
         "--chain-id", metadata["chain_id"], "--genesis-hash", metadata["genesis_hash"],
-        "--tx", tx, "--witnesses", _wallet_witness(bytes.fromhex(txid), signature),
+        "--tx", tx, "--witnesses", witnesses,
     )
     if submitted.get("txid") != txid:
         raise RuntimeError("node returned a different transaction id")
@@ -552,6 +649,12 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if parsed.path == "/api/wallet/build":
                 self.send_json(200, wallet_build(self.app.metadata, self.app.cli, body))
+                return
+            if parsed.path == "/api/wallet/build-action":
+                self.send_json(200, wallet_build_action(self.app.metadata, self.app.cli, body))
+                return
+            if parsed.path == "/api/wallet/simulate":
+                self.send_json(200, wallet_simulate(self.app.metadata, body))
                 return
             if parsed.path == "/api/wallet/submit":
                 self.send_json(200, wallet_submit(self.app.metadata, self.app.cli, body))

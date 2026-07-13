@@ -31,9 +31,9 @@ use noos_codec::NoosDecode;
 use noos_da::{encode_body, BodyDaClaimV1, ShardCandidateV1, BODY_TOTAL_SHARDS};
 use noos_ground::GroundTicketV1;
 use noos_lumen::objects::{
-    AssetV1, BoundedList, ComputeJobV1, ComputeWorkerV1, DebtPositionV1, LendingMarketV1,
-    LiquidityPositionV1, OracleFeedV1, OracleReportV1, PoolV1, PrivatePaymentV1, ReceiptV1,
-    StableAssetV1,
+    AccountV1, AssetV1, BoundedList, ComputeJobV1, ComputeWorkerV1, DebtPositionV1,
+    LendingMarketV1, LiquidityPositionV1, OracleFeedV1, OracleReportV1, PoolV1,
+    PrivatePaymentV1, ReceiptV1, StableAssetV1, StableSafetyV1,
 };
 use noos_lumen::state::LumenRoots;
 use noos_p2p::{
@@ -234,6 +234,16 @@ pub enum ConsensusMsg {
         source: u64,
         reply: Reply<Result<Hash32, AdmitError>>,
     },
+    SimulateTx {
+        tx_bytes: Vec<u8>,
+        wit_bytes: Vec<u8>,
+        reply: Reply<
+            Result<
+                noos_lumen::state::SimulationOutcome,
+                noos_lumen::state::RejectReason,
+            >,
+        >,
+    },
     ImportBlock {
         header: Box<BlockHeaderV1>,
         ticket: GroundTicketV1,
@@ -306,6 +316,9 @@ pub enum ConsensusMsg {
     GetStableAssets {
         reply: Reply<Vec<StableAssetV1>>,
     },
+    GetStableSafety {
+        reply: Reply<Vec<StableSafetyV1>>,
+    },
     GetDebtPositions {
         reply: Reply<Vec<DebtPositionV1>>,
     },
@@ -317,6 +330,10 @@ pub enum ConsensusMsg {
     },
     GetComputeJobs {
         reply: Reply<Vec<ComputeJobV1>>,
+    },
+    GetAccount {
+        account: Hash32,
+        reply: Reply<Option<AccountV1>>,
     },
     GetBalance {
         account: Hash32,
@@ -375,6 +392,13 @@ fn core_loop<P: StorePort>(
                     }
                 }
                 let _ = reply.send(result);
+            }
+            ConsensusMsg::SimulateTx {
+                tx_bytes,
+                wit_bytes,
+                reply,
+            } => {
+                let _ = reply.send(core.simulate_tx(&tx_bytes, &wit_bytes));
             }
             ConsensusMsg::ImportBlock {
                 header,
@@ -496,6 +520,9 @@ fn core_loop<P: StorePort>(
             ConsensusMsg::GetStableAssets { reply } => {
                 let _ = reply.send(core.ledger().stable_assets());
             }
+            ConsensusMsg::GetStableSafety { reply } => {
+                let _ = reply.send(core.ledger().stable_safeties());
+            }
             ConsensusMsg::GetDebtPositions { reply } => {
                 let _ = reply.send(core.ledger().debt_positions());
             }
@@ -507,6 +534,9 @@ fn core_loop<P: StorePort>(
             }
             ConsensusMsg::GetComputeJobs { reply } => {
                 let _ = reply.send(core.ledger().compute_jobs());
+            }
+            ConsensusMsg::GetAccount { account, reply } => {
+                let _ = reply.send(core.ledger().get_account(&account));
             }
             ConsensusMsg::GetBalance {
                 account,

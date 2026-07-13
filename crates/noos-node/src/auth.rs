@@ -71,6 +71,40 @@ impl AuthVerifier for NodeAuthVerifier {
     }
 }
 
+/// Execution verifier used only after mempool admission has verified every
+/// signature against the same unchanged account authorization descriptors.
+/// Non-signature authorization remains fail-closed exactly as in
+/// [`NodeAuthVerifier`].
+#[derive(Debug, Default, Clone, Copy)]
+pub struct PreverifiedSignatureAuth;
+
+impl AuthVerifier for PreverifiedSignatureAuth {
+    fn verify_signature(
+        &self,
+        _suite: u16,
+        _auth_descriptor: &[u8],
+        _message: &Hash32,
+        _signature: &[u8],
+    ) -> bool {
+        true
+    }
+
+    fn verify_lock_reveal(&self, lock_root: &Hash32, reveal: &[u8]) -> bool {
+        NodeAuthVerifier.verify_lock_reveal(lock_root, reveal)
+    }
+
+    fn verify_evidence_ref(&self, evidence_ref: &Hash32) -> bool {
+        NodeAuthVerifier.verify_evidence_ref(evidence_ref)
+    }
+
+    fn verify_witness_extras(
+        &self,
+        witnesses: &noos_lumen::objects::TransactionWitnessesV1,
+    ) -> bool {
+        NodeAuthVerifier.verify_witness_extras(witnesses)
+    }
+}
+
 /// Immutable production adapter from Lumen's pure execution seam to Grain.
 ///
 /// The registry is deliberately part of the engine value rather than a

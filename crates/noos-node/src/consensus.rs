@@ -61,7 +61,7 @@ use noos_witness::finality::{
 use noos_witness::membership::{build_snapshot, SnapshotOutcome};
 use noos_witness::vote::{validate_vote, CheckpointView, FinalityVoteV1};
 
-use crate::auth::{GrainContractEngine, NodeAuthVerifier};
+use crate::auth::{GrainContractEngine, NodeAuthVerifier, PreverifiedSignatureAuth};
 use crate::devnet_fixture::fixture_witness_secret;
 use crate::genesis::{
     BuiltGenesis, GenesisSpec, DEVNET_PROPOSER_SEED, PROPOSER_POOL_ACCOUNT, TREASURY_ACCOUNT,
@@ -121,6 +121,9 @@ pub struct NodeConfig {
     /// witnesses. `noosd` enables this only for `--validator` runs against
     /// parameters with `is_test_network = true`.
     pub devnet_fixture_finality: bool,
+    /// Height at which every legacy lending market is deterministically
+    /// backfilled with a zero-funded StableSafetyV1 object.
+    pub stable_safety_activation_height: Option<u64>,
 }
 
 impl Default for NodeConfig {
@@ -136,6 +139,7 @@ impl Default for NodeConfig {
             witness_bonds: Vec::new(),
             min_bond: 1,
             devnet_fixture_finality: false,
+            stable_safety_activation_height: None,
         }
     }
 }
@@ -1305,13 +1309,21 @@ impl<P: StorePort> NodeCore<P> {
                     &mut ledger,
                     self.chain_id,
                     &self.engine,
+                    self.cfg.stable_safety_activation_height,
                     &ancestor.header,
                     &ancestor.body,
                 )?;
             }
             ledger
         };
-        Self::execute_and_verify_on(&mut ledger, self.chain_id, &self.engine, header, body)?;
+        Self::execute_and_verify_on(
+            &mut ledger,
+            self.chain_id,
+            &self.engine,
+            self.cfg.stable_safety_activation_height,
+            header,
+            body,
+        )?;
         Ok(())
     }
 
@@ -1462,6 +1474,7 @@ impl<P: StorePort> NodeCore<P> {
                 &mut staged.ledger,
                 self.chain_id,
                 &self.engine,
+                self.cfg.stable_safety_activation_height,
                 &block.header,
                 &block.body,
             )?;
@@ -1548,6 +1561,7 @@ impl<P: StorePort> NodeCore<P> {
                 &mut ledger,
                 self.chain_id,
                 &self.engine,
+                self.cfg.stable_safety_activation_height,
                 &block.header,
                 &block.body,
             )?;
@@ -1564,17 +1578,32 @@ impl<P: StorePort> NodeCore<P> {
         header: &BlockHeaderV1,
         body: &BlockBodyV1,
     ) -> Result<ExecResult, NodeError> {
-        Self::execute_and_verify_on(&mut self.ledger, self.chain_id, &self.engine, header, body)
+        Self::execute_and_verify_on(
+            &mut self.ledger,
+            self.chain_id,
+            &self.engine,
+            self.cfg.stable_safety_activation_height,
+            header,
+            body,
+        )
     }
 
     fn execute_and_verify_on(
         ledger: &mut LumenLedger,
         chain_id: Hash32,
         engine: &GrainContractEngine,
+        stable_safety_activation_height: Option<u64>,
         header: &BlockHeaderV1,
         body: &BlockBodyV1,
     ) -> Result<ExecResult, NodeError> {
         let mut deltas: Vec<StateDelta> = Vec::new();
+        if let Some(activation_height) = stable_safety_activation_height {
+            deltas.push(
+                ledger
+                    .activate_stable_safety_upgrade(header.height, activation_height)
+                    .map_err(NodeError::Migration)?,
+            );
+        }
 
         // System transitions first (ch01 §9.3): parameter activation, then
         // the deterministic emission for this height.
@@ -2131,6 +2160,23 @@ impl<P: StorePort> NodeCore<P> {
         Ok(id)
     }
 
+    /// Execute a transaction against a discardable Lumen overlay at the next
+    /// block height. This performs full canonical decoding, witness and
+    /// signature checks, fee calculation, action execution, and postconditions
+    /// without inserting into the mempool or mutating ledger state.
+    pub fn simulate_tx(
+        &self,
+        tx_bytes: &[u8],
+        wit_bytes: &[u8],
+    ) -> Result<noos_lumen::state::SimulationOutcome, noos_lumen::state::RejectReason> {
+        let ctx = BlockContext {
+            chain_id: self.chain_id,
+            height: self.exec_height.saturating_add(1),
+        };
+        self.ledger
+            .simulate_transaction(&ctx, tx_bytes, wit_bytes, &self.engine, &NodeAuthVerifier)
+    }
+
     // -- block production ---------------------------------------------------------------
 
     /// Produces, executes, commits, and returns the next canonical block
@@ -2178,6 +2224,13 @@ impl<P: StorePort> NodeCore<P> {
 
         // System transitions first, mirroring the import order exactly.
         let mut deltas: Vec<StateDelta> = Vec::new();
+        if let Some(activation_height) = self.cfg.stable_safety_activation_height {
+            deltas.push(
+                self.ledger
+                    .activate_stable_safety_upgrade(height, activation_height)
+                    .map_err(NodeError::Migration)?,
+            );
+        }
         deltas.push(self.ledger.activate_pending_params(height));
         let prices = self
             .ledger
@@ -2204,11 +2257,27 @@ impl<P: StorePort> NodeCore<P> {
                 .ok_or(NodeError::RootMismatch {
                     field: "fee_params",
                 })?;
-        let template: Vec<(Hash32, Vec<u8>, Vec<u8>)> = self
+        let template: Vec<(Hash32, Vec<u8>, Vec<u8>, bool)> = self
             .mempool
             .template(&capacity)
             .into_iter()
-            .map(|e| (e.txid, e.tx_bytes.clone(), e.wit_bytes.clone()))
+            .map(|entry| {
+                let signatures_preverified =
+                    entry
+                        .signature_authorizations
+                        .iter()
+                        .all(|(account_id, descriptor)| {
+                            self.ledger.get_account(account_id).is_some_and(|account| {
+                                account.auth_descriptor.as_slice() == descriptor.as_slice()
+                            })
+                        });
+                (
+                    entry.txid,
+                    entry.tx_bytes.clone(),
+                    entry.wit_bytes.clone(),
+                    signatures_preverified,
+                )
+            })
             .collect();
         let ctx = BlockContext {
             chain_id: self.chain_id,
@@ -2216,13 +2285,19 @@ impl<P: StorePort> NodeCore<P> {
         };
         let engine = self.engine.clone();
         let auth = NodeAuthVerifier;
+        let preverified_auth = PreverifiedSignatureAuth;
         let mut receipts: Vec<ReceiptV1> = Vec::new();
         let mut included: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
         let mut dropped: Vec<Hash32> = Vec::new();
-        for (txid, tx_bytes, wit_bytes) in template {
+        for (txid, tx_bytes, wit_bytes, signatures_preverified) in template {
+            let verifier: &dyn noos_lumen::engine::AuthVerifier = if signatures_preverified {
+                &preverified_auth
+            } else {
+                &auth
+            };
             match self
                 .ledger
-                .apply_transaction(&ctx, &tx_bytes, &wit_bytes, &engine, &auth)
+                .apply_transaction(&ctx, &tx_bytes, &wit_bytes, &engine, verifier)
             {
                 Ok(outcome) => {
                     receipts.push(outcome.receipt().clone());

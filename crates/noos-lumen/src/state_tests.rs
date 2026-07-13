@@ -25,7 +25,8 @@ use crate::objects::{
 };
 use crate::state::{
     param_key, ApplyOutcome, BlockContext, FailCode, GenesisConfig, GenesisError, LumenLedger,
-    LumenRoots, RejectReason, StateDelta, TreeId, CONTROL_PREFIX, NOOS_ASSET, PARAM_ISSUANCE,
+    LumenRoots, RejectReason, SimulationOutcome, StateDelta, TreeId, CONTROL_PREFIX, NOOS_ASSET,
+    PARAM_ISSUANCE,
 };
 use crate::test_util::SplitMix64;
 use crate::Hash32;
@@ -305,6 +306,36 @@ fn create_object(ledger: &mut LumenLedger, height: u64, code_hash: Hash32) -> Ha
 // ---------------------------------------------------------------------------
 // Root-transition invariants
 // ---------------------------------------------------------------------------
+
+#[test]
+fn simulation_matches_application_without_mutating_any_state() {
+    let mut ledger = genesis();
+    let (tx_bytes, witness_bytes, tx) = build_tx(1, vec![], vec![PAYER], vec![], vec![]);
+    let transaction_id = txid(&tx);
+    let roots_before = ledger.roots();
+    let balance_before = ledger.balance(&PAYER, &NOOS_ASSET);
+    let nonce_before = ledger.get_account(&PAYER).unwrap().nonce;
+
+    let simulated = ledger
+        .simulate_transaction(&ctx(1), &tx_bytes, &witness_bytes, &StubEngine, &AcceptAll)
+        .unwrap();
+    let SimulationOutcome::Applied {
+        receipt: simulated_receipt,
+    } = simulated
+    else {
+        panic!("valid transaction did not simulate successfully");
+    };
+    assert_roots_eq(&roots_before, &ledger.roots());
+    assert_eq!(ledger.balance(&PAYER, &NOOS_ASSET), balance_before);
+    assert_eq!(ledger.get_account(&PAYER).unwrap().nonce, nonce_before);
+    assert!(ledger.get_receipt(&transaction_id).is_none());
+
+    let applied = ledger
+        .apply_transaction(&ctx(1), &tx_bytes, &witness_bytes, &StubEngine, &AcceptAll)
+        .unwrap();
+    assert_eq!(applied.receipt(), &simulated_receipt);
+    assert!(ledger.get_receipt(&transaction_id).is_some());
+}
 
 #[test]
 fn rejected_transaction_leaves_all_six_roots_byte_identical() {
@@ -967,6 +998,18 @@ fn quorum_oracle_and_collateralized_stable_debt_lifecycle() {
         ),
         ApplyOutcome::Applied { .. }
     ));
+    assert!(ledger.get_stable_safety(&market_id).is_some());
+    ledger.remove_stable_safety_for_test(&market_id);
+    assert!(ledger
+        .activate_stable_safety_upgrade(6, 7)
+        .unwrap()
+        .is_empty());
+    assert!(ledger.get_stable_safety(&market_id).is_none());
+    assert!(!ledger
+        .activate_stable_safety_upgrade(7, 7)
+        .unwrap()
+        .is_empty());
+    assert!(ledger.get_stable_safety(&market_id).is_some());
     assert!(matches!(
         apply(
             &mut ledger,

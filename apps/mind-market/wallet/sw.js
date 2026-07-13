@@ -1,5 +1,5 @@
 "use strict";
-const CACHE = "harbor-wallet-shell-v2";
+const CACHE = "harbor-wallet-shell-v3";
 const SHELL = ["/wallet/", "/wallet/styles.css", "/wallet/app.js", "/wallet/passkey-recovery.js", "/wallet/manifest.webmanifest", "/wallet/icon.svg"];
 self.addEventListener("install", (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL))));
 self.addEventListener("activate", (event) => event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))));

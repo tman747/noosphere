@@ -62,6 +62,32 @@
         <div><span>VAULT</span><strong>Device encrypted</strong></div>
         <button id="refresh">Refresh</button>
       </section>
+      <section class="psm" aria-labelledby="psm-title">
+        <div class="psm-copy">
+          <p class="eyebrow">Protocol stability module</p>
+          <h2 id="psm-title">Convert against the reserve.</h2>
+          <p>Mint stable assets from approved collateral or redeem stable assets for reserve collateral. Harbor simulates the signed transaction before submission; your slippage floor remains enforceable on-chain.</p>
+        </div>
+        <div class="reserve-ledger" aria-live="polite">
+          <div><span>STABLE RESERVE</span><strong id="psm-stable-reserve">—</strong></div>
+          <div><span>COLLATERAL RESERVE</span><strong id="psm-collateral-reserve">—</strong></div>
+          <div><span>PSM DEBT</span><strong id="psm-debt">—</strong></div>
+          <div><span>FEE</span><strong id="psm-fee">—</strong></div>
+        </div>
+        <form id="psm-form">
+          <label>Direction<select name="type" id="psm-kind"><option value="psm_mint">Collateral → stable</option><option value="psm_redeem">Stable → collateral</option></select></label>
+          <label>Market<select name="market_id" id="psm-market" required></select></label>
+          <div class="psm-balances">
+            <span>INPUT BALANCE <b id="psm-input-balance">—</b></span>
+            <span>OUTPUT ASSET <b id="psm-output-asset">—</b></span>
+          </div>
+          <label>Input amount in base units<input name="amount" inputmode="numeric" pattern="[0-9]+" required></label>
+          <label>Minimum output in base units<input name="min_output" inputmode="numeric" pattern="[0-9]+" required></label>
+          <div class="transaction-check"><span>Safety path</span><b>Build → local signature → exact simulation → submit</b></div>
+          <button type="submit">Review reserve conversion</button>
+          <p class="psm-empty hidden" id="psm-empty">No active stability markets are available on this chain.</p>
+        </form>
+      </section>
       <section class="operations">
         <article class="send">
           <p class="eyebrow">Signed locally</p><h2>Send payment</h2>
@@ -69,7 +95,7 @@
             <label>Asset<select name="asset" id="asset"></select></label>
             <label>Recipient public key<input name="recipient" minlength="64" maxlength="64" autocomplete="off" required></label>
             <label>Amount in base units<input name="amount" inputmode="numeric" pattern="[0-9]+" required></label>
-            <div class="transaction-check"><span>Transaction path</span><b>Build unsigned → verify identity → sign here → submit</b></div>
+            <div class="transaction-check"><span>Transaction path</span><b>Build → local signature → exact simulation → submit</b></div>
             <button type="submit">Review and sign</button>
           </form>
         </article>
@@ -85,7 +111,7 @@
       </section>
     </section>
   </main>
-  <dialog id="confirm-dialog"><form method="dialog"><p class="eyebrow">Confirm transaction</p><h2>Sign this transfer?</h2><dl id="review"></dl><div><button value="cancel">Cancel</button><button id="confirm-sign" value="confirm">Sign and submit</button></div></form></dialog>
+  <dialog id="confirm-dialog"><form method="dialog"><p class="eyebrow">Confirm transaction</p><h2 id="review-title">Sign this transaction?</h2><dl id="review"></dl><div><button value="cancel">Cancel</button><button id="confirm-sign" value="confirm">Sign and submit</button></div></form></dialog>
   <script src="/wallet/app.js" type="module"></script>
 </body>
 </html>

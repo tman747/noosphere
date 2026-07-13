@@ -52,7 +52,7 @@ class DefiGatewayTests(unittest.TestCase):
         self.assertEqual(paths, [
             "/api/v1/pools", "/api/v1/liquidity-positions", "/api/v1/oracle-feeds",
             "/api/v1/oracle-reports", "/api/v1/lending-markets", "/api/v1/stable-assets",
-            "/api/v1/debt-positions",
+            "/api/v1/debt-positions", "/api/v1/stable-safety",
             "/api/v1/private-payments",
         ])
         self.assertTrue(all(value for key, value in state.items() if key != "account"))
@@ -93,6 +93,44 @@ class WalletGatewayTests(unittest.TestCase):
         self.assertNotIn("seed", gateway.json.dumps(spec))
         self.assertEqual(result["signing_message"], (b"NOOS/SIG/TX/V1" + bytes.fromhex("cc" * 32)).hex())
 
+    def test_psm_builder_binds_owner_and_emits_only_the_selected_action(self) -> None:
+        built = {"tx": "01", "txid": "cc" * 32}
+        with patch.object(gateway, "request_json", return_value={"unsafe_head": {"height": "40"}}), patch.object(gateway, "cli_json", return_value=built) as cli:
+            result = gateway.wallet_build_action(
+                self.metadata,
+                gateway.Path("noos-cli"),
+                {
+                    "account": ACCOUNT,
+                    "type": "psm_mint",
+                    "market_id": MARKET,
+                    "amount": "1200",
+                    "min_output": "1188",
+                    "owner": OWNER,
+                },
+            )
+        spec = gateway.json.loads(cli.call_args.args[-1])
+        self.assertEqual(spec["fee_payer"], ACCOUNT)
+        self.assertEqual(spec["actions"], [{
+            "type": "psm_mint",
+            "owner": ACCOUNT,
+            "market_id": MARKET,
+            "collateral_in": "1200",
+            "min_stable_out": "1188",
+        }])
+        self.assertEqual(result["action"], spec["actions"][0])
+        with self.assertRaisesRegex(ValueError, "psm_mint or psm_redeem"):
+            gateway.wallet_build_action(
+                self.metadata,
+                gateway.Path("noos-cli"),
+                {
+                    "account": ACCOUNT,
+                    "type": "fund_stable_reserve",
+                    "market_id": MARKET,
+                    "amount": "1",
+                    "min_output": "1",
+                },
+            )
+
     def test_submit_accepts_only_a_matching_local_signature(self) -> None:
         key = Ed25519PrivateKey.generate()
         account = key.public_key().public_bytes(
@@ -115,5 +153,23 @@ class WalletGatewayTests(unittest.TestCase):
                 gateway.Path("noos-cli"),
                 {"account": account, "tx": "01", "txid": txid, "signature": bad},
             )
+
+    def test_simulation_uses_the_verified_signature_envelope(self) -> None:
+        key = Ed25519PrivateKey.generate()
+        account = key.public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw
+        ).hex()
+        txid = "cc" * 32
+        signature = key.sign(b"NOOS/SIG/TX/V1" + bytes.fromhex(txid)).hex()
+        prediction = {"accepted": True, "txid": txid, "status": 0}
+        with patch.object(gateway, "post_json", return_value=prediction) as post:
+            result = gateway.wallet_simulate(
+                self.metadata,
+                {"account": account, "tx": "01", "txid": txid, "signature": signature},
+            )
+        self.assertEqual(result, prediction)
+        envelope = post.call_args.args[3]
+        self.assertEqual(envelope["tx"], "01")
+        self.assertTrue(envelope["witnesses"])
 if __name__ == "__main__":
     unittest.main()
