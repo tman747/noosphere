@@ -130,6 +130,7 @@ impl AdmitError {
 pub struct PoolEntry {
     pub txid: Hash32,
     pub tx: TransactionV1,
+    pub witnesses: TransactionWitnessesV1,
     pub tx_bytes: Vec<u8>,
     pub wit_bytes: Vec<u8>,
     /// Account authorization descriptors against which every signature was
@@ -369,6 +370,7 @@ impl Mempool {
         let entry = PoolEntry {
             txid: id,
             tx,
+            witnesses: wits,
             tx_bytes: tx_bytes.to_vec(),
             wit_bytes: wit_bytes.to_vec(),
             signature_authorizations,

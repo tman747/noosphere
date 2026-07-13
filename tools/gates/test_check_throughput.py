@@ -69,6 +69,35 @@ class ThroughputGateTests(unittest.TestCase):
         with self.assertRaisesRegex(gate.ThroughputError, "production authorization"):
             self.evaluate(validator, producer)
 
+    def test_durable_two_node_pipeline_enforces_both_roles(self) -> None:
+        samples = []
+        for producer, validator in ((9_200, 7_800), (9_600, 8_200)):
+            sample = report(0, "mempool-preverified-signatures")
+            sample["result"].update({
+                "applied": 1_200,
+                "pending_after_block": 0,
+                "block_pipeline_tps": producer,
+                "validator_import_tps": validator,
+            })
+            samples.append(sample)
+        observed = gate.evaluate_durable_reports(samples, 1_200, 9_000, 7_500, 0.30)
+        self.assertFalse(observed["failures"])
+        self.assertEqual(
+            observed["checks"]["durable_producer_median_tps"]["observed"],
+            9_400,
+        )
+
+    def test_durable_two_node_pipeline_rejects_pending_work(self) -> None:
+        sample = report(0, "mempool-preverified-signatures")
+        sample["result"].update({
+            "applied": 1_199,
+            "pending_after_block": 1,
+            "block_pipeline_tps": 10_000,
+            "validator_import_tps": 9_000,
+        })
+        with self.assertRaisesRegex(gate.ThroughputError, "complete workload"):
+            gate.evaluate_durable_reports([sample], 1_200, 9_000, 7_500, 0.30)
+
 
 if __name__ == "__main__":
     unittest.main()

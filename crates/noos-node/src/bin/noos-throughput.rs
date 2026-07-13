@@ -3,7 +3,10 @@
 
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Instant;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use noos_codec::NoosEncode;
 use noos_crypto::{DomainId, Keypair};
@@ -14,13 +17,22 @@ use noos_lumen::objects::{
 };
 use noos_lumen::state::{ApplyOutcome, BlockContext, NOOS_ASSET};
 use noos_node::auth::{GrainContractEngine, NodeAuthVerifier, PreverifiedSignatureAuth};
-use noos_node::genesis::{DevnetParams, GenesisSpec};
+use noos_node::consensus::{NodeConfig, NodeCore};
+use noos_node::genesis::{BuiltGenesis, DevnetParams, GenesisSpec};
+use noos_node::metrics::Metrics;
+use noos_node::store_port::InProcStore;
 use serde_json::json;
 
 const DEFAULT_TRANSACTIONS: usize = 10_000;
 const DEFAULT_ACCOUNTS: usize = 1_024;
 const DEFAULT_BATCH_SIZE: usize = 256;
 const BENCHMARK_HEIGHT: u64 = 1;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Pipeline {
+    State,
+    DurableBlock,
+}
 
 struct Config {
     transactions: usize,
@@ -30,6 +42,7 @@ struct Config {
     output: Option<PathBuf>,
     allow_debug: bool,
     preverified_signatures: bool,
+    pipeline: Pipeline,
 }
 
 fn parse_args() -> Result<Config, String> {
@@ -41,6 +54,7 @@ fn parse_args() -> Result<Config, String> {
         output: None,
         allow_debug: false,
         preverified_signatures: false,
+        pipeline: Pipeline::State,
     };
     let mut args = std::env::args().skip(1);
     while let Some(argument) = args.next() {
@@ -68,9 +82,16 @@ fn parse_args() -> Result<Config, String> {
             "--output" => config.output = Some(PathBuf::from(value("--output")?)),
             "--allow-debug" => config.allow_debug = true,
             "--preverified-signatures" => config.preverified_signatures = true,
+            "--pipeline" => {
+                config.pipeline = match value("--pipeline")?.as_str() {
+                    "state" => Pipeline::State,
+                    "durable-block" => Pipeline::DurableBlock,
+                    _ => return Err("--pipeline must be state or durable-block".to_owned()),
+                };
+            }
             "-h" | "--help" => {
                 return Err(
-                    "usage: noos-throughput [--transactions N] [--accounts N] [--batch-size N] [--params PATH] [--output PATH] [--allow-debug] [--preverified-signatures]".to_owned(),
+                    "usage: noos-throughput [--pipeline state|durable-block] [--transactions N] [--accounts N] [--batch-size N] [--params PATH] [--output PATH] [--allow-debug] [--preverified-signatures]".to_owned(),
                 );
             }
             other => return Err(format!("unknown argument {other}")),
@@ -135,7 +156,7 @@ fn build_transaction(
         fee_payer: account,
         fee_authorization: OptionalObject(None),
         resource_limits: ResourceVector {
-            bytes: 4_096,
+            bytes: 600,
             grain_steps: 0,
             proof_units: 0,
             state_reads: 64,
@@ -181,6 +202,138 @@ fn percentile(values: &[f64], quantile: f64) -> f64 {
     ordered[index]
 }
 
+#[allow(clippy::too_many_arguments)]
+fn run_durable_block(
+    config: &Config,
+    spec: &GenesisSpec,
+    built: BuiltGenesis,
+    workload: &[(Vec<u8>, Vec<u8>)],
+    workload_hash: &str,
+    encoded_bytes: u64,
+    setup_seconds: f64,
+) -> Result<serde_json::Value, String> {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_nanos();
+    let store_root =
+        std::env::temp_dir().join(format!("noos-throughput-{}-{unique}", std::process::id()));
+    let importer_root = std::env::temp_dir().join(format!(
+        "noos-throughput-importer-{}-{unique}",
+        std::process::id()
+    ));
+    let importer_built = spec.build().map_err(|error| error.to_string())?;
+    let importer_store = InProcStore::open(
+        importer_root.clone(),
+        &importer_built.chain_id,
+        &importer_built.genesis_hash,
+    )
+    .map_err(|error| error.to_string())?;
+    let store = InProcStore::open(store_root.clone(), &built.chain_id, &built.genesis_hash)
+        .map_err(|error| error.to_string())?;
+    let mut node_config = NodeConfig::default();
+    node_config.network.enabled = false;
+    let mut importer = NodeCore::boot(
+        node_config.clone(),
+        spec,
+        importer_built,
+        importer_store,
+        Arc::new(Metrics::default()),
+    )
+    .map_err(|error| error.to_string())?;
+    let metrics = Arc::new(Metrics::default());
+    let mut core = NodeCore::boot(node_config, spec, built, store, Arc::clone(&metrics))
+        .map_err(|error| error.to_string())?;
+
+    let admission_started = Instant::now();
+    for (index, (transaction, witnesses)) in workload.iter().enumerate() {
+        let source = u64::try_from(index % 64)
+            .ok()
+            .and_then(|value| value.checked_add(1))
+            .ok_or_else(|| "source id overflow".to_owned())?;
+        core.submit_tx(transaction, witnesses, source)
+            .map_err(|error| format!("mempool admission failed: {error:?}"))?;
+    }
+    let admission_seconds = admission_started.elapsed().as_secs_f64();
+    core.set_now(
+        spec.genesis_time_ms
+            .checked_add(6_000)
+            .ok_or_else(|| "benchmark clock overflow".to_owned())?,
+    );
+    let pipeline_started = Instant::now();
+    let block = core.produce_block().map_err(|error| error.to_string())?;
+    let pipeline_seconds = pipeline_started.elapsed().as_secs_f64();
+    importer.set_now(block.header.timestamp_ms);
+    let import_started = Instant::now();
+    importer
+        .import_block(&block.header, &block.ticket, &block.claim, &block.shards)
+        .map_err(|error| error.to_string())?;
+    let import_seconds = import_started.elapsed().as_secs_f64();
+    let included = block.body.transactions.len();
+    let roots = core.ledger().roots();
+    if importer.ledger().roots() != roots {
+        return Err("producer and validator state commitments diverged".to_owned());
+    }
+    let durable_sequence = metrics.store_seq.load(Ordering::Relaxed);
+    let logical_cpus = std::thread::available_parallelism().map_or(1, usize::from);
+    let shard_bytes = block
+        .shards
+        .iter()
+        .try_fold(0_u64, |total, shard| {
+            total.checked_add(shard.bytes.len() as u64)
+        })
+        .ok_or_else(|| "shard byte count overflow".to_owned())?;
+    let report = json!({
+        "schema": "noos/deterministic-throughput-benchmark/v1",
+        "workload": {
+            "kind": "signed-self-transfer",
+            "transactions": config.transactions,
+            "accounts": config.accounts,
+            "batch_size": config.batch_size,
+            "encoded_bytes": encoded_bytes.to_string(),
+            "workload_blake3": workload_hash,
+            "contention": "transactions are striped deterministically across fee-payer accounts",
+        },
+        "result": {
+            "applied": included,
+            "failed": 0,
+            "pending_after_block": config.transactions.saturating_sub(included),
+            "setup_seconds": setup_seconds,
+            "admission_seconds": admission_seconds,
+            "admission_tps": config.transactions as f64 / admission_seconds,
+            "block_pipeline_seconds": pipeline_seconds,
+            "block_pipeline_tps": included as f64 / pipeline_seconds,
+            "validator_import_seconds": import_seconds,
+            "validator_import_tps": included as f64 / import_seconds,
+            "canonical_body_bytes": block.claim.original_bytes.to_string(),
+            "erasure_shard_bytes": shard_bytes.to_string(),
+            "durable_store_sequence": durable_sequence.to_string(),
+        },
+        "state_commitment": {
+            "notes_root": hex(&roots.notes_root),
+            "nullifiers_root": hex(&roots.nullifiers_root),
+            "accounts_root": hex(&roots.accounts_root),
+            "objects_root": hex(&roots.objects_root),
+            "receipts_root": hex(&roots.receipts_root),
+            "params_root": hex(&roots.params_root),
+        },
+        "environment": {
+            "release_build": !cfg!(debug_assertions),
+            "logical_cpus": logical_cpus,
+            "target_arch": std::env::consts::ARCH,
+            "target_os": std::env::consts::OS,
+            "node_version": env!("CARGO_PKG_VERSION"),
+            "authorization": "mempool-preverified-signatures",
+            "scope": "two independent durable node instances in one process; includes producer admission, execution, roots, body commitments, Reed-Solomon DA, protocol WAL fsync, RocksDB apply, and validator reconstruction/import; excludes network propagation and finality",
+        },
+    });
+    drop(core);
+    drop(importer);
+    std::fs::remove_dir_all(store_root).map_err(|error| error.to_string())?;
+    std::fs::remove_dir_all(importer_root).map_err(|error| error.to_string())?;
+    Ok(report)
+}
+
 fn run(config: &Config) -> Result<serde_json::Value, String> {
     let mut params = DevnetParams::load(&config.params).map_err(|error| error.to_string())?;
     if !params.is_test_network {
@@ -196,7 +349,6 @@ fn run(config: &Config) -> Result<serde_json::Value, String> {
         .map(|key| (key.public_key().into_bytes(), 1_000_000_000))
         .collect();
     let built = spec.build().map_err(|error| error.to_string())?;
-    let mut ledger = built.ledger;
 
     let setup_started = Instant::now();
     let mut workload = Vec::with_capacity(config.transactions);
@@ -212,6 +364,19 @@ fn run(config: &Config) -> Result<serde_json::Value, String> {
         workload.push(envelope);
     }
     let setup_seconds = setup_started.elapsed().as_secs_f64();
+    let workload_hash = workload_hash.finalize().to_hex().to_string();
+    if config.pipeline == Pipeline::DurableBlock {
+        return run_durable_block(
+            config,
+            &spec,
+            built,
+            &workload,
+            &workload_hash,
+            encoded_bytes,
+            setup_seconds,
+        );
+    }
+    let mut ledger = built.ledger;
 
     let context = BlockContext {
         chain_id: built.chain_id,
@@ -261,7 +426,7 @@ fn run(config: &Config) -> Result<serde_json::Value, String> {
             "accounts": config.accounts,
             "batch_size": config.batch_size,
             "encoded_bytes": encoded_bytes.to_string(),
-            "workload_blake3": workload_hash.finalize().to_hex().to_string(),
+            "workload_blake3": workload_hash,
             "contention": "transactions are striped deterministically across fee-payer accounts",
         },
         "result": {

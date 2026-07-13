@@ -49,6 +49,12 @@ OPTIONS:
     --produce-interval-ms <ms>
                            Block production cadence for --validator
                            (default: 6000 = one block per devnet slot)
+    --template-byte-budget <bytes>
+                           Maximum admitted tx+witness bytes per proposal
+                           (default: 786432; max: DA body minus 64 KiB)
+    --template-max-transactions <count>
+                           Maximum transactions per proposal (default: 2048;
+                           bounded by the consensus BlockBodyV1 maximum)
     --devnet-account <account-id-hex>
                            Pre-provision a zero-balance account in genesis
                            (repeatable; TEST NETWORKS ONLY)
@@ -114,6 +120,7 @@ fn main() -> ExitCode {
     let mut social: Option<noos_braid::CheckpointRef> = None;
     let mut stable_safety_activation_height: Option<u64> = None;
     let mut network = NetworkSettings::default();
+    let mut mempool = noos_node::mempool::MempoolConfig::default();
 
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -200,9 +207,33 @@ fn main() -> ExitCode {
             }
             "--produce-interval-ms" => {
                 match take("--produce-interval-ms").and_then(|v| v.parse().ok()) {
-                    Some(v) => produce_interval_ms = v,
-                    None => {
-                        eprintln!("error: --produce-interval-ms expects milliseconds");
+                    Some(v) if v > 0 => produce_interval_ms = v,
+                    _ => {
+                        eprintln!("error: --produce-interval-ms expects positive milliseconds");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            "--template-byte-budget" => {
+                let maximum = noos_da::MAX_BLOCK_BODY_BYTES.saturating_sub(65_536);
+                match take("--template-byte-budget").and_then(|v| v.parse().ok()) {
+                    Some(value) if (1..=maximum).contains(&value) => {
+                        mempool.template_byte_budget = value;
+                    }
+                    _ => {
+                        eprintln!("error: --template-byte-budget expects 1..={maximum} bytes");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            "--template-max-transactions" => {
+                let maximum = noos_braid::MAX_TRANSACTIONS as usize;
+                match take("--template-max-transactions").and_then(|v| v.parse().ok()) {
+                    Some(value) if (1..=maximum).contains(&value) => {
+                        mempool.template_max_txs = value;
+                    }
+                    _ => {
+                        eprintln!("error: --template-max-transactions expects 1..={maximum}");
                         return ExitCode::from(2);
                     }
                 }
@@ -347,6 +378,7 @@ fn main() -> ExitCode {
         min_bond,
         devnet_fixture_finality: validator,
         stable_safety_activation_height,
+        mempool,
         ..NodeConfig::default()
     };
 

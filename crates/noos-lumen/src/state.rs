@@ -1100,6 +1100,39 @@ impl LumenLedger {
         }
     }
 
+    /// Apply an already canonically decoded transaction without repeating the
+    /// codec pass. `encoded_len` MUST be the exact combined canonical
+    /// transaction-plus-witness byte length retained by the consensus
+    /// admission or block decoder.
+    pub fn apply_canonical_decoded_transaction(
+        &mut self,
+        ctx: &BlockContext,
+        tx: &TransactionV1,
+        witnesses: &TransactionWitnessesV1,
+        encoded_len: usize,
+        engine: &dyn ContractEngine,
+        auth: &dyn AuthVerifier,
+    ) -> Result<ApplyOutcome, RejectReason> {
+        let encoded_len =
+            u64::try_from(encoded_len).map_err(|_| RejectReason::OversizedEncoding)?;
+        let prepared = self.prepare_decoded_transaction(
+            ctx,
+            tx.clone(),
+            witnesses.clone(),
+            encoded_len,
+            auth,
+        )?;
+        match self.evaluate_transaction(ctx, &prepared, engine) {
+            EvaluatedTransaction::Applied { overlay, receipt } => {
+                let delta = self.commit_overlay(overlay);
+                Ok(ApplyOutcome::Applied { receipt, delta })
+            }
+            EvaluatedTransaction::Failed { receipt, code } => {
+                Ok(self.commit_failure_receipt(&prepared.tx, receipt, code))
+            }
+        }
+    }
+
     /// Execute the exact admission, authorization, fee, and action pipeline
     /// used by [`Self::apply_transaction`] without committing any mutation.
     pub fn simulate_transaction(
@@ -1130,6 +1163,22 @@ impl LumenLedger {
             TransactionV1::decode_canonical(tx_bytes).map_err(|_| RejectReason::Noncanonical)?;
         let witnesses = TransactionWitnessesV1::decode_canonical(witness_bytes)
             .map_err(|_| RejectReason::Noncanonical)?;
+        let encoded_len = u64::try_from(tx_bytes.len())
+            .ok()
+            .zip(u64::try_from(witness_bytes.len()).ok())
+            .and_then(|(transaction, witness)| transaction.checked_add(witness))
+            .ok_or(RejectReason::OversizedEncoding)?;
+        self.prepare_decoded_transaction(ctx, tx, witnesses, encoded_len, auth)
+    }
+
+    fn prepare_decoded_transaction(
+        &self,
+        ctx: &BlockContext,
+        tx: TransactionV1,
+        witnesses: TransactionWitnessesV1,
+        encoded_len: u64,
+        auth: &dyn AuthVerifier,
+    ) -> Result<PreparedTransaction, RejectReason> {
         let mut actions: Vec<ActionV1> = Vec::with_capacity(tx.actions.len());
         for raw in tx.actions.iter() {
             let action = ActionV1::decode_canonical(raw.as_slice())
@@ -1155,11 +1204,6 @@ impl LumenLedger {
                 return Err(RejectReason::ResourceLimitExceedsCapacity);
             }
         }
-        let encoded_len = u64::try_from(tx_bytes.len())
-            .ok()
-            .zip(u64::try_from(witness_bytes.len()).ok())
-            .and_then(|(transaction, witness)| transaction.checked_add(witness))
-            .ok_or(RejectReason::OversizedEncoding)?;
         if encoded_len > tx.resource_limits.bytes {
             return Err(RejectReason::OversizedEncoding);
         }

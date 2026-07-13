@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed when deterministic sustained state throughput regresses."""
+"""Fail closed when deterministic state or durable two-node throughput regresses."""
 from __future__ import annotations
 
 import argparse
@@ -28,6 +28,7 @@ def run_sample(
     preverified: bool,
     output: Path,
     params: Path | None,
+    pipeline: str = "state",
 ) -> dict[str, Any]:
     command = [
         str(binary),
@@ -36,6 +37,8 @@ def run_sample(
         "--batch-size", str(batch_size),
         "--output", str(output),
     ]
+    if pipeline != "state":
+        command.extend(("--pipeline", pipeline))
     if preverified:
         command.append("--preverified-signatures")
     if params is not None:
@@ -143,6 +146,70 @@ def evaluate_reports(
     }
 
 
+def evaluate_durable_reports(
+    reports: list[dict[str, Any]],
+    transactions: int,
+    minimum_producer_tps: float,
+    minimum_validator_tps: float,
+    maximum_sample_spread: float,
+) -> dict[str, Any]:
+    if not reports:
+        raise ThroughputError("durable block sample set must be non-empty")
+    commitments = {canonical_json(report.get("state_commitment")) for report in reports}
+    workload_hashes = {
+        report.get("workload", {}).get("workload_blake3") for report in reports
+    }
+    if len(commitments) != 1 or len(workload_hashes) != 1 or None in workload_hashes:
+        raise ThroughputError("durable block samples produced different commitments")
+    for report in reports:
+        result = report.get("result", {})
+        environment = report.get("environment", {})
+        if environment.get("release_build") is not True:
+            raise ThroughputError("durable block sample is not a release build")
+        if result.get("applied") != transactions or result.get("failed") != 0:
+            raise ThroughputError("durable block sample did not settle the complete workload")
+        if result.get("pending_after_block") != 0:
+            raise ThroughputError("durable block sample left transactions pending")
+    producer = [float(report["result"]["block_pipeline_tps"]) for report in reports]
+    validator = [float(report["result"]["validator_import_tps"]) for report in reports]
+
+    def spread(values: list[float]) -> float:
+        median = statistics.median(values)
+        return (max(values) - min(values)) / median if median > 0 else float("inf")
+
+    checks = {
+        "durable_producer_median_tps": {
+            "observed": statistics.median(producer),
+            "minimum": minimum_producer_tps,
+            "pass": statistics.median(producer) >= minimum_producer_tps,
+        },
+        "durable_validator_median_tps": {
+            "observed": statistics.median(validator),
+            "minimum": minimum_validator_tps,
+            "pass": statistics.median(validator) >= minimum_validator_tps,
+        },
+        "durable_producer_sample_spread": {
+            "observed": spread(producer),
+            "maximum": maximum_sample_spread,
+            "pass": spread(producer) <= maximum_sample_spread,
+        },
+        "durable_validator_sample_spread": {
+            "observed": spread(validator),
+            "maximum": maximum_sample_spread,
+            "pass": spread(validator) <= maximum_sample_spread,
+        },
+        "durable_commitment": {"pass": True},
+    }
+    return {
+        "checks": checks,
+        "failures": [name for name, value in checks.items() if not value["pass"]],
+        "samples": {
+            "durable_producer_tps": producer,
+            "durable_validator_tps": validator,
+        },
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, required=True)
@@ -152,6 +219,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--samples", type=int, default=3)
     parser.add_argument("--minimum-validator-tps", type=float, default=7_500)
+    parser.add_argument("--durable-transactions", type=int, default=1_200)
+    parser.add_argument("--minimum-durable-producer-tps", type=float, default=8_000)
+    parser.add_argument("--minimum-durable-validator-tps", type=float, default=7_500)
     parser.add_argument("--minimum-producer-tps", type=float, default=10_000)
     parser.add_argument("--maximum-root-share", type=float, default=0.15)
     parser.add_argument("--maximum-sample-spread", type=float, default=0.30)
@@ -164,6 +234,9 @@ def main(argv: list[str] | None = None) -> int:
         or args.batch_size < 1
         or not 2 <= args.samples <= 10
         or args.minimum_validator_tps <= 0
+        or args.durable_transactions < 1
+        or args.minimum_durable_producer_tps <= 0
+        or args.minimum_durable_validator_tps <= 0
         or args.minimum_producer_tps <= 0
         or not 0 < args.maximum_root_share < 1
         or not 0 < args.maximum_sample_spread < 1
@@ -206,6 +279,31 @@ def main(argv: list[str] | None = None) -> int:
                 args.maximum_root_share,
                 args.maximum_sample_spread,
             )
+            durable_reports = [
+                run_sample(
+                    args.binary,
+                    args.durable_transactions,
+                    args.accounts,
+                    args.batch_size,
+                    False,
+                    root / f"durable-{index}.json",
+                    args.params,
+                    "durable-block",
+                )
+                for index in range(args.samples)
+            ]
+            durable = evaluate_durable_reports(
+                durable_reports,
+                args.durable_transactions,
+                args.minimum_durable_producer_tps,
+                args.minimum_durable_validator_tps,
+                args.maximum_sample_spread,
+            )
+            report["checks"].update(durable["checks"])
+            report["failures"].extend(durable["failures"])
+            report["samples"].update(durable["samples"])
+            if report["failures"]:
+                report["verdict"] = "FAIL"
     except (ThroughputError, OSError, subprocess.SubprocessError) as error:
         report = {
             "schema": "noos/throughput-regression-report/v1",

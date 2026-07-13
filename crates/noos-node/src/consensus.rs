@@ -44,14 +44,15 @@ use noos_codec::{NoosDecode, NoosEncode};
 use noos_crypto::{bls_verify, BlsPublicKey, BlsSecretKey, BlsSignature, DomainId};
 use noos_da::{
     encode_body, reconstruct_and_verify, AvailabilityLedger, BodyDaClaimV1, DaError,
-    ShardCandidateV1,
+    ReconstructedBodyV1, ShardCandidateV1,
 };
 use noos_ground::{
     median_time_past_ms, pulse_target_v1, slot_from_timestamp, validate_ticket, GroundTicketV1,
     PulseAnchor, TicketContext, U256,
 };
+use noos_lumen::engine::AuthVerifier;
 use noos_lumen::fees;
-use noos_lumen::objects::{BoundedList, ReceiptV1, TransactionWitnessesV1};
+use noos_lumen::objects::{txid, BoundedList, ReceiptV1, TransactionV1, TransactionWitnessesV1};
 use noos_lumen::state::{BlockContext, DeltaEntry, LumenLedger, LumenRoots, StateDelta, TreeId};
 use noos_store::{Blob, WriteSet};
 use noos_witness::bond::WitnessBondV1;
@@ -167,6 +168,10 @@ struct ParkedBlock {
     claim: BodyDaClaimV1,
     shards: Vec<ShardCandidateV1>,
 }
+struct ReconstructedBlockBody {
+    body: BlockBodyV1,
+    availability: ReconstructedBodyV1,
+}
 
 /// A produced block ready for gossip.
 pub struct ProducedBlock {
@@ -176,6 +181,76 @@ pub struct ProducedBlock {
     pub body: BlockBodyV1,
     pub claim: BodyDaClaimV1,
     pub shards: Vec<ShardCandidateV1>,
+}
+
+const PARALLEL_SIGNATURE_MIN_TRANSACTIONS: usize = 32;
+
+#[derive(Clone)]
+struct SignaturePrecheck {
+    authorizations: Vec<(Hash32, Vec<u8>)>,
+}
+
+fn verify_transaction_signatures(
+    ledger: &LumenLedger,
+    transaction: &TransactionV1,
+    witnesses: &TransactionWitnessesV1,
+) -> Option<SignaturePrecheck> {
+    if transaction.account_inputs.len() != witnesses.intents.len() {
+        return None;
+    }
+    let id = txid(transaction);
+    let verifier = NodeAuthVerifier;
+    let mut authorizations = Vec::with_capacity(transaction.account_inputs.len());
+    for (account_id, intent) in transaction
+        .account_inputs
+        .iter()
+        .zip(witnesses.intents.iter())
+    {
+        if intent.tx_commitment != id {
+            return None;
+        }
+        let account = ledger.get_account(account_id)?;
+        if !verifier.verify_signature(
+            intent.signature_suite,
+            account.auth_descriptor.as_slice(),
+            &id,
+            intent.signature.as_slice(),
+        ) {
+            return None;
+        }
+        authorizations.push((*account_id, account.auth_descriptor.as_slice().to_vec()));
+    }
+    Some(SignaturePrecheck { authorizations })
+}
+
+#[allow(clippy::arithmetic_side_effects)]
+fn parallel_signature_prechecks(
+    ledger: &LumenLedger,
+    body: &BlockBodyV1,
+) -> Vec<Option<SignaturePrecheck>> {
+    let transaction_count = body.transactions.len();
+    let mut checks = vec![None; transaction_count];
+    if transaction_count < PARALLEL_SIGNATURE_MIN_TRANSACTIONS {
+        return checks;
+    }
+    let workers = std::thread::available_parallelism()
+        .map_or(1, usize::from)
+        .min(transaction_count);
+    let chunk_size = transaction_count.div_ceil(workers);
+    std::thread::scope(|scope| {
+        for (chunk_index, check_chunk) in checks.chunks_mut(chunk_size).enumerate() {
+            let start = chunk_index * chunk_size;
+            scope.spawn(move || {
+                for (offset, check) in check_chunk.iter_mut().enumerate() {
+                    let index = start + offset;
+                    let transaction = &body.transactions.as_slice()[index];
+                    let witnesses = &body.segregated_witnesses.as_slice()[index];
+                    *check = verify_transaction_signatures(ledger, transaction, witnesses);
+                }
+            });
+        }
+    });
+    checks
 }
 
 struct ExecResult {
@@ -1111,7 +1186,7 @@ impl<P: StorePort> NodeCore<P> {
         ticket: &GroundTicketV1,
         claim: &BodyDaClaimV1,
         shards: &[ShardCandidateV1],
-    ) -> Result<BlockBodyV1, NodeError> {
+    ) -> Result<ReconstructedBlockBody, NodeError> {
         let da_root = noos_crypto::Hash32::from_bytes(header.body_da_root);
         let reconstructed = reconstruct_and_verify(&da_root, claim, shards)?;
         // Stage 0 for the body: canonical decode of the DA form. The
@@ -1148,7 +1223,10 @@ impl<P: StorePort> NodeCore<P> {
             });
         }
         check_blob_descriptors(body.consensus_blob_descriptors.as_slice())?;
-        Ok(body)
+        Ok(ReconstructedBlockBody {
+            body,
+            availability: reconstructed,
+        })
     }
 
     fn validate_stage_commit(
@@ -1156,7 +1234,7 @@ impl<P: StorePort> NodeCore<P> {
         hash: Hash32,
         header: &BlockHeaderV1,
         ticket: &GroundTicketV1,
-        body: BlockBodyV1,
+        body: ReconstructedBlockBody,
     ) -> Result<ImportOutcome, NodeError> {
         let mut staged = self.staged_consensus();
         let mut writes = WriteSet::default();
@@ -1169,6 +1247,7 @@ impl<P: StorePort> NodeCore<P> {
             header,
             ticket,
             body,
+            true,
         )?;
         self.stage_reachable_orphans(&mut staged, &mut writes, &mut bodies, hash);
         let (reorged, connected_blocks, settled_txs) =
@@ -1226,8 +1305,10 @@ impl<P: StorePort> NodeCore<P> {
         expected_hash: Hash32,
         header: &BlockHeaderV1,
         ticket: &GroundTicketV1,
-        body: BlockBodyV1,
+        reconstructed: ReconstructedBlockBody,
+        defer_selected_validation: bool,
     ) -> Result<(), NodeError> {
+        let ReconstructedBlockBody { body, availability } = reconstructed;
         self.validate_header_non_context(header, ticket)?;
         self.validate_ticket_in_context_for(&staged.dag, header, ticket)?;
         let outcome = staged.dag.insert(header.clone(), ticket)?;
@@ -1245,15 +1326,19 @@ impl<P: StorePort> NodeCore<P> {
 
         self.stage_certificates(staged, body.finality_certificates.as_slice(), Some(writes))?;
         Self::validate_checkpoint_binding(staged, header, &hash)?;
-        self.validate_body_at_parent(staged, bodies, header, &body)?;
-
-        let encoded = encode_body(&da_form_bytes(&body))?;
-        if encoded.shard_root().into_bytes() != header.body_da_root {
-            return Err(NodeError::RootMismatch {
-                field: "body_da_root",
-            });
+        // The selected head is executed and root-verified by
+        // `stage_fork_choice` before any write commits. Validate inert
+        // side-chain bodies here; avoid executing the canonical candidate
+        // twice.
+        if !defer_selected_validation || staged.dag.select_head() != Some(hash) {
+            self.validate_body_at_parent(staged, bodies, header, &body)?;
         }
-        staged.availability.record_encoded(&encoded);
+
+        // `reconstruct_and_verify` already rebuilt the unique codeword and
+        // checked its full shard tree against the trusted header root. Record
+        // that proof-bearing result directly; re-encoding it here would repeat
+        // Reed-Solomon and Merkle work without adding a check.
+        staged.availability.record_reconstructed(&availability);
         let mut header_bytes = header.encode_canonical();
         header_bytes.extend_from_slice(&ticket.encode());
         writes.headers.push((key_header(&hash), Some(header_bytes)));
@@ -1362,6 +1447,7 @@ impl<P: StorePort> NodeCore<P> {
                             &parked.header,
                             &parked.ticket,
                             body,
+                            false,
                         )
                     })
                 } else if orphan.header.finality_certificate_root != ZERO_ROOT {
@@ -1644,17 +1730,39 @@ impl<P: StorePort> NodeCore<P> {
             chain_id,
             height: header.height,
         };
+        let signature_prechecks = parallel_signature_prechecks(ledger, body);
         let auth = NodeAuthVerifier;
+        let preverified_auth = PreverifiedSignatureAuth;
         let mut receipts: Vec<ReceiptV1> = Vec::with_capacity(body.transactions.len());
-        for (tx, wits) in body
+        for (index, (tx, wits)) in body
             .transactions
             .iter()
             .zip(body.segregated_witnesses.iter())
+            .enumerate()
         {
+            let signatures_unchanged = signature_prechecks[index].as_ref().is_some_and(|check| {
+                check.authorizations.iter().all(|(account_id, descriptor)| {
+                    ledger.get_account(account_id).is_some_and(|account| {
+                        account.auth_descriptor.as_slice() == descriptor.as_slice()
+                    })
+                })
+            });
+            let verifier: &dyn AuthVerifier = if signatures_unchanged {
+                &preverified_auth
+            } else {
+                &auth
+            };
             let tx_bytes = tx.encode_canonical();
             let wit_bytes = wits.encode_canonical();
+            let encoded_len =
+                tx_bytes
+                    .len()
+                    .checked_add(wit_bytes.len())
+                    .ok_or(NodeError::LumenReject(
+                        noos_lumen::state::RejectReason::OversizedEncoding,
+                    ))?;
             let outcome = ledger
-                .apply_transaction(&ctx, &tx_bytes, &wit_bytes, engine, &auth)
+                .apply_canonical_decoded_transaction(&ctx, tx, wits, encoded_len, engine, verifier)
                 .map_err(NodeError::LumenReject)?;
             receipts.push(outcome.receipt().clone());
             match outcome {
@@ -2257,7 +2365,7 @@ impl<P: StorePort> NodeCore<P> {
                 .ok_or(NodeError::RootMismatch {
                     field: "fee_params",
                 })?;
-        let template: Vec<(Hash32, Vec<u8>, Vec<u8>, bool)> = self
+        let template: Vec<(Hash32, TransactionV1, TransactionWitnessesV1, usize, bool)> = self
             .mempool
             .template(&capacity)
             .into_iter()
@@ -2273,8 +2381,9 @@ impl<P: StorePort> NodeCore<P> {
                         });
                 (
                     entry.txid,
-                    entry.tx_bytes.clone(),
-                    entry.wit_bytes.clone(),
+                    entry.tx.clone(),
+                    entry.witnesses.clone(),
+                    entry.encoded_len(),
                     signatures_preverified,
                 )
             })
@@ -2287,18 +2396,22 @@ impl<P: StorePort> NodeCore<P> {
         let auth = NodeAuthVerifier;
         let preverified_auth = PreverifiedSignatureAuth;
         let mut receipts: Vec<ReceiptV1> = Vec::new();
-        let mut included: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
+        let mut included: Vec<(TransactionV1, TransactionWitnessesV1)> = Vec::new();
         let mut dropped: Vec<Hash32> = Vec::new();
-        for (txid, tx_bytes, wit_bytes, signatures_preverified) in template {
+        for (txid, tx, witnesses, encoded_len, signatures_preverified) in template {
             let verifier: &dyn noos_lumen::engine::AuthVerifier = if signatures_preverified {
                 &preverified_auth
             } else {
                 &auth
             };
-            match self
-                .ledger
-                .apply_transaction(&ctx, &tx_bytes, &wit_bytes, &engine, verifier)
-            {
+            match self.ledger.apply_canonical_decoded_transaction(
+                &ctx,
+                &tx,
+                &witnesses,
+                encoded_len,
+                &engine,
+                verifier,
+            ) {
                 Ok(outcome) => {
                     receipts.push(outcome.receipt().clone());
                     match outcome {
@@ -2307,7 +2420,7 @@ impl<P: StorePort> NodeCore<P> {
                             deltas.push(delta);
                         }
                     }
-                    included.push((tx_bytes, wit_bytes));
+                    included.push((tx, witnesses));
                 }
                 Err(_) => dropped.push(txid),
             }
@@ -2325,15 +2438,9 @@ impl<P: StorePort> NodeCore<P> {
         );
         let roots = self.ledger.roots();
 
-        // Assemble the body (ticket = canonical zero until mined).
-        let mut txs = Vec::with_capacity(included.len());
-        let mut wits = Vec::with_capacity(included.len());
-        for (tx_bytes, wit_bytes) in &included {
-            txs.push(noos_lumen::objects::TransactionV1::decode_canonical(
-                tx_bytes,
-            )?);
-            wits.push(TransactionWitnessesV1::decode_canonical(wit_bytes)?);
-        }
+        // Assemble the body directly from the canonical typed values retained
+        // at admission; no encode/decode round trip occurs on the hot path.
+        let (txs, wits): (Vec<_>, Vec<_>) = included.into_iter().unzip();
         let certs: Vec<FinalityCertificateV1> = std::mem::take(&mut self.pending_certs);
         let mut body = BlockBodyV1 {
             transactions: BoundedList::new(txs)

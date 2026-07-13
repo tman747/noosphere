@@ -251,14 +251,11 @@ pub fn commit_shards(claim: BodyDaClaimV1, shards: Vec<Vec<u8>>) -> Result<Encod
     commit(claim, shards)
 }
 
-/// Verifies one shard candidate against the trusted root: index range,
-/// exact fixed length, and the Merkle branch. This is the *individual*
-/// rejection law: a failing shard never poisons its siblings.
-pub fn verify_body_shard(
+fn verified_shard_leaf(
     shard_root: &Hash32,
     content_root: &Hash32,
     candidate: &ShardCandidateV1,
-) -> Result<(), DaError> {
+) -> Result<Hash32, DaError> {
     if candidate.index as usize >= BODY_TOTAL_SHARDS {
         return Err(DaError::ShardIndexOutOfRange {
             index: candidate.index,
@@ -277,7 +274,18 @@ pub fn verify_body_shard(
             index: candidate.index,
         });
     }
-    Ok(())
+    Ok(leaf)
+}
+
+/// Verifies one shard candidate against the trusted root: index range,
+/// exact fixed length, and the Merkle branch. This is the *individual*
+/// rejection law: a failing shard never poisons its siblings.
+pub fn verify_body_shard(
+    shard_root: &Hash32,
+    content_root: &Hash32,
+    candidate: &ShardCandidateV1,
+) -> Result<(), DaError> {
+    verified_shard_leaf(shard_root, content_root, candidate).map(|_| ())
 }
 
 /// Light-client sampling primitive (ch01 §10.1).
@@ -337,14 +345,16 @@ pub fn reconstruct_and_verify(
     // branch-valid candidates at one index are byte-identical by collision
     // resistance of the leaf hash.
     let mut slots: Vec<Option<Vec<u8>>> = vec![None; BODY_TOTAL_SHARDS];
+    let mut verified_leaves: Vec<Option<Hash32>> = vec![None; BODY_TOTAL_SHARDS];
     let mut valid: u32 = 0;
     for candidate in candidates {
-        if verify_body_shard(shard_root, &claim.content_root, candidate).is_err() {
+        let Ok(leaf) = verified_shard_leaf(shard_root, &claim.content_root, candidate) else {
             continue;
-        }
+        };
         let slot = &mut slots[candidate.index as usize];
         if slot.is_none() {
             *slot = Some(candidate.bytes.clone());
+            verified_leaves[candidate.index as usize] = Some(leaf);
             valid = valid.saturating_add(1);
         }
     }
@@ -366,22 +376,32 @@ pub fn reconstruct_and_verify(
         shards.push(slot.ok_or(DaError::ReconstructionFailed)?);
     }
 
-    // (4) reconstruction-before-acceptance: the whole recomputed tree must
-    // reproduce the trusted root (catches an inconsistent committed
-    // codeword even when 16 branches verified).
-    let recommitted = commit(*claim, shards)?;
-    if recommitted.shard_root != *shard_root {
+    // (4) reconstruction-before-acceptance: recompute the whole tree from
+    // the verified leaf hashes plus hashes of reconstructed missing shards.
+    // Reusing already verified leaves avoids hashing every 64 KiB shard twice.
+    let mut leaves = Vec::with_capacity(BODY_TOTAL_SHARDS);
+    for (index, shard) in shards.iter().enumerate() {
+        let leaf = match verified_leaves[index] {
+            Some(leaf) => leaf,
+            None => shard_leaf(&claim.content_root, index as u32, shard)?,
+        };
+        leaves.push(leaf);
+    }
+    let levels = build_levels(leaves)?;
+    let recomputed_root = *levels
+        .last()
+        .and_then(|top| top.first())
+        .ok_or(DaError::Crypto)?;
+    if recomputed_root != *shard_root {
         return Err(DaError::CommitmentMismatch);
     }
 
     // (5) zero-padding law over the reconstructed data region.
     let original = claim.original_bytes as usize;
-    let data: Vec<u8> = recommitted
-        .shards
-        .iter()
-        .take(BODY_DATA_SHARDS)
-        .flat_map(|s| s.iter().copied())
-        .collect();
+    let mut data = Vec::with_capacity(MAX_BLOCK_BODY_BYTES);
+    for shard in shards.iter().take(BODY_DATA_SHARDS) {
+        data.extend_from_slice(shard);
+    }
     if data[original..].iter().any(|&b| b != 0) {
         return Err(DaError::NonZeroPadding);
     }

@@ -176,6 +176,7 @@ def verify_upgrade(manifest_path: Path, keyring_path: Path, candidate: dict[str,
         "chain_id": manifest["chain_id"],
         "genesis_hash": manifest["genesis_hash"],
         "artifact_count": len(manifest["artifacts"]),
+        "throughput": manifest["throughput"],
     }
 
 

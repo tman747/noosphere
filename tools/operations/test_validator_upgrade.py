@@ -103,6 +103,11 @@ class ValidatorUpgradeTests(unittest.TestCase):
             "chain_id": CHAIN_ID,
             "genesis_hash": GENESIS_HASH,
             "activation_height": 100,
+            "throughput": {
+                "produce_interval_ms": 100,
+                "template_byte_budget": 900_000,
+                "template_max_transactions": 4_096,
+            },
             "restart_buffer_blocks": 12,
             "artifacts": {"noosd.py": upgrade.sha256_file(binary)},
             "binary": {"artifact": "noosd.py", "install_path": "bin/noosd.py"},
@@ -136,6 +141,7 @@ class ValidatorUpgradeTests(unittest.TestCase):
         journal = self.prepare(manifest)
         self.assertEqual(journal["phase"], "PREPARED")
         self.assertEqual(journal["prepared_at_height"], 10)
+        self.assertEqual(journal["throughput"]["produce_interval_ms"], 100)
         staged = Path(journal["release_dir"]) / "noosd.py"
         self.assertEqual(upgrade.sha256_file(staged), manifest["artifacts"]["noosd.py"])
         persisted = upgrade.read_json(upgrade.journal_path(self.state, manifest["release_id"]))

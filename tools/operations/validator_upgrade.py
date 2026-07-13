@@ -86,6 +86,26 @@ def verify_manifest(manifest: dict[str, Any], keyring: dict[str, Any]) -> None:
     for field in ("activation_height", "restart_buffer_blocks"):
         if not isinstance(manifest.get(field), int) or manifest[field] < 1:
             raise UpgradeError(f"{field} must be a positive integer")
+    throughput = manifest.get("throughput")
+    required_throughput = {
+        "produce_interval_ms",
+        "template_byte_budget",
+        "template_max_transactions",
+    }
+    if not isinstance(throughput, dict) or set(throughput) != required_throughput:
+        raise UpgradeError("throughput must bind cadence, byte budget, and transaction cap")
+    if not isinstance(throughput["produce_interval_ms"], int) or throughput["produce_interval_ms"] < 1:
+        raise UpgradeError("throughput produce_interval_ms must be positive")
+    if (
+        not isinstance(throughput["template_byte_budget"], int)
+        or not 1 <= throughput["template_byte_budget"] <= 983_040
+    ):
+        raise UpgradeError("throughput template_byte_budget must be 1..=983040")
+    if (
+        not isinstance(throughput["template_max_transactions"], int)
+        or not 1 <= throughput["template_max_transactions"] <= 16_384
+    ):
+        raise UpgradeError("throughput template_max_transactions must be 1..=16384")
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict) or not artifacts:
         raise UpgradeError("artifacts must be a non-empty path-to-sha256 map")
@@ -212,6 +232,7 @@ def prepare(manifest: dict[str, Any], source_root: Path, install_root: Path, sta
         "chain_id": manifest["chain_id"],
         "genesis_hash": manifest["genesis_hash"],
         "activation_height": manifest["activation_height"],
+        "throughput": manifest["throughput"],
         "prepared_at_height": head,
         "release_dir": str(release_dir.resolve()),
         "install_path": str(install_path),
@@ -288,6 +309,11 @@ def activate(manifest: dict[str, Any], install_root: Path, data_dir: Path, state
         "release_dir": str(release_dir),
         "data_dir": str(data_dir.resolve()),
         "activation_height": str(manifest["activation_height"]),
+        "produce_interval_ms": str(manifest["throughput"]["produce_interval_ms"]),
+        "template_byte_budget": str(manifest["throughput"]["template_byte_budget"]),
+        "template_max_transactions": str(
+            manifest["throughput"]["template_max_transactions"]
+        ),
     }
     stopped = False
     try:

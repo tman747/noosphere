@@ -10,7 +10,7 @@
     clippy::arithmetic_side_effects
 )]
 
-use noos_codec::NoosEncode;
+use noos_codec::{NoosDecode, NoosEncode};
 
 use crate::engine::{AuthVerifier, ContractEngine, EngineOutcome, EngineTrap};
 use crate::fees::{self, FeeParamsV1, FeeStateV1};
@@ -335,6 +335,29 @@ fn simulation_matches_application_without_mutating_any_state() {
         .unwrap();
     assert_eq!(applied.receipt(), &simulated_receipt);
     assert!(ledger.get_receipt(&transaction_id).is_some());
+}
+
+#[test]
+fn canonical_decoded_application_matches_raw_application() {
+    let mut raw_ledger = genesis();
+    let mut decoded_ledger = raw_ledger.clone();
+    let (tx_bytes, witness_bytes, tx) = build_tx(1, vec![], vec![PAYER], vec![], vec![]);
+    let witnesses = TransactionWitnessesV1::decode_canonical(&witness_bytes).unwrap();
+    let raw = raw_ledger
+        .apply_transaction(&ctx(1), &tx_bytes, &witness_bytes, &StubEngine, &AcceptAll)
+        .unwrap();
+    let decoded = decoded_ledger
+        .apply_canonical_decoded_transaction(
+            &ctx(1),
+            &tx,
+            &witnesses,
+            tx_bytes.len() + witness_bytes.len(),
+            &StubEngine,
+            &AcceptAll,
+        )
+        .unwrap();
+    assert_eq!(raw.receipt(), decoded.receipt());
+    assert_roots_eq(&raw_ledger.roots(), &decoded_ledger.roots());
 }
 
 #[test]
