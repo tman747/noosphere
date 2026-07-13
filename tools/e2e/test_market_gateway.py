@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 from unittest.mock import patch
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 import market_gateway as gateway
 
@@ -51,6 +53,7 @@ class DefiGatewayTests(unittest.TestCase):
             "/api/v1/pools", "/api/v1/liquidity-positions", "/api/v1/oracle-feeds",
             "/api/v1/oracle-reports", "/api/v1/lending-markets", "/api/v1/stable-assets",
             "/api/v1/debt-positions",
+            "/api/v1/private-payments",
         ])
         self.assertTrue(all(value for key, value in state.items() if key != "account"))
 
@@ -61,5 +64,56 @@ class DefiGatewayTests(unittest.TestCase):
         submit.assert_not_called()
 
 
+
+class WalletGatewayTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.metadata = {
+            "developer_public_id": ACCOUNT,
+            "indexer": "127.0.0.1:1",
+            "validator_rpc": "127.0.0.1:2",
+            "rpc_token": "token",
+            "chain_id": "aa" * 32,
+            "genesis_hash": "bb" * 32,
+        }
+
+    def test_unsigned_builder_never_receives_a_private_key(self) -> None:
+        built = {"tx": "01", "txid": "cc" * 32}
+        with patch.object(gateway, "request_json", return_value={"unsafe_head": {"height": "40"}}), patch.object(gateway, "cli_json", return_value=built) as cli:
+            result = gateway.wallet_build(
+                self.metadata,
+                gateway.Path("noos-cli"),
+                {"account": ACCOUNT, "recipient": OWNER, "asset": "55" * 32, "amount": "72"},
+            )
+        spec = gateway.json.loads(cli.call_args.args[-1])
+        self.assertEqual(spec["fee_payer"], ACCOUNT)
+        self.assertEqual(spec["actions"], [
+            {"type": "withdraw_from_account", "account_id": ACCOUNT, "asset_id": "55" * 32, "amount": "72"},
+            {"type": "deposit_to_account", "account_id": OWNER, "asset_id": "55" * 32, "amount": "72"},
+        ])
+        self.assertNotIn("seed", gateway.json.dumps(spec))
+        self.assertEqual(result["signing_message"], (b"NOOS/SIG/TX/V1" + bytes.fromhex("cc" * 32)).hex())
+
+    def test_submit_accepts_only_a_matching_local_signature(self) -> None:
+        key = Ed25519PrivateKey.generate()
+        account = key.public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw
+        ).hex()
+        txid = "cc" * 32
+        signature = key.sign(b"NOOS/SIG/TX/V1" + bytes.fromhex(txid)).hex()
+        with patch.object(gateway, "cli_json", return_value={"txid": txid}) as cli, patch.object(gateway, "settled_receipt", return_value={"state": {"status_code": 0}}):
+            result = gateway.wallet_submit(
+                self.metadata,
+                gateway.Path("noos-cli"),
+                {"account": account, "tx": "01", "txid": txid, "signature": signature},
+            )
+        self.assertEqual(result["txid"], txid)
+        self.assertIn("--witnesses", cli.call_args.args)
+        bad = ("00" * 64)
+        with self.assertRaisesRegex(ValueError, "signature"):
+            gateway.wallet_submit(
+                self.metadata,
+                gateway.Path("noos-cli"),
+                {"account": account, "tx": "01", "txid": txid, "signature": bad},
+            )
 if __name__ == "__main__":
     unittest.main()

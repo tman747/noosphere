@@ -57,6 +57,10 @@ pub enum WalletError {
     TlsPinMismatch,
     #[error("invalid derivation index")]
     InvalidDerivationIndex,
+    #[error("invalid private payment")]
+    InvalidPrivatePayment,
+    #[error("agent payment policy denied")]
+    PaymentPolicyDenied,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -534,6 +538,217 @@ pub fn prepare_submission(
     })
 }
 
+pub const MAX_PRIVATE_MEMO_BYTES: usize = 1024;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PrivatePaymentPlan {
+    pub stable_asset: Hash32,
+    pub amount: u128,
+    pub recipient_commitment: Hash32,
+    pub memo_commitment: Hash32,
+    pub reference_commitment: Hash32,
+    pub expiry_height: u64,
+    pub payment_kind: u8,
+    pub envelope: noos_umbra::stealth::StealthEnvelope,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OpenedPrivatePayment {
+    pub recipient: Hash32,
+    pub claim_secret: Hash32,
+    pub stable_asset: Hash32,
+    pub amount: u128,
+    pub reference_commitment: Hash32,
+    pub expiry_height: u64,
+    pub payment_kind: u8,
+    pub memo: Vec<u8>,
+}
+
+fn payment_hash(domain: &str, parts: &[&[u8]]) -> Hash32 {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(domain.as_bytes());
+    for part in parts {
+        hasher.update(part);
+    }
+    *hasher.finalize().as_bytes()
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn prepare_private_payment(
+    gate: &IdentityGate,
+    recipient: Hash32,
+    recipient_scan_public: [u8; 32],
+    ephemeral_secret: [u8; 32],
+    nonce: [u8; 12],
+    claim_secret: Hash32,
+    stable_asset: Hash32,
+    amount: u128,
+    reference_commitment: Hash32,
+    expiry_height: u64,
+    payment_kind: u8,
+    memo: &[u8],
+) -> Result<PrivatePaymentPlan, WalletError> {
+    gate.require()?;
+    if recipient == [0; 32]
+        || recipient_scan_public == [0; 32]
+        || ephemeral_secret == [0; 32]
+        || claim_secret == [0; 32]
+        || stable_asset == [0; 32]
+        || amount == 0
+        || expiry_height == 0
+        || payment_kind > 3
+        || memo.is_empty()
+        || memo.len() > MAX_PRIVATE_MEMO_BYTES
+    {
+        return Err(WalletError::InvalidPrivatePayment);
+    }
+    let memo_commitment = payment_hash("NOOS/PRIVATE-PAYMENT/MEMO/V1", &[memo]);
+    let recipient_commitment = payment_hash(
+        "NOOS/PRIVATE-PAYMENT/RECIPIENT/V1",
+        &[&recipient, &claim_secret],
+    );
+    let memo_len = u32::try_from(memo.len()).map_err(|_| WalletError::InvalidPrivatePayment)?;
+    let mut note = Vec::with_capacity(158usize.saturating_add(memo.len()));
+    note.extend_from_slice(&1u16.to_le_bytes());
+    note.extend_from_slice(&recipient);
+    note.extend_from_slice(&claim_secret);
+    note.extend_from_slice(&stable_asset);
+    note.extend_from_slice(&amount.to_le_bytes());
+    note.extend_from_slice(&reference_commitment);
+    note.extend_from_slice(&expiry_height.to_le_bytes());
+    note.push(payment_kind);
+    note.extend_from_slice(&memo_len.to_le_bytes());
+    note.extend_from_slice(memo);
+    let envelope = noos_umbra::stealth::seal(
+        &x25519_dalek::PublicKey::from(recipient_scan_public),
+        x25519_dalek::StaticSecret::from(ephemeral_secret),
+        nonce,
+        &note,
+    )
+    .map_err(|_| WalletError::InvalidPrivatePayment)?;
+    Ok(PrivatePaymentPlan {
+        stable_asset,
+        amount,
+        recipient_commitment,
+        memo_commitment,
+        reference_commitment,
+        expiry_height,
+        payment_kind,
+        envelope,
+    })
+}
+
+fn payment_take32(note: &[u8], offset: &mut usize) -> Result<Hash32, WalletError> {
+    let end = offset
+        .checked_add(32)
+        .ok_or(WalletError::InvalidPrivatePayment)?;
+    let bytes = note
+        .get(*offset..end)
+        .ok_or(WalletError::InvalidPrivatePayment)?;
+    let mut value = [0u8; 32];
+    value.copy_from_slice(bytes);
+    *offset = end;
+    Ok(value)
+}
+
+pub fn open_private_payment(
+    gate: &IdentityGate,
+    scan_secret: [u8; 32],
+    plan: &PrivatePaymentPlan,
+) -> Result<Option<OpenedPrivatePayment>, WalletError> {
+    gate.require()?;
+    let outcome = noos_umbra::stealth::scan(
+        &x25519_dalek::StaticSecret::from(scan_secret),
+        &plan.envelope,
+    )
+    .map_err(|_| WalletError::InvalidPrivatePayment)?;
+    let noos_umbra::stealth::ScanOutcome::Note(note) = outcome else {
+        return Ok(None);
+    };
+    if note.len() < 159 || u16::from_le_bytes([note[0], note[1]]) != 1 {
+        return Err(WalletError::InvalidPrivatePayment);
+    }
+    let mut offset = 2usize;
+    let recipient = payment_take32(&note, &mut offset)?;
+    let claim_secret = payment_take32(&note, &mut offset)?;
+    let stable_asset = payment_take32(&note, &mut offset)?;
+    let amount = u128::from_le_bytes(
+        note[offset..offset.saturating_add(16)]
+            .try_into()
+            .map_err(|_| WalletError::InvalidPrivatePayment)?,
+    );
+    offset = offset.saturating_add(16);
+    let reference_commitment = payment_take32(&note, &mut offset)?;
+    let expiry_height = u64::from_le_bytes(
+        note[offset..offset.saturating_add(8)]
+            .try_into()
+            .map_err(|_| WalletError::InvalidPrivatePayment)?,
+    );
+    offset = offset.saturating_add(8);
+    let payment_kind = *note.get(offset).ok_or(WalletError::InvalidPrivatePayment)?;
+    offset = offset.saturating_add(1);
+    let memo_len = u32::from_le_bytes(
+        note[offset..offset.saturating_add(4)]
+            .try_into()
+            .map_err(|_| WalletError::InvalidPrivatePayment)?,
+    ) as usize;
+    offset = offset.saturating_add(4);
+    if note.len() != offset.saturating_add(memo_len)
+        || stable_asset != plan.stable_asset
+        || amount != plan.amount
+        || reference_commitment != plan.reference_commitment
+        || expiry_height != plan.expiry_height
+        || payment_kind != plan.payment_kind
+        || payment_hash("NOOS/PRIVATE-PAYMENT/MEMO/V1", &[&note[offset..]]) != plan.memo_commitment
+        || payment_hash(
+            "NOOS/PRIVATE-PAYMENT/RECIPIENT/V1",
+            &[&recipient, &claim_secret],
+        ) != plan.recipient_commitment
+    {
+        return Err(WalletError::InvalidPrivatePayment);
+    }
+    Ok(Some(OpenedPrivatePayment {
+        recipient,
+        claim_secret,
+        stable_asset,
+        amount,
+        reference_commitment,
+        expiry_height,
+        payment_kind,
+        memo: note[offset..].to_vec(),
+    }))
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AgentPaymentPolicy {
+    pub allowed_stable_assets: BTreeSet<Hash32>,
+    pub per_payment_limit: u128,
+    pub epoch_spend_limit: u128,
+    pub expires_height: u64,
+}
+
+impl AgentPaymentPolicy {
+    pub fn authorize(
+        &self,
+        current_height: u64,
+        spent_this_epoch: u128,
+        plan: &PrivatePaymentPlan,
+    ) -> Result<u128, WalletError> {
+        let next_spend = spent_this_epoch
+            .checked_add(plan.amount)
+            .ok_or(WalletError::Overflow)?;
+        if current_height > self.expires_height
+            || plan.payment_kind != 1
+            || !self.allowed_stable_assets.contains(&plan.stable_asset)
+            || plan.amount > self.per_payment_limit
+            || next_spend > self.epoch_spend_limit
+        {
+            return Err(WalletError::PaymentPolicyDenied);
+        }
+        Ok(next_spend)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
@@ -779,5 +994,79 @@ mod tests {
             .collect();
             assert_eq!(hex::encode(bytes), case["bytes"].as_str().unwrap());
         }
+    }
+
+    #[test]
+    fn private_stable_payment_opens_only_for_recipient_scan_key() {
+        let scan_secret = [0x31; 32];
+        let scan_public =
+            *x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(scan_secret))
+                .as_bytes();
+        let plan = prepare_private_payment(
+            &gate(),
+            [0x41; 32],
+            scan_public,
+            [0x51; 32],
+            [0x61; 12],
+            [0x71; 32],
+            [0x81; 32],
+            42_000,
+            [0x91; 32],
+            500,
+            1,
+            b"agent inference invoice 7",
+        )
+        .unwrap();
+        let opened = open_private_payment(&gate(), scan_secret, &plan)
+            .unwrap()
+            .unwrap();
+        assert_eq!(opened.recipient, [0x41; 32]);
+        assert_eq!(opened.claim_secret, [0x71; 32]);
+        assert_eq!(opened.memo, b"agent inference invoice 7");
+        assert_ne!(plan.memo_commitment, [0; 32]);
+        assert_ne!(plan.recipient_commitment, [0; 32]);
+        assert!(
+            open_private_payment(&gate(), [0x32; 32], &plan).is_err()
+                || open_private_payment(&gate(), [0x32; 32], &plan).unwrap() == None
+        );
+    }
+
+    #[test]
+    fn agent_payment_policy_caps_assets_amounts_and_epoch_spend() {
+        let stable = [0x81; 32];
+        let scan_secret = [0x31; 32];
+        let scan_public =
+            *x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(scan_secret))
+                .as_bytes();
+        let plan = prepare_private_payment(
+            &gate(),
+            [0x41; 32],
+            scan_public,
+            [0x51; 32],
+            [0x61; 12],
+            [0x71; 32],
+            stable,
+            42_000,
+            [0x91; 32],
+            500,
+            1,
+            b"bounded agent payment",
+        )
+        .unwrap();
+        let policy = AgentPaymentPolicy {
+            allowed_stable_assets: BTreeSet::from([stable]),
+            per_payment_limit: 50_000,
+            epoch_spend_limit: 100_000,
+            expires_height: 600,
+        };
+        assert_eq!(policy.authorize(400, 20_000, &plan), Ok(62_000));
+        assert_eq!(
+            policy.authorize(400, 60_000, &plan),
+            Err(WalletError::PaymentPolicyDenied)
+        );
+        assert_eq!(
+            policy.authorize(601, 0, &plan),
+            Err(WalletError::PaymentPolicyDenied)
+        );
     }
 }

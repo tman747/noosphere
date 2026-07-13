@@ -16,6 +16,8 @@ serde = { version = "=1.0.228", features = ["derive"] }
 sha2 = "=0.10.9"
 thiserror = "=2.0.18"
 zeroize = { version = "=1.9.0", features = ["zeroize_derive"] }
+noos-umbra = { path = "../noos-umbra" }
+x25519-dalek = { version = "2", features = ["static_secrets"] }
 
 [dev-dependencies]
 hex = "=0.4.3"

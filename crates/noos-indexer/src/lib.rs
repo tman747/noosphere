@@ -341,6 +341,7 @@ fn build_router(indexer: Indexer, submission_source: Option<ingest::LineProtocol
         .route("/api/v1/lending-markets", get(lending_markets))
         .route("/api/v1/stable-assets", get(stable_assets))
         .route("/api/v1/debt-positions", get(debt_positions))
+        .route("/api/v1/private-payments", get(private_payments))
         .route("/api/v1/balances/{account}/{asset}", get(market_balance))
         .route("/api/v1/notes/{noteid}", get(hash_not_found))
         .route("/api/v1/addresses/{address}/notes", get(address_page))
@@ -648,6 +649,10 @@ async fn stable_assets(State(s): State<AppState>, headers: HeaderMap) -> ApiResu
 
 async fn debt_positions(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
     market_query(s, headers, "/lending/positions".to_owned()).await
+}
+
+async fn private_payments(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    market_query(s, headers, "/payments/private".to_owned()).await
 }
 
 async fn compute_workers(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {

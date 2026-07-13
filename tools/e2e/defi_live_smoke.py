@@ -12,9 +12,13 @@ import subprocess
 import sys
 import tempfile
 import time
+import blake3
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from market_gateway import wallet_build, wallet_faucet, wallet_submit  # noqa: E402
 from live_smoke import FAUCET_KEY, FAUCET_PUB, Proc, cli, enc_intent, enc_witnesses, http_json, sign_txid, transfer_actions  # noqa: E402
 
 RPC = "127.0.0.1:28632"
@@ -125,6 +129,30 @@ def main() -> int:
         wait_json(INDEXER, "/api/status")
         fund(exes["noos-cli"], chain_id, genesis_hash, accounts)
         checks.append("funded three authenticated accounts")
+        wallet_key = Ed25519PrivateKey.generate()
+        wallet_account = wallet_key.public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw
+        ).hex()
+        wallet_metadata = {
+            "chain_id": chain_id,
+            "genesis_hash": genesis_hash,
+            "developer_public_id": accounts[0],
+            "developer_seed_hex": seeds[0],
+            "validator_rpc": RPC,
+            "indexer": INDEXER,
+            "rpc_token": TOKEN,
+        }
+        wallet_faucet(wallet_metadata, exes["noos-cli"], {"account": wallet_account, "amount": "1000000"})
+        unsigned = wallet_build(wallet_metadata, exes["noos-cli"], {
+            "account": wallet_account, "recipient": accounts[2],
+            "asset": NOOS, "amount": "100000",
+        })
+        wallet_signature = wallet_key.sign(bytes.fromhex(unsigned["signing_message"])).hex()
+        wallet_submit(wallet_metadata, exes["noos-cli"], {
+            "account": wallet_account, "tx": unsigned["tx"],
+            "txid": unsigned["txid"], "signature": wallet_signature,
+        })
+        checks.append("generated wallet key locally and settled through unsigned-build/sign/submit RPC")
 
         asset_build = submit_seed(exes["noos-cli"], chain_id, genesis_hash, accounts[0], seeds[0], [{"type": "create_asset", "issuer": accounts[0], "symbol": "QUOTE", "name": "Live Quote Unit", "decimals": 9, "total_supply": "100000000"}])
         quote = asset_build["created_assets"][0]["asset_id"]
@@ -158,9 +186,75 @@ def main() -> int:
             submit_seed(exes["noos-cli"], chain_id, genesis_hash, account, seed, [{"type": "submit_oracle_report", "reporter": account, "feed_id": feed, "price_q9": str(500_000_000 + index * 1_000_000), "confidence_bps": 10, "sequence": "2", "observed_height": observed}])
         submit_seed(exes["noos-cli"], chain_id, genesis_hash, accounts[1], seeds[1], [{"type": "liquidate_position", "liquidator": accounts[1], "market_id": market, "owner": accounts[0], "repay_amount": "100000", "min_collateral_out": "1"}])
         checks.append("transferred stable value, repriced by quorum, and liquidated unhealthy debt")
+        claim_secret = bytes([0xC1]) * 32
+        recipient_commitment = blake3.blake3(
+            b"NOOS/PRIVATE-PAYMENT/RECIPIENT/V1"
+            + bytes.fromhex(accounts[2])
+            + claim_secret
+        ).hexdigest()
+        payment_build = submit_seed(exes["noos-cli"], chain_id, genesis_hash, accounts[0], seeds[0], [{
+            "type": "open_private_payment", "payer": accounts[0], "stable_asset": stable,
+            "recipient_commitment": recipient_commitment, "memo_commitment": "b1" * 32,
+            "reference_commitment": "a1" * 32, "amount": "50000",
+            "expiry_height": str(int(http_json(RPC, "/status", TOKEN)["unsafe_head"]["height"]) + 100),
+            "payment_kind": 1,
+        }])
+        payment = payment_build["created_private_payments"][0]["payment_id"]
+        submit_seed(exes["noos-cli"], chain_id, genesis_hash, accounts[2], seeds[2], [{
+            "type": "claim_private_payment", "recipient": accounts[2],
+            "payment_id": payment, "claim_secret": claim_secret.hex(),
+        }])
+        refund_expiry = int(http_json(RPC, "/status", TOKEN)["unsafe_head"]["height"]) + 50
+        refundable_build = submit_seed(exes["noos-cli"], chain_id, genesis_hash, accounts[0], seeds[0], [{
+            "type": "open_private_payment", "payer": accounts[0], "stable_asset": stable,
+            "recipient_commitment": recipient_commitment, "memo_commitment": "b2" * 32,
+            "reference_commitment": "a2" * 32, "amount": "20000",
+            "expiry_height": str(refund_expiry), "payment_kind": 2,
+        }])
+        refundable = refundable_build["created_private_payments"][0]["payment_id"]
+        while int(http_json(RPC, "/status", TOKEN)["unsafe_head"]["height"]) <= refund_expiry:
+            time.sleep(0.02)
+        submit_seed(exes["noos-cli"], chain_id, genesis_hash, accounts[0], seeds[0], [{
+            "type": "refund_private_payment", "payer": accounts[0], "payment_id": refundable,
+        }])
+        agent_secret = bytes([0xC3]) * 32
+        agent_recipient_commitment = blake3.blake3(
+            b"NOOS/PRIVATE-PAYMENT/RECIPIENT/V1"
+            + bytes.fromhex(accounts[2])
+            + agent_secret
+        ).hexdigest()
+        schema_root = blake3.blake3(b"NOOS/AGENT-PAYMENT/SCHEMA/V1").hexdigest()
+        scope_root = blake3.blake3(
+            b"NOOS/AGENT-PAYMENT/SCOPE/V1"
+            + bytes.fromhex(stable)
+            + bytes.fromhex(agent_recipient_commitment)
+        ).hexdigest()
+        grant_id = "d1" * 32
+        grant_expiry = int(http_json(RPC, "/status", TOKEN)["unsafe_head"]["height"]) + 200
+        submit_seed(exes["noos-cli"], chain_id, genesis_hash, accounts[0], seeds[0], [{
+            "type": "grant_capability", "grant_id": grant_id, "issuer": accounts[0],
+            "subject_agent": accounts[1], "allowed_action_schema_root": schema_root,
+            "object_scope_root": scope_root, "per_action_limit": "10000",
+            "cumulative_budget": "15000", "expiry_height": str(grant_expiry),
+            "delegation_depth": 0, "revocation_nonce": "0",
+        }])
+        agent_payment_build = submit_seed(exes["noos-cli"], chain_id, genesis_hash, accounts[1], seeds[1], [{
+            "type": "open_agent_private_payment", "agent": accounts[1], "payer": accounts[0],
+            "stable_asset": stable, "recipient_commitment": agent_recipient_commitment,
+            "memo_commitment": "b3" * 32, "reference_commitment": "a3" * 32,
+            "amount": "10000", "expiry_height": str(grant_expiry - 1),
+            "capability_ref": grant_id,
+        }])
+        agent_payment = agent_payment_build["created_private_payments"][0]["payment_id"]
+        submit_seed(exes["noos-cli"], chain_id, genesis_hash, accounts[2], seeds[2], [{
+            "type": "claim_private_payment", "recipient": accounts[2],
+            "payment_id": agent_payment, "claim_secret": agent_secret.hex(),
+        }])
+        checks.append("enforced agent asset, recipient, per-payment, cumulative, and expiry capability on-chain")
+        checks.append("claimed recipient-hidden agent payment and refunded expired invoice")
 
 
-        expected = {"/api/v1/pools": pool, "/api/v1/liquidity-positions": pool, "/api/v1/oracle-feeds": feed, "/api/v1/oracle-reports": feed, "/api/v1/lending-markets": market, "/api/v1/stable-assets": stable, "/api/v1/debt-positions": market}
+        expected = {"/api/v1/pools": pool, "/api/v1/liquidity-positions": pool, "/api/v1/oracle-feeds": feed, "/api/v1/oracle-reports": feed, "/api/v1/lending-markets": market, "/api/v1/stable-assets": stable, "/api/v1/debt-positions": market, "/api/v1/private-payments": agent_payment}
         deadline = time.monotonic() + 30
         while True:
             views = {path: http_json(INDEXER, path) for path in expected}
@@ -172,6 +266,20 @@ def main() -> int:
         stable_view = next(item for item in views["/api/v1/stable-assets"]["items"] if item["asset_id"] == stable)
         if debt["debt"] != "300000" or not 0 < int(debt["collateral"]) < 900000: raise RuntimeError(f"unexpected liquidated debt state: {debt}")
         if market_view["total_debt"] != stable_view["minted_supply"] or market_view["total_debt"] != "300000": raise RuntimeError("stable supply/debt conservation failed")
+        payments = views["/api/v1/private-payments"]["items"]
+        claimed = next(item for item in payments if item["payment_id"] == payment)
+        refunded = next(item for item in payments if item["payment_id"] == refundable)
+        agent_claimed = next(item for item in payments if item["payment_id"] == agent_payment)
+        if claimed["status"] != 1 or claimed["settled_account"] != accounts[2]:
+            raise RuntimeError(f"private payment did not claim correctly: {claimed}")
+        if refunded["status"] != 2 or refunded["settled_account"] != accounts[0]:
+            raise RuntimeError(f"private payment did not refund correctly: {refunded}")
+        if agent_claimed["status"] != 1 or agent_claimed["settled_account"] != accounts[2]:
+            raise RuntimeError(f"agent payment did not claim correctly: {agent_claimed}")
+        payer_balance = http_json(INDEXER, f"/api/v1/balances/{accounts[0]}/{stable}")["balance"]
+        recipient_balance = http_json(INDEXER, f"/api/v1/balances/{accounts[2]}/{stable}")["balance"]
+        if payer_balance != "240000" or recipient_balance != "60000":
+            raise RuntimeError("private payment escrow conservation failed")
         checks.append("indexer exposed conserved live DeFi state")
         print(json.dumps({"verdict": "PASS", "chain_id": chain_id, "genesis_hash": genesis_hash, "checks": checks, "pool_id": pool, "feed_id": feed, "market_id": market, "stable_asset": stable, "debt": debt}, indent=2))
         return 0

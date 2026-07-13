@@ -24,9 +24,10 @@ use noos_lumen::objects::{
     asset_id as lumen_asset_id, compute_job_id as lumen_compute_job_id,
     lending_market_id as lumen_lending_market_id, object_id as lumen_object_id,
     oracle_feed_id as lumen_oracle_feed_id, pool_id as lumen_pool_id,
-    stable_asset_id as lumen_stable_asset_id, txid as lumen_txid, witness_root, AccessEntry,
-    ActionV1, BoundedBytes, BoundedList, FeeAuthorizationV1, NoteV1, OptionalHash32,
-    OptionalObject, ResourceVector, SignedIntentV1, TransactionV1, TransactionWitnessesV1,
+    private_payment_id as lumen_private_payment_id, stable_asset_id as lumen_stable_asset_id,
+    txid as lumen_txid, witness_root, AccessEntry, ActionV1, BoundedBytes, BoundedList,
+    CapabilityGrantV1, FeeAuthorizationV1, NoteV1, OptionalHash32, OptionalObject, ResourceVector,
+    SignedIntentV1, TransactionV1, TransactionWitnessesV1,
 };
 use noos_wallet::{derive_authority, IdentityGate, NodeIdentity, Purpose};
 use serde_json::{json, Value};
@@ -271,6 +272,33 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
             rent_deposit: spec_u128(spec, "rent_deposit")?,
             flags: spec_u32(spec, "flags")?,
         },
+        "deposit_to_account" => ActionV1::DepositToAccount {
+            account_id: spec_hash(spec, "account_id")?,
+            asset_id: spec_hash(spec, "asset_id")?,
+            amount: spec_u128(spec, "amount")?,
+        },
+        "withdraw_from_account" => ActionV1::WithdrawFromAccount {
+            account_id: spec_hash(spec, "account_id")?,
+            asset_id: spec_hash(spec, "asset_id")?,
+            amount: spec_u128(spec, "amount")?,
+        },
+        "grant_capability" => ActionV1::GrantCapability {
+            grant: CapabilityGrantV1 {
+                grant_id: spec_hash(spec, "grant_id")?,
+                issuer: spec_hash(spec, "issuer")?,
+                subject_agent: spec_hash(spec, "subject_agent")?,
+                allowed_action_schema_root: spec_hash(spec, "allowed_action_schema_root")?,
+                object_scope_root: spec_hash(spec, "object_scope_root")?,
+                per_action_limit: spec_u128(spec, "per_action_limit")?,
+                cumulative_budget: spec_u128(spec, "cumulative_budget")?,
+                expiry_height: spec_u64(spec, "expiry_height")?,
+                delegation_depth: spec_u8(spec, "delegation_depth")?,
+                revocation_nonce: spec_u64(spec, "revocation_nonce")?,
+            },
+        },
+        "revoke_capability" => ActionV1::RevokeCapability {
+            grant_id: spec_hash(spec, "grant_id")?,
+        },
         "create_asset" => ActionV1::CreateAsset {
             issuer: spec_hash(spec, "issuer")?,
             symbol: spec_text(spec, "symbol")?,
@@ -361,6 +389,36 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
             owner: spec_hash(spec, "owner")?,
             repay_amount: spec_u128(spec, "repay_amount")?,
             min_collateral_out: spec_u128(spec, "min_collateral_out")?,
+        },
+        "open_private_payment" => ActionV1::OpenPrivatePayment {
+            payer: spec_hash(spec, "payer")?,
+            stable_asset: spec_hash(spec, "stable_asset")?,
+            recipient_commitment: spec_hash(spec, "recipient_commitment")?,
+            memo_commitment: spec_hash(spec, "memo_commitment")?,
+            reference_commitment: spec_hash(spec, "reference_commitment")?,
+            amount: spec_u128(spec, "amount")?,
+            expiry_height: spec_u64(spec, "expiry_height")?,
+            payment_kind: spec_u8(spec, "payment_kind")?,
+        },
+        "open_agent_private_payment" => ActionV1::OpenAgentPrivatePayment {
+            agent: spec_hash(spec, "agent")?,
+            payer: spec_hash(spec, "payer")?,
+            stable_asset: spec_hash(spec, "stable_asset")?,
+            recipient_commitment: spec_hash(spec, "recipient_commitment")?,
+            memo_commitment: spec_hash(spec, "memo_commitment")?,
+            reference_commitment: spec_hash(spec, "reference_commitment")?,
+            amount: spec_u128(spec, "amount")?,
+            expiry_height: spec_u64(spec, "expiry_height")?,
+            capability_ref: spec_hash(spec, "capability_ref")?,
+        },
+        "claim_private_payment" => ActionV1::ClaimPrivatePayment {
+            recipient: spec_hash(spec, "recipient")?,
+            payment_id: spec_hash(spec, "payment_id")?,
+            claim_secret: spec_hash(spec, "claim_secret")?,
+        },
+        "refund_private_payment" => ActionV1::RefundPrivatePayment {
+            payer: spec_hash(spec, "payer")?,
+            payment_id: spec_hash(spec, "payment_id")?,
         },
         "register_compute_worker" => ActionV1::RegisterComputeWorker {
             worker: spec_hash(spec, "worker")?,
@@ -675,6 +733,49 @@ pub fn tx_build(spec_json: &str) -> Result<Value> {
             }))
         })
         .collect();
+    let created_private_payments: Vec<Value> = tx
+        .actions
+        .as_slice()
+        .iter()
+        .enumerate()
+        .filter_map(|(index, bytes)| {
+            let (payer, stable_asset, amount, expiry_height, payment_kind) =
+                match ActionV1::decode_canonical(bytes.as_slice()).ok()? {
+                    ActionV1::OpenPrivatePayment {
+                        payer,
+                        stable_asset,
+                        amount,
+                        expiry_height,
+                        payment_kind,
+                        ..
+                    } => (payer, stable_asset, amount, expiry_height, payment_kind),
+                    ActionV1::OpenAgentPrivatePayment {
+                        payer,
+                        stable_asset,
+                        amount,
+                        expiry_height,
+                        ..
+                    } => (
+                        payer,
+                        stable_asset,
+                        amount,
+                        expiry_height,
+                        noos_lumen::objects::PrivatePaymentV1::KIND_AGENT,
+                    ),
+                    _ => return None,
+                };
+            let action_index = u32::try_from(index).ok()?;
+            Some(json!({
+                "action_index": action_index,
+                "payment_id": to_hex(&lumen_private_payment_id(&txid, action_index)),
+                "payer": to_hex(&payer),
+                "stable_asset": to_hex(&stable_asset),
+                "amount": amount.to_string(),
+                "expiry_height": expiry_height.to_string(),
+                "payment_kind": payment_kind,
+            }))
+        })
+        .collect();
     let created_compute_jobs: Vec<Value> = tx
         .actions
         .as_slice()
@@ -714,6 +815,7 @@ pub fn tx_build(spec_json: &str) -> Result<Value> {
         "created_compute_jobs": created_compute_jobs,
         "created_oracle_feeds": created_oracle_feeds,
         "created_lending_markets": created_lending_markets,
+        "created_private_payments": created_private_payments,
     }))
 }
 

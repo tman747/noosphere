@@ -21,15 +21,18 @@ use crate::engine::{AuthVerifier, ContractEngine};
 use crate::fees::{self, FeeParamsV1, FeeStateV1, Usage};
 use crate::issuance::{EmissionSharesV1, IssuanceParamsV1};
 use crate::objects::{
-    asset_id as derive_asset_id, compute_job_id as derive_compute_job_id,
-    debt_position_id as derive_debt_position_id, lending_market_id as derive_lending_market_id,
+    agent_private_payment_schema_root, agent_private_payment_scope, asset_id as derive_asset_id,
+    compute_job_id as derive_compute_job_id, debt_position_id as derive_debt_position_id,
+    lending_market_id as derive_lending_market_id,
     liquidity_position_id as derive_liquidity_position_id, oracle_feed_id as derive_oracle_feed_id,
     oracle_report_id as derive_oracle_report_id, pool_id as derive_pool_id,
+    private_payment_id as derive_private_payment_id, private_recipient_commitment,
     stable_asset_id as derive_stable_asset_id, witness_root as derive_witness_root, AccessEntry,
     AccountV1, ActionV1, AssetV1, BoundedBytes, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1,
     DebtPositionV1, FeatureControlV1, LendingMarketV1, LiquidityPositionV1, NoteV1, ObjectV1,
-    OracleFeedV1, OracleReportV1, ParamRecordV1, PendingParamV1, PoolV1, ReceiptV1, ResourceVector,
-    StableAssetV1, TransactionV1, TransactionWitnessesV1,
+    OptionalHash32, OracleFeedV1, OracleReportV1, ParamRecordV1, PendingParamV1, PoolV1,
+    PrivatePaymentV1, ReceiptV1, ResourceVector, StableAssetV1, TransactionV1,
+    TransactionWitnessesV1,
 };
 use crate::smt::Smt;
 use crate::Hash32;
@@ -44,6 +47,7 @@ pub const MINIMUM_LIQUIDITY: u128 = 1_000;
 pub const ORACLE_SCALE: u128 = 1_000_000_000;
 pub const MAX_ORACLE_CONFIDENCE_BPS: u16 = 1_000;
 pub const MAX_CREDIT_QUANTITY: u128 = u64::MAX as u128;
+pub const MAX_PRIVATE_PAYMENT_LIFETIME: u64 = 100_000;
 
 fn integer_sqrt(value: u128) -> u128 {
     if value < 2 {
@@ -535,6 +539,21 @@ impl LumenLedger {
             .iter()
             .filter_map(|(_, bytes)| DebtPositionV1::decode_canonical(bytes).ok())
             .collect()
+    }
+
+    #[must_use]
+    pub fn private_payments(&self) -> Vec<PrivatePaymentV1> {
+        self.objects
+            .iter()
+            .filter_map(|(_, bytes)| PrivatePaymentV1::decode_canonical(bytes).ok())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn get_private_payment(&self, id: &Hash32) -> Option<PrivatePaymentV1> {
+        self.objects
+            .get(id)
+            .and_then(|bytes| PrivatePaymentV1::decode_canonical(bytes).ok())
     }
 
     #[must_use]
@@ -1331,6 +1350,18 @@ impl LumenLedger {
                     return Err(RejectReason::CapabilityDenied);
                 }
                 ActionV1::LiquidatePosition { liquidator, .. } if !signed(liquidator) => {
+                    return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::OpenPrivatePayment { payer, .. }
+                | ActionV1::RefundPrivatePayment { payer, .. }
+                    if !signed(payer) =>
+                {
+                    return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::ClaimPrivatePayment { recipient, .. } if !signed(recipient) => {
+                    return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::OpenAgentPrivatePayment { agent, .. } if !signed(agent) => {
                     return Err(RejectReason::CapabilityDenied);
                 }
                 ActionV1::RegisterComputeWorker { worker, .. }
@@ -2521,6 +2552,210 @@ impl LumenLedger {
                     for _ in 0..5 {
                         ov.write_count()?;
                     }
+                }
+                ActionV1::OpenPrivatePayment {
+                    payer,
+                    stable_asset,
+                    recipient_commitment,
+                    memo_commitment,
+                    reference_commitment,
+                    amount,
+                    expiry_height,
+                    payment_kind,
+                } => {
+                    let max_expiry = ctx
+                        .height
+                        .checked_add(MAX_PRIVATE_PAYMENT_LIFETIME)
+                        .ok_or(FailCode::Overflow)?;
+                    if *amount == 0
+                        || *amount > MAX_CREDIT_QUANTITY
+                        || *expiry_height <= ctx.height
+                        || *expiry_height > max_expiry
+                        || *payment_kind > PrivatePaymentV1::KIND_COMMERCE
+                        || *recipient_commitment == [0; 32]
+                        || *memo_commitment == [0; 32]
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let stable_raw = overlay_object(&ov, self, stable_asset)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let stable = StableAssetV1::decode_canonical(&stable_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if stable.kind != 1 || stable.asset_id != *stable_asset {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let payer_balance = overlay_balance(&ov, self, payer, stable_asset);
+                    ov.balances.insert(
+                        (*payer, *stable_asset),
+                        payer_balance
+                            .checked_sub(*amount)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    let idx = u32::try_from(index).map_err(|_| FailCode::Overflow)?;
+                    let payment_id = derive_private_payment_id(txid, idx);
+                    if overlay_object(&ov, self, &payment_id).is_some() {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let payment = PrivatePaymentV1 {
+                        payment_id,
+                        payer: *payer,
+                        stable_asset: *stable_asset,
+                        recipient_commitment: *recipient_commitment,
+                        memo_commitment: *memo_commitment,
+                        reference_commitment: *reference_commitment,
+                        amount: *amount,
+                        expiry_height: *expiry_height,
+                        payment_kind: *payment_kind,
+                        status: PrivatePaymentV1::STATUS_OPEN,
+                        settled_account: OptionalHash32(None),
+                        settled_height: 0,
+                    };
+                    ov.objects
+                        .insert(payment_id, Some(payment.encode_canonical()));
+                    ov.write_count()?;
+                    ov.write_count()?;
+                }
+                ActionV1::OpenAgentPrivatePayment {
+                    agent,
+                    payer,
+                    stable_asset,
+                    recipient_commitment,
+                    memo_commitment,
+                    reference_commitment,
+                    amount,
+                    expiry_height,
+                    capability_ref,
+                } => {
+                    let max_expiry = ctx
+                        .height
+                        .checked_add(MAX_PRIVATE_PAYMENT_LIFETIME)
+                        .ok_or(FailCode::Overflow)?;
+                    let grant_raw = overlay_object(&ov, self, capability_ref)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut grant = CapabilityGrantV1::decode_canonical(&grant_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if grant.grant_id != *capability_ref
+                        || grant.issuer != *payer
+                        || grant.subject_agent != *agent
+                        || grant.allowed_action_schema_root != agent_private_payment_schema_root()
+                        || grant.object_scope_root
+                            != agent_private_payment_scope(stable_asset, recipient_commitment)
+                        || ctx.height > grant.expiry_height
+                        || *expiry_height <= ctx.height
+                        || *expiry_height > max_expiry
+                        || *expiry_height > grant.expiry_height
+                        || *amount == 0
+                        || *amount > grant.per_action_limit
+                        || *amount > MAX_CREDIT_QUANTITY
+                        || *recipient_commitment == [0; 32]
+                        || *memo_commitment == [0; 32]
+                        || *reference_commitment == [0; 32]
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    grant.cumulative_budget = grant
+                        .cumulative_budget
+                        .checked_sub(*amount)
+                        .ok_or(FailCode::InsufficientBalance)?;
+                    let stable_raw = overlay_object(&ov, self, stable_asset)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let stable = StableAssetV1::decode_canonical(&stable_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if stable.kind != 1 || stable.asset_id != *stable_asset {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let payer_balance = overlay_balance(&ov, self, payer, stable_asset);
+                    ov.balances.insert(
+                        (*payer, *stable_asset),
+                        payer_balance
+                            .checked_sub(*amount)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    let idx = u32::try_from(index).map_err(|_| FailCode::Overflow)?;
+                    let payment_id = derive_private_payment_id(txid, idx);
+                    if overlay_object(&ov, self, &payment_id).is_some() {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let payment = PrivatePaymentV1 {
+                        payment_id,
+                        payer: *payer,
+                        stable_asset: *stable_asset,
+                        recipient_commitment: *recipient_commitment,
+                        memo_commitment: *memo_commitment,
+                        reference_commitment: *reference_commitment,
+                        amount: *amount,
+                        expiry_height: *expiry_height,
+                        payment_kind: PrivatePaymentV1::KIND_AGENT,
+                        status: PrivatePaymentV1::STATUS_OPEN,
+                        settled_account: OptionalHash32(None),
+                        settled_height: 0,
+                    };
+                    ov.objects
+                        .insert(payment_id, Some(payment.encode_canonical()));
+                    ov.objects
+                        .insert(*capability_ref, Some(grant.encode_canonical()));
+                    ov.write_count()?;
+                    ov.write_count()?;
+                    ov.write_count()?;
+                }
+                ActionV1::ClaimPrivatePayment {
+                    recipient,
+                    payment_id,
+                    claim_secret,
+                } => {
+                    let payment_raw = overlay_object(&ov, self, payment_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut payment = PrivatePaymentV1::decode_canonical(&payment_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if payment.payment_id != *payment_id
+                        || payment.status != PrivatePaymentV1::STATUS_OPEN
+                        || ctx.height > payment.expiry_height
+                        || payment.recipient_commitment
+                            != private_recipient_commitment(recipient, claim_secret)
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let balance = overlay_balance(&ov, self, recipient, &payment.stable_asset);
+                    ov.balances.insert(
+                        (*recipient, payment.stable_asset),
+                        balance
+                            .checked_add(payment.amount)
+                            .ok_or(FailCode::Overflow)?,
+                    );
+                    payment.status = PrivatePaymentV1::STATUS_CLAIMED;
+                    payment.settled_account = OptionalHash32(Some(*recipient));
+                    payment.settled_height = ctx.height;
+                    ov.objects
+                        .insert(*payment_id, Some(payment.encode_canonical()));
+                    ov.write_count()?;
+                    ov.write_count()?;
+                }
+                ActionV1::RefundPrivatePayment { payer, payment_id } => {
+                    let payment_raw = overlay_object(&ov, self, payment_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut payment = PrivatePaymentV1::decode_canonical(&payment_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if payment.payment_id != *payment_id
+                        || payment.payer != *payer
+                        || payment.status != PrivatePaymentV1::STATUS_OPEN
+                        || ctx.height <= payment.expiry_height
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let balance = overlay_balance(&ov, self, payer, &payment.stable_asset);
+                    ov.balances.insert(
+                        (*payer, payment.stable_asset),
+                        balance
+                            .checked_add(payment.amount)
+                            .ok_or(FailCode::Overflow)?,
+                    );
+                    payment.status = PrivatePaymentV1::STATUS_REFUNDED;
+                    payment.settled_account = OptionalHash32(Some(*payer));
+                    payment.settled_height = ctx.height;
+                    ov.objects
+                        .insert(*payment_id, Some(payment.encode_canonical()));
+                    ov.write_count()?;
+                    ov.write_count()?;
                 }
                 ActionV1::RegisterComputeWorker {
                     worker,

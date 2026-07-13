@@ -11,8 +11,8 @@
 use noos_cli::{from_hex, to_hex, CliError};
 use noos_codec::{NoosDecode, NoosEncode};
 use noos_lumen::objects::{
-    asset_id, lending_market_id, object_id, oracle_feed_id, pool_id, stable_asset_id, ActionV1,
-    BoundedBytes, TransactionV1,
+    asset_id, lending_market_id, object_id, oracle_feed_id, pool_id, private_payment_id,
+    stable_asset_id, ActionV1, BoundedBytes, TransactionV1,
 };
 use serde_json::{json, Value};
 use std::io::{Read, Write};
@@ -365,6 +365,61 @@ fn tx_build_encodes_oracle_and_lending_market_actions() {
         ActionV1::CreateLendingMarket {
             collateral_factor_bps: 5000,
             liquidation_threshold_bps: 7500,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn tx_build_encodes_transfers_and_private_payment_actions() {
+    let mut spec = minimal_spec();
+    let payer = h(0x41);
+    let recipient = h(0x42);
+    let stable = h(0x43);
+    spec["fee_payer"] = json!(payer);
+    spec["account_inputs"] = json!([payer]);
+    spec["actions"] = json!([
+        {
+            "type": "withdraw_from_account",
+            "account_id": payer,
+            "asset_id": stable,
+            "amount": "9000"
+        },
+        {
+            "type": "deposit_to_account",
+            "account_id": recipient,
+            "asset_id": stable,
+            "amount": "9000"
+        },
+        {
+            "type": "open_private_payment",
+            "payer": payer,
+            "stable_asset": stable,
+            "recipient_commitment": h(0x44),
+            "memo_commitment": h(0x45),
+            "reference_commitment": h(0x46),
+            "amount": "7000",
+            "expiry_height": "800",
+            "payment_kind": 1
+        }
+    ]);
+    let built = noos_cli::tx_build(&spec.to_string()).unwrap();
+    let txid = noos_cli::from_hex32(built["txid"].as_str().unwrap()).unwrap();
+    assert_eq!(
+        built["created_private_payments"][0]["payment_id"],
+        to_hex(&private_payment_id(&txid, 2))
+    );
+    let tx =
+        TransactionV1::decode_canonical(&from_hex(built["tx"].as_str().unwrap()).unwrap()).unwrap();
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[0].as_slice()).unwrap(),
+        ActionV1::WithdrawFromAccount { amount: 9000, .. }
+    ));
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[2].as_slice()).unwrap(),
+        ActionV1::OpenPrivatePayment {
+            amount: 7000,
+            payment_kind: 1,
             ..
         }
     ));

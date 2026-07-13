@@ -16,11 +16,12 @@ use crate::engine::{AuthVerifier, ContractEngine, EngineOutcome, EngineTrap};
 use crate::fees::{self, FeeParamsV1, FeeStateV1};
 use crate::issuance::{EmissionSharesV1, IssuanceParamsV1};
 use crate::objects::{
-    asset_id, compute_job_id, debt_position_id, lending_market_id, liquidity_position_id, note_id,
-    oracle_feed_id, pool_id, stable_asset_id, txid, witness_root, AccessEntry, AccountV1, ActionV1,
-    BoundedBytes, BoundedList, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1, FeatureControlV1,
-    IntentV1, NoteV1, ObjectV1, OptionalHash32, OptionalObject, ResourceVector, SignedIntentV1,
-    TransactionV1, TransactionWitnessesV1,
+    agent_private_payment_schema_root, agent_private_payment_scope, asset_id, compute_job_id,
+    debt_position_id, lending_market_id, liquidity_position_id, note_id, oracle_feed_id, pool_id,
+    private_recipient_commitment, stable_asset_id, txid, witness_root, AccessEntry, AccountV1,
+    ActionV1, BoundedBytes, BoundedList, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1,
+    FeatureControlV1, IntentV1, NoteV1, ObjectV1, OptionalHash32, OptionalObject, PrivatePaymentV1,
+    ResourceVector, SignedIntentV1, TransactionV1, TransactionWitnessesV1,
 };
 use crate::state::{
     param_key, ApplyOutcome, BlockContext, FailCode, GenesisConfig, GenesisError, LumenLedger,
@@ -1077,6 +1078,194 @@ fn quorum_oracle_and_collateralized_stable_debt_lifecycle() {
         40_000
     );
     assert_eq!(ledger.stable_assets()[0].minted_supply, 40_000);
+
+    let claim_secret = [0xC1; 32];
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            15,
+            vec![PAYER],
+            vec![ActionV1::OpenPrivatePayment {
+                payer: PAYER,
+                stable_asset: stable,
+                recipient_commitment: private_recipient_commitment(&EMERGENCY, &claim_secret),
+                memo_commitment: [0xB1; 32],
+                reference_commitment: [0xA1; 32],
+                amount: 5_000,
+                expiry_height: 25,
+                payment_kind: PrivatePaymentV1::KIND_AGENT,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    let payment_id = ledger
+        .private_payments()
+        .into_iter()
+        .find(|payment| payment.reference_commitment == [0xA1; 32])
+        .unwrap()
+        .payment_id;
+    let wrong_claim = apply(
+        &mut ledger,
+        16,
+        vec![PAYER, GOV],
+        vec![ActionV1::ClaimPrivatePayment {
+            recipient: GOV,
+            payment_id,
+            claim_secret,
+        }],
+    );
+    assert!(matches!(
+        wrong_claim,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            17,
+            vec![PAYER, EMERGENCY],
+            vec![ActionV1::ClaimPrivatePayment {
+                recipient: EMERGENCY,
+                payment_id,
+                claim_secret,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert_eq!(ledger.balance(&EMERGENCY, &stable), 5_000);
+    assert_eq!(
+        ledger.get_private_payment(&payment_id).unwrap().status,
+        PrivatePaymentV1::STATUS_CLAIMED
+    );
+
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            18,
+            vec![PAYER],
+            vec![ActionV1::OpenPrivatePayment {
+                payer: PAYER,
+                stable_asset: stable,
+                recipient_commitment: private_recipient_commitment(&EMERGENCY, &[0xC2; 32]),
+                memo_commitment: [0xB2; 32],
+                reference_commitment: [0xA2; 32],
+                amount: 3_000,
+                expiry_height: 19,
+                payment_kind: PrivatePaymentV1::KIND_INVOICE,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    let refundable_id = ledger
+        .private_payments()
+        .into_iter()
+        .find(|payment| payment.reference_commitment == [0xA2; 32])
+        .unwrap()
+        .payment_id;
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            19,
+            vec![PAYER],
+            vec![ActionV1::RefundPrivatePayment {
+                payer: PAYER,
+                payment_id: refundable_id,
+            }],
+        ),
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            20,
+            vec![PAYER],
+            vec![ActionV1::RefundPrivatePayment {
+                payer: PAYER,
+                payment_id: refundable_id,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert_eq!(ledger.balance(&PAYER, &stable), 35_000);
+    assert_eq!(
+        ledger.get_private_payment(&refundable_id).unwrap().status,
+        PrivatePaymentV1::STATUS_REFUNDED
+    );
+
+    let agent_secret = [0xC3; 32];
+    let agent_recipient = private_recipient_commitment(&EMERGENCY, &agent_secret);
+    let grant_id = [0xD1; 32];
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            21,
+            vec![PAYER],
+            vec![ActionV1::GrantCapability {
+                grant: CapabilityGrantV1 {
+                    grant_id,
+                    issuer: PAYER,
+                    subject_agent: GOV,
+                    allowed_action_schema_root: agent_private_payment_schema_root(),
+                    object_scope_root: agent_private_payment_scope(&stable, &agent_recipient),
+                    per_action_limit: 4_000,
+                    cumulative_budget: 6_000,
+                    expiry_height: 50,
+                    delegation_depth: 0,
+                    revocation_nonce: 0,
+                },
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            22,
+            vec![PAYER, GOV],
+            vec![ActionV1::OpenAgentPrivatePayment {
+                agent: GOV,
+                payer: PAYER,
+                stable_asset: stable,
+                recipient_commitment: agent_recipient,
+                memo_commitment: [0xB3; 32],
+                reference_commitment: [0xA3; 32],
+                amount: 3_000,
+                expiry_height: 40,
+                capability_ref: grant_id,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert_eq!(ledger.balance(&PAYER, &stable), 32_000);
+    let overspend = apply(
+        &mut ledger,
+        23,
+        vec![PAYER, GOV],
+        vec![ActionV1::OpenAgentPrivatePayment {
+            agent: GOV,
+            payer: PAYER,
+            stable_asset: stable,
+            recipient_commitment: agent_recipient,
+            memo_commitment: [0xB4; 32],
+            reference_commitment: [0xA4; 32],
+            amount: 4_000,
+            expiry_height: 40,
+            capability_ref: grant_id,
+        }],
+    );
+    assert!(matches!(
+        overspend,
+        ApplyOutcome::Failed {
+            code: FailCode::InsufficientBalance,
+            ..
+        }
+    ));
+    assert_eq!(ledger.balance(&PAYER, &stable), 32_000);
 }
 
 #[test]

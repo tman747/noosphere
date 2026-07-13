@@ -1,0 +1,14 @@
+{
+  "name": "Harbor Wallet for MindChain",
+  "short_name": "Harbor Wallet",
+  "description": "Self-custody MindChain wallet with locally encrypted Ed25519 keys.",
+  "id": "/wallet/",
+  "start_url": "/wallet/",
+  "scope": "/wallet/",
+  "display": "standalone",
+  "background_color": "#f1efe5",
+  "theme_color": "#11241f",
+  "orientation": "any",
+  "categories": ["finance", "productivity"],
+  "icons": [{"src":"/wallet/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

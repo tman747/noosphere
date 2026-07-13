@@ -32,7 +32,8 @@ use noos_da::{encode_body, BodyDaClaimV1, ShardCandidateV1, BODY_TOTAL_SHARDS};
 use noos_ground::GroundTicketV1;
 use noos_lumen::objects::{
     AssetV1, BoundedList, ComputeJobV1, ComputeWorkerV1, DebtPositionV1, LendingMarketV1,
-    LiquidityPositionV1, OracleFeedV1, OracleReportV1, PoolV1, ReceiptV1, StableAssetV1,
+    LiquidityPositionV1, OracleFeedV1, OracleReportV1, PoolV1, PrivatePaymentV1, ReceiptV1,
+    StableAssetV1,
 };
 use noos_lumen::state::LumenRoots;
 use noos_p2p::{
@@ -308,6 +309,9 @@ pub enum ConsensusMsg {
     GetDebtPositions {
         reply: Reply<Vec<DebtPositionV1>>,
     },
+    GetPrivatePayments {
+        reply: Reply<Vec<PrivatePaymentV1>>,
+    },
     GetComputeWorkers {
         reply: Reply<Vec<ComputeWorkerV1>>,
     },
@@ -494,6 +498,9 @@ fn core_loop<P: StorePort>(
             }
             ConsensusMsg::GetDebtPositions { reply } => {
                 let _ = reply.send(core.ledger().debt_positions());
+            }
+            ConsensusMsg::GetPrivatePayments { reply } => {
+                let _ = reply.send(core.ledger().private_payments());
             }
             ConsensusMsg::GetComputeWorkers { reply } => {
                 let _ = reply.send(core.ledger().compute_workers());

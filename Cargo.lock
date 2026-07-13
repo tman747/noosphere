@@ -3577,11 +3577,13 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "hkdf",
+ "noos-umbra",
  "ring",
  "serde",
  "serde_json",
  "sha2",
  "thiserror 2.0.18",
+ "x25519-dalek",
  "zeroize",
 ]
 

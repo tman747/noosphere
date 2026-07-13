@@ -232,6 +232,7 @@ fn handle_connection(
         ("GET", "/lending/markets") => lending_markets_route(consensus_tx),
         ("GET", "/stable/assets") => stable_assets_route(consensus_tx),
         ("GET", "/lending/positions") => debt_positions_route(consensus_tx),
+        ("GET", "/payments/private") => private_payments_route(consensus_tx),
         ("GET", "/compute/workers") => compute_workers_route(consensus_tx),
         ("GET", "/compute/jobs") => compute_jobs_route(consensus_tx),
         _ if method == "GET" && path.starts_with("/balance/") => {
@@ -737,6 +738,49 @@ fn debt_positions_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
             hex(&position.position_id), hex(&position.market_id), hex(&position.owner),
             position.collateral, position.debt
         ))
+        .collect::<Vec<_>>()
+        .join(",");
+    http(
+        "200 OK",
+        "application/json",
+        &format!(r#"{{"items":[{entries}]}}"#),
+    )
+}
+
+fn private_payments_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
+    let Some(items) = round_trip(consensus_tx, |reply| ConsensusMsg::GetPrivatePayments {
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no private payment reply",
+        );
+    };
+    let entries = items
+        .iter()
+        .map(|payment| {
+            let settled_account = payment
+                .settled_account
+                .0
+                .map(|account| format!(r#""{}""#, hex(&account)))
+                .unwrap_or_else(|| "null".to_owned());
+            format!(
+                r#"{{"payment_id":"{}","payer":"{}","stable_asset":"{}","recipient_commitment":"{}","memo_commitment":"{}","reference_commitment":"{}","amount":"{}","expiry_height":"{}","payment_kind":{},"status":{},"settled_account":{},"settled_height":"{}"}}"#,
+                hex(&payment.payment_id),
+                hex(&payment.payer),
+                hex(&payment.stable_asset),
+                hex(&payment.recipient_commitment),
+                hex(&payment.memo_commitment),
+                hex(&payment.reference_commitment),
+                payment.amount,
+                payment.expiry_height,
+                payment.payment_kind,
+                payment.status,
+                settled_account,
+                payment.settled_height,
+            )
+        })
         .collect::<Vec<_>>()
         .join(",");
     http(

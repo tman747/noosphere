@@ -309,6 +309,38 @@ async fn lending_state_is_identity_checked_and_forwarded_read_only() {
 }
 
 #[tokio::test]
+async fn private_payments_are_identity_checked_and_forwarded_read_only() {
+    let item = serde_json::json!({
+        "items": [{
+            "payment_id": hash('4'),
+            "stable_asset": hash('5'),
+            "amount": "7000",
+            "status": 0
+        }]
+    });
+    let node = FakeNode::spawn(vec![
+        (200, status_body(&identity())),
+        (200, item.to_string()),
+    ]);
+    let (_dir, app) = configured_app(&node);
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/private-payments")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response_json(response).await, item);
+    let requests = node.requests();
+    assert_eq!(requests.len(), 2);
+    assert!(requests[0].starts_with(b"GET /status HTTP/1.1\r\n"));
+    assert!(requests[1].starts_with(b"GET /payments/private HTTP/1.1\r\n"));
+}
+
+#[tokio::test]
 async fn malformed_and_oversize_public_inputs_never_reach_a_node_or_index() {
     let node = FakeNode::spawn(Vec::new());
     let (_dir, app) = configured_app(&node);

@@ -10,7 +10,7 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/">MIND<span>/MARKET</span></a>
-    <nav><a href="/exchange/">Swap</a><a href="/launch/">Launch</a><a class="active" href="/defi/">DeFi</a></nav>
+    <nav><a href="/exchange/">Swap</a><a href="/launch/">Launch</a><a class="active" href="/defi/">DeFi</a><a href="/wallet/">Wallet</a></nav>
     <div class="network" id="network"><i></i><span>Connecting</span></div>
   </header>
   <main>
@@ -19,13 +19,14 @@
         <p class="eyebrow">Native liquidity and credit</p>
         <h1>Harbor</h1>
       </div>
-      <p>Provide proportional liquidity, earn swap fees, lock collateral, and manage stable debt. Every balance and risk limit is enforced by the atomic ledger transition—not by this interface.</p>
+      <div><p>Provide proportional liquidity, earn swap fees, lock collateral, and manage stable debt. Commitment escrow now supports recipient-hidden stable payments for agents and invoices.</p><a class="wallet-cta" href="/wallet/">Open self-custody wallet →</a></div>
     </section>
 
     <section class="identity" aria-label="Connected account">
       <div><span>ACCOUNT</span><code id="account">—</code></div>
       <div><span>POOLS</span><strong id="pool-count">—</strong></div>
       <div><span>DEBT MARKETS</span><strong id="market-count">—</strong></div>
+      <div><span>PRIVATE PAYMENTS</span><strong id="payment-count">—</strong></div>
       <button id="refresh" type="button">Refresh state</button>
     </section>
 
@@ -99,6 +100,7 @@
         <li>Checked integer arithmetic and bounded quantities; no floating-point consensus math.</li>
         <li>Minimum locked AMM liquidity; proportional share minting; reserve product cannot decrease.</li>
         <li>Collateral factors below liquidation thresholds; bounded close factor and liquidation bonus.</li>
+        <li>Private stable escrow hides recipient and memo until claim; payer, amount, and timing remain public.</li>
         <li>No reentrancy, callbacks, arbitrary contract calls, flash loans, or external code execution.</li>
       </ul>
       <p>This local gateway signs with the deterministic valueless developer account. Production users sign locally in the wallet; a public server must never hold user seeds.</p>

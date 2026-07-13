@@ -132,6 +132,11 @@ function renderPositions() {
     const owned = position.owner === state.config.account ? "Your debt position" : "External debt position";
     records.push([owned, short(position.position_id), ["Collateral", format(position.collateral)], ["Debt", format(position.debt)]]);
   }
+  for (const payment of state.defi.private_payments || []) {
+    const paymentStatus = [\"Open\", \"Claimed\", \"Refunded\"][payment.status] || \"Unknown\";
+    const paymentKind = [\"General\", \"Agent\", \"Invoice\", \"Commerce\"][payment.payment_kind] || \"Unknown\";
+    records.push([`Private payment / ${paymentStatus}`, short(payment.payment_id), [\"Amount\", format(payment.amount)], [\"Kind\", paymentKind]]);
+  }
   if (!records.length) { target.append(text("p", "No liquidity or debt positions exist.", "empty")); return; }
   for (const record of records) {
     const card = text("article", "", "position");
@@ -145,6 +150,7 @@ function render() {
   $("#account").textContent = state.config.account;
   $("#pool-count").textContent = state.defi.pools.length;
   $("#market-count").textContent = state.defi.lending_markets.length;
+  $(\"#payment-count\").textContent = (state.defi.private_payments || []).length;
   populateSelect("#pool", state.defi.pools, "pool_id", (pool) => `${short(pool.asset_0)} / ${short(pool.asset_1)} · ${pool.fee_bps} bps`);
   populateSelect("#market", state.defi.lending_markets, "market_id", (market) => `${stableFor(market)?.symbol || "STABLE"} · ${short(market.collateral_asset)}`);
   renderPool(); renderMarket(); renderPositions();

@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import struct
 import sys
 import threading
 import time
@@ -20,6 +21,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUNTIME = Path(os.environ.get("NOOS_LOCAL_DEVNET_DIR", "C:/tmp/noosphere-local-devnet"))
@@ -268,6 +271,7 @@ def defi_state(metadata: dict) -> dict:
         "lending_markets": request_json(indexer, "/api/v1/lending-markets").get("items", []),
         "stable_assets": request_json(indexer, "/api/v1/stable-assets").get("items", []),
         "debt_positions": request_json(indexer, "/api/v1/debt-positions").get("items", []),
+        "private_payments": request_json(indexer, "/api/v1/private-payments").get("items", []),
     }
 
 
@@ -326,6 +330,42 @@ def defi_action(metadata: dict, exe: Path, body: dict) -> dict:
                 integer(body.get("min_collateral_out"), "min_collateral_out", 1)
             ),
         }
+    elif kind == "open_private_payment":
+        stable = str(body.get("stable_asset", ""))
+        recipient_commitment = str(body.get("recipient_commitment", ""))
+        memo_commitment = str(body.get("memo_commitment", ""))
+        reference_commitment = str(body.get("reference_commitment", ""))
+        if not all(HEX32.fullmatch(value) for value in (
+            stable, recipient_commitment, memo_commitment, reference_commitment
+        )):
+            raise ValueError("private payment fields must be 32-byte lowercase hex")
+        action = {
+            "type": kind,
+            "payer": account,
+            "stable_asset": stable,
+            "recipient_commitment": recipient_commitment,
+            "memo_commitment": memo_commitment,
+            "reference_commitment": reference_commitment,
+            "amount": str(integer(body.get("amount"), "amount", 1)),
+            "expiry_height": str(integer(body.get("expiry_height"), "expiry_height", 1)),
+            "payment_kind": integer(body.get("payment_kind"), "payment_kind", 0, 3),
+        }
+    elif kind == "claim_private_payment":
+        payment = str(body.get("payment_id", ""))
+        secret = str(body.get("claim_secret", ""))
+        if not HEX32.fullmatch(payment) or not HEX32.fullmatch(secret):
+            raise ValueError("payment_id and claim_secret must be 32-byte lowercase hex")
+        action = {
+            "type": kind,
+            "recipient": account,
+            "payment_id": payment,
+            "claim_secret": secret,
+        }
+    elif kind == "refund_private_payment":
+        payment = str(body.get("payment_id", ""))
+        if not HEX32.fullmatch(payment):
+            raise ValueError("payment_id must be 32-byte lowercase hex")
+        action = {"type": kind, "payer": account, "payment_id": payment}
     else:
         raise ValueError("unsupported DeFi action")
     with TX_LOCK:
@@ -333,6 +373,99 @@ def defi_action(metadata: dict, exe: Path, body: dict) -> dict:
     return {"txid": result["build"]["txid"], "receipt": result["receipt"]}
 
 
+
+def wallet_build(metadata: dict, exe: Path, body: dict) -> dict:
+    account = str(body.get("account", ""))
+    recipient = str(body.get("recipient", ""))
+    asset = str(body.get("asset", ""))
+    if not all(HEX32.fullmatch(value) for value in (account, recipient, asset)):
+        raise ValueError("account, recipient, and asset must be 32-byte lowercase hex")
+    amount = integer(body.get("amount"), "amount", 1)
+    status = request_json(metadata["validator_rpc"], "/status", metadata["rpc_token"])
+    spec = {
+        "chain_id": metadata["chain_id"],
+        "expiry_height": int(status["unsafe_head"]["height"]) + 1000,
+        "fee_payer": account,
+        "resource_limits": {
+            "bytes": 4096,
+            "grain_steps": 0,
+            "proof_units": 0,
+            "state_reads": 32,
+            "state_writes": 32,
+            "blob_bytes": 0,
+        },
+        "account_inputs": [account],
+        "actions": [
+            {"type": "withdraw_from_account", "account_id": account, "asset_id": asset, "amount": str(amount)},
+            {"type": "deposit_to_account", "account_id": recipient, "asset_id": asset, "amount": str(amount)},
+        ],
+    }
+    built = cli_json(exe, "tx", "build", "--spec", json.dumps(spec, separators=(",", ":")))
+    return {
+        "tx": built["tx"],
+        "txid": built["txid"],
+        "chain_id": metadata["chain_id"],
+        "genesis_hash": metadata["genesis_hash"],
+        "signing_message": (b"NOOS/SIG/TX/V1" + bytes.fromhex(built["txid"])).hex(),
+    }
+
+
+def _tag(value: int) -> bytes:
+    return struct.pack("<H", value)
+
+
+def _wallet_witness(txid: bytes, signature: bytes) -> str:
+    intent = struct.pack("<H", 1)
+    intent += _tag(1) + txid
+    intent += _tag(2) + bytes([0])
+    intent += _tag(3) + bytes([0])
+    intent += _tag(4) + struct.pack("<H", 1)
+    intent += _tag(5) + struct.pack("<I", len(signature)) + signature
+    witnesses = struct.pack("<H", 1)
+    witnesses += _tag(1) + struct.pack("<I", 1) + intent
+    witnesses += _tag(2) + struct.pack("<I", 0)
+    return witnesses.hex()
+
+
+def wallet_submit(metadata: dict, exe: Path, body: dict) -> dict:
+    account = str(body.get("account", ""))
+    tx = str(body.get("tx", ""))
+    txid = str(body.get("txid", ""))
+    signature_hex = str(body.get("signature", ""))
+    if not HEX32.fullmatch(account) or not HEX32.fullmatch(txid):
+        raise ValueError("account and txid must be 32-byte lowercase hex")
+    if not re.fullmatch(r"(?:[0-9a-f]{2})+", tx) or len(signature_hex) != 128 or not re.fullmatch(r"[0-9a-f]+", signature_hex):
+        raise ValueError("tx and signature must be canonical lowercase hex")
+    signature = bytes.fromhex(signature_hex)
+    try:
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(account)).verify(
+            signature, b"NOOS/SIG/TX/V1" + bytes.fromhex(txid)
+        )
+    except (ValueError, InvalidSignature) as error:
+        raise ValueError("signature does not authorize this transaction id") from error
+    submitted = cli_json(
+        exe, "tx", "submit",
+        "--node", metadata["validator_rpc"], "--token", metadata["rpc_token"],
+        "--chain-id", metadata["chain_id"], "--genesis-hash", metadata["genesis_hash"],
+        "--tx", tx, "--witnesses", _wallet_witness(bytes.fromhex(txid), signature),
+    )
+    if submitted.get("txid") != txid:
+        raise RuntimeError("node returned a different transaction id")
+    return {"txid": txid, "receipt": settled_receipt(metadata, txid)}
+
+
+def wallet_faucet(metadata: dict, exe: Path, body: dict) -> dict:
+    recipient = str(body.get("account", ""))
+    if not HEX32.fullmatch(recipient):
+        raise ValueError("account must be 32-byte lowercase hex")
+    amount = integer(body.get("amount", 1_000_000), "amount", 1, 1_000_000)
+    account = metadata["developer_public_id"]
+    with TX_LOCK:
+        result = submit_actions(metadata, exe, [
+            {"type": "withdraw_from_account", "account_id": account, "asset_id": NOOS_ASSET, "amount": str(amount)},
+            {"type": "deposit_to_account", "account_id": recipient, "asset_id": NOOS_ASSET, "amount": str(amount)},
+        ])
+    return {"txid": result["build"]["txid"], "receipt": result["receipt"]}
 class Handler(BaseHTTPRequestHandler):
     server_version = "MindMarket/1"
 
@@ -380,9 +513,9 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/api/balance":
                 values = parse_qs(parsed.query)
                 asset = values.get("asset", [""])[0]
-                if not HEX32.fullmatch(asset):
-                    raise ValueError("asset must be 32-byte lowercase hex")
-                account = self.app.metadata["developer_public_id"]
+                account = values.get("account", [self.app.metadata["developer_public_id"]])[0]
+                if not HEX32.fullmatch(asset) or not HEX32.fullmatch(account):
+                    raise ValueError("account and asset must be 32-byte lowercase hex")
                 self.send_json(
                     200,
                     request_json(
@@ -417,6 +550,15 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/api/defi/action":
                 self.send_json(200, defi_action(self.app.metadata, self.app.cli, body))
                 return
+            if parsed.path == "/api/wallet/build":
+                self.send_json(200, wallet_build(self.app.metadata, self.app.cli, body))
+                return
+            if parsed.path == "/api/wallet/submit":
+                self.send_json(200, wallet_submit(self.app.metadata, self.app.cli, body))
+                return
+            if parsed.path == "/api/wallet/faucet":
+                self.send_json(200, wallet_faucet(self.app.metadata, self.app.cli, body))
+                return
             self.send_json(404, {"error": "unknown route"})
         except (ValueError, RuntimeError) as error:
             self.send_json(400, {"error": str(error)})
@@ -434,6 +576,8 @@ class Handler(BaseHTTPRequestHandler):
             "/exchange/": STATIC_ROOT / "exchange" / "index.html",
             "/defi": STATIC_ROOT / "defi" / "index.html",
             "/defi/": STATIC_ROOT / "defi" / "index.html",
+            "/wallet": STATIC_ROOT / "wallet" / "index.html",
+            "/wallet/": STATIC_ROOT / "wallet" / "index.html",
         }
         target = aliases.get(raw_path)
         if target is None:

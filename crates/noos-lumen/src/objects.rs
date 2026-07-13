@@ -619,6 +619,36 @@ define_object! {
         5 => debt: u128,
     }
 }
+
+define_object! {
+    /// Stable-asset escrow whose recipient and memo remain commitment-hidden
+    /// until an authenticated claim. Amount and payer remain public by design.
+    pub struct PrivatePaymentV1 {
+        version: 1;
+        1 => payment_id: [u8; 32],
+        2 => payer: [u8; 32],
+        3 => stable_asset: [u8; 32],
+        4 => recipient_commitment: [u8; 32],
+        5 => memo_commitment: [u8; 32],
+        6 => reference_commitment: [u8; 32],
+        7 => amount: u128,
+        8 => expiry_height: u64,
+        9 => payment_kind: u8,
+        10 => status: u8,
+        11 => settled_account: OptionalHash32,
+        12 => settled_height: u64,
+    }
+}
+
+impl PrivatePaymentV1 {
+    pub const KIND_GENERAL: u8 = 0;
+    pub const KIND_AGENT: u8 = 1;
+    pub const KIND_INVOICE: u8 = 2;
+    pub const KIND_COMMERCE: u8 = 3;
+    pub const STATUS_OPEN: u8 = 0;
+    pub const STATUS_CLAIMED: u8 = 1;
+    pub const STATUS_REFUNDED: u8 = 2;
+}
 define_object! {
     /// Compute worker advertisement used by the application-only rental
     /// market. Capability bit 0 = CPU and bit 1 = GPU.
@@ -718,6 +748,35 @@ pub fn stable_asset_id(market: &Hash32) -> Hash32 {
 #[must_use]
 pub fn debt_position_id(market: &Hash32, owner: &Hash32) -> Hash32 {
     domain_hash("NOOS/LENDING/POSITION/ID/V1", &[market, owner])
+}
+
+#[must_use]
+pub fn private_payment_id(creating_txid: &Hash32, action_index: u32) -> Hash32 {
+    domain_hash(
+        "NOOS/PRIVATE-PAYMENT/ID/V1",
+        &[creating_txid, &action_index.to_le_bytes()],
+    )
+}
+
+#[must_use]
+pub fn private_recipient_commitment(recipient: &Hash32, claim_secret: &Hash32) -> Hash32 {
+    domain_hash(
+        "NOOS/PRIVATE-PAYMENT/RECIPIENT/V1",
+        &[recipient, claim_secret],
+    )
+}
+
+#[must_use]
+pub fn agent_private_payment_schema_root() -> Hash32 {
+    domain_hash("NOOS/AGENT-PAYMENT/SCHEMA/V1", &[])
+}
+
+#[must_use]
+pub fn agent_private_payment_scope(stable_asset: &Hash32, recipient_commitment: &Hash32) -> Hash32 {
+    domain_hash(
+        "NOOS/AGENT-PAYMENT/SCOPE/V1",
+        &[stable_asset, recipient_commitment],
+    )
 }
 #[must_use]
 pub fn compute_job_id(creating_txid: &Hash32, action_index: u32) -> Hash32 {
@@ -938,10 +997,41 @@ pub enum ActionV1 {
         repay_amount: u128,
         min_collateral_out: u128,
     },
+    /// 31 — escrow stable value to a commitment-hidden recipient.
+    OpenPrivatePayment {
+        payer: Hash32,
+        stable_asset: Hash32,
+        recipient_commitment: Hash32,
+        memo_commitment: Hash32,
+        reference_commitment: Hash32,
+        amount: u128,
+        expiry_height: u64,
+        payment_kind: u8,
+    },
+    /// 32 — reveal the committed recipient and release escrow before expiry.
+    ClaimPrivatePayment {
+        recipient: Hash32,
+        payment_id: Hash32,
+        claim_secret: Hash32,
+    },
+    /// 33 — return unclaimed escrow to its signed payer after expiry.
+    RefundPrivatePayment { payer: Hash32, payment_id: Hash32 },
+    /// 34 — agent-signed private stable payment under a hard on-chain grant.
+    OpenAgentPrivatePayment {
+        agent: Hash32,
+        payer: Hash32,
+        stable_asset: Hash32,
+        recipient_commitment: Hash32,
+        memo_commitment: Hash32,
+        reference_commitment: Hash32,
+        amount: u128,
+        expiry_height: u64,
+        capability_ref: Hash32,
+    },
 }
 
 impl ActionV1 {
-    pub const VARIANT_COUNT: u16 = 31;
+    pub const VARIANT_COUNT: u16 = 35;
 }
 
 impl NoosEncode for ActionV1 {
@@ -1279,6 +1369,63 @@ impl NoosEncode for ActionV1 {
                 w.put_u128(*repay_amount);
                 w.put_u128(*min_collateral_out);
             }
+            ActionV1::OpenPrivatePayment {
+                payer,
+                stable_asset,
+                recipient_commitment,
+                memo_commitment,
+                reference_commitment,
+                amount,
+                expiry_height,
+                payment_kind,
+            } => {
+                w.put_u16(31);
+                w.put_array32(payer);
+                w.put_array32(stable_asset);
+                w.put_array32(recipient_commitment);
+                w.put_array32(memo_commitment);
+                w.put_array32(reference_commitment);
+                w.put_u128(*amount);
+                w.put_u64(*expiry_height);
+                w.put_u8(*payment_kind);
+            }
+            ActionV1::ClaimPrivatePayment {
+                recipient,
+                payment_id,
+                claim_secret,
+            } => {
+                w.put_u16(32);
+                w.put_array32(recipient);
+                w.put_array32(payment_id);
+                w.put_array32(claim_secret);
+            }
+            ActionV1::RefundPrivatePayment { payer, payment_id } => {
+                w.put_u16(33);
+                w.put_array32(payer);
+                w.put_array32(payment_id);
+            }
+            ActionV1::OpenAgentPrivatePayment {
+                agent,
+                payer,
+                stable_asset,
+                recipient_commitment,
+                memo_commitment,
+                reference_commitment,
+                amount,
+                expiry_height,
+                capability_ref,
+            } => {
+                w.put_u16(34);
+                w.put_array32(agent);
+                w.put_array32(payer);
+                w.put_array32(stable_asset);
+                w.put_array32(recipient_commitment);
+                w.put_array32(memo_commitment);
+                w.put_array32(reference_commitment);
+                w.put_u128(*amount);
+                w.put_u64(*expiry_height);
+                w.put_array32(capability_ref);
+            }
         }
     }
 }
@@ -1463,6 +1610,36 @@ impl NoosDecode for ActionV1 {
                 owner: r.get_array32()?,
                 repay_amount: r.get_u128()?,
                 min_collateral_out: r.get_u128()?,
+            }),
+            31 => Ok(ActionV1::OpenPrivatePayment {
+                payer: r.get_array32()?,
+                stable_asset: r.get_array32()?,
+                recipient_commitment: r.get_array32()?,
+                memo_commitment: r.get_array32()?,
+                reference_commitment: r.get_array32()?,
+                amount: r.get_u128()?,
+                expiry_height: r.get_u64()?,
+                payment_kind: r.get_u8()?,
+            }),
+            32 => Ok(ActionV1::ClaimPrivatePayment {
+                recipient: r.get_array32()?,
+                payment_id: r.get_array32()?,
+                claim_secret: r.get_array32()?,
+            }),
+            33 => Ok(ActionV1::RefundPrivatePayment {
+                payer: r.get_array32()?,
+                payment_id: r.get_array32()?,
+            }),
+            34 => Ok(ActionV1::OpenAgentPrivatePayment {
+                agent: r.get_array32()?,
+                payer: r.get_array32()?,
+                stable_asset: r.get_array32()?,
+                recipient_commitment: r.get_array32()?,
+                memo_commitment: r.get_array32()?,
+                reference_commitment: r.get_array32()?,
+                amount: r.get_u128()?,
+                expiry_height: r.get_u64()?,
+                capability_ref: r.get_array32()?,
             }),
             _ => Err(CodecError::UnknownDiscriminant),
         }
