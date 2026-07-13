@@ -10,6 +10,7 @@ description = "NOOSPHERE Lumen: typed authenticated public state, canonical tran
 [dependencies]
 noos-codec = { path = "../noos-codec" }
 noos-crypto = { path = "../noos-crypto" }
+noos-stable-safety = { path = "../noos-stable-safety" }
 blake3 = "1.8"
 
 [lints]

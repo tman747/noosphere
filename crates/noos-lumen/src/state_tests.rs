@@ -918,7 +918,7 @@ fn quorum_oracle_and_collateralized_stable_debt_lifecycle() {
                 reporter_4: TREASURY,
                 max_age_blocks: 100,
                 max_deviation_bps: 5_000,
-                twap_window_blocks: 100,
+                twap_window_blocks: 2,
             }],
         ),
         ApplyOutcome::Applied { .. }
@@ -1116,6 +1116,81 @@ fn quorum_oracle_and_collateralized_stable_debt_lifecycle() {
         40_000
     );
     assert_eq!(ledger.stable_assets()[0].minted_supply, 40_000);
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            14,
+            vec![PAYER],
+            vec![ActionV1::FundStableReserve {
+                contributor: PAYER,
+                market_id,
+                amount: 40_000,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert_eq!(
+        ledger.get_stable_safety(&market_id).unwrap().stable_reserve,
+        40_000
+    );
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            14,
+            vec![PAYER, GOV],
+            vec![ActionV1::BackstopLiquidate {
+                keeper: GOV,
+                market_id,
+                owner: PAYER,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert_eq!(
+        ledger.get_debt_position(&market_id, &PAYER).unwrap().debt,
+        0
+    );
+    assert_eq!(
+        ledger.get_stable_safety(&market_id).unwrap().stable_reserve,
+        0
+    );
+    assert!(
+        ledger
+            .get_stable_safety(&market_id)
+            .unwrap()
+            .collateral_reserve
+            > 0
+    );
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            14,
+            vec![PAYER, GOV],
+            vec![ActionV1::SetOracleMode {
+                feed_id,
+                mode: crate::state::ORACLE_MODE_LIVE,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            14,
+            vec![PAYER],
+            vec![ActionV1::PsmMint {
+                owner: PAYER,
+                market_id,
+                collateral_in: 20_000,
+                min_stable_out: 13_000,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert_eq!(
+        ledger.get_stable_safety(&market_id).unwrap().psm_debt,
+        13_860
+    );
 
     let claim_secret = [0xC1; 32];
     assert!(matches!(
@@ -1229,7 +1304,7 @@ fn quorum_oracle_and_collateralized_stable_debt_lifecycle() {
         ),
         ApplyOutcome::Applied { .. }
     ));
-    assert_eq!(ledger.balance(&PAYER, &stable), 35_000);
+    assert_eq!(ledger.balance(&PAYER, &stable), 8_833);
     assert_eq!(
         ledger.get_private_payment(&refundable_id).unwrap().status,
         PrivatePaymentV1::STATUS_REFUNDED
@@ -1279,7 +1354,7 @@ fn quorum_oracle_and_collateralized_stable_debt_lifecycle() {
         ),
         ApplyOutcome::Applied { .. }
     ));
-    assert_eq!(ledger.balance(&PAYER, &stable), 32_000);
+    assert_eq!(ledger.balance(&PAYER, &stable), 5_833);
     let overspend = apply(
         &mut ledger,
         23,
@@ -1303,7 +1378,26 @@ fn quorum_oracle_and_collateralized_stable_debt_lifecycle() {
             ..
         }
     ));
-    assert_eq!(ledger.balance(&PAYER, &stable), 32_000);
+    assert_eq!(ledger.balance(&PAYER, &stable), 5_833);
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            24,
+            vec![PAYER],
+            vec![ActionV1::PsmRedeem {
+                owner: PAYER,
+                market_id,
+                stable_in: 1_000,
+                min_collateral_out: 1,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert_eq!(ledger.balance(&PAYER, &stable), 4_833);
+    assert_eq!(
+        ledger.get_stable_safety(&market_id).unwrap().psm_debt,
+        12_862
+    );
 }
 
 #[test]

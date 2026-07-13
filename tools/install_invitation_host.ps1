@@ -104,6 +104,7 @@ $ToolFiles = @(
     "network_dashboard.py",
     "fleet_telemetry.py",
     "mindscan.py",
+    "network_readiness.py",
     "start_tailscale_host.ps1",
     "invitation_leases.py",
     "build_join_bundle.py",

@@ -398,6 +398,28 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
             repay_amount: spec_u128(spec, "repay_amount")?,
             min_collateral_out: spec_u128(spec, "min_collateral_out")?,
         },
+        "fund_stable_reserve" => ActionV1::FundStableReserve {
+            contributor: spec_hash(spec, "contributor")?,
+            market_id: spec_hash(spec, "market_id")?,
+            amount: spec_u128(spec, "amount")?,
+        },
+        "backstop_liquidate" => ActionV1::BackstopLiquidate {
+            keeper: spec_hash(spec, "keeper")?,
+            market_id: spec_hash(spec, "market_id")?,
+            owner: spec_hash(spec, "owner")?,
+        },
+        "psm_mint" => ActionV1::PsmMint {
+            owner: spec_hash(spec, "owner")?,
+            market_id: spec_hash(spec, "market_id")?,
+            collateral_in: spec_u128(spec, "collateral_in")?,
+            min_stable_out: spec_u128(spec, "min_stable_out")?,
+        },
+        "psm_redeem" => ActionV1::PsmRedeem {
+            owner: spec_hash(spec, "owner")?,
+            market_id: spec_hash(spec, "market_id")?,
+            stable_in: spec_u128(spec, "stable_in")?,
+            min_collateral_out: spec_u128(spec, "min_collateral_out")?,
+        },
         "open_private_payment" => ActionV1::OpenPrivatePayment {
             payer: spec_hash(spec, "payer")?,
             stable_asset: spec_hash(spec, "stable_asset")?,

@@ -258,6 +258,19 @@ if (-not $ExplorerReady) {
     Write-Warning "The validator is online, but MindScan did not start."
 }
 
+$ReadinessProbe = Join-Path $Repo "tools\network_readiness.py"
+$ReadinessJson = & python $ReadinessProbe `
+    --operator-secret $OperatorSecret `
+    --indexer "http://127.0.0.1:21080" `
+    --mindscan "http://127.0.0.1:18130" `
+    --compute "http://127.0.0.1:18110" `
+    --dashboard "http://127.0.0.1:18120" `
+    --advance-seconds 2
+if ($LASTEXITCODE -ne 0) {
+    throw "MindChain service stack failed the readiness gate: $ReadinessJson"
+}
+Write-Host $ReadinessJson
+
 Write-Host "MindChain invitation host is online." -ForegroundColor Green
 Write-Host "Validator: $ExpectedHost UDP 21701"
 Write-Host "Public API: http://${ExpectedHost}:21080"

@@ -618,6 +618,20 @@ define_object! {
 }
 
 define_object! {
+    /// Protocol-owned reserve, backstop collateral, and PSM accounting.
+    pub struct StableSafetyV1 {
+        version: 1;
+        1 => safety_id: [u8; 32],
+        2 => market_id: [u8; 32],
+        3 => stable_reserve: u128,
+        4 => collateral_reserve: u128,
+        5 => psm_debt: u128,
+        6 => uncovered_bad_debt: u128,
+        7 => psm_fee_bps: u16,
+    }
+}
+
+define_object! {
     /// Owner-isolated collateral and stable debt.
     pub struct DebtPositionV1 {
         version: 1;
@@ -752,6 +766,11 @@ pub fn lending_market_id(collateral: &Hash32, feed: &Hash32) -> Hash32 {
 #[must_use]
 pub fn stable_asset_id(market: &Hash32) -> Hash32 {
     domain_hash("NOOS/STABLE/ASSET/ID/V1", &[market])
+}
+
+#[must_use]
+pub fn stable_safety_id(market: &Hash32) -> Hash32 {
+    domain_hash("NOOS/STABLE/SAFETY/ID/V1", &[market])
 }
 
 #[must_use]
@@ -1043,10 +1062,36 @@ pub enum ActionV1 {
     },
     /// 35 — governance selects live, last-good liquidation-only, or frozen mode.
     SetOracleMode { feed_id: Hash32, mode: u8 },
+    /// 36 — transfer existing stable tokens into the protocol safety reserve.
+    FundStableReserve {
+        contributor: Hash32,
+        market_id: Hash32,
+        amount: u128,
+    },
+    /// 37 — permissionless keeper trigger using protocol-owned reserve funds.
+    BackstopLiquidate {
+        keeper: Hash32,
+        market_id: Hash32,
+        owner: Hash32,
+    },
+    /// 38 — deposit collateral into the PSM and receive newly issued stable.
+    PsmMint {
+        owner: Hash32,
+        market_id: Hash32,
+        collateral_in: u128,
+        min_stable_out: u128,
+    },
+    /// 39 — burn stable through the PSM and withdraw collateral.
+    PsmRedeem {
+        owner: Hash32,
+        market_id: Hash32,
+        stable_in: u128,
+        min_collateral_out: u128,
+    },
 }
 
 impl ActionV1 {
-    pub const VARIANT_COUNT: u16 = 36;
+    pub const VARIANT_COUNT: u16 = 40;
 }
 
 impl NoosEncode for ActionV1 {
@@ -1454,6 +1499,50 @@ impl NoosEncode for ActionV1 {
                 w.put_array32(feed_id);
                 w.put_u8(*mode);
             }
+            ActionV1::FundStableReserve {
+                contributor,
+                market_id,
+                amount,
+            } => {
+                w.put_u16(36);
+                w.put_array32(contributor);
+                w.put_array32(market_id);
+                w.put_u128(*amount);
+            }
+            ActionV1::BackstopLiquidate {
+                keeper,
+                market_id,
+                owner,
+            } => {
+                w.put_u16(37);
+                w.put_array32(keeper);
+                w.put_array32(market_id);
+                w.put_array32(owner);
+            }
+            ActionV1::PsmMint {
+                owner,
+                market_id,
+                collateral_in,
+                min_stable_out,
+            } => {
+                w.put_u16(38);
+                w.put_array32(owner);
+                w.put_array32(market_id);
+                w.put_u128(*collateral_in);
+                w.put_u128(*min_stable_out);
+            }
+            ActionV1::PsmRedeem {
+                owner,
+                market_id,
+                stable_in,
+                min_collateral_out,
+            } => {
+                w.put_u16(39);
+                w.put_array32(owner);
+                w.put_array32(market_id);
+                w.put_u128(*stable_in);
+                w.put_u128(*min_collateral_out);
+            }
         }
     }
 }
@@ -1676,6 +1765,28 @@ impl NoosDecode for ActionV1 {
             35 => Ok(ActionV1::SetOracleMode {
                 feed_id: r.get_array32()?,
                 mode: r.get_u8()?,
+            }),
+            36 => Ok(ActionV1::FundStableReserve {
+                contributor: r.get_array32()?,
+                market_id: r.get_array32()?,
+                amount: r.get_u128()?,
+            }),
+            37 => Ok(ActionV1::BackstopLiquidate {
+                keeper: r.get_array32()?,
+                market_id: r.get_array32()?,
+                owner: r.get_array32()?,
+            }),
+            38 => Ok(ActionV1::PsmMint {
+                owner: r.get_array32()?,
+                market_id: r.get_array32()?,
+                collateral_in: r.get_u128()?,
+                min_stable_out: r.get_u128()?,
+            }),
+            39 => Ok(ActionV1::PsmRedeem {
+                owner: r.get_array32()?,
+                market_id: r.get_array32()?,
+                stable_in: r.get_u128()?,
+                min_collateral_out: r.get_u128()?,
             }),
             _ => Err(CodecError::UnknownDiscriminant),
         }

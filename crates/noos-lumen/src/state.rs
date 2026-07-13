@@ -16,6 +16,7 @@
 use std::collections::BTreeMap;
 
 use noos_codec::{NoosDecode, NoosEncode};
+use noos_stable_safety::{DebtPosition as SafetyDebtPosition, SafetyPolicy, SafetyState};
 
 use crate::engine::{AuthVerifier, ContractEngine};
 use crate::fees::{self, FeeParamsV1, FeeStateV1, Usage};
@@ -27,12 +28,12 @@ use crate::objects::{
     liquidity_position_id as derive_liquidity_position_id, oracle_feed_id as derive_oracle_feed_id,
     oracle_report_id as derive_oracle_report_id, pool_id as derive_pool_id,
     private_payment_id as derive_private_payment_id, private_recipient_commitment,
-    stable_asset_id as derive_stable_asset_id, witness_root as derive_witness_root, AccessEntry,
-    AccountV1, ActionV1, AssetV1, BoundedBytes, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1,
-    DebtPositionV1, FeatureControlV1, LendingMarketV1, LiquidityPositionV1, NoteV1, ObjectV1,
-    OptionalHash32, OracleFeedV1, OracleReportV1, ParamRecordV1, PendingParamV1, PoolV1,
-    PrivatePaymentV1, ReceiptV1, ResourceVector, StableAssetV1, TransactionV1,
-    TransactionWitnessesV1,
+    stable_asset_id as derive_stable_asset_id, stable_safety_id as derive_stable_safety_id,
+    witness_root as derive_witness_root, AccessEntry, AccountV1, ActionV1, AssetV1, BoundedBytes,
+    CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1, DebtPositionV1, FeatureControlV1,
+    LendingMarketV1, LiquidityPositionV1, NoteV1, ObjectV1, OptionalHash32, OracleFeedV1,
+    OracleReportV1, ParamRecordV1, PendingParamV1, PoolV1, PrivatePaymentV1, ReceiptV1,
+    ResourceVector, StableAssetV1, StableSafetyV1, TransactionV1, TransactionWitnessesV1,
 };
 use crate::smt::Smt;
 use crate::Hash32;
@@ -45,6 +46,7 @@ pub const MAX_POOL_QUANTITY: u128 = u64::MAX as u128;
 pub const MINIMUM_LIQUIDITY: u128 = 1_000;
 /// Oracle price scale: quote base units per collateral base unit.
 pub const ORACLE_SCALE: u128 = 1_000_000_000;
+pub const DEFAULT_PSM_FEE_BPS: u16 = 20;
 pub const MAX_ORACLE_CONFIDENCE_BPS: u16 = 1_000;
 pub const ORACLE_MODE_LIVE: u8 = 0;
 pub const ORACLE_MODE_LAST_GOOD: u8 = 1;
@@ -527,6 +529,13 @@ impl LumenLedger {
             .iter()
             .filter_map(|(_, bytes)| StableAssetV1::decode_canonical(bytes).ok())
             .collect()
+    }
+
+    #[must_use]
+    pub fn get_stable_safety(&self, market: &Hash32) -> Option<StableSafetyV1> {
+        self.objects
+            .get(&derive_stable_safety_id(market))
+            .and_then(|bytes| StableSafetyV1::decode_canonical(bytes).ok())
     }
 
     #[must_use]
@@ -1350,11 +1359,19 @@ impl LumenLedger {
                 | ActionV1::WithdrawCollateral { owner, .. }
                 | ActionV1::BorrowStable { owner, .. }
                 | ActionV1::RepayStable { owner, .. }
+                | ActionV1::PsmMint { owner, .. }
+                | ActionV1::PsmRedeem { owner, .. }
                     if !signed(owner) =>
                 {
                     return Err(RejectReason::CapabilityDenied);
                 }
                 ActionV1::LiquidatePosition { liquidator, .. } if !signed(liquidator) => {
+                    return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::BackstopLiquidate { keeper, .. } if !signed(keeper) => {
+                    return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::FundStableReserve { contributor, .. } if !signed(contributor) => {
                     return Err(RejectReason::CapabilityDenied);
                 }
                 ActionV1::OpenPrivatePayment { payer, .. }
@@ -2286,8 +2303,10 @@ impl LumenLedger {
                     }
                     let market_id = derive_lending_market_id(collateral_asset, oracle_feed_id);
                     let stable_id = derive_stable_asset_id(&market_id);
+                    let safety_id = derive_stable_safety_id(&market_id);
                     if overlay_object(&ov, self, &market_id).is_some()
                         || overlay_object(&ov, self, &stable_id).is_some()
+                        || overlay_object(&ov, self, &safety_id).is_some()
                     {
                         return Err(FailCode::PostconditionFailed);
                     }
@@ -2312,10 +2331,22 @@ impl LumenLedger {
                         minted_supply: 0,
                         kind: 1,
                     };
+                    let safety = StableSafetyV1 {
+                        safety_id,
+                        market_id,
+                        stable_reserve: 0,
+                        collateral_reserve: 0,
+                        psm_debt: 0,
+                        uncovered_bad_debt: 0,
+                        psm_fee_bps: DEFAULT_PSM_FEE_BPS,
+                    };
                     ov.objects
                         .insert(market_id, Some(market.encode_canonical()));
                     ov.objects
                         .insert(stable_id, Some(stable.encode_canonical()));
+                    ov.objects
+                        .insert(safety_id, Some(safety.encode_canonical()));
+                    ov.write_count()?;
                     ov.write_count()?;
                     ov.write_count()?;
                 }
@@ -2621,6 +2652,236 @@ impl LumenLedger {
                         .insert(*market_id, Some(market.encode_canonical()));
                     ov.objects
                         .insert(stable.asset_id, Some(stable.encode_canonical()));
+                    for _ in 0..5 {
+                        ov.write_count()?;
+                    }
+                }
+                ActionV1::FundStableReserve {
+                    contributor,
+                    market_id,
+                    amount,
+                } => {
+                    if *amount == 0 {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let market_raw = overlay_object(&ov, self, market_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let market = decode_lending_market(&market_raw, market_id)?;
+                    let safety_id = derive_stable_safety_id(market_id);
+                    let safety_raw = overlay_object(&ov, self, &safety_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut safety = decode_stable_safety(&safety_raw, &market)?;
+                    let balance = overlay_balance(&ov, self, contributor, &market.stable_asset);
+                    let mut state = safety_state(&safety);
+                    state
+                        .fund_stable_reserve(*amount)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    update_safety(&mut safety, state);
+                    ov.balances.insert(
+                        (*contributor, market.stable_asset),
+                        balance
+                            .checked_sub(*amount)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    ov.objects
+                        .insert(safety_id, Some(safety.encode_canonical()));
+                    ov.write_count()?;
+                    ov.write_count()?;
+                }
+                ActionV1::BackstopLiquidate {
+                    keeper: _,
+                    market_id,
+                    owner,
+                } => {
+                    let market_raw = overlay_object(&ov, self, market_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut market = decode_lending_market(&market_raw, market_id)?;
+                    let stable_raw = overlay_object(&ov, self, &market.stable_asset)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut stable = decode_stable_asset(&stable_raw, &market)?;
+                    let safety_id = derive_stable_safety_id(market_id);
+                    let safety_raw = overlay_object(&ov, self, &safety_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut safety = decode_stable_safety(&safety_raw, &market)?;
+                    let position_id = derive_debt_position_id(market_id, owner);
+                    let position_raw = overlay_object(&ov, self, &position_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut position = decode_debt_position(&position_raw, market_id, owner)?;
+                    if safety.stable_reserve < position.debt {
+                        return Err(FailCode::InsufficientBalance);
+                    }
+                    let feed_raw = overlay_object(&ov, self, &market.oracle_feed_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let feed = decode_oracle_feed(&feed_raw, &market.oracle_feed_id)?;
+                    let price = liquidation_oracle_price(&mut ov, self, &feed, ctx.height)?;
+                    let mut state = safety_state(&safety);
+                    let result = state
+                        .backstop_liquidate(
+                            safety_policy(&market, &safety),
+                            SafetyDebtPosition {
+                                collateral: position.collateral,
+                                debt: position.debt,
+                            },
+                            price,
+                        )
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if result.remaining_position.debt != 0 || result.newly_uncovered_bad_debt != 0 {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    position.collateral = result.remaining_position.collateral;
+                    position.debt = 0;
+                    market.total_debt = market
+                        .total_debt
+                        .checked_sub(result.stable_burned)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    stable.minted_supply = stable
+                        .minted_supply
+                        .checked_sub(result.stable_burned)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    update_safety(&mut safety, state);
+                    if stable.minted_supply != market.total_debt {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    ov.objects
+                        .insert(position_id, Some(position.encode_canonical()));
+                    ov.objects
+                        .insert(*market_id, Some(market.encode_canonical()));
+                    ov.objects
+                        .insert(stable.asset_id, Some(stable.encode_canonical()));
+                    ov.objects
+                        .insert(safety_id, Some(safety.encode_canonical()));
+                    for _ in 0..4 {
+                        ov.write_count()?;
+                    }
+                }
+                ActionV1::PsmMint {
+                    owner,
+                    market_id,
+                    collateral_in,
+                    min_stable_out,
+                } => {
+                    let market_raw = overlay_object(&ov, self, market_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut market = decode_lending_market(&market_raw, market_id)?;
+                    let stable_raw = overlay_object(&ov, self, &market.stable_asset)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut stable = decode_stable_asset(&stable_raw, &market)?;
+                    let safety_id = derive_stable_safety_id(market_id);
+                    let safety_raw = overlay_object(&ov, self, &safety_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut safety = decode_stable_safety(&safety_raw, &market)?;
+                    let feed_raw = overlay_object(&ov, self, &market.oracle_feed_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let feed = decode_oracle_feed(&feed_raw, &market.oracle_feed_id)?;
+                    let price = risk_increasing_oracle_price(&mut ov, self, &feed, ctx.height)?;
+                    let mut state = safety_state(&safety);
+                    let result = state
+                        .psm_mint(safety_policy(&market, &safety), *collateral_in, price)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if result.stable_to_user < *min_stable_out {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let new_total_debt = market
+                        .total_debt
+                        .checked_add(result.supply_and_debt_increase)
+                        .ok_or(FailCode::Overflow)?;
+                    if new_total_debt > market.debt_ceiling {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let collateral_balance =
+                        overlay_balance(&ov, self, owner, &market.collateral_asset);
+                    let stable_balance = overlay_balance(&ov, self, owner, &market.stable_asset);
+                    ov.balances.insert(
+                        (*owner, market.collateral_asset),
+                        collateral_balance
+                            .checked_sub(*collateral_in)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    ov.balances.insert(
+                        (*owner, market.stable_asset),
+                        stable_balance
+                            .checked_add(result.stable_to_user)
+                            .ok_or(FailCode::Overflow)?,
+                    );
+                    market.total_debt = new_total_debt;
+                    stable.minted_supply = stable
+                        .minted_supply
+                        .checked_add(result.supply_and_debt_increase)
+                        .ok_or(FailCode::Overflow)?;
+                    update_safety(&mut safety, state);
+                    if stable.minted_supply != market.total_debt {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    ov.objects
+                        .insert(*market_id, Some(market.encode_canonical()));
+                    ov.objects
+                        .insert(stable.asset_id, Some(stable.encode_canonical()));
+                    ov.objects
+                        .insert(safety_id, Some(safety.encode_canonical()));
+                    for _ in 0..5 {
+                        ov.write_count()?;
+                    }
+                }
+                ActionV1::PsmRedeem {
+                    owner,
+                    market_id,
+                    stable_in,
+                    min_collateral_out,
+                } => {
+                    let market_raw = overlay_object(&ov, self, market_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut market = decode_lending_market(&market_raw, market_id)?;
+                    let stable_raw = overlay_object(&ov, self, &market.stable_asset)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut stable = decode_stable_asset(&stable_raw, &market)?;
+                    let safety_id = derive_stable_safety_id(market_id);
+                    let safety_raw = overlay_object(&ov, self, &safety_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut safety = decode_stable_safety(&safety_raw, &market)?;
+                    let feed_raw = overlay_object(&ov, self, &market.oracle_feed_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let feed = decode_oracle_feed(&feed_raw, &market.oracle_feed_id)?;
+                    let price = risk_increasing_oracle_price(&mut ov, self, &feed, ctx.height)?;
+                    let mut state = safety_state(&safety);
+                    let result = state
+                        .psm_redeem(safety_policy(&market, &safety), *stable_in, price)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if result.collateral_to_user < *min_collateral_out {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let stable_balance = overlay_balance(&ov, self, owner, &market.stable_asset);
+                    let collateral_balance =
+                        overlay_balance(&ov, self, owner, &market.collateral_asset);
+                    ov.balances.insert(
+                        (*owner, market.stable_asset),
+                        stable_balance
+                            .checked_sub(*stable_in)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    ov.balances.insert(
+                        (*owner, market.collateral_asset),
+                        collateral_balance
+                            .checked_add(result.collateral_to_user)
+                            .ok_or(FailCode::Overflow)?,
+                    );
+                    market.total_debt = market
+                        .total_debt
+                        .checked_sub(result.supply_and_debt_decrease)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    stable.minted_supply = stable
+                        .minted_supply
+                        .checked_sub(result.supply_and_debt_decrease)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    update_safety(&mut safety, state);
+                    if stable.minted_supply != market.total_debt {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    ov.objects
+                        .insert(*market_id, Some(market.encode_canonical()));
+                    ov.objects
+                        .insert(stable.asset_id, Some(stable.encode_canonical()));
+                    ov.objects
+                        .insert(safety_id, Some(safety.encode_canonical()));
                     for _ in 0..5 {
                         ov.write_count()?;
                     }
@@ -3403,6 +3664,43 @@ fn decode_stable_asset(raw: &[u8], market: &LendingMarketV1) -> Result<StableAss
         return Err(FailCode::PostconditionFailed);
     }
     Ok(stable)
+}
+
+fn decode_stable_safety(raw: &[u8], market: &LendingMarketV1) -> Result<StableSafetyV1, FailCode> {
+    let safety =
+        StableSafetyV1::decode_canonical(raw).map_err(|_| FailCode::PostconditionFailed)?;
+    if safety.safety_id != derive_stable_safety_id(&market.market_id)
+        || safety.market_id != market.market_id
+        || safety.psm_fee_bps > 500
+        || safety.psm_debt > market.total_debt
+    {
+        return Err(FailCode::PostconditionFailed);
+    }
+    Ok(safety)
+}
+
+fn safety_state(value: &StableSafetyV1) -> SafetyState {
+    SafetyState {
+        stable_reserve: value.stable_reserve,
+        collateral_reserve: value.collateral_reserve,
+        psm_debt: value.psm_debt,
+        uncovered_bad_debt: value.uncovered_bad_debt,
+    }
+}
+
+fn update_safety(value: &mut StableSafetyV1, state: SafetyState) {
+    value.stable_reserve = state.stable_reserve;
+    value.collateral_reserve = state.collateral_reserve;
+    value.psm_debt = state.psm_debt;
+    value.uncovered_bad_debt = state.uncovered_bad_debt;
+}
+
+fn safety_policy(market: &LendingMarketV1, safety: &StableSafetyV1) -> SafetyPolicy {
+    SafetyPolicy {
+        liquidation_threshold_bps: market.liquidation_threshold_bps,
+        liquidation_bonus_bps: market.liquidation_bonus_bps,
+        psm_fee_bps: safety.psm_fee_bps,
+    }
 }
 
 fn decode_debt_position(

@@ -375,6 +375,68 @@ fn tx_build_encodes_oracle_and_lending_market_actions() {
 }
 
 #[test]
+fn tx_build_encodes_stable_safety_actions() {
+    let mut spec = minimal_spec();
+    let owner = h(0x71);
+    let market = h(0x72);
+    spec["actions"] = json!([
+        {
+            "type": "fund_stable_reserve",
+            "contributor": owner,
+            "market_id": market,
+            "amount": "40000"
+        },
+        {
+            "type": "backstop_liquidate",
+            "keeper": owner,
+            "market_id": market,
+            "owner": h(0x73)
+        },
+        {
+            "type": "psm_mint",
+            "owner": owner,
+            "market_id": market,
+            "collateral_in": "20000",
+            "min_stable_out": "13000"
+        },
+        {
+            "type": "psm_redeem",
+            "owner": owner,
+            "market_id": market,
+            "stable_in": "1000",
+            "min_collateral_out": "1"
+        }
+    ]);
+    let built = noos_cli::tx_build(&spec.to_string()).unwrap();
+    let tx =
+        TransactionV1::decode_canonical(&from_hex(built["tx"].as_str().unwrap()).unwrap()).unwrap();
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[0].as_slice()).unwrap(),
+        ActionV1::FundStableReserve { amount: 40_000, .. }
+    ));
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[1].as_slice()).unwrap(),
+        ActionV1::BackstopLiquidate { .. }
+    ));
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[2].as_slice()).unwrap(),
+        ActionV1::PsmMint {
+            collateral_in: 20_000,
+            min_stable_out: 13_000,
+            ..
+        }
+    ));
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[3].as_slice()).unwrap(),
+        ActionV1::PsmRedeem {
+            stable_in: 1_000,
+            min_collateral_out: 1,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn tx_build_encodes_transfers_and_private_payment_actions() {
     let mut spec = minimal_spec();
     let payer = h(0x41);
