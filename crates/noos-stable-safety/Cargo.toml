@@ -1,0 +1,15 @@
+[package]
+name = "noos-stable-safety"
+version = "0.1.0"
+description = "Conserved protocol backstop reserve and direct stable redemption state machine"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+
+[lints]
+workspace = true

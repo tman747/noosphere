@@ -80,8 +80,8 @@ function isChainProfile(v: unknown): v is ChainProfile {
 const invoke = findInvoke();
 const status = el("shell-status", HTMLParagraphElement);
 status.textContent = invoke
-  ? "Desktop shell connected: derivation and signing available."
-  : "Browser preview: address checks only. Derivation, submission, and identity-bound manifest checks require the desktop shell.";
+  ? "Desktop shell connected: OS-vault custody, derivation, and signing available."
+  : "Browser preview: address checks only. Seed import, derivation, submission, and identity-bound manifest checks require the native shell.";
 
 const profileSelect = el("chain-profile", HTMLSelectElement);
 const profileOut = el("profile-out", HTMLOutputElement);
@@ -141,6 +141,58 @@ refreshStatusBtn.addEventListener("click", () => {
   })();
 });
 
+// --- Native seed vault --------------------------------------------------
+const walletIdInput = el("wallet-id", HTMLInputElement);
+const seedInput = el("seed", HTMLInputElement);
+const importSeedBtn = el("import-seed-btn", HTMLButtonElement);
+const deleteWalletBtn = el("delete-wallet-btn", HTMLButtonElement);
+const vaultOut = el("vault-out", HTMLOutputElement);
+importSeedBtn.disabled = !invoke;
+deleteWalletBtn.disabled = !invoke;
+
+function walletId(): string {
+  const value = walletIdInput.value.trim();
+  if (!/^[a-z0-9_-]{3,64}$/.test(value)) throw new Error("invalid_wallet_id");
+  return value;
+}
+
+importSeedBtn.addEventListener("click", () => {
+  void (async () => {
+    if (!invoke) return;
+    importSeedBtn.disabled = true;
+    try {
+      const handle = await invoke("import_seed_cmd", {
+        req: { wallet_id: walletId(), seed_hex: seedInput.value },
+      });
+      seedInput.value = "";
+      if (!handle || typeof handle !== "object" || !("protection" in handle)) {
+        throw new Error("malformed_secure_store_response");
+      }
+      show(vaultOut, true, `wallet imported\\nprotection: ${String(handle.protection)}\\nseed export to page: disabled`);
+    } catch (e) {
+      show(vaultOut, false, errorCode(e));
+    } finally {
+      seedInput.value = "";
+      importSeedBtn.disabled = false;
+    }
+  })();
+});
+
+deleteWalletBtn.addEventListener("click", () => {
+  void (async () => {
+    if (!invoke) return;
+    deleteWalletBtn.disabled = true;
+    try {
+      await invoke("delete_wallet_cmd", { walletId: walletId() });
+      show(vaultOut, true, "wallet seed deleted from OS vault");
+    } catch (e) {
+      show(vaultOut, false, errorCode(e));
+    } finally {
+      deleteWalletBtn.disabled = false;
+    }
+  })();
+});
+
 // --- Derivation ---------------------------------------------------------
 const purpose = el("purpose", HTMLSelectElement);
 const suiteLabel = el("suite-label", HTMLLabelElement);
@@ -156,7 +208,7 @@ deriveBtn.addEventListener("click", () => {
     if (!invoke) return;
     try {
       const req = {
-        seed_hex: el("seed", HTMLInputElement).value,
+        wallet_id: walletId(),
         purpose: purpose.value,
         suite: purpose.value === "umbra" ? Number(el("suite", HTMLInputElement).value) : null,
         account: Number(el("account", HTMLInputElement).value),
@@ -212,7 +264,7 @@ submitBtn.addEventListener("click", () => {
     try {
       const req = {
         profile_id: activeProfile.id,
-        seed_hex: el("seed", HTMLInputElement).value,
+        wallet_id: walletId(),
         account: Number(el("account", HTMLInputElement).value),
         index: Number(el("index", HTMLInputElement).value),
         signer_scope: Number(el("signer-scope", HTMLInputElement).value),

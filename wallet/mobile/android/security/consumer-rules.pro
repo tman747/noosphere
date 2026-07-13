@@ -1,0 +1,1 @@
+-keep public class org.noosphere.wallet.security.StrongBoxSeedVault { public *; }

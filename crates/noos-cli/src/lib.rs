@@ -341,7 +341,11 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
             reporter_0: spec_hash(spec, "reporter_0")?,
             reporter_1: spec_hash(spec, "reporter_1")?,
             reporter_2: spec_hash(spec, "reporter_2")?,
+            reporter_3: spec_hash(spec, "reporter_3")?,
+            reporter_4: spec_hash(spec, "reporter_4")?,
             max_age_blocks: spec_u64(spec, "max_age_blocks")?,
+            max_deviation_bps: spec_u16(spec, "max_deviation_bps")?,
+            twap_window_blocks: spec_u64(spec, "twap_window_blocks")?,
         },
         "submit_oracle_report" => ActionV1::SubmitOracleReport {
             reporter: spec_hash(spec, "reporter")?,
@@ -350,6 +354,10 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
             confidence_bps: spec_u16(spec, "confidence_bps")?,
             sequence: spec_u64(spec, "sequence")?,
             observed_height: spec_u64(spec, "observed_height")?,
+        },
+        "set_oracle_mode" => ActionV1::SetOracleMode {
+            feed_id: spec_hash(spec, "feed_id")?,
+            mode: spec_u8(spec, "mode")?,
         },
         "create_lending_market" => ActionV1::CreateLendingMarket {
             collateral_asset: spec_hash(spec, "collateral_asset")?,

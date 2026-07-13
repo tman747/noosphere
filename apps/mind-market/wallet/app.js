@@ -1,9 +1,12 @@
+import { enrollPasskeyRecovery, passkeyRecoverySupported, recoverPasskeyPassword } from "./passkey-recovery.js";
+
 "use strict";
 
 const $ = (selector) => document.querySelector(selector);
 const DB_NAME = "harbor-wallet-v1";
 const STORE = "vault";
 const VAULT_KEY = "primary";
+const RECOVERY_KEY = "passkey-recovery";
 const PBKDF2_ROUNDS = 310000;
 const NOOS = "00".repeat(32);
 const state = { privateKey: null, account: null, vault: null, config: null, assets: [], installPrompt: null, busy: false };
@@ -23,8 +26,10 @@ function openDb() {
     request.onerror = () => reject(request.error);
   });
 }
-async function vaultGet() { const db = await openDb(); return new Promise((resolve, reject) => { const request = db.transaction(STORE).objectStore(STORE).get(VAULT_KEY); request.onsuccess = () => resolve(request.result || null); request.onerror = () => reject(request.error); }); }
-async function vaultPut(value) { const db = await openDb(); return new Promise((resolve, reject) => { const request = db.transaction(STORE, "readwrite").objectStore(STORE).put(value, VAULT_KEY); request.onsuccess = () => resolve(); request.onerror = () => reject(request.error); }); }
+async function storeGet(key) { const db = await openDb(); return new Promise((resolve, reject) => { const request = db.transaction(STORE).objectStore(STORE).get(key); request.onsuccess = () => resolve(request.result || null); request.onerror = () => reject(request.error); }); }
+async function storePut(key, value) { const db = await openDb(); return new Promise((resolve, reject) => { const request = db.transaction(STORE, "readwrite").objectStore(STORE).put(value, key); request.onsuccess = () => resolve(); request.onerror = () => reject(request.error); }); }
+async function vaultGet() { return storeGet(VAULT_KEY); }
+async function vaultPut(value) { return storePut(VAULT_KEY, value); }
 async function passwordKey(password, salt) {
   const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
   return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: PBKDF2_ROUNDS, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
@@ -119,6 +124,41 @@ document.querySelectorAll("[data-tab]").forEach((button) => button.addEventListe
 $("#create-form").addEventListener("submit", async (event) => { event.preventDefault(); const values = new FormData(event.currentTarget); if (values.get("password") !== values.get("confirm")) return status("Passwords do not match.", true); setBusy(true); try { await createWallet(values.get("password")); showWallet(); } catch (error) { status(error.message, true); } finally { setBusy(false); } });
 $("#unlock-form").addEventListener("submit", async (event) => { event.preventDefault(); const password = new FormData(event.currentTarget).get("password"); setBusy(true); try { const vault = await vaultGet(); if (!vault) throw new Error("No local vault exists. Create or import one first."); await unlock(vault, password); showWallet(); } catch (error) { status(error.message, true); } finally { setBusy(false); } });
 $("#import-form").addEventListener("submit", async (event) => { event.preventDefault(); setBusy(true); try { const data = new FormData(event.currentTarget); const vault = JSON.parse(await data.get("vault").text()); await unlock(vault, data.get("password")); await vaultPut(vault); showWallet(); } catch (error) { status(error.message, true); } finally { setBusy(false); } });
+$("#passkey-unlock").addEventListener("click", async () => {
+  setBusy(true);
+  try {
+    const [vault, recovery] = await Promise.all([vaultGet(), storeGet(RECOVERY_KEY)]);
+    if (!vault || !recovery) throw new Error("Passkey recovery is not enrolled on this device.");
+    const config = await json(await fetch("/api/config", { cache: "no-store" }));
+    const password = await recoverPasskeyPassword(recovery, {
+      chainId: config.chain_id,
+      publicId: vault.public_id,
+      vaultSchema: vault.schema,
+    });
+    await unlock(vault, password);
+    showWallet();
+  } catch (error) { status(error.message, true); }
+  finally { setBusy(false); }
+});
+$("#passkey-enroll").addEventListener("click", async () => {
+  setBusy(true);
+  const passwordInput = $("#passkey-password");
+  try {
+    if (!passkeyRecoverySupported()) throw new Error("This browser does not support passkey recovery.");
+    const password = passwordInput.value;
+    await decryptVault(state.vault, password);
+    if (!state.config) await loadNetwork();
+    const recovery = await enrollPasskeyRecovery({
+      password,
+      chainId: state.config.chain_id,
+      publicId: state.vault.public_id,
+      vaultSchema: state.vault.schema,
+    });
+    await storePut(RECOVERY_KEY, recovery);
+    notice("Passkey recovery enabled for this origin, chain, account, and vault version.");
+  } catch (error) { notice(error.message, true); }
+  finally { passwordInput.value = ""; setBusy(false); }
+});
 $("#send-form").addEventListener("submit", async (event) => { event.preventDefault(); if (state.busy) return; setBusy(true); try { await sendPayment(event.currentTarget); } catch (error) { notice(error.message, true); } finally { setBusy(false); } });
 $("#faucet").addEventListener("click", async () => { setBusy(true); try { const result = await post("/api/wallet/faucet", { account: state.account, amount: "1000000" }); notice(`Valueless test funding settled: ${short(result.txid)}`); await refresh(); } catch (error) { notice(error.message, true); } finally { setBusy(false); } });
 $("#refresh").addEventListener("click", refresh);

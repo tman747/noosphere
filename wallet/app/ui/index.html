@@ -23,8 +23,12 @@
 
     <section id="derivation" aria-labelledby="derivation-h">
       <h2 id="derivation-h">Key derivation</h2>
-      <p>Purpose-separated authorities are derived by the <code>noos-wallet</code> core inside the shell. The seed stays inside the local desktop app, and derived private keys are never returned to the page.</p>
-      <label>Seed (hex) <input id="seed" type="password" spellcheck="false" autocomplete="off" /></label>
+      <p>Purpose-separated authorities are derived inside the native shell. Seed material is imported once into the operating-system credential vault; the page keeps only an opaque wallet id and never receives stored seed bytes.</p>
+      <label>Wallet id <input id="wallet-id" value="primary" maxlength="64" pattern="[a-z0-9_-]{3,64}" autocomplete="username" /></label>
+      <label>Seed import (hex) <input id="seed" type="password" spellcheck="false" autocomplete="new-password" /></label>
+      <button id="import-seed-btn" type="button">Import into OS vault</button>
+      <button id="delete-wallet-btn" type="button">Delete from OS vault</button>
+      <output id="vault-out" for="import-seed-btn delete-wallet-btn" role="status" aria-live="polite"></output>
       <label>Purpose
         <select id="purpose">
           <option value="sign">sign</option>

@@ -9,18 +9,65 @@
 pub mod address;
 pub mod manifest;
 pub mod ops;
+pub mod secure_store;
 
 #[cfg(feature = "gui")]
 mod commands {
-    use crate::{address, manifest, ops};
+    use crate::{address, manifest, ops, secure_store};
+    use serde::Deserialize;
+    use zeroize::Zeroizing;
 
     fn code<E: std::fmt::Display>(e: E) -> String {
         e.to_string()
     }
 
+    #[derive(Deserialize)]
+    pub struct ImportSeedRequest {
+        pub wallet_id: String,
+        pub seed_hex: String,
+    }
+
+    #[derive(Deserialize)]
+    pub struct VaultDeriveRequest {
+        pub wallet_id: String,
+        pub purpose: String,
+        pub suite: Option<u32>,
+        pub account: u32,
+        pub index: u32,
+    }
+
+    #[derive(Deserialize)]
+    pub struct VaultSubmitRequest {
+        pub wallet_id: String,
+        pub profile_id: String,
+        pub account: u32,
+        pub index: u32,
+        pub signer_scope: u8,
+        pub transaction_spec: String,
+    }
+
     #[tauri::command]
-    pub fn derive_authority_cmd(req: ops::DeriveRequest) -> Result<ops::DeriveResponse, String> {
-        ops::derive(&req).map_err(code)
+    pub fn import_seed_cmd(req: ImportSeedRequest) -> Result<secure_store::WalletHandle, String> {
+        secure_store::import_seed(&req.wallet_id, &req.seed_hex).map_err(code)
+    }
+
+    #[tauri::command]
+    pub fn delete_wallet_cmd(wallet_id: String) -> Result<(), String> {
+        secure_store::delete_seed(&wallet_id).map_err(code)
+    }
+
+    #[tauri::command]
+    pub fn derive_authority_cmd(req: VaultDeriveRequest) -> Result<ops::DeriveResponse, String> {
+        let seed = secure_store::load_seed(&req.wallet_id).map_err(code)?;
+        let seed_hex = Zeroizing::new(hex::encode(seed.as_slice()));
+        ops::derive(&ops::DeriveRequest {
+            seed_hex: seed_hex.to_string(),
+            purpose: req.purpose,
+            suite: req.suite,
+            account: req.account,
+            index: req.index,
+        })
+        .map_err(code)
     }
 
     #[tauri::command]
@@ -47,12 +94,23 @@ mod commands {
 
     #[tauri::command]
     pub async fn submit_transaction_cmd(
-        req: ops::SubmitRequest,
+        req: VaultSubmitRequest,
     ) -> Result<ops::SubmitResponse, String> {
-        tauri::async_runtime::spawn_blocking(move || ops::submit(&req))
-            .await
-            .map_err(code)?
+        tauri::async_runtime::spawn_blocking(move || {
+            let seed = secure_store::load_seed(&req.wallet_id).map_err(code)?;
+            let seed_hex = Zeroizing::new(hex::encode(seed.as_slice()));
+            ops::submit(&ops::SubmitRequest {
+                profile_id: req.profile_id,
+                seed_hex: seed_hex.to_string(),
+                account: req.account,
+                index: req.index,
+                signer_scope: req.signer_scope,
+                transaction_spec: req.transaction_spec,
+            })
             .map_err(code)
+        })
+        .await
+        .map_err(code)?
     }
 
     /// Verify an update manifest. The updater key comes from the explicit
@@ -83,6 +141,8 @@ pub fn run() {
     #[allow(clippy::expect_used)] // process entry point: a broken shell must abort loudly
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
+            commands::import_seed_cmd,
+            commands::delete_wallet_cmd,
             commands::derive_authority_cmd,
             commands::validate_address_cmd,
             commands::chain_profiles_cmd,

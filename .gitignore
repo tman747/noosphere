@@ -13,3 +13,6 @@ __pycache__/
 /wallet/app/src-tauri/icons/StoreLogo.png
 /wallet/app/src-tauri/icons/android/
 /wallet/app/src-tauri/icons/ios/
+/wallet/mobile/android/.gradle/
+/wallet/mobile/android/.kotlin/
+/wallet/mobile/android/**/build/

@@ -38,6 +38,7 @@
           <h2>Unlock local vault</h2>
           <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
           <button type="submit">Unlock wallet</button>
+          <button id="passkey-unlock" type="button">Recover with passkey</button>
         </form>
         <form id="import-form" class="auth-form hidden">
           <h2>Import encrypted backup</h2>
@@ -75,6 +76,7 @@
         <aside>
           <section class="receive"><p class="eyebrow">Receive</p><h2>Fund this account</h2><p>A first incoming transfer automatically creates this self-authenticating account on-chain.</p><button id="faucet">Request valueless test NOOS</button></section>
           <section class="vault"><p class="eyebrow">Vault controls</p><button id="backup">Download encrypted backup</button><button id="install">Install wallet</button><button id="lock">Lock now</button></section>
+          <section class="vault"><p class="eyebrow">Passkey recovery</p><p>Requires a WebAuthn PRF-capable passkey. A passkey assertion without the PRF secret cannot decrypt the vault.</p><label>Current password<input id="passkey-password" type="password" minlength="12" autocomplete="current-password"></label><button id="passkey-enroll">Enable passkey recovery</button></section>
         </aside>
       </section>
       <section class="privacy-roadmap">
@@ -84,6 +86,6 @@
     </section>
   </main>
   <dialog id="confirm-dialog"><form method="dialog"><p class="eyebrow">Confirm transaction</p><h2>Sign this transfer?</h2><dl id="review"></dl><div><button value="cancel">Cancel</button><button id="confirm-sign" value="confirm">Sign and submit</button></div></form></dialog>
-  <script src="/wallet/app.js" defer></script>
+  <script src="/wallet/app.js" type="module"></script>
 </body>
 </html>

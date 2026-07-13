@@ -46,6 +46,9 @@ pub const MINIMUM_LIQUIDITY: u128 = 1_000;
 /// Oracle price scale: quote base units per collateral base unit.
 pub const ORACLE_SCALE: u128 = 1_000_000_000;
 pub const MAX_ORACLE_CONFIDENCE_BPS: u16 = 1_000;
+pub const ORACLE_MODE_LIVE: u8 = 0;
+pub const ORACLE_MODE_LAST_GOOD: u8 = 1;
+pub const ORACLE_MODE_FROZEN: u8 = 2;
 pub const MAX_CREDIT_QUANTITY: u128 = u64::MAX as u128;
 pub const MAX_PRIVATE_PAYMENT_LIFETIME: u64 = 100_000;
 
@@ -1333,7 +1336,9 @@ impl LumenLedger {
                 ActionV1::SwapExactIn { trader, .. } if !signed(trader) => {
                     return Err(RejectReason::CapabilityDenied);
                 }
-                ActionV1::CreateOracleFeed { .. } | ActionV1::CreateLendingMarket { .. }
+                ActionV1::CreateOracleFeed { .. }
+                | ActionV1::CreateLendingMarket { .. }
+                | ActionV1::SetOracleMode { .. }
                     if !gov_ok() =>
                 {
                     return Err(RejectReason::GovernanceDenied);
@@ -2090,14 +2095,25 @@ impl LumenLedger {
                     reporter_0,
                     reporter_1,
                     reporter_2,
+                    reporter_3,
+                    reporter_4,
+                    max_deviation_bps,
+                    twap_window_blocks,
                     max_age_blocks,
                 } => {
-                    let reporters = [*reporter_0, *reporter_1, *reporter_2];
+                    let reporters = [
+                        *reporter_0,
+                        *reporter_1,
+                        *reporter_2,
+                        *reporter_3,
+                        *reporter_4,
+                    ];
+                    let mut unique_reporters = reporters;
+                    unique_reporters.sort_unstable();
                     if base_asset == quote_asset
-                        || reporters[0] == reporters[1]
-                        || reporters[0] == reporters[2]
-                        || reporters[1] == reporters[2]
-                        || !(1..=10_000).contains(max_age_blocks)
+                        || unique_reporters.windows(2).any(|pair| pair[0] == pair[1])
+                        || !(1..=5_000).contains(max_deviation_bps)
+                        || !(2..=10_000).contains(twap_window_blocks)
                         || reporters
                             .iter()
                             .any(|reporter| overlay_account(&ov, self, reporter).is_none())
@@ -2127,7 +2143,16 @@ impl LumenLedger {
                         reporter_0: *reporter_0,
                         reporter_1: *reporter_1,
                         reporter_2: *reporter_2,
+                        reporter_3: *reporter_3,
+                        reporter_4: *reporter_4,
                         max_age_blocks: *max_age_blocks,
+                        max_deviation_bps: *max_deviation_bps,
+                        twap_window_blocks: *twap_window_blocks,
+                        last_good_price_q9: 0,
+                        last_good_height: 0,
+                        twap_price_q9: 0,
+                        twap_height: 0,
+                        mode: ORACLE_MODE_LIVE,
                     };
                     ov.objects.insert(id, Some(feed.encode_canonical()));
                     ov.write_count()?;
@@ -2143,7 +2168,14 @@ impl LumenLedger {
                     let raw =
                         overlay_object(&ov, self, feed_id).ok_or(FailCode::PostconditionFailed)?;
                     let feed = decode_oracle_feed(&raw, feed_id)?;
-                    if ![feed.reporter_0, feed.reporter_1, feed.reporter_2].contains(reporter)
+                    if ![
+                        feed.reporter_0,
+                        feed.reporter_1,
+                        feed.reporter_2,
+                        feed.reporter_3,
+                        feed.reporter_4,
+                    ]
+                    .contains(reporter)
                         || *price_q9 == 0
                         || *price_q9 > MAX_CREDIT_QUANTITY
                         || *confidence_bps > MAX_ORACLE_CONFIDENCE_BPS
@@ -2174,6 +2206,46 @@ impl LumenLedger {
                     };
                     ov.objects
                         .insert(report_id, Some(report.encode_canonical()));
+                    ov.write_count()?;
+                    if let Some(median) = fresh_reporter_median(&mut ov, self, &feed, ctx.height)? {
+                        if feed.last_good_price_q9 != 0
+                            && deviation_bps(median, feed.last_good_price_q9)?
+                                > feed.max_deviation_bps
+                        {
+                            return Err(FailCode::PostconditionFailed);
+                        }
+                        let mut updated = feed;
+                        updated.last_good_price_q9 = median;
+                        updated.last_good_height = ctx.height;
+                        updated.twap_price_q9 = update_twap(
+                            updated.twap_price_q9,
+                            median,
+                            updated.twap_height,
+                            ctx.height,
+                            updated.twap_window_blocks,
+                        )?;
+                        updated.twap_height = ctx.height;
+                        updated.mode = ORACLE_MODE_LIVE;
+                        ov.objects
+                            .insert(updated.feed_id, Some(updated.encode_canonical()));
+                        ov.write_count()?;
+                    }
+                }
+                ActionV1::SetOracleMode { feed_id, mode } => {
+                    if !matches!(
+                        *mode,
+                        ORACLE_MODE_LIVE | ORACLE_MODE_LAST_GOOD | ORACLE_MODE_FROZEN
+                    ) {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let raw =
+                        overlay_object(&ov, self, feed_id).ok_or(FailCode::PostconditionFailed)?;
+                    let mut feed = decode_oracle_feed(&raw, feed_id)?;
+                    if *mode == ORACLE_MODE_LAST_GOOD && feed.last_good_price_q9 == 0 {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    feed.mode = *mode;
+                    ov.objects.insert(*feed_id, Some(feed.encode_canonical()));
                     ov.write_count()?;
                 }
                 ActionV1::CreateLendingMarket {
@@ -2316,7 +2388,7 @@ impl LumenLedger {
                         let feed_raw = overlay_object(&ov, self, &market.oracle_feed_id)
                             .ok_or(FailCode::PostconditionFailed)?;
                         let feed = decode_oracle_feed(&feed_raw, &market.oracle_feed_id)?;
-                        let price = conservative_oracle_price(&mut ov, self, &feed, ctx.height)?;
+                        let price = risk_increasing_oracle_price(&mut ov, self, &feed, ctx.height)?;
                         let value = collateral_value(position.collateral, price)?;
                         if position.debt > mul_bps(value, market.collateral_factor_bps)? {
                             return Err(FailCode::PostconditionFailed);
@@ -2356,7 +2428,7 @@ impl LumenLedger {
                     let feed_raw = overlay_object(&ov, self, &market.oracle_feed_id)
                         .ok_or(FailCode::PostconditionFailed)?;
                     let feed = decode_oracle_feed(&feed_raw, &market.oracle_feed_id)?;
-                    let price = conservative_oracle_price(&mut ov, self, &feed, ctx.height)?;
+                    let price = risk_increasing_oracle_price(&mut ov, self, &feed, ctx.height)?;
                     let new_debt = position
                         .debt
                         .checked_add(*amount)
@@ -2476,7 +2548,7 @@ impl LumenLedger {
                     let feed_raw = overlay_object(&ov, self, &market.oracle_feed_id)
                         .ok_or(FailCode::PostconditionFailed)?;
                     let feed = decode_oracle_feed(&feed_raw, &market.oracle_feed_id)?;
-                    let price = conservative_oracle_price(&mut ov, self, &feed, ctx.height)?;
+                    let price = liquidation_oracle_price(&mut ov, self, &feed, ctx.height)?;
                     let value = collateral_value(position.collateral, price)?;
                     if position.debt <= mul_bps(value, market.liquidation_threshold_bps)? {
                         return Err(FailCode::PostconditionFailed);
@@ -3133,14 +3205,109 @@ fn mul_bps(value: u128, bps: u16) -> Result<u128, FailCode> {
     whole.checked_add(remainder).ok_or(FailCode::Overflow)
 }
 
-fn conservative_oracle_price(
+fn deviation_bps(current: u128, reference: u128) -> Result<u16, FailCode> {
+    if reference == 0 {
+        return Err(FailCode::PostconditionFailed);
+    }
+    let difference = current.abs_diff(reference);
+    let scaled = difference
+        .checked_mul(10_000)
+        .and_then(|value| value.checked_div(reference))
+        .ok_or(FailCode::Overflow)?;
+    Ok(u16::try_from(scaled.min(u128::from(u16::MAX))).map_err(|_| FailCode::Overflow)?)
+}
+
+fn update_twap(
+    previous: u128,
+    current: u128,
+    previous_height: u64,
+    height: u64,
+    window: u64,
+) -> Result<u128, FailCode> {
+    if previous == 0 || previous_height == 0 {
+        return Ok(current);
+    }
+    let elapsed = height.saturating_sub(previous_height).min(window);
+    let old_weight = window.saturating_sub(elapsed);
+    previous
+        .checked_mul(u128::from(old_weight))
+        .and_then(|old| {
+            current
+                .checked_mul(u128::from(elapsed))
+                .and_then(|new| old.checked_add(new))
+        })
+        .and_then(|total| total.checked_div(u128::from(window)))
+        .ok_or(FailCode::Overflow)
+}
+
+fn risk_increasing_oracle_price(
     ov: &mut Overlay,
     base: &LumenLedger,
     feed: &OracleFeedV1,
     height: u64,
 ) -> Result<u128, FailCode> {
-    let mut prices = Vec::with_capacity(3);
-    for reporter in [feed.reporter_0, feed.reporter_1, feed.reporter_2] {
+    if feed.mode != ORACLE_MODE_LIVE {
+        return Err(FailCode::PostconditionFailed);
+    }
+    let fresh =
+        fresh_reporter_median(ov, base, feed, height)?.ok_or(FailCode::PostconditionFailed)?;
+    if feed.twap_price_q9 == 0 || deviation_bps(fresh, feed.twap_price_q9)? > feed.max_deviation_bps
+    {
+        return Err(FailCode::PostconditionFailed);
+    }
+    Ok(fresh.min(feed.twap_price_q9))
+}
+
+fn liquidation_oracle_price(
+    ov: &mut Overlay,
+    base: &LumenLedger,
+    feed: &OracleFeedV1,
+    height: u64,
+) -> Result<u128, FailCode> {
+    match feed.mode {
+        ORACLE_MODE_LIVE => {
+            let fresh = fresh_reporter_median(ov, base, feed, height)?
+                .ok_or(FailCode::PostconditionFailed)?;
+            Ok(if feed.twap_price_q9 == 0 {
+                fresh
+            } else {
+                fresh.min(feed.twap_price_q9)
+            })
+        }
+        ORACLE_MODE_LAST_GOOD => {
+            let emergency_age = feed
+                .max_age_blocks
+                .checked_mul(10)
+                .ok_or(FailCode::Overflow)?;
+            if feed.last_good_price_q9 == 0
+                || height.saturating_sub(feed.last_good_height) > emergency_age
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            Ok(if feed.twap_price_q9 == 0 {
+                feed.last_good_price_q9
+            } else {
+                feed.last_good_price_q9.min(feed.twap_price_q9)
+            })
+        }
+        _ => Err(FailCode::PostconditionFailed),
+    }
+}
+
+fn fresh_reporter_median(
+    ov: &mut Overlay,
+    base: &LumenLedger,
+    feed: &OracleFeedV1,
+    height: u64,
+) -> Result<Option<u128>, FailCode> {
+    let mut prices = Vec::with_capacity(5);
+    for reporter in [
+        feed.reporter_0,
+        feed.reporter_1,
+        feed.reporter_2,
+        feed.reporter_3,
+        feed.reporter_4,
+    ] {
         ov.read_count()?;
         let id = derive_oracle_report_id(&feed.feed_id, &reporter);
         let Some(raw) = overlay_object(ov, base, &id) else {
@@ -3164,15 +3331,11 @@ fn conservative_oracle_price(
             10_000u16.saturating_sub(report.confidence_bps),
         )?);
     }
-    if prices.len() < 2 {
-        return Err(FailCode::PostconditionFailed);
+    if prices.len() < 3 {
+        return Ok(None);
     }
     prices.sort_unstable();
-    Ok(if prices.len() == 2 {
-        prices[0]
-    } else {
-        prices[1]
-    })
+    Ok(Some(prices[prices.len() / 2]))
 }
 
 fn collateral_value(collateral: u128, price_q9: u128) -> Result<u128, FailCode> {
@@ -3184,13 +3347,25 @@ fn collateral_value(collateral: u128, price_q9: u128) -> Result<u128, FailCode> 
 
 fn decode_oracle_feed(raw: &[u8], feed_id: &Hash32) -> Result<OracleFeedV1, FailCode> {
     let feed = OracleFeedV1::decode_canonical(raw).map_err(|_| FailCode::PostconditionFailed)?;
+    let mut reporters = [
+        feed.reporter_0,
+        feed.reporter_1,
+        feed.reporter_2,
+        feed.reporter_3,
+        feed.reporter_4,
+    ];
+    reporters.sort_unstable();
     if feed.feed_id != *feed_id
         || feed.feed_id != derive_oracle_feed_id(&feed.base_asset, &feed.quote_asset)
         || feed.base_asset == feed.quote_asset
-        || feed.reporter_0 == feed.reporter_1
-        || feed.reporter_0 == feed.reporter_2
-        || feed.reporter_1 == feed.reporter_2
+        || reporters.windows(2).any(|pair| pair[0] == pair[1])
         || !(1..=10_000).contains(&feed.max_age_blocks)
+        || !(1..=5_000).contains(&feed.max_deviation_bps)
+        || !(2..=10_000).contains(&feed.twap_window_blocks)
+        || feed.mode > ORACLE_MODE_FROZEN
+        || (feed.mode == ORACLE_MODE_LAST_GOOD && feed.last_good_price_q9 == 0)
+        || (feed.last_good_price_q9 == 0
+            && (feed.last_good_height != 0 || feed.twap_price_q9 != 0 || feed.twap_height != 0))
     {
         return Err(FailCode::PostconditionFailed);
     }

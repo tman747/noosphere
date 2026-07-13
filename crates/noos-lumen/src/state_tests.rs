@@ -914,7 +914,11 @@ fn quorum_oracle_and_collateralized_stable_debt_lifecycle() {
                 reporter_0: GOV,
                 reporter_1: EMERGENCY,
                 reporter_2: PROPOSER,
+                reporter_3: WITNESS_POOL,
+                reporter_4: TREASURY,
                 max_age_blocks: 100,
+                max_deviation_bps: 5_000,
+                twap_window_blocks: 100,
             }],
         ),
         ApplyOutcome::Applied { .. }
@@ -1031,9 +1035,9 @@ fn quorum_oracle_and_collateralized_stable_debt_lifecycle() {
     ));
 
     for (height, reporter, price) in [
-        (11, GOV, 500_000_000u128),
-        (12, EMERGENCY, 510_000_000),
-        (13, PROPOSER, 490_000_000),
+        (11, GOV, 1_100_000_000u128),
+        (12, EMERGENCY, 1_110_000_000),
+        (13, PROPOSER, 1_090_000_000),
     ] {
         assert!(matches!(
             apply(
@@ -1052,6 +1056,40 @@ fn quorum_oracle_and_collateralized_stable_debt_lifecycle() {
             ApplyOutcome::Applied { .. }
         ));
     }
+    for (reporter, price) in [
+        (GOV, 700_000_000u128),
+        (EMERGENCY, 710_000_000),
+        (PROPOSER, 690_000_000),
+    ] {
+        assert!(matches!(
+            apply(
+                &mut ledger,
+                13,
+                vec![PAYER, reporter],
+                vec![ActionV1::SubmitOracleReport {
+                    reporter,
+                    feed_id,
+                    price_q9: price,
+                    confidence_bps: 100,
+                    sequence: 3,
+                    observed_height: 13,
+                }],
+            ),
+            ApplyOutcome::Applied { .. }
+        ));
+    }
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            14,
+            vec![PAYER, GOV],
+            vec![ActionV1::SetOracleMode {
+                feed_id,
+                mode: crate::state::ORACLE_MODE_LAST_GOOD,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
     assert!(matches!(
         apply(
             &mut ledger,
@@ -1305,7 +1343,11 @@ fn oracle_replay_and_single_report_borrow_fail_closed() {
                 reporter_0: GOV,
                 reporter_1: EMERGENCY,
                 reporter_2: PROPOSER,
+                reporter_3: WITNESS_POOL,
+                reporter_4: TREASURY,
                 max_age_blocks: 10,
+                max_deviation_bps: 1_500,
+                twap_window_blocks: 100,
             }],
         )
         .0,

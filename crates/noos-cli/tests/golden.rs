@@ -325,7 +325,11 @@ fn tx_build_encodes_oracle_and_lending_market_actions() {
             "reporter_0": h(0x61),
             "reporter_1": h(0x62),
             "reporter_2": h(0x63),
-            "max_age_blocks": "64"
+            "reporter_3": h(0x64),
+            "reporter_4": h(0x65),
+            "max_age_blocks": "64",
+            "max_deviation_bps": 1500,
+            "twap_window_blocks": "100"
         },
         {
             "type": "create_lending_market",

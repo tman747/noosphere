@@ -550,7 +550,7 @@ define_object! {
 }
 
 define_object! {
-    /// Governance-created three-reporter price feed.
+    /// Governance-created five-reporter price feed.
     pub struct OracleFeedV1 {
         version: 1;
         1 => feed_id: [u8; 32],
@@ -559,7 +559,16 @@ define_object! {
         4 => reporter_0: [u8; 32],
         5 => reporter_1: [u8; 32],
         6 => reporter_2: [u8; 32],
-        7 => max_age_blocks: u64,
+        7 => reporter_3: [u8; 32],
+        8 => reporter_4: [u8; 32],
+        9 => max_age_blocks: u64,
+        10 => max_deviation_bps: u16,
+        11 => twap_window_blocks: u64,
+        12 => last_good_price_q9: u128,
+        13 => last_good_height: u64,
+        14 => twap_price_q9: u128,
+        15 => twap_height: u64,
+        16 => mode: u8,
     }
 }
 
@@ -934,14 +943,18 @@ pub enum ActionV1 {
         min_amount_0: u128,
         min_amount_1: u128,
     },
-    /// 23 — governance creates a fixed three-reporter feed.
+    /// 23 — governance creates a fixed five-reporter feed.
     CreateOracleFeed {
         base_asset: Hash32,
         quote_asset: Hash32,
         reporter_0: Hash32,
         reporter_1: Hash32,
         reporter_2: Hash32,
+        reporter_3: Hash32,
+        reporter_4: Hash32,
         max_age_blocks: u64,
+        max_deviation_bps: u16,
+        twap_window_blocks: u64,
     },
     /// 24 — one feed member advances its authenticated report.
     SubmitOracleReport {
@@ -1028,10 +1041,12 @@ pub enum ActionV1 {
         expiry_height: u64,
         capability_ref: Hash32,
     },
+    /// 35 — governance selects live, last-good liquidation-only, or frozen mode.
+    SetOracleMode { feed_id: Hash32, mode: u8 },
 }
 
 impl ActionV1 {
-    pub const VARIANT_COUNT: u16 = 35;
+    pub const VARIANT_COUNT: u16 = 36;
 }
 
 impl NoosEncode for ActionV1 {
@@ -1265,7 +1280,11 @@ impl NoosEncode for ActionV1 {
                 reporter_0,
                 reporter_1,
                 reporter_2,
+                reporter_3,
+                reporter_4,
                 max_age_blocks,
+                max_deviation_bps,
+                twap_window_blocks,
             } => {
                 w.put_u16(23);
                 w.put_array32(base_asset);
@@ -1273,7 +1292,11 @@ impl NoosEncode for ActionV1 {
                 w.put_array32(reporter_0);
                 w.put_array32(reporter_1);
                 w.put_array32(reporter_2);
+                w.put_array32(reporter_3);
+                w.put_array32(reporter_4);
                 w.put_u64(*max_age_blocks);
+                w.put_u16(*max_deviation_bps);
+                w.put_u64(*twap_window_blocks);
             }
             ActionV1::SubmitOracleReport {
                 reporter,
@@ -1426,6 +1449,11 @@ impl NoosEncode for ActionV1 {
                 w.put_u64(*expiry_height);
                 w.put_array32(capability_ref);
             }
+            ActionV1::SetOracleMode { feed_id, mode } => {
+                w.put_u16(35);
+                w.put_array32(feed_id);
+                w.put_u8(*mode);
+            }
         }
     }
 }
@@ -1562,7 +1590,11 @@ impl NoosDecode for ActionV1 {
                 reporter_0: r.get_array32()?,
                 reporter_1: r.get_array32()?,
                 reporter_2: r.get_array32()?,
+                reporter_3: r.get_array32()?,
+                reporter_4: r.get_array32()?,
                 max_age_blocks: r.get_u64()?,
+                max_deviation_bps: r.get_u16()?,
+                twap_window_blocks: r.get_u64()?,
             }),
             24 => Ok(ActionV1::SubmitOracleReport {
                 reporter: r.get_array32()?,
@@ -1640,6 +1672,10 @@ impl NoosDecode for ActionV1 {
                 amount: r.get_u128()?,
                 expiry_height: r.get_u64()?,
                 capability_ref: r.get_array32()?,
+            }),
+            35 => Ok(ActionV1::SetOracleMode {
+                feed_id: r.get_array32()?,
+                mode: r.get_u8()?,
             }),
             _ => Err(CodecError::UnknownDiscriminant),
         }
