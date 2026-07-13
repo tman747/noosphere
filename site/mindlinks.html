@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f3f0e7">
+  <meta name="description" content="Inspect, import, and render MindLink v0 objects without a wallet or private help.">
+  <meta property="og:title" content="MindChain — MindLink renderer">
+  <meta property="og:description" content="A readable index for portable World Wide Mind contributions.">
+  <meta property="og:type" content="website">
+  <title>MindChain — MindLink renderer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <nav class="shell nav" aria-label="Primary navigation">
+      <a class="brand" href="index.html" aria-label="MindChain home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>MindChain</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="index.html#contribute">Help build it</a></li>
+        <li><a href="index.html#map">Map</a></li>
+        <li><a href="mindlinks.html" aria-current="page">MindLinks</a></li>
+        <li><a href="../explorer/">Explorer</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section class="renderer-hero shell" aria-labelledby="renderer-title">
+      <div class="section-heading renderer-heading reveal">
+        <p class="eyebrow">Independent renderer</p>
+        <h1 id="renderer-title">MindLinks should travel.</h1>
+        <p>A MindLink is only open if another surface can read it. This renderer imports exported objects, validates their required fields, and shows the contribution in plain language.</p>
+      </div>
+      <div class="renderer-stats reveal" aria-label="MindLink index statistics">
+        <div><span id="stat-total">0</span><small>Total objects</small></div>
+        <div><span id="stat-public">0</span><small>Public on map</small></div>
+        <div><span id="stat-imported">0</span><small>Imported this session</small></div>
+      </div>
+    </section>
+
+    <section class="shell renderer-workbench" aria-labelledby="import-title">
+      <div class="bezel reveal">
+        <div class="core renderer-core">
+          <div>
+            <p class="panel-label">Import</p>
+            <h2 id="import-title">Render a MindLink.</h2>
+            <p>Paste a MindLink export. The page checks the required v0 fields and adds it to this browser's readable index. It does not need a wallet or a network call.</p>
+          </div>
+          <div class="field-block">
+            <label for="import-json">MindLink JSON</label>
+            <textarea id="import-json" rows="10" placeholder="Paste exported MindLink JSON here."></textarea>
+            <p id="import-status" class="helper" role="status">Waiting for a MindLink export.</p>
+          </div>
+          <div class="button-row">
+            <button class="button button-primary" id="import-button" type="button">
+              <span>Import object</span>
+              <span class="button-orb" aria-hidden="true">↗</span>
+            </button>
+            <button class="button button-secondary" id="load-example" type="button">Load example</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="shell index-section" aria-labelledby="index-title">
+      <div class="section-heading reveal">
+        <p class="eyebrow">Readable index</p>
+        <h2 id="index-title">What the browser can render.</h2>
+        <p>Local contributions, imported MindLinks, and seed examples appear together. Private drafts stay local to this browser.</p>
+      </div>
+      <div class="filter-row reveal" aria-label="Filter MindLinks">
+        <button class="filter-button active" type="button" data-filter="all">All</button>
+        <button class="filter-button" type="button" data-filter="public">Public</button>
+        <button class="filter-button" type="button" data-filter="link">Link-only</button>
+        <button class="filter-button" type="button" data-filter="only_me">Private drafts</button>
+      </div>
+      <div id="mindlink-list" class="mindlink-list" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-grid">
+      <p>Renderer status: local prototype. A production index still needs server persistence, moderation routing, independent hosting, and schema conformance tests.</p>
+      <nav aria-label="Footer navigation">
+        <a href="index.html">Home</a>
+        <a href="mindlink-v0.schema.json">Schema</a>
+        <a href="../protocol/claims/registry.json">Claim registry</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="mindlinks.js" defer></script>
+</body>
+</html>
