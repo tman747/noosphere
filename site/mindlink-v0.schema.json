@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindchain.network/mindlink-v0.schema.json",
+  "title": "MindLink v0",
+  "description": "Portable, rights-aware contribution object for the World Wide Mind prototype.",
+  "type": "object",
+  "required": [
+    "mindlink_version",
+    "id",
+    "type",
+    "title",
+    "language",
+    "content",
+    "authority",
+    "provenance",
+    "rights",
+    "relations",
+    "challenge",
+    "moderation",
+    "state",
+    "created_at",
+    "updated_at",
+    "content_hash"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "mindlink_version": {
+      "const": "0.1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "claim",
+        "question",
+        "evidence",
+        "correction",
+        "translation",
+        "memory",
+        "model",
+        "agent",
+        "capability",
+        "tool",
+        "request",
+        "result",
+        "challenge",
+        "collection",
+        "community",
+        "contribution"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 180
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 16
+    },
+    "content": {
+      "type": "object",
+      "required": ["original_text", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "original_text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1200
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1200
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "required": ["contributor", "community"],
+      "additionalProperties": false,
+      "properties": {
+        "contributor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "community": {
+          "type": ["string", "null"],
+          "maxLength": 160
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["sources", "derived_from"],
+      "additionalProperties": false,
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 20
+        },
+        "derived_from": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 20
+        }
+      }
+    },
+    "rights": {
+      "type": "object",
+      "required": ["visibility", "ai_training", "commercial_use", "license", "cultural_authority"],
+      "additionalProperties": false,
+      "properties": {
+        "visibility": {
+          "type": "string",
+          "enum": ["only_me", "link", "public"]
+        },
+        "ai_training": {
+          "type": "string",
+          "enum": ["deny", "conditional", "allow"]
+        },
+        "commercial_use": {
+          "type": "string",
+          "enum": ["deny", "conditional", "allow"]
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "cultural_authority": {
+          "type": ["string", "null"],
+          "maxLength": 160
+        }
+      }
+    },
+    "relations": {
+      "type": "object",
+      "required": ["related", "supports", "contradicts", "translates", "extends"],
+      "additionalProperties": false,
+      "properties": {
+        "related": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/relation" },
+          "maxItems": 20
+        },
+        "supports": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 50
+        },
+        "contradicts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 50
+        },
+        "translates": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 50
+        },
+        "extends": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 50
+        }
+      }
+    },
+    "challenge": {
+      "type": "object",
+      "required": ["status"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["unchallenged", "disputed", "corrected", "withdrawn"]
+        }
+      }
+    },
+    "moderation": {
+      "type": "object",
+      "required": ["status"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["not_reported", "reported_pending_review", "reviewed_kept", "reviewed_changed", "withdrawn"]
+        }
+      }
+    },
+    "state": {
+      "type": "string",
+      "enum": ["public", "unlisted", "private_draft", "research", "horizon", "building"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "content_hash": {
+      "type": "string",
+      "minLength": 8
+    }
+  },
+  "$defs": {
+    "relation": {
+      "type": "object",
+      "required": ["id", "title", "reason", "feedback"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 320
+        },
+        "feedback": {
+          "type": "string",
+          "enum": [
+            "unreviewed",
+            "user_marked_not_related",
+            "user_requested_map_review",
+            "user_wants_to_add_evidence"
+          ]
+        }
+      }
+    }
+  }
+}
