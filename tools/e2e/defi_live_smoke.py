@@ -71,6 +71,13 @@ def spec(chain_id: str, signer: str, actions: list[dict | str]) -> dict:
     }
 
 
+def asset_transfer_actions(sender: str, recipient: str, asset: str, amount: int) -> list[str]:
+    encoded_amount = amount.to_bytes(16, "little")
+    withdraw = (3).to_bytes(2, "little") + bytes.fromhex(sender) + bytes.fromhex(asset) + encoded_amount
+    deposit = (2).to_bytes(2, "little") + bytes.fromhex(recipient) + bytes.fromhex(asset) + encoded_amount
+    return [withdraw.hex(), deposit.hex()]
+
+
 def submit_seed(exe: Path, chain_id: str, genesis_hash: str, signer: str, seed: str, actions: list[dict | str]) -> dict:
     built = cli(exe, "tx", "build", "--spec", json.dumps(spec(chain_id, signer, actions), separators=(",", ":")))
     signed = cli(exe, "tx", "sign", "--tx", built["tx"], "--seed", seed, "--account", "0", "--index", "0", "--chain-id", chain_id, "--genesis-hash", genesis_hash)
@@ -145,6 +152,13 @@ def main() -> int:
             {"type": "withdraw_collateral", "owner": accounts[0], "market_id": market, "amount": "100000"},
         ]: submit_seed(exes["noos-cli"], chain_id, genesis_hash, accounts[0], seeds[0], [action])
         checks.append("deposited, borrowed, repaid, and withdrew collateral")
+        submit_seed(exes["noos-cli"], chain_id, genesis_hash, accounts[0], seeds[0], asset_transfer_actions(accounts[0], accounts[1], stable, 100000))
+        for index, (account, seed) in enumerate(zip(accounts, seeds)):
+            observed = str(http_json(RPC, "/status", TOKEN)["unsafe_head"]["height"])
+            submit_seed(exes["noos-cli"], chain_id, genesis_hash, account, seed, [{"type": "submit_oracle_report", "reporter": account, "feed_id": feed, "price_q9": str(500_000_000 + index * 1_000_000), "confidence_bps": 10, "sequence": "2", "observed_height": observed}])
+        submit_seed(exes["noos-cli"], chain_id, genesis_hash, accounts[1], seeds[1], [{"type": "liquidate_position", "liquidator": accounts[1], "market_id": market, "owner": accounts[0], "repay_amount": "100000", "min_collateral_out": "1"}])
+        checks.append("transferred stable value, repriced by quorum, and liquidated unhealthy debt")
+
 
         expected = {"/api/v1/pools": pool, "/api/v1/liquidity-positions": pool, "/api/v1/oracle-feeds": feed, "/api/v1/oracle-reports": feed, "/api/v1/lending-markets": market, "/api/v1/stable-assets": stable, "/api/v1/debt-positions": market}
         deadline = time.monotonic() + 30
@@ -156,8 +170,8 @@ def main() -> int:
         debt = next(item for item in views["/api/v1/debt-positions"]["items"] if item["market_id"] == market)
         market_view = next(item for item in views["/api/v1/lending-markets"]["items"] if item["market_id"] == market)
         stable_view = next(item for item in views["/api/v1/stable-assets"]["items"] if item["asset_id"] == stable)
-        if debt["collateral"] != "900000" or debt["debt"] != "400000": raise RuntimeError(f"unexpected debt state: {debt}")
-        if market_view["total_debt"] != stable_view["minted_supply"] or market_view["total_debt"] != "400000": raise RuntimeError("stable supply/debt conservation failed")
+        if debt["debt"] != "300000" or not 0 < int(debt["collateral"]) < 900000: raise RuntimeError(f"unexpected liquidated debt state: {debt}")
+        if market_view["total_debt"] != stable_view["minted_supply"] or market_view["total_debt"] != "300000": raise RuntimeError("stable supply/debt conservation failed")
         checks.append("indexer exposed conserved live DeFi state")
         print(json.dumps({"verdict": "PASS", "chain_id": chain_id, "genesis_hash": genesis_hash, "checks": checks, "pool_id": pool, "feed_id": feed, "market_id": market, "stable_asset": stable, "debt": debt}, indent=2))
         return 0
