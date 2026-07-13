@@ -1,6 +1,7 @@
 (() => {
   const CONTRIBUTION_KEY = "mindchain.worldWideMind.contributions.v1";
   const IMPORT_KEY = "mindchain.worldWideMind.importedMindlinks.v1";
+  const API_ROOT = "/api";
 
   const exampleMindLink = {
     mindlink_version: "0.1",
@@ -61,10 +62,14 @@
     list: document.getElementById("mindlink-list"),
     statTotal: document.getElementById("stat-total"),
     statPublic: document.getElementById("stat-public"),
-    statImported: document.getElementById("stat-imported")
+    statImported: document.getElementById("stat-imported"),
+    statIndexed: document.getElementById("stat-indexed"),
+    apiStatus: document.getElementById("api-status")
   };
 
   let activeFilter = "all";
+  let apiMindLinks = [];
+  let apiStatusText = "Checking local MindLink API.";
 
   function readJsonStorage(key) {
     try {
@@ -133,7 +138,7 @@
   function allMindLinks() {
     const contributions = readJsonStorage(CONTRIBUTION_KEY).map(contributionToMindLink);
     const imports = readJsonStorage(IMPORT_KEY);
-    const merged = [exampleMindLink, ...contributions, ...imports];
+    const merged = [exampleMindLink, ...contributions, ...imports, ...apiMindLinks];
     const seen = new Set();
     return merged.filter((item) => {
       if (!item || !item.id || seen.has(item.id)) return false;
@@ -174,6 +179,29 @@
     return { ok: true, message: "MindLink v0 fields are present." };
   }
 
+  async function loadApiMindLinks() {
+    if (!window.fetch) {
+      apiMindLinks = [];
+      apiStatusText = "Local MindLink API unavailable in this browser; showing seed, local, and imported objects.";
+      renderList();
+      return;
+    }
+    try {
+      const response = await fetch(`${API_ROOT}/mindlinks`, {
+        headers: { "Accept": "application/json" }
+      });
+      if (!response.ok) throw new Error("index unavailable");
+      const payload = await response.json();
+      const incoming = Array.isArray(payload.mindlinks) ? payload.mindlinks : [];
+      apiMindLinks = incoming.filter((item) => validateMindLink(item).ok);
+      apiStatusText = `Local MindLink API online: ${apiMindLinks.length} synced object${apiMindLinks.length === 1 ? "" : "s"} visible.`;
+    } catch (error) {
+      apiMindLinks = [];
+      apiStatusText = "Local MindLink API offline; showing seed, local, and imported objects only.";
+    }
+    renderList();
+  }
+
   function readable(value) {
     return String(value || "unknown").replace(/_/g, " ");
   }
@@ -198,6 +226,8 @@
     nodes.statTotal.textContent = String(items.length);
     nodes.statPublic.textContent = String(items.filter((item) => item.rights.visibility === "public").length);
     nodes.statImported.textContent = String(imported);
+    nodes.statIndexed.textContent = String(apiMindLinks.length);
+    nodes.apiStatus.textContent = apiStatusText;
   }
 
   function renderList() {
@@ -275,4 +305,5 @@
   });
 
   renderList();
+  loadApiMindLinks();
 })();

@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_KEY = "mindchain.worldWideMind.contributions.v1";
   const DRAFT_KEY = "mindchain.worldWideMind.rawDraft.v1";
+  const API_ROOT = "/api";
 
   const seedIdeas = [
     {
@@ -46,6 +47,7 @@
     source: document.getElementById("source-input"),
     error: document.getElementById("contribution-error"),
     alert: document.getElementById("system-alert"),
+    flowStatus: document.getElementById("flow-status"),
     originalPreview: document.getElementById("original-preview"),
     suggestedType: document.getElementById("suggested-type"),
     suggestedTitle: document.getElementById("suggested-title"),
@@ -57,8 +59,11 @@
     publish: document.getElementById("publish-contribution"),
     resultStatus: document.getElementById("result-status"),
     resultCopy: document.getElementById("result-copy"),
+    syncStatus: document.getElementById("sync-status"),
+    recoveryLabel: document.getElementById("recovery-label"),
     recoveryLink: document.getElementById("recovery-link"),
     copyRecovery: document.getElementById("copy-recovery"),
+    seeMap: document.getElementById("see-map"),
     editCurrent: document.getElementById("edit-current"),
     unpublishCurrent: document.getElementById("unpublish-current"),
     exportCurrent: document.getElementById("export-current"),
@@ -124,9 +129,14 @@
     }
   }
 
+  function announceStatus(message) {
+    if (nodes.flowStatus) nodes.flowStatus.textContent = message;
+  }
+
   function showAlert(message) {
     nodes.alert.textContent = message;
     nodes.alert.hidden = false;
+    announceStatus(message);
   }
 
   function clearAlert() {
@@ -142,7 +152,8 @@
   };
 
   function showStep(stepNumber) {
-    document.getElementById("flow-title").textContent = stepTitles[stepNumber] || "Contribution flow";
+    const title = stepTitles[stepNumber] || "Contribution flow";
+    document.getElementById("flow-title").textContent = title;
     document.querySelectorAll(".flow-step").forEach((step) => {
       const active = step.dataset.step === String(stepNumber);
       step.hidden = !active;
@@ -151,6 +162,13 @@
     document.querySelectorAll("[data-step-indicator]").forEach((indicator) => {
       indicator.classList.toggle("active", indicator.dataset.stepIndicator === String(stepNumber));
     });
+    const activeStep = document.querySelector(`.flow-step[data-step="${stepNumber}"]`);
+    const heading = activeStep ? activeStep.querySelector("h4") : null;
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
+    announceStatus(`Step ${stepNumber}: ${title}.`);
   }
 
   function wordsFrom(text) {
@@ -163,9 +181,10 @@
 
   function createTitle(text) {
     const clean = text.replace(/\s+/g, " ").trim();
-    const words = clean.split(" ").slice(0, 9).join(" ");
-    if (!words) return "Untitled contribution";
-    return words.length < clean.length ? `${words}` : words;
+    const parts = clean.split(" ").filter(Boolean);
+    const title = parts.slice(0, 9).join(" ").replace(/[,:;.!?]+$/, "");
+    if (!title) return "Untitled contribution";
+    return parts.length > 9 ? `${title}…` : title;
   }
 
   function inferType(text) {
@@ -269,20 +288,19 @@
 
   function buildRelations(text) {
     const contributionWords = new Set(wordsFrom(text));
-    const scored = seedIdeas.map((idea) => {
-      const matches = idea.keywords.filter((keyword) => contributionWords.has(keyword));
-      return {
-        id: idea.id,
-        title: idea.title,
-        text: idea.text,
-        reason: matches.length
-          ? `Connected because both mention ${matches.slice(0, 3).join(", ")}.`
-          : `Connected because ${idea.fallback}.`,
-        score: matches.length,
-        feedback: "unreviewed"
-      };
-    });
-    return scored
+    return seedIdeas
+      .map((idea) => {
+        const matches = idea.keywords.filter((keyword) => contributionWords.has(keyword));
+        return {
+          id: idea.id,
+          title: idea.title,
+          text: idea.text,
+          reason: matches.length ? `Connected because both mention ${matches.slice(0, 3).join(", ")}.` : "",
+          score: matches.length,
+          feedback: "unreviewed"
+        };
+      })
+      .filter((idea) => idea.score > 0)
       .sort((left, right) => right.score - left.score || left.title.localeCompare(right.title))
       .slice(0, 3);
   }
@@ -316,6 +334,11 @@
       challenge_status: "unchallenged",
       relations: visibility === "public" ? buildRelations(original) : [],
       content_hash: await hashText(JSON.stringify({ original, suggested: state.suggested, source_urls: sourceUrls })),
+      sync_status: {
+        state: visibility === "only_me" ? "local_only" : "pending",
+        stored: false,
+        reason: visibility === "only_me" ? "private_draft_local_only" : "not_attempted"
+      },
       versions: [
         {
           at: now,
@@ -379,20 +402,215 @@
     };
   }
 
+  function contributionIdFromMindLink(mindlink) {
+    const fragment = String(mindlink.id || "").split("#").pop();
+    return fragment || generateId("mindlink");
+  }
+
+  function mindLinkToContribution(mindlink) {
+    const visibility = mindlink.rights.visibility;
+    return {
+      id: contributionIdFromMindLink(mindlink),
+      recovery_token: "",
+      created_at: mindlink.created_at,
+      updated_at: mindlink.updated_at,
+      original_text: mindlink.content.original_text,
+      suggested: {
+        type: mindlink.type,
+        title: mindlink.title,
+        summary: mindlink.content.summary,
+        source_urls: mindlink.provenance.sources || [],
+        structured_by: "mindlink-index-api"
+      },
+      visibility,
+      attribution: {
+        mode: mindlink.authority.contributor === "anonymous" ? "anonymous" : "named",
+        display_name: mindlink.authority.contributor === "anonymous" ? "Anonymous contributor" : mindlink.authority.contributor
+      },
+      rights: {
+        ai_training: mindlink.rights.ai_training,
+        commercial_use: mindlink.rights.commercial_use,
+        cultural_authority: mindlink.rights.cultural_authority,
+        license: mindlink.rights.license
+      },
+      source_urls: mindlink.provenance.sources || [],
+      status: mindlink.state,
+      moderation_status: mindlink.moderation.status,
+      challenge_status: mindlink.challenge.status,
+      relations: mindlink.relations.related || [],
+      content_hash: mindlink.content_hash,
+      sync_status: { state: "synced", stored: true, reason: "loaded_from_index" },
+      versions: []
+    };
+  }
+
+  async function fetchContributionFromIndex(hash) {
+    if (!window.fetch || !hash || hash.startsWith("recover=")) return null;
+    const mindlinkId = `${location.href.split("#")[0]}#${hash}`;
+    try {
+      const response = await fetch(`${API_ROOT}/mindlinks/${encodeURIComponent(mindlinkId)}`, {
+        headers: { "Accept": "application/json" }
+      });
+      if (!response.ok) return null;
+      const payload = await response.json();
+      return payload && payload.mindlink ? mindLinkToContribution(payload.mindlink) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function renderSyncStatus(contribution) {
+    if (!nodes.syncStatus) return;
+    const sync = contribution.sync_status || {};
+    if (sync.state === "removed") {
+      nodes.syncStatus.textContent = "Index sync: removed from the local MindLink API.";
+      return;
+    }
+    if (contribution.visibility === "only_me") {
+      nodes.syncStatus.textContent = "Index sync: private drafts stay in this browser.";
+      return;
+    }
+    if (sync.state === "synced") {
+      nodes.syncStatus.textContent = "Index sync: saved to the local MindLink API.";
+      return;
+    }
+    if (sync.state === "local_only") {
+      nodes.syncStatus.textContent = sync.detail || "Index sync: local-only by design.";
+      return;
+    }
+    if (sync.state === "failed") {
+      nodes.syncStatus.textContent = `Index sync: failed — ${sync.detail || "the local API rejected the MindLink."}`;
+      return;
+    }
+    if (sync.state === "unavailable") {
+      nodes.syncStatus.textContent = "Index sync: API unavailable; local save and export still work.";
+      return;
+    }
+    nodes.syncStatus.textContent = "Index sync: waiting for the local API.";
+  }
+
+  async function syncContributionToIndex(contribution, options = {}) {
+    const removeFromIndex = options.removeFromIndex === true;
+    if (contribution.visibility === "only_me" && !removeFromIndex) {
+      return {
+        state: "local_only",
+        stored: false,
+        reason: "private_draft_local_only",
+        detail: "Private drafts stay in this browser."
+      };
+    }
+    if (!window.fetch) {
+      return {
+        state: "unavailable",
+        stored: false,
+        reason: "fetch_unavailable",
+        detail: "This browser cannot reach the local index API."
+      };
+    }
+    try {
+      const response = await fetch(`${API_ROOT}/mindlinks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(toMindLink(contribution))
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) {
+        const detail = Array.isArray(payload.errors) ? payload.errors.join(", ") : "The local API rejected the MindLink.";
+        return { state: "failed", stored: false, reason: "api_rejected", detail };
+      }
+      if (payload.stored) {
+        return {
+          state: "synced",
+          stored: true,
+          reason: "indexed",
+          detail: "Saved to the local MindLink API."
+        };
+      }
+      if (payload.removed) {
+        return {
+          state: "removed",
+          stored: false,
+          reason: "removed_from_index",
+          detail: "Removed from the local MindLink API."
+        };
+      }
+      return {
+        state: "local_only",
+        stored: false,
+        reason: payload.reason || "not_indexed",
+        detail: "Private drafts stay in this browser."
+      };
+    } catch (error) {
+      return {
+        state: "unavailable",
+        stored: false,
+        reason: "api_unavailable",
+        detail: "Saved in this browser; the local index API is unavailable."
+      };
+    }
+  }
+
+  async function syncReportToIndex(contribution) {
+    if (!contribution.sync_status || !contribution.sync_status.stored || !window.fetch) {
+      return { ok: false, detail: "No indexed copy is available to report." };
+    }
+    try {
+      const response = await fetch(`${API_ROOT}/mindlinks/${encodeURIComponent(toMindLink(contribution).id)}/report`, {
+        method: "POST"
+      });
+      return response.ok
+        ? { ok: true, detail: "Report routed to the local index API." }
+        : { ok: false, detail: "Report recorded locally; the index API rejected the update." };
+    } catch (error) {
+      return { ok: false, detail: "Report recorded locally; the index API is unavailable." };
+    }
+  }
+
+  async function syncRelationFeedbackToIndex(contribution, relation) {
+    if (!contribution.sync_status || !contribution.sync_status.stored || !window.fetch) {
+      return { ok: false, detail: "Feedback recorded locally; no indexed copy is available." };
+    }
+    try {
+      const response = await fetch(`${API_ROOT}/mindlinks/${encodeURIComponent(toMindLink(contribution).id)}/relation-feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ relation_id: relation.id, feedback: relation.feedback })
+      });
+      return response.ok
+        ? { ok: true, detail: "Map feedback routed to the local index API." }
+        : { ok: false, detail: "Feedback recorded locally; the index API rejected the update." };
+    } catch (error) {
+      return { ok: false, detail: "Feedback recorded locally; the index API is unavailable." };
+    }
+  }
+
   function renderResult(contribution) {
     const isPublic = contribution.visibility === "public";
     const isLink = contribution.visibility === "link";
     nodes.resultStatus.textContent = isPublic
-      ? "Public contribution added to the map."
+      ? "Public contribution saved."
       : isLink
         ? "Link-only contribution saved."
-        : "Private draft saved.";
+        : "Private draft saved on this device.";
     nodes.resultCopy.textContent = isPublic
-      ? "Your contribution is highlighted below with related ideas and control actions."
-      : "Your contribution is saved locally and exportable as a MindLink. You can publish it later.";
-    nodes.recoveryLink.value = `${location.href.split("#")[0]}#recover=${encodeURIComponent(contribution.recovery_token)}`;
+      ? "Control it here first. When you are ready, open the map from this step."
+      : isLink
+        ? "The view link becomes durable after index sync. Export remains the backup."
+        : "Your draft stays in this browser unless you publish, sync, or export it.";
+    if (nodes.recoveryLabel) {
+      nodes.recoveryLabel.textContent = contribution.visibility === "only_me"
+        ? "Device-only recovery link"
+        : isLink
+          ? "Link-only view link"
+          : "Public view link";
+    }
+    nodes.recoveryLink.value = contribution.visibility === "only_me"
+      ? `${location.href.split("#")[0]}#recover=${encodeURIComponent(contribution.recovery_token)}`
+      : `${location.href.split("#")[0]}#${contribution.id}`;
+    if (nodes.seeMap) nodes.seeMap.hidden = !isPublic;
     nodes.moderationStatus.textContent = `Moderation status: ${readableStatus(contribution.moderation_status)}.`;
     nodes.mindlinkJson.textContent = JSON.stringify(toMindLink(contribution), null, 2);
+    renderSyncStatus(contribution);
     renderMap(contribution);
   }
 
@@ -401,15 +619,31 @@
   }
 
   function renderMap(contribution) {
+    const relatedNodes = Array.from(document.querySelectorAll(".related-node"));
+    const mapLines = document.querySelector(".map-lines");
     if (!contribution || contribution.visibility !== "public") {
       nodes.userNode.classList.remove("is-highlighted");
       nodes.userNode.innerHTML = '<span class="node-label">Your contribution</span><strong>No public contribution yet</strong><p>Choose “Public on the map” to place one here.</p>';
+      relatedNodes.forEach((node) => { node.hidden = false; });
+      if (mapLines) mapLines.hidden = false;
       nodes.relationPanel.innerHTML = '<p class="panel-label">Connected because</p><p>No public contribution has been placed yet.</p>';
       return;
     }
 
     nodes.userNode.classList.add("is-highlighted");
     nodes.userNode.innerHTML = `<span class="node-label">Your contribution</span><strong>${escapeHtml(contribution.suggested.title)}</strong><p>${escapeHtml(contribution.suggested.summary)}</p>`;
+    relatedNodes.forEach((node, index) => {
+      const relation = contribution.relations[index];
+      node.hidden = !relation;
+      if (relation) {
+        node.innerHTML = `<span class="node-label">Related idea</span><strong>${escapeHtml(relation.title)}</strong><p>${escapeHtml(relation.text || relation.reason)}</p>`;
+      }
+    });
+    if (mapLines) mapLines.hidden = contribution.relations.length === 0;
+    if (!contribution.relations.length) {
+      nodes.relationPanel.innerHTML = '<p class="panel-label">No strong connection yet</p><p>This contribution is public, but the preview did not find a clear keyword match. It stays unforced until a stronger relation or evidence is added.</p>';
+      return;
+    }
     const relationItems = contribution.relations.map((relation, index) => `
       <li>
         <strong>${escapeHtml(relation.title)}</strong>
@@ -467,7 +701,7 @@
     renderResult(contribution);
   }
 
-  function loadContributionFromHash() {
+  async function loadContributionFromHash() {
     const hash = window.location.hash.replace(/^#/, "");
     if (!hash) return null;
     const items = readContributions();
@@ -475,11 +709,12 @@
       const token = decodeURIComponent(hash.slice("recover=".length));
       return items.find((item) => item.recovery_token === token) || null;
     }
-    return items.find((item) => item.id === hash) || null;
+    const local = items.find((item) => item.id === hash);
+    return local || await fetchContributionFromIndex(hash);
   }
 
-  function restoreLatestPublicContribution() {
-    const recovered = loadContributionFromHash();
+  async function restoreLatestPublicContribution() {
+    const recovered = await loadContributionFromHash();
     if (recovered) {
       state.current = recovered;
       state.originalText = recovered.original_text;
@@ -559,9 +794,9 @@
       const contribution = await buildContribution();
       updateCurrent(contribution);
       showStep(4);
-      if (contribution.visibility === "public") {
-        document.getElementById("map").scrollIntoView({ block: "start" });
-      }
+      announceStatus("Contribution saved. Control step is visible before map navigation.");
+      const syncStatus = await syncContributionToIndex(contribution);
+      updateCurrent({ ...contribution, sync_status: syncStatus });
     } catch (error) {
       showAlert("We could not complete every enrichment step, but the raw contribution remains saved as a draft.");
       const fallback = {
@@ -580,6 +815,7 @@
         challenge_status: "unchallenged",
         relations: [],
         content_hash: await hashText(state.originalText),
+        sync_status: { state: "local_only", stored: false, reason: "degraded_private_draft" },
         versions: []
       };
       updateCurrent(fallback);
@@ -589,7 +825,19 @@
 
   nodes.copyRecovery.addEventListener("click", async () => {
     await copyText(nodes.recoveryLink);
-    showAlert("Recovery link copied. Keep it private if the contribution is private.");
+    showAlert(state.current && state.current.visibility === "only_me"
+      ? "Device-only recovery link copied. Keep it private."
+      : "View link copied. Check index sync status before sharing it outside this browser.");
+  });
+
+  nodes.seeMap.addEventListener("click", () => {
+    document.getElementById("map").scrollIntoView({ block: "start" });
+    const heading = document.getElementById("map-title");
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
+    announceStatus("Map section shown.");
   });
 
   nodes.editCurrent.addEventListener("click", () => {
@@ -599,16 +847,30 @@
     showStep(1);
   });
 
-  nodes.unpublishCurrent.addEventListener("click", () => {
+  nodes.unpublishCurrent.addEventListener("click", async () => {
     if (!state.current) return;
+    const wasIndexed = state.current.sync_status && state.current.sync_status.stored;
     const updated = {
       ...state.current,
       visibility: "only_me",
       status: "private_draft",
       updated_at: new Date().toISOString(),
-      relations: []
+      relations: [],
+      sync_status: {
+        state: wasIndexed ? "pending" : "local_only",
+        stored: false,
+        reason: wasIndexed ? "removal_pending" : "private_draft_local_only"
+      }
     };
     updateCurrent(updated);
+    if (wasIndexed) {
+      const syncStatus = await syncContributionToIndex(updated, { removeFromIndex: true });
+      updateCurrent({ ...updated, sync_status: syncStatus });
+      showAlert(syncStatus.state === "removed"
+        ? "Contribution unpublished. The local index copy was removed."
+        : "Contribution unpublished in this browser. The index API could not confirm removal; retry when it is available.");
+      return;
+    }
     showAlert("Contribution unpublished. It is now a private draft in this browser.");
   });
 
@@ -617,7 +879,7 @@
     downloadContribution(state.current);
   });
 
-  nodes.reportCurrent.addEventListener("click", () => {
+  nodes.reportCurrent.addEventListener("click", async () => {
     if (!state.current) return;
     const updated = {
       ...state.current,
@@ -625,25 +887,46 @@
       updated_at: new Date().toISOString()
     };
     updateCurrent(updated);
-    showAlert("Report status recorded locally. A production deployment would route this to moderation review.");
+    const syncResult = await syncReportToIndex(updated);
+    showAlert(syncResult.ok
+      ? "Report status recorded locally and routed to the local index API."
+      : syncResult.detail);
   });
 
-  nodes.relationPanel.addEventListener("click", (event) => {
+  nodes.relationPanel.addEventListener("click", async (event) => {
     const button = event.target.closest("button[data-relation-action]");
     if (!button || !state.current) return;
     const index = Number(button.dataset.relationIndex);
     const action = button.dataset.relationAction;
+    let changedRelation = null;
     const relations = state.current.relations.map((relation, relationIndex) => {
       if (relationIndex !== index) return relation;
-      if (action === "not_related") return { ...relation, feedback: "user_marked_not_related" };
-      if (action === "move_this") return { ...relation, feedback: "user_requested_map_review" };
-      return { ...relation, feedback: "user_wants_to_add_evidence" };
+      changedRelation = action === "not_related"
+        ? { ...relation, feedback: "user_marked_not_related" }
+        : action === "move_this"
+          ? { ...relation, feedback: "user_requested_map_review" }
+          : { ...relation, feedback: "user_wants_to_add_evidence" };
+      return changedRelation;
     });
     const updated = { ...state.current, relations, updated_at: new Date().toISOString() };
     updateCurrent(updated);
+    const syncResult = changedRelation ? await syncRelationFeedbackToIndex(updated, changedRelation) : { ok: false, detail: "" };
     if (action === "add_evidence") {
-      showAlert("Evidence can be added by editing the contribution and adding a source link. The request was recorded.");
+      showAlert(syncResult.ok
+        ? "Evidence request recorded and routed to the local index API. Edit the contribution to add a source link."
+        : "Evidence can be added by editing the contribution and adding a source link. The request was recorded locally.");
+      return;
     }
+    if (!syncResult.ok && syncResult.detail) showAlert(syncResult.detail);
+  });
+
+  document.querySelectorAll("[data-start-contribution]").forEach((link) => {
+    link.addEventListener("click", () => {
+      window.setTimeout(() => {
+        nodes.input.focus();
+        announceStatus("Contribution field focused.");
+      }, 0);
+    });
   });
 
   restoreLatestPublicContribution();
