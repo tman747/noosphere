@@ -186,7 +186,7 @@ def launch(metadata: dict, exe: Path, body: dict) -> dict:
     supply = integer(body.get("total_supply"), "total_supply", 1)
     initial_noos = integer(body.get("initial_noos"), "initial_noos", 1)
     initial_tokens = integer(body.get("initial_tokens"), "initial_tokens", 1, supply)
-    fee_bps = integer(body.get("fee_bps"), "fee_bps", 0, 1000)
+    fee_bps = integer(body.get("fee_bps"), "fee_bps", 0, 100)
     account = metadata["developer_public_id"]
     with TX_LOCK:
         created = submit_actions(
@@ -255,6 +255,83 @@ def swap(metadata: dict, exe: Path, body: dict) -> dict:
         )
     return {"txid": result["build"]["txid"], "receipt": result["receipt"]}
 
+def defi_state(metadata: dict) -> dict:
+    indexer = metadata["indexer"]
+    return {
+        "account": metadata["developer_public_id"],
+        "pools": request_json(indexer, "/api/v1/pools").get("items", []),
+        "liquidity_positions": request_json(
+            indexer, "/api/v1/liquidity-positions"
+        ).get("items", []),
+        "oracle_feeds": request_json(indexer, "/api/v1/oracle-feeds").get("items", []),
+        "oracle_reports": request_json(indexer, "/api/v1/oracle-reports").get("items", []),
+        "lending_markets": request_json(indexer, "/api/v1/lending-markets").get("items", []),
+        "stable_assets": request_json(indexer, "/api/v1/stable-assets").get("items", []),
+        "debt_positions": request_json(indexer, "/api/v1/debt-positions").get("items", []),
+    }
+
+
+def defi_action(metadata: dict, exe: Path, body: dict) -> dict:
+    kind = str(body.get("type", ""))
+    account = metadata["developer_public_id"]
+    action: dict
+    if kind == "add_liquidity":
+        pool = str(body.get("pool_id", ""))
+        if not HEX32.fullmatch(pool):
+            raise ValueError("pool_id must be 32-byte lowercase hex")
+        action = {
+            "type": kind,
+            "provider": account,
+            "pool_id": pool,
+            "max_amount_0": str(integer(body.get("max_amount_0"), "max_amount_0", 1)),
+            "max_amount_1": str(integer(body.get("max_amount_1"), "max_amount_1", 1)),
+            "min_shares": str(integer(body.get("min_shares"), "min_shares", 1)),
+        }
+    elif kind == "remove_liquidity":
+        pool = str(body.get("pool_id", ""))
+        if not HEX32.fullmatch(pool):
+            raise ValueError("pool_id must be 32-byte lowercase hex")
+        action = {
+            "type": kind,
+            "provider": account,
+            "pool_id": pool,
+            "shares": str(integer(body.get("shares"), "shares", 1)),
+            "min_amount_0": str(integer(body.get("min_amount_0"), "min_amount_0", 1)),
+            "min_amount_1": str(integer(body.get("min_amount_1"), "min_amount_1", 1)),
+        }
+    elif kind in {"deposit_collateral", "withdraw_collateral", "borrow_stable", "repay_stable"}:
+        market = str(body.get("market_id", ""))
+        if not HEX32.fullmatch(market):
+            raise ValueError("market_id must be 32-byte lowercase hex")
+        action = {
+            "type": kind,
+            "owner": account,
+            "market_id": market,
+            "amount": str(integer(body.get("amount"), "amount", 1)),
+        }
+    elif kind == "liquidate_position":
+        market = str(body.get("market_id", ""))
+        owner = str(body.get("owner", ""))
+        if not HEX32.fullmatch(market) or not HEX32.fullmatch(owner):
+            raise ValueError("market_id and owner must be 32-byte lowercase hex")
+        if owner == account:
+            raise ValueError("a position owner cannot self-liquidate")
+        action = {
+            "type": kind,
+            "liquidator": account,
+            "market_id": market,
+            "owner": owner,
+            "repay_amount": str(integer(body.get("repay_amount"), "repay_amount", 1)),
+            "min_collateral_out": str(
+                integer(body.get("min_collateral_out"), "min_collateral_out", 1)
+            ),
+        }
+    else:
+        raise ValueError("unsupported DeFi action")
+    with TX_LOCK:
+        result = submit_actions(metadata, exe, [action])
+    return {"txid": result["build"]["txid"], "receipt": result["receipt"]}
+
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "MindMarket/1"
@@ -297,6 +374,9 @@ class Handler(BaseHTTPRequestHandler):
                 suffix = "/api/v1/assets" if parsed.path.endswith("assets") else "/api/v1/pools"
                 self.send_json(200, request_json(self.app.metadata["indexer"], suffix))
                 return
+            if parsed.path == "/api/defi":
+                self.send_json(200, defi_state(self.app.metadata))
+                return
             if parsed.path == "/api/balance":
                 values = parse_qs(parsed.query)
                 asset = values.get("asset", [""])[0]
@@ -334,6 +414,9 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/api/swap":
                 self.send_json(200, swap(self.app.metadata, self.app.cli, body))
                 return
+            if parsed.path == "/api/defi/action":
+                self.send_json(200, defi_action(self.app.metadata, self.app.cli, body))
+                return
             self.send_json(404, {"error": "unknown route"})
         except (ValueError, RuntimeError) as error:
             self.send_json(400, {"error": str(error)})
@@ -349,6 +432,8 @@ class Handler(BaseHTTPRequestHandler):
             "/exchange": STATIC_ROOT / "exchange" / "index.html",
             "/launch/": STATIC_ROOT / "launch" / "index.html",
             "/exchange/": STATIC_ROOT / "exchange" / "index.html",
+            "/defi": STATIC_ROOT / "defi" / "index.html",
+            "/defi/": STATIC_ROOT / "defi" / "index.html",
         }
         target = aliases.get(raw_path)
         if target is None:

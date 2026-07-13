@@ -16,10 +16,11 @@ use crate::engine::{AuthVerifier, ContractEngine, EngineOutcome, EngineTrap};
 use crate::fees::{self, FeeParamsV1, FeeStateV1};
 use crate::issuance::{EmissionSharesV1, IssuanceParamsV1};
 use crate::objects::{
-    asset_id, compute_job_id, note_id, pool_id, txid, witness_root, AccessEntry, AccountV1,
-    ActionV1, BoundedBytes, BoundedList, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1,
-    FeatureControlV1, IntentV1, NoteV1, ObjectV1, OptionalHash32, OptionalObject, ResourceVector,
-    SignedIntentV1, TransactionV1, TransactionWitnessesV1,
+    asset_id, compute_job_id, debt_position_id, lending_market_id, liquidity_position_id, note_id,
+    oracle_feed_id, pool_id, stable_asset_id, txid, witness_root, AccessEntry, AccountV1, ActionV1,
+    BoundedBytes, BoundedList, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1, FeatureControlV1,
+    IntentV1, NoteV1, ObjectV1, OptionalHash32, OptionalObject, ResourceVector, SignedIntentV1,
+    TransactionV1, TransactionWitnessesV1,
 };
 use crate::state::{
     param_key, ApplyOutcome, BlockContext, FailCode, GenesisConfig, GenesisError, LumenLedger,
@@ -635,6 +636,574 @@ fn fixed_supply_launch_and_constant_product_swaps_are_atomic() {
         }
     ));
     assert_eq!(ledger.get_pool(&pool), Some(pool_before_failure));
+}
+
+#[test]
+fn liquidity_shares_add_and_remove_without_dilution() {
+    let mut ledger = genesis();
+    let (asset_bytes, asset_witnesses, asset_tx) = build_tx(
+        1,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::CreateAsset {
+            issuer: PAYER,
+            symbol: BoundedBytes::new(b"LIQ".to_vec()).unwrap(),
+            name: BoundedBytes::new(b"Liquidity Test".to_vec()).unwrap(),
+            decimals: 6,
+            total_supply: 1_000_000_000,
+        }],
+        vec![],
+    );
+    let asset = asset_id(&txid(&asset_tx), 0);
+    assert!(matches!(
+        ledger
+            .apply_transaction(
+                &ctx(1),
+                &asset_bytes,
+                &asset_witnesses,
+                &StubEngine,
+                &AcceptAll,
+            )
+            .unwrap(),
+        ApplyOutcome::Applied { .. }
+    ));
+    let pool_id = pool_id(&NOOS_ASSET, &asset);
+    let (create_bytes, create_witnesses, _) = build_tx(
+        2,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::CreatePool {
+            provider: PAYER,
+            asset_a: NOOS_ASSET,
+            asset_b: asset,
+            amount_a: 10_000_000,
+            amount_b: 100_000_000,
+            fee_bps: 30,
+        }],
+        vec![],
+    );
+    ledger
+        .apply_transaction(
+            &ctx(2),
+            &create_bytes,
+            &create_witnesses,
+            &StubEngine,
+            &AcceptAll,
+        )
+        .unwrap();
+    let initial_pool = ledger.get_pool(&pool_id).unwrap();
+    let position_id = liquidity_position_id(&pool_id, &PAYER);
+    let initial_position = ledger.get_liquidity_position(&pool_id, &PAYER).unwrap();
+    assert_eq!(initial_position.position_id, position_id);
+    assert_eq!(
+        initial_position.shares + crate::state::MINIMUM_LIQUIDITY,
+        initial_pool.total_shares
+    );
+
+    let (add_bytes, add_witnesses, _) = build_tx(
+        3,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::AddLiquidity {
+            provider: PAYER,
+            pool_id,
+            max_amount_0: 1_000_000,
+            max_amount_1: 10_000_000,
+            min_shares: 1,
+        }],
+        vec![],
+    );
+    ledger
+        .apply_transaction(&ctx(3), &add_bytes, &add_witnesses, &StubEngine, &AcceptAll)
+        .unwrap();
+    let added_pool = ledger.get_pool(&pool_id).unwrap();
+    let added_position = ledger.get_liquidity_position(&pool_id, &PAYER).unwrap();
+    let minted = added_position.shares - initial_position.shares;
+    assert!(minted > 0);
+    assert!(
+        added_pool.reserve_0 * initial_pool.total_shares
+            >= initial_pool.reserve_0 * added_pool.total_shares,
+        "rounded add cannot dilute reserve-0 ownership"
+    );
+    assert!(
+        added_pool.reserve_1 * initial_pool.total_shares
+            >= initial_pool.reserve_1 * added_pool.total_shares,
+        "rounded add cannot dilute reserve-1 ownership"
+    );
+
+    let (remove_bytes, remove_witnesses, _) = build_tx(
+        4,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::RemoveLiquidity {
+            provider: PAYER,
+            pool_id,
+            shares: minted,
+            min_amount_0: 1,
+            min_amount_1: 1,
+        }],
+        vec![],
+    );
+    ledger
+        .apply_transaction(
+            &ctx(4),
+            &remove_bytes,
+            &remove_witnesses,
+            &StubEngine,
+            &AcceptAll,
+        )
+        .unwrap();
+    let removed_pool = ledger.get_pool(&pool_id).unwrap();
+    let removed_position = ledger.get_liquidity_position(&pool_id, &PAYER).unwrap();
+    assert_eq!(removed_position.shares, initial_position.shares);
+    assert_eq!(removed_pool.total_shares, initial_pool.total_shares);
+    assert!(removed_pool.reserve_0 >= initial_pool.reserve_0);
+    assert!(removed_pool.reserve_1 >= initial_pool.reserve_1);
+}
+
+#[test]
+fn seeded_amm_actions_preserve_share_and_reserve_invariants() {
+    let mut ledger = genesis();
+    let apply = |ledger: &mut LumenLedger, height: u64, action: ActionV1| {
+        let (bytes, witnesses, _) = build_tx(height, vec![], vec![PAYER], vec![action], vec![]);
+        ledger
+            .apply_transaction(&ctx(height), &bytes, &witnesses, &StubEngine, &AcceptAll)
+            .unwrap()
+    };
+    let (asset_bytes, asset_witnesses, asset_tx) = build_tx(
+        1,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::CreateAsset {
+            issuer: PAYER,
+            symbol: BoundedBytes::new(b"PROP".to_vec()).unwrap(),
+            name: BoundedBytes::new(b"Property Asset".to_vec()).unwrap(),
+            decimals: 6,
+            total_supply: 1_000_000_000,
+        }],
+        vec![],
+    );
+    let asset = asset_id(&txid(&asset_tx), 0);
+    assert!(matches!(
+        ledger
+            .apply_transaction(
+                &ctx(1),
+                &asset_bytes,
+                &asset_witnesses,
+                &StubEngine,
+                &AcceptAll,
+            )
+            .unwrap(),
+        ApplyOutcome::Applied { .. }
+    ));
+    let pool_id = pool_id(&NOOS_ASSET, &asset);
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            2,
+            ActionV1::CreatePool {
+                provider: PAYER,
+                asset_a: NOOS_ASSET,
+                asset_b: asset,
+                amount_a: 10_000_000,
+                amount_b: 100_000_000,
+                fee_bps: 30,
+            },
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+
+    let mut rng = SplitMix64(0xA11C_E5EED);
+    for step in 0..128u64 {
+        let before = ledger.get_pool(&pool_id).unwrap();
+        let position_before = ledger.get_liquidity_position(&pool_id, &PAYER).unwrap();
+        let action = match rng.next_u64() % 3 {
+            0 => ActionV1::SwapExactIn {
+                trader: PAYER,
+                pool_id,
+                asset_in: NOOS_ASSET,
+                amount_in: u128::from(rng.next_u64() % 10_000 + 1),
+                min_amount_out: 1,
+            },
+            1 => {
+                let max_amount_0 = u128::from(rng.next_u64() % 9_001 + 1_000);
+                let max_amount_1 = (max_amount_0 * before.reserve_1).div_ceil(before.reserve_0);
+                ActionV1::AddLiquidity {
+                    provider: PAYER,
+                    pool_id,
+                    max_amount_0,
+                    max_amount_1,
+                    min_shares: 1,
+                }
+            }
+            _ if position_before.shares > 1 => ActionV1::RemoveLiquidity {
+                provider: PAYER,
+                pool_id,
+                shares: (position_before.shares / 100).max(1),
+                min_amount_0: 1,
+                min_amount_1: 1,
+            },
+            _ => continue,
+        };
+        assert!(matches!(
+            apply(&mut ledger, step + 3, action),
+            ApplyOutcome::Applied { .. }
+        ));
+        let after = ledger.get_pool(&pool_id).unwrap();
+        let position_after = ledger.get_liquidity_position(&pool_id, &PAYER).unwrap();
+        assert!(after.reserve_0 > 0 && after.reserve_1 > 0);
+        assert!(after.total_shares >= crate::state::MINIMUM_LIQUIDITY);
+        assert_eq!(
+            after.total_shares,
+            position_after.shares + crate::state::MINIMUM_LIQUIDITY,
+            "single-provider shares plus locked minimum must equal total"
+        );
+        if after.total_shares == before.total_shares {
+            assert!(
+                after.reserve_0 * after.reserve_1 >= before.reserve_0 * before.reserve_1,
+                "a swap cannot decrease constant product"
+            );
+        }
+    }
+}
+
+#[test]
+fn quorum_oracle_and_collateralized_stable_debt_lifecycle() {
+    let mut ledger = genesis();
+    let apply =
+        |ledger: &mut LumenLedger, height: u64, accounts: Vec<Hash32>, actions: Vec<ActionV1>| {
+            let (bytes, witnesses, _) = build_tx(height, vec![], accounts, actions, vec![]);
+            ledger
+                .apply_transaction(&ctx(height), &bytes, &witnesses, &StubEngine, &AcceptAll)
+                .unwrap()
+        };
+
+    let (asset_bytes, asset_witnesses, asset_tx) = build_tx(
+        1,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::CreateAsset {
+            issuer: PAYER,
+            symbol: BoundedBytes::new(b"COLL".to_vec()).unwrap(),
+            name: BoundedBytes::new(b"Collateral".to_vec()).unwrap(),
+            decimals: 9,
+            total_supply: 1_000_000,
+        }],
+        vec![],
+    );
+    let collateral = asset_id(&txid(&asset_tx), 0);
+    ledger
+        .apply_transaction(
+            &ctx(1),
+            &asset_bytes,
+            &asset_witnesses,
+            &StubEngine,
+            &AcceptAll,
+        )
+        .unwrap();
+    let feed_id = oracle_feed_id(&collateral, &NOOS_ASSET);
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            2,
+            vec![PAYER, GOV],
+            vec![ActionV1::CreateOracleFeed {
+                base_asset: collateral,
+                quote_asset: NOOS_ASSET,
+                reporter_0: GOV,
+                reporter_1: EMERGENCY,
+                reporter_2: PROPOSER,
+                max_age_blocks: 100,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    for (height, reporter, price) in [
+        (3, GOV, 2_000_000_000u128),
+        (4, EMERGENCY, 2_020_000_000),
+        (5, PROPOSER, 1_980_000_000),
+    ] {
+        assert!(matches!(
+            apply(
+                &mut ledger,
+                height,
+                vec![PAYER, reporter],
+                vec![ActionV1::SubmitOracleReport {
+                    reporter,
+                    feed_id,
+                    price_q9: price,
+                    confidence_bps: 100,
+                    sequence: 1,
+                    observed_height: height,
+                }],
+            ),
+            ApplyOutcome::Applied { .. }
+        ));
+    }
+    let market_id = lending_market_id(&collateral, &feed_id);
+    let stable = stable_asset_id(&market_id);
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            6,
+            vec![PAYER, GOV],
+            vec![ActionV1::CreateLendingMarket {
+                collateral_asset: collateral,
+                oracle_feed_id: feed_id,
+                symbol: BoundedBytes::new(b"MUSD".to_vec()).unwrap(),
+                name: BoundedBytes::new(b"Mind USD".to_vec()).unwrap(),
+                decimals: 9,
+                collateral_factor_bps: 5_000,
+                liquidation_threshold_bps: 7_500,
+                liquidation_bonus_bps: 500,
+                debt_ceiling: 1_000_000,
+                min_debt: 1_000,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            7,
+            vec![PAYER],
+            vec![ActionV1::DepositCollateral {
+                owner: PAYER,
+                market_id,
+                amount: 100_000,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            8,
+            vec![PAYER],
+            vec![ActionV1::BorrowStable {
+                owner: PAYER,
+                market_id,
+                amount: 80_000,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert_eq!(ledger.balance(&PAYER, &stable), 80_000);
+    assert_eq!(
+        ledger.get_lending_market(&market_id).unwrap().total_debt,
+        80_000
+    );
+    assert_eq!(ledger.stable_assets()[0].minted_supply, 80_000);
+
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            9,
+            vec![PAYER],
+            vec![ActionV1::RepayStable {
+                owner: PAYER,
+                market_id,
+                amount: 20_000,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            10,
+            vec![PAYER],
+            vec![
+                ActionV1::WithdrawFromAccount {
+                    account_id: PAYER,
+                    asset_id: stable,
+                    amount: 20_000,
+                },
+                ActionV1::DepositToAccount {
+                    account_id: GOV,
+                    asset_id: stable,
+                    amount: 20_000,
+                },
+            ],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+
+    for (height, reporter, price) in [
+        (11, GOV, 500_000_000u128),
+        (12, EMERGENCY, 510_000_000),
+        (13, PROPOSER, 490_000_000),
+    ] {
+        assert!(matches!(
+            apply(
+                &mut ledger,
+                height,
+                vec![PAYER, reporter],
+                vec![ActionV1::SubmitOracleReport {
+                    reporter,
+                    feed_id,
+                    price_q9: price,
+                    confidence_bps: 100,
+                    sequence: 2,
+                    observed_height: height,
+                }],
+            ),
+            ApplyOutcome::Applied { .. }
+        ));
+    }
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            14,
+            vec![PAYER, GOV],
+            vec![ActionV1::LiquidatePosition {
+                liquidator: GOV,
+                market_id,
+                owner: PAYER,
+                repay_amount: 20_000,
+                min_collateral_out: 1,
+            }],
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    let position = ledger.get_debt_position(&market_id, &PAYER).unwrap();
+    assert_eq!(position.position_id, debt_position_id(&market_id, &PAYER));
+    assert_eq!(position.debt, 40_000);
+    assert!(position.collateral < 100_000);
+    assert!(ledger.balance(&GOV, &collateral) > 0);
+    assert_eq!(ledger.balance(&GOV, &stable), 0);
+    assert_eq!(
+        ledger.get_lending_market(&market_id).unwrap().total_debt,
+        40_000
+    );
+    assert_eq!(ledger.stable_assets()[0].minted_supply, 40_000);
+}
+
+#[test]
+fn oracle_replay_and_single_report_borrow_fail_closed() {
+    let mut ledger = genesis();
+    let apply =
+        |ledger: &mut LumenLedger, height: u64, accounts: Vec<Hash32>, actions: Vec<ActionV1>| {
+            let (bytes, witnesses, tx) = build_tx(height, vec![], accounts, actions, vec![]);
+            let outcome = ledger
+                .apply_transaction(&ctx(height), &bytes, &witnesses, &StubEngine, &AcceptAll)
+                .unwrap();
+            (outcome, tx)
+        };
+    let (asset_outcome, asset_tx) = apply(
+        &mut ledger,
+        1,
+        vec![PAYER],
+        vec![ActionV1::CreateAsset {
+            issuer: PAYER,
+            symbol: BoundedBytes::new(b"QUOTE".to_vec()).unwrap(),
+            name: BoundedBytes::new(b"Quote Unit".to_vec()).unwrap(),
+            decimals: 9,
+            total_supply: 1_000_000,
+        }],
+    );
+    assert!(matches!(asset_outcome, ApplyOutcome::Applied { .. }));
+    let quote = asset_id(&txid(&asset_tx), 0);
+    let feed_id = oracle_feed_id(&NOOS_ASSET, &quote);
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            2,
+            vec![PAYER, GOV],
+            vec![ActionV1::CreateOracleFeed {
+                base_asset: NOOS_ASSET,
+                quote_asset: quote,
+                reporter_0: GOV,
+                reporter_1: EMERGENCY,
+                reporter_2: PROPOSER,
+                max_age_blocks: 10,
+            }],
+        )
+        .0,
+        ApplyOutcome::Applied { .. }
+    ));
+    let report = ActionV1::SubmitOracleReport {
+        reporter: GOV,
+        feed_id,
+        price_q9: 2_000_000_000,
+        confidence_bps: 0,
+        sequence: 1,
+        observed_height: 3,
+    };
+    assert!(matches!(
+        apply(&mut ledger, 3, vec![PAYER, GOV], vec![report.clone()]).0,
+        ApplyOutcome::Applied { .. }
+    ));
+    let replay = apply(&mut ledger, 4, vec![PAYER, GOV], vec![report]).0;
+    assert!(matches!(
+        replay,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+
+    let market_id = lending_market_id(&NOOS_ASSET, &feed_id);
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            5,
+            vec![PAYER, GOV],
+            vec![ActionV1::CreateLendingMarket {
+                collateral_asset: NOOS_ASSET,
+                oracle_feed_id: feed_id,
+                symbol: BoundedBytes::new(b"SOLO".to_vec()).unwrap(),
+                name: BoundedBytes::new(b"Single Report Refusal".to_vec()).unwrap(),
+                decimals: 9,
+                collateral_factor_bps: 5_000,
+                liquidation_threshold_bps: 7_500,
+                liquidation_bonus_bps: 500,
+                debt_ceiling: 1_000_000,
+                min_debt: 1_000,
+            }],
+        )
+        .0,
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply(
+            &mut ledger,
+            6,
+            vec![PAYER],
+            vec![ActionV1::DepositCollateral {
+                owner: PAYER,
+                market_id,
+                amount: 100_000,
+            }],
+        )
+        .0,
+        ApplyOutcome::Applied { .. }
+    ));
+    let before = ledger.roots();
+    let borrow = apply(
+        &mut ledger,
+        7,
+        vec![PAYER],
+        vec![ActionV1::BorrowStable {
+            owner: PAYER,
+            market_id,
+            amount: 10_000,
+        }],
+    )
+    .0;
+    assert!(matches!(
+        borrow,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert_eq!(
+        ledger.get_debt_position(&market_id, &PAYER).unwrap().debt,
+        0
+    );
+    assert_eq!(ledger.get_lending_market(&market_id).unwrap().total_debt, 0);
+    assert_ne!(ledger.roots().receipts_root, before.receipts_root);
 }
 
 #[test]

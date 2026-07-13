@@ -22,16 +22,53 @@ use crate::fees::{self, FeeParamsV1, FeeStateV1, Usage};
 use crate::issuance::{EmissionSharesV1, IssuanceParamsV1};
 use crate::objects::{
     asset_id as derive_asset_id, compute_job_id as derive_compute_job_id,
-    pool_id as derive_pool_id, witness_root as derive_witness_root, AccessEntry, AccountV1,
-    ActionV1, AssetV1, BoundedBytes, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1,
-    FeatureControlV1, NoteV1, ObjectV1, ParamRecordV1, PendingParamV1, PoolV1, ReceiptV1,
-    ResourceVector, TransactionV1, TransactionWitnessesV1,
+    debt_position_id as derive_debt_position_id, lending_market_id as derive_lending_market_id,
+    liquidity_position_id as derive_liquidity_position_id, oracle_feed_id as derive_oracle_feed_id,
+    oracle_report_id as derive_oracle_report_id, pool_id as derive_pool_id,
+    stable_asset_id as derive_stable_asset_id, witness_root as derive_witness_root, AccessEntry,
+    AccountV1, ActionV1, AssetV1, BoundedBytes, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1,
+    DebtPositionV1, FeatureControlV1, LendingMarketV1, LiquidityPositionV1, NoteV1, ObjectV1,
+    OracleFeedV1, OracleReportV1, ParamRecordV1, PendingParamV1, PoolV1, ReceiptV1, ResourceVector,
+    StableAssetV1, TransactionV1, TransactionWitnessesV1,
 };
 use crate::smt::Smt;
 use crate::Hash32;
 
 /// NOOS asset id: the zero hash (frozen, lumen-v1.md §3.2).
 pub const NOOS_ASSET: Hash32 = [0u8; 32];
+/// Native AMM bounds keep every multiplication inside `u128`.
+pub const MAX_POOL_QUANTITY: u128 = u64::MAX as u128;
+/// Permanently unowned shares prevent complete reserve withdrawal.
+pub const MINIMUM_LIQUIDITY: u128 = 1_000;
+/// Oracle price scale: quote base units per collateral base unit.
+pub const ORACLE_SCALE: u128 = 1_000_000_000;
+pub const MAX_ORACLE_CONFIDENCE_BPS: u16 = 1_000;
+pub const MAX_CREDIT_QUANTITY: u128 = u64::MAX as u128;
+
+fn integer_sqrt(value: u128) -> u128 {
+    if value < 2 {
+        return value;
+    }
+    let mut x = value;
+    let mut y = x.div_ceil(2);
+    while y < x {
+        x = y;
+        y = x
+            .saturating_add(value.checked_div(x).unwrap_or(u128::MAX))
+            .checked_div(2)
+            .unwrap_or(u128::MAX);
+    }
+    x
+}
+
+fn ceil_mul_div(a: u128, b: u128, denominator: u128) -> Result<u128, FailCode> {
+    if denominator == 0 {
+        return Err(FailCode::PostconditionFailed);
+    }
+    a.checked_mul(b)
+        .map(|value| value.div_ceil(denominator))
+        .ok_or(FailCode::Overflow)
+}
 
 /// Well-known params-tree keys: ASCII name, zero-padded to 32 bytes
 /// (frozen, lumen-v1.md §7.1). Names are ≤ 32 bytes by construction.
@@ -382,9 +419,7 @@ impl LumenLedger {
     /// Total NOOS ever issued: genesis allocation plus scheduled emission.
     #[must_use]
     pub fn total_issued(&self) -> u128 {
-        self.genesis_issued
-            .checked_add(self.emission_minted)
-            .expect("issued-supply invariant")
+        self.genesis_issued.saturating_add(self.emission_minted)
     }
 
     #[must_use]
@@ -431,6 +466,78 @@ impl LumenLedger {
     }
 
     #[must_use]
+    pub fn get_liquidity_position(
+        &self,
+        pool: &Hash32,
+        provider: &Hash32,
+    ) -> Option<LiquidityPositionV1> {
+        self.objects
+            .get(&derive_liquidity_position_id(pool, provider))
+            .and_then(|bytes| LiquidityPositionV1::decode_canonical(bytes).ok())
+    }
+
+    #[must_use]
+    pub fn get_oracle_feed(&self, id: &Hash32) -> Option<OracleFeedV1> {
+        self.objects
+            .get(id)
+            .and_then(|bytes| OracleFeedV1::decode_canonical(bytes).ok())
+    }
+
+    #[must_use]
+    pub fn oracle_feeds(&self) -> Vec<OracleFeedV1> {
+        self.objects
+            .iter()
+            .filter_map(|(_, bytes)| OracleFeedV1::decode_canonical(bytes).ok())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn oracle_reports(&self) -> Vec<OracleReportV1> {
+        self.objects
+            .iter()
+            .filter_map(|(_, bytes)| OracleReportV1::decode_canonical(bytes).ok())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn get_lending_market(&self, id: &Hash32) -> Option<LendingMarketV1> {
+        self.objects
+            .get(id)
+            .and_then(|bytes| LendingMarketV1::decode_canonical(bytes).ok())
+    }
+
+    #[must_use]
+    pub fn lending_markets(&self) -> Vec<LendingMarketV1> {
+        self.objects
+            .iter()
+            .filter_map(|(_, bytes)| LendingMarketV1::decode_canonical(bytes).ok())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn stable_assets(&self) -> Vec<StableAssetV1> {
+        self.objects
+            .iter()
+            .filter_map(|(_, bytes)| StableAssetV1::decode_canonical(bytes).ok())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn get_debt_position(&self, market: &Hash32, owner: &Hash32) -> Option<DebtPositionV1> {
+        self.objects
+            .get(&derive_debt_position_id(market, owner))
+            .and_then(|bytes| DebtPositionV1::decode_canonical(bytes).ok())
+    }
+
+    #[must_use]
+    pub fn debt_positions(&self) -> Vec<DebtPositionV1> {
+        self.objects
+            .iter()
+            .filter_map(|(_, bytes)| DebtPositionV1::decode_canonical(bytes).ok())
+            .collect()
+    }
+
+    #[must_use]
     pub fn assets(&self) -> Vec<AssetV1> {
         self.objects
             .iter()
@@ -443,6 +550,14 @@ impl LumenLedger {
         self.objects
             .iter()
             .filter_map(|(_, bytes)| PoolV1::decode_canonical(bytes).ok())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn liquidity_positions(&self) -> Vec<LiquidityPositionV1> {
+        self.objects
+            .iter()
+            .filter_map(|(_, bytes)| LiquidityPositionV1::decode_canonical(bytes).ok())
             .collect()
     }
 
@@ -1189,10 +1304,33 @@ impl LumenLedger {
                 ActionV1::CreateAsset { issuer, .. } if !signed(issuer) => {
                     return Err(RejectReason::CapabilityDenied);
                 }
-                ActionV1::CreatePool { provider, .. } if !signed(provider) => {
+                ActionV1::CreatePool { provider, .. }
+                | ActionV1::AddLiquidity { provider, .. }
+                | ActionV1::RemoveLiquidity { provider, .. }
+                    if !signed(provider) =>
+                {
                     return Err(RejectReason::CapabilityDenied);
                 }
                 ActionV1::SwapExactIn { trader, .. } if !signed(trader) => {
+                    return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::CreateOracleFeed { .. } | ActionV1::CreateLendingMarket { .. }
+                    if !gov_ok() =>
+                {
+                    return Err(RejectReason::GovernanceDenied);
+                }
+                ActionV1::SubmitOracleReport { reporter, .. } if !signed(reporter) => {
+                    return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::DepositCollateral { owner, .. }
+                | ActionV1::WithdrawCollateral { owner, .. }
+                | ActionV1::BorrowStable { owner, .. }
+                | ActionV1::RepayStable { owner, .. }
+                    if !signed(owner) =>
+                {
+                    return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::LiquidatePosition { liquidator, .. } if !signed(liquidator) => {
                     return Err(RejectReason::CapabilityDenied);
                 }
                 ActionV1::RegisterComputeWorker { worker, .. }
@@ -1561,7 +1699,9 @@ impl LumenLedger {
                     if asset_a == asset_b
                         || *amount_a == 0
                         || *amount_b == 0
-                        || *fee_bps > 1_000
+                        || *amount_a > MAX_POOL_QUANTITY
+                        || *amount_b > MAX_POOL_QUANTITY
+                        || *fee_bps > 100
                         || overlay_account(&ov, self, provider).is_none()
                         || (*asset_a != NOOS_ASSET
                             && AssetV1::decode_canonical(
@@ -1580,6 +1720,11 @@ impl LumenLedger {
                     }
                     let id = derive_pool_id(asset_a, asset_b);
                     if overlay_object(&ov, self, &id).is_some() {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let product = amount_a.checked_mul(*amount_b).ok_or(FailCode::Overflow)?;
+                    let total_shares = integer_sqrt(product);
+                    if total_shares <= MINIMUM_LIQUIDITY {
                         return Err(FailCode::PostconditionFailed);
                     }
                     let balance_a = overlay_balance(&ov, self, provider, asset_a);
@@ -1609,8 +1754,21 @@ impl LumenLedger {
                         reserve_1,
                         fee_bps: *fee_bps,
                         creator: *provider,
+                        total_shares,
+                    };
+                    let position_id = derive_liquidity_position_id(&id, provider);
+                    let position = LiquidityPositionV1 {
+                        position_id,
+                        pool_id: id,
+                        provider: *provider,
+                        shares: total_shares
+                            .checked_sub(MINIMUM_LIQUIDITY)
+                            .ok_or(FailCode::PostconditionFailed)?,
                     };
                     ov.objects.insert(id, Some(pool.encode_canonical()));
+                    ov.objects
+                        .insert(position_id, Some(position.encode_canonical()));
+                    ov.write_count()?;
                     ov.write_count()?;
                     ov.write_count()?;
                     ov.write_count()?;
@@ -1622,13 +1780,29 @@ impl LumenLedger {
                     amount_in,
                     min_amount_out,
                 } => {
-                    if *amount_in == 0 || overlay_account(&ov, self, trader).is_none() {
+                    if *amount_in == 0
+                        || *amount_in > MAX_POOL_QUANTITY
+                        || overlay_account(&ov, self, trader).is_none()
+                    {
                         return Err(FailCode::PostconditionFailed);
                     }
                     let raw =
                         overlay_object(&ov, self, pool_id).ok_or(FailCode::PostconditionFailed)?;
                     let mut pool = PoolV1::decode_canonical(&raw)
                         .map_err(|_| FailCode::PostconditionFailed)?;
+                    if pool.reserve_0 == 0
+                        || pool.reserve_1 == 0
+                        || pool.reserve_0 > MAX_POOL_QUANTITY
+                        || pool.reserve_1 > MAX_POOL_QUANTITY
+                        || pool.total_shares <= MINIMUM_LIQUIDITY
+                        || pool.fee_bps > 100
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let old_product = pool
+                        .reserve_0
+                        .checked_mul(pool.reserve_1)
+                        .ok_or(FailCode::Overflow)?;
                     let (reserve_in, reserve_out, asset_out, input_is_zero) =
                         if *asset_in == pool.asset_0 {
                             (pool.reserve_0, pool.reserve_1, pool.asset_1, true)
@@ -1641,6 +1815,9 @@ impl LumenLedger {
                         .checked_mul(u128::from(10_000u16.saturating_sub(pool.fee_bps)))
                         .and_then(|value| value.checked_div(10_000))
                         .ok_or(FailCode::Overflow)?;
+                    if effective == 0 {
+                        return Err(FailCode::PostconditionFailed);
+                    }
                     let amount_out = reserve_out
                         .checked_mul(effective)
                         .and_then(|value| value.checked_div(reserve_in.checked_add(effective)?))
@@ -1667,6 +1844,7 @@ impl LumenLedger {
                         pool.reserve_0 = pool
                             .reserve_0
                             .checked_add(*amount_in)
+                            .filter(|value| *value <= MAX_POOL_QUANTITY)
                             .ok_or(FailCode::Overflow)?;
                         pool.reserve_1 = pool
                             .reserve_1
@@ -1676,16 +1854,673 @@ impl LumenLedger {
                         pool.reserve_1 = pool
                             .reserve_1
                             .checked_add(*amount_in)
+                            .filter(|value| *value <= MAX_POOL_QUANTITY)
                             .ok_or(FailCode::Overflow)?;
                         pool.reserve_0 = pool
                             .reserve_0
                             .checked_sub(amount_out)
                             .ok_or(FailCode::Overflow)?;
                     }
+                    let new_product = pool
+                        .reserve_0
+                        .checked_mul(pool.reserve_1)
+                        .ok_or(FailCode::Overflow)?;
+                    if new_product < old_product {
+                        return Err(FailCode::PostconditionFailed);
+                    }
                     ov.objects.insert(*pool_id, Some(pool.encode_canonical()));
                     ov.write_count()?;
                     ov.write_count()?;
                     ov.write_count()?;
+                }
+                ActionV1::AddLiquidity {
+                    provider,
+                    pool_id,
+                    max_amount_0,
+                    max_amount_1,
+                    min_shares,
+                } => {
+                    if *max_amount_0 == 0
+                        || *max_amount_1 == 0
+                        || *max_amount_0 > MAX_POOL_QUANTITY
+                        || *max_amount_1 > MAX_POOL_QUANTITY
+                        || overlay_account(&ov, self, provider).is_none()
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let raw =
+                        overlay_object(&ov, self, pool_id).ok_or(FailCode::PostconditionFailed)?;
+                    let mut pool = PoolV1::decode_canonical(&raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if pool.reserve_0 == 0
+                        || pool.reserve_1 == 0
+                        || pool.total_shares <= MINIMUM_LIQUIDITY
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let shares_0 = max_amount_0
+                        .checked_mul(pool.total_shares)
+                        .and_then(|value| value.checked_div(pool.reserve_0))
+                        .ok_or(FailCode::Overflow)?;
+                    let shares_1 = max_amount_1
+                        .checked_mul(pool.total_shares)
+                        .and_then(|value| value.checked_div(pool.reserve_1))
+                        .ok_or(FailCode::Overflow)?;
+                    let shares = shares_0.min(shares_1);
+                    if shares == 0 || shares < *min_shares {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let amount_0 = ceil_mul_div(shares, pool.reserve_0, pool.total_shares)?;
+                    let amount_1 = ceil_mul_div(shares, pool.reserve_1, pool.total_shares)?;
+                    if amount_0 == 0
+                        || amount_1 == 0
+                        || amount_0 > *max_amount_0
+                        || amount_1 > *max_amount_1
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let balance_0 = overlay_balance(&ov, self, provider, &pool.asset_0);
+                    let balance_1 = overlay_balance(&ov, self, provider, &pool.asset_1);
+                    ov.balances.insert(
+                        (*provider, pool.asset_0),
+                        balance_0
+                            .checked_sub(amount_0)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    ov.balances.insert(
+                        (*provider, pool.asset_1),
+                        balance_1
+                            .checked_sub(amount_1)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    pool.reserve_0 = pool
+                        .reserve_0
+                        .checked_add(amount_0)
+                        .filter(|value| *value <= MAX_POOL_QUANTITY)
+                        .ok_or(FailCode::Overflow)?;
+                    pool.reserve_1 = pool
+                        .reserve_1
+                        .checked_add(amount_1)
+                        .filter(|value| *value <= MAX_POOL_QUANTITY)
+                        .ok_or(FailCode::Overflow)?;
+                    pool.total_shares = pool
+                        .total_shares
+                        .checked_add(shares)
+                        .filter(|value| *value <= MAX_POOL_QUANTITY)
+                        .ok_or(FailCode::Overflow)?;
+                    let position_id = derive_liquidity_position_id(pool_id, provider);
+                    let mut position = overlay_object(&ov, self, &position_id)
+                        .map(|bytes| LiquidityPositionV1::decode_canonical(&bytes))
+                        .transpose()
+                        .map_err(|_| FailCode::PostconditionFailed)?
+                        .unwrap_or(LiquidityPositionV1 {
+                            position_id,
+                            pool_id: *pool_id,
+                            provider: *provider,
+                            shares: 0,
+                        });
+                    if position.pool_id != *pool_id || position.provider != *provider {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    position.shares = position
+                        .shares
+                        .checked_add(shares)
+                        .ok_or(FailCode::Overflow)?;
+                    ov.objects.insert(*pool_id, Some(pool.encode_canonical()));
+                    ov.objects
+                        .insert(position_id, Some(position.encode_canonical()));
+                    for _ in 0..5 {
+                        ov.write_count()?;
+                    }
+                }
+                ActionV1::RemoveLiquidity {
+                    provider,
+                    pool_id,
+                    shares,
+                    min_amount_0,
+                    min_amount_1,
+                } => {
+                    if *shares == 0 || overlay_account(&ov, self, provider).is_none() {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let raw =
+                        overlay_object(&ov, self, pool_id).ok_or(FailCode::PostconditionFailed)?;
+                    let mut pool = PoolV1::decode_canonical(&raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let position_id = derive_liquidity_position_id(pool_id, provider);
+                    let position_raw = overlay_object(&ov, self, &position_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut position = LiquidityPositionV1::decode_canonical(&position_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if position.pool_id != *pool_id
+                        || position.provider != *provider
+                        || position.shares < *shares
+                        || pool.total_shares <= *shares
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let amount_0 = pool
+                        .reserve_0
+                        .checked_mul(*shares)
+                        .and_then(|value| value.checked_div(pool.total_shares))
+                        .ok_or(FailCode::Overflow)?;
+                    let amount_1 = pool
+                        .reserve_1
+                        .checked_mul(*shares)
+                        .and_then(|value| value.checked_div(pool.total_shares))
+                        .ok_or(FailCode::Overflow)?;
+                    if amount_0 == 0
+                        || amount_1 == 0
+                        || amount_0 < *min_amount_0
+                        || amount_1 < *min_amount_1
+                        || amount_0 >= pool.reserve_0
+                        || amount_1 >= pool.reserve_1
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let balance_0 = overlay_balance(&ov, self, provider, &pool.asset_0);
+                    let balance_1 = overlay_balance(&ov, self, provider, &pool.asset_1);
+                    ov.balances.insert(
+                        (*provider, pool.asset_0),
+                        balance_0.checked_add(amount_0).ok_or(FailCode::Overflow)?,
+                    );
+                    ov.balances.insert(
+                        (*provider, pool.asset_1),
+                        balance_1.checked_add(amount_1).ok_or(FailCode::Overflow)?,
+                    );
+                    pool.reserve_0 = pool
+                        .reserve_0
+                        .checked_sub(amount_0)
+                        .ok_or(FailCode::Overflow)?;
+                    pool.reserve_1 = pool
+                        .reserve_1
+                        .checked_sub(amount_1)
+                        .ok_or(FailCode::Overflow)?;
+                    pool.total_shares = pool
+                        .total_shares
+                        .checked_sub(*shares)
+                        .ok_or(FailCode::Overflow)?;
+                    position.shares = position
+                        .shares
+                        .checked_sub(*shares)
+                        .ok_or(FailCode::Overflow)?;
+                    ov.objects.insert(*pool_id, Some(pool.encode_canonical()));
+                    ov.objects.insert(
+                        position_id,
+                        (position.shares != 0).then(|| position.encode_canonical()),
+                    );
+                    for _ in 0..5 {
+                        ov.write_count()?;
+                    }
+                }
+                ActionV1::CreateOracleFeed {
+                    base_asset,
+                    quote_asset,
+                    reporter_0,
+                    reporter_1,
+                    reporter_2,
+                    max_age_blocks,
+                } => {
+                    let reporters = [*reporter_0, *reporter_1, *reporter_2];
+                    if base_asset == quote_asset
+                        || reporters[0] == reporters[1]
+                        || reporters[0] == reporters[2]
+                        || reporters[1] == reporters[2]
+                        || !(1..=10_000).contains(max_age_blocks)
+                        || reporters
+                            .iter()
+                            .any(|reporter| overlay_account(&ov, self, reporter).is_none())
+                        || (*base_asset != NOOS_ASSET
+                            && AssetV1::decode_canonical(
+                                &overlay_object(&ov, self, base_asset)
+                                    .ok_or(FailCode::PostconditionFailed)?,
+                            )
+                            .is_err())
+                        || (*quote_asset != NOOS_ASSET
+                            && AssetV1::decode_canonical(
+                                &overlay_object(&ov, self, quote_asset)
+                                    .ok_or(FailCode::PostconditionFailed)?,
+                            )
+                            .is_err())
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let id = derive_oracle_feed_id(base_asset, quote_asset);
+                    if overlay_object(&ov, self, &id).is_some() {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let feed = OracleFeedV1 {
+                        feed_id: id,
+                        base_asset: *base_asset,
+                        quote_asset: *quote_asset,
+                        reporter_0: *reporter_0,
+                        reporter_1: *reporter_1,
+                        reporter_2: *reporter_2,
+                        max_age_blocks: *max_age_blocks,
+                    };
+                    ov.objects.insert(id, Some(feed.encode_canonical()));
+                    ov.write_count()?;
+                }
+                ActionV1::SubmitOracleReport {
+                    reporter,
+                    feed_id,
+                    price_q9,
+                    confidence_bps,
+                    sequence,
+                    observed_height,
+                } => {
+                    let raw =
+                        overlay_object(&ov, self, feed_id).ok_or(FailCode::PostconditionFailed)?;
+                    let feed = decode_oracle_feed(&raw, feed_id)?;
+                    if ![feed.reporter_0, feed.reporter_1, feed.reporter_2].contains(reporter)
+                        || *price_q9 == 0
+                        || *price_q9 > MAX_CREDIT_QUANTITY
+                        || *confidence_bps > MAX_ORACLE_CONFIDENCE_BPS
+                        || *sequence == 0
+                        || *observed_height > ctx.height
+                        || ctx.height.saturating_sub(*observed_height) > feed.max_age_blocks
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let report_id = derive_oracle_report_id(feed_id, reporter);
+                    if let Some(previous) = overlay_object(&ov, self, &report_id) {
+                        let previous = OracleReportV1::decode_canonical(&previous)
+                            .map_err(|_| FailCode::PostconditionFailed)?;
+                        if *sequence <= previous.sequence
+                            || *observed_height < previous.observed_height
+                        {
+                            return Err(FailCode::PostconditionFailed);
+                        }
+                    }
+                    let report = OracleReportV1 {
+                        report_id,
+                        feed_id: *feed_id,
+                        reporter: *reporter,
+                        price_q9: *price_q9,
+                        confidence_bps: *confidence_bps,
+                        sequence: *sequence,
+                        observed_height: *observed_height,
+                    };
+                    ov.objects
+                        .insert(report_id, Some(report.encode_canonical()));
+                    ov.write_count()?;
+                }
+                ActionV1::CreateLendingMarket {
+                    collateral_asset,
+                    oracle_feed_id,
+                    symbol,
+                    name,
+                    decimals,
+                    collateral_factor_bps,
+                    liquidation_threshold_bps,
+                    liquidation_bonus_bps,
+                    debt_ceiling,
+                    min_debt,
+                } => {
+                    let symbol_valid = !symbol.as_slice().is_empty()
+                        && symbol
+                            .as_slice()
+                            .iter()
+                            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit());
+                    let feed_raw = overlay_object(&ov, self, oracle_feed_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let feed = decode_oracle_feed(&feed_raw, oracle_feed_id)?;
+                    if !symbol_valid
+                        || name.as_slice().is_empty()
+                        || std::str::from_utf8(name.as_slice()).is_err()
+                        || *decimals > 18
+                        || feed.base_asset != *collateral_asset
+                        || !(1_000..=8_000).contains(collateral_factor_bps)
+                        || *liquidation_threshold_bps <= *collateral_factor_bps
+                        || *liquidation_threshold_bps > 9_000
+                        || *liquidation_bonus_bps > 1_000
+                        || *debt_ceiling == 0
+                        || *debt_ceiling > MAX_CREDIT_QUANTITY
+                        || *min_debt == 0
+                        || *min_debt > *debt_ceiling
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let market_id = derive_lending_market_id(collateral_asset, oracle_feed_id);
+                    let stable_id = derive_stable_asset_id(&market_id);
+                    if overlay_object(&ov, self, &market_id).is_some()
+                        || overlay_object(&ov, self, &stable_id).is_some()
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let market = LendingMarketV1 {
+                        market_id,
+                        collateral_asset: *collateral_asset,
+                        stable_asset: stable_id,
+                        oracle_feed_id: *oracle_feed_id,
+                        collateral_factor_bps: *collateral_factor_bps,
+                        liquidation_threshold_bps: *liquidation_threshold_bps,
+                        liquidation_bonus_bps: *liquidation_bonus_bps,
+                        debt_ceiling: *debt_ceiling,
+                        min_debt: *min_debt,
+                        total_debt: 0,
+                    };
+                    let stable = StableAssetV1 {
+                        asset_id: stable_id,
+                        market_id,
+                        symbol: symbol.clone(),
+                        name: name.clone(),
+                        decimals: *decimals,
+                        minted_supply: 0,
+                        kind: 1,
+                    };
+                    ov.objects
+                        .insert(market_id, Some(market.encode_canonical()));
+                    ov.objects
+                        .insert(stable_id, Some(stable.encode_canonical()));
+                    ov.write_count()?;
+                    ov.write_count()?;
+                }
+                ActionV1::DepositCollateral {
+                    owner,
+                    market_id,
+                    amount,
+                } => {
+                    if *amount == 0 || *amount > MAX_CREDIT_QUANTITY {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let market_raw = overlay_object(&ov, self, market_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let market = decode_lending_market(&market_raw, market_id)?;
+                    let balance = overlay_balance(&ov, self, owner, &market.collateral_asset);
+                    ov.balances.insert(
+                        (*owner, market.collateral_asset),
+                        balance
+                            .checked_sub(*amount)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    let position_id = derive_debt_position_id(market_id, owner);
+                    let mut position = overlay_object(&ov, self, &position_id)
+                        .map(|bytes| DebtPositionV1::decode_canonical(&bytes))
+                        .transpose()
+                        .map_err(|_| FailCode::PostconditionFailed)?
+                        .unwrap_or(DebtPositionV1 {
+                            position_id,
+                            market_id: *market_id,
+                            owner: *owner,
+                            collateral: 0,
+                            debt: 0,
+                        });
+                    if position.position_id != position_id
+                        || position.market_id != *market_id
+                        || position.owner != *owner
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    position.collateral = position
+                        .collateral
+                        .checked_add(*amount)
+                        .filter(|value| *value <= MAX_CREDIT_QUANTITY)
+                        .ok_or(FailCode::Overflow)?;
+                    ov.objects
+                        .insert(position_id, Some(position.encode_canonical()));
+                    ov.write_count()?;
+                    ov.write_count()?;
+                }
+                ActionV1::WithdrawCollateral {
+                    owner,
+                    market_id,
+                    amount,
+                } => {
+                    if *amount == 0 {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let market_raw = overlay_object(&ov, self, market_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let market = decode_lending_market(&market_raw, market_id)?;
+                    let position_id = derive_debt_position_id(market_id, owner);
+                    let position_raw = overlay_object(&ov, self, &position_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut position = decode_debt_position(&position_raw, market_id, owner)?;
+                    position.collateral = position
+                        .collateral
+                        .checked_sub(*amount)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    if position.debt > 0 {
+                        let feed_raw = overlay_object(&ov, self, &market.oracle_feed_id)
+                            .ok_or(FailCode::PostconditionFailed)?;
+                        let feed = decode_oracle_feed(&feed_raw, &market.oracle_feed_id)?;
+                        let price = conservative_oracle_price(&mut ov, self, &feed, ctx.height)?;
+                        let value = collateral_value(position.collateral, price)?;
+                        if position.debt > mul_bps(value, market.collateral_factor_bps)? {
+                            return Err(FailCode::PostconditionFailed);
+                        }
+                    }
+                    let balance = overlay_balance(&ov, self, owner, &market.collateral_asset);
+                    ov.balances.insert(
+                        (*owner, market.collateral_asset),
+                        balance.checked_add(*amount).ok_or(FailCode::Overflow)?,
+                    );
+                    ov.objects.insert(
+                        position_id,
+                        (position.collateral != 0 || position.debt != 0)
+                            .then(|| position.encode_canonical()),
+                    );
+                    ov.write_count()?;
+                    ov.write_count()?;
+                }
+                ActionV1::BorrowStable {
+                    owner,
+                    market_id,
+                    amount,
+                } => {
+                    if *amount == 0 || *amount > MAX_CREDIT_QUANTITY {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let market_raw = overlay_object(&ov, self, market_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut market = decode_lending_market(&market_raw, market_id)?;
+                    let stable_raw = overlay_object(&ov, self, &market.stable_asset)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut stable = decode_stable_asset(&stable_raw, &market)?;
+                    let position_id = derive_debt_position_id(market_id, owner);
+                    let position_raw = overlay_object(&ov, self, &position_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut position = decode_debt_position(&position_raw, market_id, owner)?;
+                    let feed_raw = overlay_object(&ov, self, &market.oracle_feed_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let feed = decode_oracle_feed(&feed_raw, &market.oracle_feed_id)?;
+                    let price = conservative_oracle_price(&mut ov, self, &feed, ctx.height)?;
+                    let new_debt = position
+                        .debt
+                        .checked_add(*amount)
+                        .ok_or(FailCode::Overflow)?;
+                    let new_total = market
+                        .total_debt
+                        .checked_add(*amount)
+                        .filter(|value| *value <= market.debt_ceiling)
+                        .ok_or(FailCode::Overflow)?;
+                    if new_debt < market.min_debt
+                        || new_debt
+                            > mul_bps(
+                                collateral_value(position.collateral, price)?,
+                                market.collateral_factor_bps,
+                            )?
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let balance = overlay_balance(&ov, self, owner, &market.stable_asset);
+                    ov.balances.insert(
+                        (*owner, market.stable_asset),
+                        balance.checked_add(*amount).ok_or(FailCode::Overflow)?,
+                    );
+                    position.debt = new_debt;
+                    market.total_debt = new_total;
+                    stable.minted_supply = stable
+                        .minted_supply
+                        .checked_add(*amount)
+                        .ok_or(FailCode::Overflow)?;
+                    if stable.minted_supply != market.total_debt {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    ov.objects
+                        .insert(position_id, Some(position.encode_canonical()));
+                    ov.objects
+                        .insert(*market_id, Some(market.encode_canonical()));
+                    ov.objects
+                        .insert(stable.asset_id, Some(stable.encode_canonical()));
+                    for _ in 0..4 {
+                        ov.write_count()?;
+                    }
+                }
+                ActionV1::RepayStable {
+                    owner,
+                    market_id,
+                    amount,
+                } => {
+                    if *amount == 0 {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let market_raw = overlay_object(&ov, self, market_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut market = decode_lending_market(&market_raw, market_id)?;
+                    let stable_raw = overlay_object(&ov, self, &market.stable_asset)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut stable = decode_stable_asset(&stable_raw, &market)?;
+                    let position_id = derive_debt_position_id(market_id, owner);
+                    let position_raw = overlay_object(&ov, self, &position_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut position = decode_debt_position(&position_raw, market_id, owner)?;
+                    let remaining = position
+                        .debt
+                        .checked_sub(*amount)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    if remaining != 0 && remaining < market.min_debt {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let balance = overlay_balance(&ov, self, owner, &market.stable_asset);
+                    ov.balances.insert(
+                        (*owner, market.stable_asset),
+                        balance
+                            .checked_sub(*amount)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    position.debt = remaining;
+                    market.total_debt = market
+                        .total_debt
+                        .checked_sub(*amount)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    stable.minted_supply = stable
+                        .minted_supply
+                        .checked_sub(*amount)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    if stable.minted_supply != market.total_debt {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    ov.objects
+                        .insert(position_id, Some(position.encode_canonical()));
+                    ov.objects
+                        .insert(*market_id, Some(market.encode_canonical()));
+                    ov.objects
+                        .insert(stable.asset_id, Some(stable.encode_canonical()));
+                    for _ in 0..4 {
+                        ov.write_count()?;
+                    }
+                }
+                ActionV1::LiquidatePosition {
+                    liquidator,
+                    market_id,
+                    owner,
+                    repay_amount,
+                    min_collateral_out,
+                } => {
+                    if *repay_amount == 0 || liquidator == owner {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let market_raw = overlay_object(&ov, self, market_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut market = decode_lending_market(&market_raw, market_id)?;
+                    let stable_raw = overlay_object(&ov, self, &market.stable_asset)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut stable = decode_stable_asset(&stable_raw, &market)?;
+                    let position_id = derive_debt_position_id(market_id, owner);
+                    let position_raw = overlay_object(&ov, self, &position_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let mut position = decode_debt_position(&position_raw, market_id, owner)?;
+                    let feed_raw = overlay_object(&ov, self, &market.oracle_feed_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let feed = decode_oracle_feed(&feed_raw, &market.oracle_feed_id)?;
+                    let price = conservative_oracle_price(&mut ov, self, &feed, ctx.height)?;
+                    let value = collateral_value(position.collateral, price)?;
+                    if position.debt <= mul_bps(value, market.liquidation_threshold_bps)? {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let max_repay = if position.debt <= market.min_debt.saturating_mul(2) {
+                        position.debt
+                    } else {
+                        position.debt / 2
+                    };
+                    if *repay_amount > max_repay {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let remaining = position
+                        .debt
+                        .checked_sub(*repay_amount)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    if remaining != 0 && remaining < market.min_debt {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let bonus = 10_000u128
+                        .checked_add(u128::from(market.liquidation_bonus_bps))
+                        .ok_or(FailCode::Overflow)?;
+                    let numerator = repay_amount
+                        .checked_mul(ORACLE_SCALE)
+                        .and_then(|value| value.checked_mul(bonus))
+                        .ok_or(FailCode::Overflow)?;
+                    let denominator = price.checked_mul(10_000).ok_or(FailCode::Overflow)?;
+                    let collateral_out = numerator.div_ceil(denominator);
+                    if collateral_out == 0
+                        || collateral_out < *min_collateral_out
+                        || collateral_out > position.collateral
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let stable_balance =
+                        overlay_balance(&ov, self, liquidator, &market.stable_asset);
+                    let collateral_balance =
+                        overlay_balance(&ov, self, liquidator, &market.collateral_asset);
+                    ov.balances.insert(
+                        (*liquidator, market.stable_asset),
+                        stable_balance
+                            .checked_sub(*repay_amount)
+                            .ok_or(FailCode::InsufficientBalance)?,
+                    );
+                    ov.balances.insert(
+                        (*liquidator, market.collateral_asset),
+                        collateral_balance
+                            .checked_add(collateral_out)
+                            .ok_or(FailCode::Overflow)?,
+                    );
+                    position.debt = remaining;
+                    position.collateral = position
+                        .collateral
+                        .checked_sub(collateral_out)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    market.total_debt = market
+                        .total_debt
+                        .checked_sub(*repay_amount)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    stable.minted_supply = stable
+                        .minted_supply
+                        .checked_sub(*repay_amount)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    if stable.minted_supply != market.total_debt {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    ov.objects
+                        .insert(position_id, Some(position.encode_canonical()));
+                    ov.objects
+                        .insert(*market_id, Some(market.encode_canonical()));
+                    ov.objects
+                        .insert(stable.asset_id, Some(stable.encode_canonical()));
+                    for _ in 0..5 {
+                        ov.write_count()?;
+                    }
                 }
                 ActionV1::RegisterComputeWorker {
                     worker,
@@ -2048,6 +2883,134 @@ fn overlay_balance(ov: &Overlay, base: &LumenLedger, account: &Hash32, asset: &H
         Some(amount) => *amount,
         None => base.balance(account, asset),
     }
+}
+
+fn mul_bps(value: u128, bps: u16) -> Result<u128, FailCode> {
+    let whole = value
+        .checked_div(10_000)
+        .and_then(|part| part.checked_mul(u128::from(bps)))
+        .ok_or(FailCode::Overflow)?;
+    let remainder = value
+        .checked_rem(10_000)
+        .and_then(|part| part.checked_mul(u128::from(bps)))
+        .and_then(|part| part.checked_div(10_000))
+        .ok_or(FailCode::Overflow)?;
+    whole.checked_add(remainder).ok_or(FailCode::Overflow)
+}
+
+fn conservative_oracle_price(
+    ov: &mut Overlay,
+    base: &LumenLedger,
+    feed: &OracleFeedV1,
+    height: u64,
+) -> Result<u128, FailCode> {
+    let mut prices = Vec::with_capacity(3);
+    for reporter in [feed.reporter_0, feed.reporter_1, feed.reporter_2] {
+        ov.read_count()?;
+        let id = derive_oracle_report_id(&feed.feed_id, &reporter);
+        let Some(raw) = overlay_object(ov, base, &id) else {
+            continue;
+        };
+        let report =
+            OracleReportV1::decode_canonical(&raw).map_err(|_| FailCode::PostconditionFailed)?;
+        if report.report_id != id
+            || report.feed_id != feed.feed_id
+            || report.reporter != reporter
+            || report.price_q9 == 0
+            || report.price_q9 > MAX_CREDIT_QUANTITY
+            || report.confidence_bps > MAX_ORACLE_CONFIDENCE_BPS
+            || report.observed_height > height
+            || height.saturating_sub(report.observed_height) > feed.max_age_blocks
+        {
+            continue;
+        }
+        prices.push(mul_bps(
+            report.price_q9,
+            10_000u16.saturating_sub(report.confidence_bps),
+        )?);
+    }
+    if prices.len() < 2 {
+        return Err(FailCode::PostconditionFailed);
+    }
+    prices.sort_unstable();
+    Ok(if prices.len() == 2 {
+        prices[0]
+    } else {
+        prices[1]
+    })
+}
+
+fn collateral_value(collateral: u128, price_q9: u128) -> Result<u128, FailCode> {
+    collateral
+        .checked_mul(price_q9)
+        .and_then(|value| value.checked_div(ORACLE_SCALE))
+        .ok_or(FailCode::Overflow)
+}
+
+fn decode_oracle_feed(raw: &[u8], feed_id: &Hash32) -> Result<OracleFeedV1, FailCode> {
+    let feed = OracleFeedV1::decode_canonical(raw).map_err(|_| FailCode::PostconditionFailed)?;
+    if feed.feed_id != *feed_id
+        || feed.feed_id != derive_oracle_feed_id(&feed.base_asset, &feed.quote_asset)
+        || feed.base_asset == feed.quote_asset
+        || feed.reporter_0 == feed.reporter_1
+        || feed.reporter_0 == feed.reporter_2
+        || feed.reporter_1 == feed.reporter_2
+        || !(1..=10_000).contains(&feed.max_age_blocks)
+    {
+        return Err(FailCode::PostconditionFailed);
+    }
+    Ok(feed)
+}
+
+fn decode_lending_market(raw: &[u8], market_id: &Hash32) -> Result<LendingMarketV1, FailCode> {
+    let market =
+        LendingMarketV1::decode_canonical(raw).map_err(|_| FailCode::PostconditionFailed)?;
+    if market.market_id != *market_id
+        || market.stable_asset != derive_stable_asset_id(market_id)
+        || market.collateral_factor_bps < 1_000
+        || market.collateral_factor_bps > 8_000
+        || market.liquidation_threshold_bps <= market.collateral_factor_bps
+        || market.liquidation_threshold_bps > 9_000
+        || market.liquidation_bonus_bps > 1_000
+        || market.debt_ceiling == 0
+        || market.debt_ceiling > MAX_CREDIT_QUANTITY
+        || market.min_debt == 0
+        || market.min_debt > market.debt_ceiling
+        || market.total_debt > market.debt_ceiling
+    {
+        return Err(FailCode::PostconditionFailed);
+    }
+    Ok(market)
+}
+
+fn decode_stable_asset(raw: &[u8], market: &LendingMarketV1) -> Result<StableAssetV1, FailCode> {
+    let stable = StableAssetV1::decode_canonical(raw).map_err(|_| FailCode::PostconditionFailed)?;
+    if stable.kind != 1
+        || stable.asset_id != market.stable_asset
+        || stable.market_id != market.market_id
+        || stable.minted_supply != market.total_debt
+    {
+        return Err(FailCode::PostconditionFailed);
+    }
+    Ok(stable)
+}
+
+fn decode_debt_position(
+    raw: &[u8],
+    market_id: &Hash32,
+    owner: &Hash32,
+) -> Result<DebtPositionV1, FailCode> {
+    let position =
+        DebtPositionV1::decode_canonical(raw).map_err(|_| FailCode::PostconditionFailed)?;
+    if position.position_id != derive_debt_position_id(market_id, owner)
+        || position.market_id != *market_id
+        || position.owner != *owner
+        || position.collateral > MAX_CREDIT_QUANTITY
+        || position.debt > MAX_CREDIT_QUANTITY
+    {
+        return Err(FailCode::PostconditionFailed);
+    }
+    Ok(position)
 }
 
 fn apply_write(

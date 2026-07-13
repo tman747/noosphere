@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Manage native MindChain liquidity and overcollateralized stable debt.">
+  <title>Harbor — MindChain DeFi</title>
+  <link rel="stylesheet" href="/defi/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">MIND<span>/MARKET</span></a>
+    <nav><a href="/exchange/">Swap</a><a href="/launch/">Launch</a><a class="active" href="/defi/">DeFi</a></nav>
+    <div class="network" id="network"><i></i><span>Connecting</span></div>
+  </header>
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Native liquidity and credit</p>
+        <h1>Harbor</h1>
+      </div>
+      <p>Provide proportional liquidity, earn swap fees, lock collateral, and manage stable debt. Every balance and risk limit is enforced by the atomic ledger transition—not by this interface.</p>
+    </section>
+
+    <section class="identity" aria-label="Connected account">
+      <div><span>ACCOUNT</span><code id="account">—</code></div>
+      <div><span>POOLS</span><strong id="pool-count">—</strong></div>
+      <div><span>DEBT MARKETS</span><strong id="market-count">—</strong></div>
+      <button id="refresh" type="button">Refresh state</button>
+    </section>
+
+    <div class="notice" id="notice" role="status" aria-live="polite">Loading consensus state…</div>
+
+    <section class="workspace" aria-label="DeFi workspace">
+      <article class="module liquidity">
+        <header><div><p class="eyebrow">01 / AMM</p><h2>Liquidity</h2></div><span>x × y = k</span></header>
+        <label for="pool">Pool</label>
+        <select id="pool"></select>
+        <div class="readout" id="pool-readout"><p>Select a pool to inspect reserves and shares.</p></div>
+
+        <form id="add-form">
+          <h3>Add proportional liquidity</h3>
+          <div class="fields">
+            <label>Maximum asset 0<input name="max_amount_0" inputmode="numeric" required></label>
+            <label>Maximum asset 1<input name="max_amount_1" inputmode="numeric" required></label>
+            <label>Minimum shares<input name="min_shares" inputmode="numeric" value="1" required></label>
+          </div>
+          <p class="helper" id="add-quote">Enter both maximum amounts to preview non-dilutive shares.</p>
+          <button type="submit">Add liquidity</button>
+        </form>
+
+        <form id="remove-form">
+          <h3>Remove owned liquidity</h3>
+          <div class="fields">
+            <label>Shares to burn<input name="shares" inputmode="numeric" required></label>
+            <label>Minimum asset 0<input name="min_amount_0" inputmode="numeric" value="1" required></label>
+            <label>Minimum asset 1<input name="min_amount_1" inputmode="numeric" value="1" required></label>
+          </div>
+          <p class="helper" id="remove-quote">Only shares owned by the connected account can be burned.</p>
+          <button type="submit">Remove liquidity</button>
+        </form>
+      </article>
+
+      <article class="module credit">
+        <header><div><p class="eyebrow">02 / CREDIT</p><h2>Stable debt</h2></div><span>Quorum oracle</span></header>
+        <label for="market">Market</label>
+        <select id="market"></select>
+        <div class="readout" id="market-readout"><p>Select a market to inspect collateral and debt.</p></div>
+
+        <div class="action-grid">
+          <form class="compact" data-action="deposit_collateral"><h3>Deposit collateral</h3><label>Amount<input name="amount" inputmode="numeric" required></label><button type="submit">Deposit</button></form>
+          <form class="compact" data-action="withdraw_collateral"><h3>Withdraw collateral</h3><label>Amount<input name="amount" inputmode="numeric" required></label><button type="submit">Withdraw</button></form>
+          <form class="compact" data-action="borrow_stable"><h3>Borrow stable</h3><label>Amount<input name="amount" inputmode="numeric" required></label><button type="submit">Borrow</button></form>
+          <form class="compact" data-action="repay_stable"><h3>Repay stable</h3><label>Amount<input name="amount" inputmode="numeric" required></label><button type="submit">Repay</button></form>
+        </div>
+
+        <form id="liquidate-form">
+          <h3>Liquidate an unhealthy position</h3>
+          <div class="fields">
+            <label>Position owner<input name="owner" minlength="64" maxlength="64" required></label>
+            <label>Stable amount to repay<input name="repay_amount" inputmode="numeric" required></label>
+            <label>Minimum collateral out<input name="min_collateral_out" inputmode="numeric" value="1" required></label>
+          </div>
+          <button type="submit">Liquidate position</button>
+        </form>
+      </article>
+    </section>
+
+    <section class="ledger">
+      <div><p class="eyebrow">Consensus records</p><h2>Positions</h2></div>
+      <div class="position-list" id="positions"><p class="empty">No positions loaded.</p></div>
+    </section>
+
+    <section class="security">
+      <p class="eyebrow">Security boundary</p>
+      <h2>Fail closed, not “trust the frontend.”</h2>
+      <ul>
+        <li>Three configured reporters; two fresh reports required; deterministic conservative median.</li>
+        <li>Checked integer arithmetic and bounded quantities; no floating-point consensus math.</li>
+        <li>Minimum locked AMM liquidity; proportional share minting; reserve product cannot decrease.</li>
+        <li>Collateral factors below liquidation thresholds; bounded close factor and liquidation bonus.</li>
+        <li>No reentrancy, callbacks, arbitrary contract calls, flash loans, or external code execution.</li>
+      </ul>
+      <p>This local gateway signs with the deterministic valueless developer account. Production users sign locally in the wallet; a public server must never hold user seeds.</p>
+    </section>
+  </main>
+  <script src="/defi/app.js" defer></script>
+</body>
+</html>

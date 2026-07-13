@@ -30,7 +30,10 @@ use noos_braid::{BlockHeaderV1, CheckpointRef, FinalityCertificateV1, MAX_FINALI
 use noos_codec::NoosDecode;
 use noos_da::{encode_body, BodyDaClaimV1, ShardCandidateV1, BODY_TOTAL_SHARDS};
 use noos_ground::GroundTicketV1;
-use noos_lumen::objects::{AssetV1, BoundedList, ComputeJobV1, ComputeWorkerV1, PoolV1, ReceiptV1};
+use noos_lumen::objects::{
+    AssetV1, BoundedList, ComputeJobV1, ComputeWorkerV1, DebtPositionV1, LendingMarketV1,
+    LiquidityPositionV1, OracleFeedV1, OracleReportV1, PoolV1, ReceiptV1, StableAssetV1,
+};
 use noos_lumen::state::LumenRoots;
 use noos_p2p::{
     BodyReplyV1, ChainIdentity, InboundItem, Multiaddr, P2pConfig, P2pEvent, P2pHandle, P2pNode,
@@ -287,6 +290,24 @@ pub enum ConsensusMsg {
     GetPools {
         reply: Reply<Vec<PoolV1>>,
     },
+    GetLiquidityPositions {
+        reply: Reply<Vec<LiquidityPositionV1>>,
+    },
+    GetOracleFeeds {
+        reply: Reply<Vec<OracleFeedV1>>,
+    },
+    GetOracleReports {
+        reply: Reply<Vec<OracleReportV1>>,
+    },
+    GetLendingMarkets {
+        reply: Reply<Vec<LendingMarketV1>>,
+    },
+    GetStableAssets {
+        reply: Reply<Vec<StableAssetV1>>,
+    },
+    GetDebtPositions {
+        reply: Reply<Vec<DebtPositionV1>>,
+    },
     GetComputeWorkers {
         reply: Reply<Vec<ComputeWorkerV1>>,
     },
@@ -455,6 +476,24 @@ fn core_loop<P: StorePort>(
             }
             ConsensusMsg::GetPools { reply } => {
                 let _ = reply.send(core.ledger().pools());
+            }
+            ConsensusMsg::GetLiquidityPositions { reply } => {
+                let _ = reply.send(core.ledger().liquidity_positions());
+            }
+            ConsensusMsg::GetOracleFeeds { reply } => {
+                let _ = reply.send(core.ledger().oracle_feeds());
+            }
+            ConsensusMsg::GetOracleReports { reply } => {
+                let _ = reply.send(core.ledger().oracle_reports());
+            }
+            ConsensusMsg::GetLendingMarkets { reply } => {
+                let _ = reply.send(core.ledger().lending_markets());
+            }
+            ConsensusMsg::GetStableAssets { reply } => {
+                let _ = reply.send(core.ledger().stable_assets());
+            }
+            ConsensusMsg::GetDebtPositions { reply } => {
+                let _ = reply.send(core.ledger().debt_positions());
             }
             ConsensusMsg::GetComputeWorkers { reply } => {
                 let _ = reply.send(core.ledger().compute_workers());

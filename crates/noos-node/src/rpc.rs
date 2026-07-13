@@ -226,6 +226,12 @@ fn handle_connection(
         }
         ("GET", "/assets") => assets_route(consensus_tx),
         ("GET", "/pools") => pools_route(consensus_tx),
+        ("GET", "/liquidity/positions") => liquidity_positions_route(consensus_tx),
+        ("GET", "/oracle/feeds") => oracle_feeds_route(consensus_tx),
+        ("GET", "/oracle/reports") => oracle_reports_route(consensus_tx),
+        ("GET", "/lending/markets") => lending_markets_route(consensus_tx),
+        ("GET", "/stable/assets") => stable_assets_route(consensus_tx),
+        ("GET", "/lending/positions") => debt_positions_route(consensus_tx),
         ("GET", "/compute/workers") => compute_workers_route(consensus_tx),
         ("GET", "/compute/jobs") => compute_jobs_route(consensus_tx),
         _ if method == "GET" && path.starts_with("/balance/") => {
@@ -384,7 +390,8 @@ fn block_route(consensus_tx: &SyncSender<ConsensusMsg>, id_raw: &str) -> String 
 
 fn blocks_route(consensus_tx: &SyncSender<ConsensusMsg>, range_raw: &str) -> String {
     let mut parts = range_raw.split('/');
-    let (Some(start_raw), Some(limit_raw), None) = (parts.next(), parts.next(), parts.next()) else {
+    let (Some(start_raw), Some(limit_raw), None) = (parts.next(), parts.next(), parts.next())
+    else {
         return json_error(
             "400 Bad Request",
             "malformed",
@@ -395,7 +402,11 @@ fn blocks_route(consensus_tx: &SyncSender<ConsensusMsg>, range_raw: &str) -> Str
         return json_error("400 Bad Request", "malformed", "bad block range");
     };
     if !(1..=64).contains(&limit) {
-        return json_error("400 Bad Request", "malformed", "block range limit must be 1..64");
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "block range limit must be 1..64",
+        );
     }
     let mut items = Vec::with_capacity(limit);
     for offset in 0..limit {
@@ -550,7 +561,7 @@ fn pools_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
         .iter()
         .map(|pool| {
             format!(
-                r#"{{"pool_id":"{}","asset_0":"{}","asset_1":"{}","reserve_0":"{}","reserve_1":"{}","fee_bps":{},"creator":"{}"}}"#,
+                r#"{{"pool_id":"{}","asset_0":"{}","asset_1":"{}","reserve_0":"{}","reserve_1":"{}","fee_bps":{},"creator":"{}","total_shares":"{}"}}"#,
                 hex(&pool.pool_id),
                 hex(&pool.asset_0),
                 hex(&pool.asset_1),
@@ -558,8 +569,174 @@ fn pools_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
                 pool.reserve_1,
                 pool.fee_bps,
                 hex(&pool.creator),
+                pool.total_shares,
             )
         })
+        .collect::<Vec<_>>()
+        .join(",");
+    http(
+        "200 OK",
+        "application/json",
+        &format!(r#"{{"items":[{entries}]}}"#),
+    )
+}
+
+fn liquidity_positions_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
+    let Some(items) = round_trip(consensus_tx, |reply| ConsensusMsg::GetLiquidityPositions {
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no liquidity position reply",
+        );
+    };
+    let entries = items
+        .iter()
+        .map(|position| {
+            format!(
+                r#"{{"position_id":"{}","pool_id":"{}","provider":"{}","shares":"{}"}}"#,
+                hex(&position.position_id),
+                hex(&position.pool_id),
+                hex(&position.provider),
+                position.shares
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    http(
+        "200 OK",
+        "application/json",
+        &format!(r#"{{"items":[{entries}]}}"#),
+    )
+}
+
+fn oracle_feeds_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
+    let Some(items) = round_trip(consensus_tx, |reply| ConsensusMsg::GetOracleFeeds { reply })
+    else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no oracle feed reply",
+        );
+    };
+    let entries = items
+        .iter()
+        .map(|feed| format!(
+            r#"{{"feed_id":"{}","base_asset":"{}","quote_asset":"{}","reporters":["{}","{}","{}"],"max_age_blocks":"{}"}}"#,
+            hex(&feed.feed_id), hex(&feed.base_asset), hex(&feed.quote_asset),
+            hex(&feed.reporter_0), hex(&feed.reporter_1), hex(&feed.reporter_2), feed.max_age_blocks
+        ))
+        .collect::<Vec<_>>()
+        .join(",");
+    http(
+        "200 OK",
+        "application/json",
+        &format!(r#"{{"items":[{entries}]}}"#),
+    )
+}
+
+fn oracle_reports_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
+    let Some(items) = round_trip(consensus_tx, |reply| ConsensusMsg::GetOracleReports {
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no oracle report reply",
+        );
+    };
+    let entries = items
+        .iter()
+        .map(|report| format!(
+            r#"{{"report_id":"{}","feed_id":"{}","reporter":"{}","price_q9":"{}","confidence_bps":{},"sequence":"{}","observed_height":"{}"}}"#,
+            hex(&report.report_id), hex(&report.feed_id), hex(&report.reporter), report.price_q9,
+            report.confidence_bps, report.sequence, report.observed_height
+        ))
+        .collect::<Vec<_>>()
+        .join(",");
+    http(
+        "200 OK",
+        "application/json",
+        &format!(r#"{{"items":[{entries}]}}"#),
+    )
+}
+
+fn lending_markets_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
+    let Some(items) = round_trip(consensus_tx, |reply| ConsensusMsg::GetLendingMarkets {
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no lending market reply",
+        );
+    };
+    let entries = items
+        .iter()
+        .map(|market| format!(
+            r#"{{"market_id":"{}","collateral_asset":"{}","stable_asset":"{}","oracle_feed_id":"{}","collateral_factor_bps":{},"liquidation_threshold_bps":{},"liquidation_bonus_bps":{},"debt_ceiling":"{}","min_debt":"{}","total_debt":"{}"}}"#,
+            hex(&market.market_id), hex(&market.collateral_asset), hex(&market.stable_asset),
+            hex(&market.oracle_feed_id), market.collateral_factor_bps, market.liquidation_threshold_bps,
+            market.liquidation_bonus_bps, market.debt_ceiling, market.min_debt, market.total_debt
+        ))
+        .collect::<Vec<_>>()
+        .join(",");
+    http(
+        "200 OK",
+        "application/json",
+        &format!(r#"{{"items":[{entries}]}}"#),
+    )
+}
+
+fn stable_assets_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
+    let Some(items) = round_trip(consensus_tx, |reply| ConsensusMsg::GetStableAssets {
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no stable asset reply",
+        );
+    };
+    let entries = items
+        .iter()
+        .filter(|asset| asset.kind == 1)
+        .map(|asset| {
+            let symbol = std::str::from_utf8(asset.symbol.as_slice()).unwrap_or_default();
+            let name = std::str::from_utf8(asset.name.as_slice()).unwrap_or_default();
+            format!(
+                r#"{{"asset_id":"{}","market_id":"{}","symbol":"{}","name":"{}","decimals":{},"minted_supply":"{}"}}"#,
+                hex(&asset.asset_id), hex(&asset.market_id), json_escape(symbol), json_escape(name),
+                asset.decimals, asset.minted_supply
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    http(
+        "200 OK",
+        "application/json",
+        &format!(r#"{{"items":[{entries}]}}"#),
+    )
+}
+
+fn debt_positions_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
+    let Some(items) = round_trip(consensus_tx, |reply| ConsensusMsg::GetDebtPositions {
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no debt position reply",
+        );
+    };
+    let entries = items
+        .iter()
+        .map(|position| format!(
+            r#"{{"position_id":"{}","market_id":"{}","owner":"{}","collateral":"{}","debt":"{}"}}"#,
+            hex(&position.position_id), hex(&position.market_id), hex(&position.owner),
+            position.collateral, position.debt
+        ))
         .collect::<Vec<_>>()
         .join(",");
     http(

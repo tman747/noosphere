@@ -22,8 +22,8 @@
 //!   calls, preserving the independent-heads contract.
 
 use crate::{
-    is_hash, ChainPoint, Identity, IndexReadiness, IndexState, IndexedBlock, Indexer,
-    IndexerError, Result, TelemetryParser, ZERO_HASH,
+    is_hash, ChainPoint, Identity, IndexReadiness, IndexState, IndexedBlock, Indexer, IndexerError,
+    Result, TelemetryParser, ZERO_HASH,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -284,8 +284,8 @@ pub(super) fn restore_index_state(root: &Path, identity: &Identity) -> Result<Op
 fn durable_store_generation(root: &Path, payload: GenerationPayload) -> Result<()> {
     let sha256 = payload_digest(&payload)?;
     let envelope = GenerationEnvelope { payload, sha256 };
-    let bytes =
-        serde_json::to_vec_pretty(&envelope).map_err(|error| IndexerError::Io(error.to_string()))?;
+    let bytes = serde_json::to_vec_pretty(&envelope)
+        .map_err(|error| IndexerError::Io(error.to_string()))?;
     let sequence = envelope.payload.sequence;
     let final_path = root.join(format!("{GENERATION_PREFIX}{sequence:020}.json"));
     let stage_path = root.join(format!("{GENERATION_PREFIX}{sequence:020}.stage"));
@@ -384,8 +384,7 @@ impl Indexer {
                     // Fork: find the deepest retained ancestor still on the
                     // source's chain, then delete exactly the orphaned rows.
                     let ancestor = find_ancestor(source, &cp)?;
-                    rolled_back =
-                        rolled_back.saturating_add(tip_height.saturating_sub(ancestor));
+                    rolled_back = rolled_back.saturating_add(tip_height.saturating_sub(ancestor));
                     self.rollback_to(ancestor, &mut cp).await;
                     next = ancestor.saturating_add(1);
                     continue 'fetch;
@@ -778,8 +777,7 @@ fn decode_node_block(value: &Value) -> Result<NodeBlock> {
         .ok_or_else(|| IndexerError::Source("block without txids".into()))?
         .iter()
         .map(|txid| {
-            txid
-                .as_str()
+            txid.as_str()
                 .map(str::to_owned)
                 .ok_or_else(|| IndexerError::Source("non-string txid".into()))
         })
@@ -826,7 +824,9 @@ impl NodeSource for LineProtocolSource {
 
     fn blocks_from(&mut self, start: u64, limit: u32) -> Result<Vec<NodeBlock>> {
         if !(1..=64).contains(&limit) {
-            return Err(IndexerError::Source("block range limit must be 1..64".into()));
+            return Err(IndexerError::Source(
+                "block range limit must be 1..64".into(),
+            ));
         }
         let (code, value) = self.get(&format!("/blocks/{start}/{limit}"))?;
         match code {
@@ -953,7 +953,7 @@ fn http_request(
         if let Some(end) = raw
             .windows(4)
             .position(|window| window == b"\r\n\r\n")
-            .map(|position| position + 4)
+            .and_then(|position| position.checked_add(4))
         {
             break end;
         }

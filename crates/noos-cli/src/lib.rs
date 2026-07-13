@@ -13,17 +13,19 @@
 //! - `query` — the frozen indexer public API v1.
 
 #![forbid(unsafe_code)]
-mod manifest;
 mod invitation;
+mod manifest;
 
-pub use manifest::manifest_verify;
 pub use invitation::invitation_verify;
+pub use manifest::manifest_verify;
 
 use noos_codec::{NoosDecode, NoosEncode};
 use noos_lumen::objects::{
     asset_id as lumen_asset_id, compute_job_id as lumen_compute_job_id,
-    object_id as lumen_object_id, pool_id as lumen_pool_id, txid as lumen_txid, witness_root,
-    AccessEntry, ActionV1, BoundedBytes, BoundedList, FeeAuthorizationV1, NoteV1, OptionalHash32,
+    lending_market_id as lumen_lending_market_id, object_id as lumen_object_id,
+    oracle_feed_id as lumen_oracle_feed_id, pool_id as lumen_pool_id,
+    stable_asset_id as lumen_stable_asset_id, txid as lumen_txid, witness_root, AccessEntry,
+    ActionV1, BoundedBytes, BoundedList, FeeAuthorizationV1, NoteV1, OptionalHash32,
     OptionalObject, ResourceVector, SignedIntentV1, TransactionV1, TransactionWitnessesV1,
 };
 use noos_wallet::{derive_authority, IdentityGate, NodeIdentity, Purpose};
@@ -291,6 +293,75 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
             amount_in: spec_u128(spec, "amount_in")?,
             min_amount_out: spec_u128(spec, "min_amount_out")?,
         },
+        "add_liquidity" => ActionV1::AddLiquidity {
+            provider: spec_hash(spec, "provider")?,
+            pool_id: spec_hash(spec, "pool_id")?,
+            max_amount_0: spec_u128(spec, "max_amount_0")?,
+            max_amount_1: spec_u128(spec, "max_amount_1")?,
+            min_shares: spec_u128(spec, "min_shares")?,
+        },
+        "remove_liquidity" => ActionV1::RemoveLiquidity {
+            provider: spec_hash(spec, "provider")?,
+            pool_id: spec_hash(spec, "pool_id")?,
+            shares: spec_u128(spec, "shares")?,
+            min_amount_0: spec_u128(spec, "min_amount_0")?,
+            min_amount_1: spec_u128(spec, "min_amount_1")?,
+        },
+        "create_oracle_feed" => ActionV1::CreateOracleFeed {
+            base_asset: spec_hash(spec, "base_asset")?,
+            quote_asset: spec_hash(spec, "quote_asset")?,
+            reporter_0: spec_hash(spec, "reporter_0")?,
+            reporter_1: spec_hash(spec, "reporter_1")?,
+            reporter_2: spec_hash(spec, "reporter_2")?,
+            max_age_blocks: spec_u64(spec, "max_age_blocks")?,
+        },
+        "submit_oracle_report" => ActionV1::SubmitOracleReport {
+            reporter: spec_hash(spec, "reporter")?,
+            feed_id: spec_hash(spec, "feed_id")?,
+            price_q9: spec_u128(spec, "price_q9")?,
+            confidence_bps: spec_u16(spec, "confidence_bps")?,
+            sequence: spec_u64(spec, "sequence")?,
+            observed_height: spec_u64(spec, "observed_height")?,
+        },
+        "create_lending_market" => ActionV1::CreateLendingMarket {
+            collateral_asset: spec_hash(spec, "collateral_asset")?,
+            oracle_feed_id: spec_hash(spec, "oracle_feed_id")?,
+            symbol: spec_text(spec, "symbol")?,
+            name: spec_text(spec, "name")?,
+            decimals: spec_u8(spec, "decimals")?,
+            collateral_factor_bps: spec_u16(spec, "collateral_factor_bps")?,
+            liquidation_threshold_bps: spec_u16(spec, "liquidation_threshold_bps")?,
+            liquidation_bonus_bps: spec_u16(spec, "liquidation_bonus_bps")?,
+            debt_ceiling: spec_u128(spec, "debt_ceiling")?,
+            min_debt: spec_u128(spec, "min_debt")?,
+        },
+        "deposit_collateral" => ActionV1::DepositCollateral {
+            owner: spec_hash(spec, "owner")?,
+            market_id: spec_hash(spec, "market_id")?,
+            amount: spec_u128(spec, "amount")?,
+        },
+        "withdraw_collateral" => ActionV1::WithdrawCollateral {
+            owner: spec_hash(spec, "owner")?,
+            market_id: spec_hash(spec, "market_id")?,
+            amount: spec_u128(spec, "amount")?,
+        },
+        "borrow_stable" => ActionV1::BorrowStable {
+            owner: spec_hash(spec, "owner")?,
+            market_id: spec_hash(spec, "market_id")?,
+            amount: spec_u128(spec, "amount")?,
+        },
+        "repay_stable" => ActionV1::RepayStable {
+            owner: spec_hash(spec, "owner")?,
+            market_id: spec_hash(spec, "market_id")?,
+            amount: spec_u128(spec, "amount")?,
+        },
+        "liquidate_position" => ActionV1::LiquidatePosition {
+            liquidator: spec_hash(spec, "liquidator")?,
+            market_id: spec_hash(spec, "market_id")?,
+            owner: spec_hash(spec, "owner")?,
+            repay_amount: spec_u128(spec, "repay_amount")?,
+            min_collateral_out: spec_u128(spec, "min_collateral_out")?,
+        },
         "register_compute_worker" => ActionV1::RegisterComputeWorker {
             worker: spec_hash(spec, "worker")?,
             capabilities: spec_u8(spec, "capabilities")?,
@@ -556,6 +627,54 @@ pub fn tx_build(spec_json: &str) -> Result<Value> {
             }))
         })
         .collect();
+    let created_oracle_feeds: Vec<Value> = tx
+        .actions
+        .as_slice()
+        .iter()
+        .filter_map(|bytes| {
+            let ActionV1::CreateOracleFeed {
+                base_asset,
+                quote_asset,
+                ..
+            } = ActionV1::decode_canonical(bytes.as_slice()).ok()?
+            else {
+                return None;
+            };
+            Some(json!({
+                "feed_id": to_hex(&lumen_oracle_feed_id(&base_asset, &quote_asset)),
+                "base_asset": to_hex(&base_asset),
+                "quote_asset": to_hex(&quote_asset),
+            }))
+        })
+        .collect();
+    let created_lending_markets: Vec<Value> = tx
+        .actions
+        .as_slice()
+        .iter()
+        .filter_map(|bytes| {
+            let ActionV1::CreateLendingMarket {
+                collateral_asset,
+                oracle_feed_id,
+                symbol,
+                name,
+                decimals,
+                ..
+            } = ActionV1::decode_canonical(bytes.as_slice()).ok()?
+            else {
+                return None;
+            };
+            let market_id = lumen_lending_market_id(&collateral_asset, &oracle_feed_id);
+            Some(json!({
+                "market_id": to_hex(&market_id),
+                "stable_asset": to_hex(&lumen_stable_asset_id(&market_id)),
+                "collateral_asset": to_hex(&collateral_asset),
+                "oracle_feed_id": to_hex(&oracle_feed_id),
+                "symbol": String::from_utf8(symbol.as_slice().to_vec()).ok()?,
+                "name": String::from_utf8(name.as_slice().to_vec()).ok()?,
+                "decimals": decimals,
+            }))
+        })
+        .collect();
     let created_compute_jobs: Vec<Value> = tx
         .actions
         .as_slice()
@@ -593,6 +712,8 @@ pub fn tx_build(spec_json: &str) -> Result<Value> {
         "created_assets": created_assets,
         "created_pools": created_pools,
         "created_compute_jobs": created_compute_jobs,
+        "created_oracle_feeds": created_oracle_feeds,
+        "created_lending_markets": created_lending_markets,
     }))
 }
 
@@ -888,9 +1009,7 @@ pub fn run(args: &[String]) -> Result<String> {
                 now_unix_ms,
             )?)
         }
-        [invitation, verify, rest @ ..]
-            if invitation == "invitation" && verify == "verify" =>
-        {
+        [invitation, verify, rest @ ..] if invitation == "invitation" && verify == "verify" => {
             let path = required(rest, "--file")?;
             let encoded = std::fs::read_to_string(&path)
                 .map_err(|error| CliError::Usage(format!("--file {path}: {error}")))?;

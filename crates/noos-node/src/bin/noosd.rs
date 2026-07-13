@@ -49,6 +49,9 @@ OPTIONS:
     --devnet-account <account-id-hex>
                            Pre-provision a zero-balance account in genesis
                            (repeatable; TEST NETWORKS ONLY)
+    --devnet-governance-account <account-id-hex>
+                           Use a pre-provisioned account as governance authority
+                           (isolated TEST NETWORKS ONLY)
     --devnet-contract-fixture
                            Register the deterministic [0 1] Grain identity
                            contract at code hash c0...c0 (TEST NETWORKS ONLY)
@@ -100,6 +103,7 @@ fn main() -> ExitCode {
     let mut devnet_witness: Option<usize> = None;
     let mut produce_interval_ms: u64 = 6000;
     let mut devnet_accounts: Vec<noos_node::Hash32> = Vec::new();
+    let mut devnet_governance_account: Option<noos_node::Hash32> = None;
     let mut devnet_contract_fixture = false;
     let mut devnet_witness_fixture = false;
     let mut light = false;
@@ -197,6 +201,21 @@ fn main() -> ExitCode {
                     }
                 }
             }
+            "--devnet-governance-account" => {
+                match take("--devnet-governance-account")
+                    .as_deref()
+                    .and_then(rpc::unhex32)
+                {
+                    Some(account) => {
+                        devnet_accounts.push(account);
+                        devnet_governance_account = Some(account);
+                    }
+                    None => {
+                        eprintln!("error: --devnet-governance-account expects 32-byte hex");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
             "--devnet-contract-fixture" => devnet_contract_fixture = true,
             "--devnet-witness-fixture" => devnet_witness_fixture = true,
             "--observer" => observer = true,
@@ -241,6 +260,13 @@ fn main() -> ExitCode {
         eprintln!("error: --devnet-account is a devnet fixture; is_test_network = false");
         return ExitCode::FAILURE;
     }
+    if devnet_governance_account.is_some() && !params.is_test_network {
+        eprintln!(
+            "error: --devnet-governance-account is a devnet fixture; \
+             is_test_network = false"
+        );
+        return ExitCode::FAILURE;
+    }
     if devnet_contract_fixture && !params.is_test_network {
         eprintln!(
             "error: --devnet-contract-fixture is a devnet fixture; \
@@ -275,6 +301,9 @@ fn main() -> ExitCode {
         .into_iter()
         .map(|account| (account, 0))
         .collect();
+    if let Some(account) = devnet_governance_account {
+        spec.gov_authority = account;
+    }
     let contract_codes = if devnet_contract_fixture {
         let formula = match Noun::cell(Noun::atom_u64(0), Noun::atom_u64(1)) {
             Ok(formula) => formula,

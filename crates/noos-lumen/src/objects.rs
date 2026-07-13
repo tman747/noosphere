@@ -534,6 +534,89 @@ define_object! {
         5 => reserve_1: u128,
         6 => fee_bps: u16,
         7 => creator: [u8; 32],
+        8 => total_shares: u128,
+    }
+}
+
+define_object! {
+    /// Provider-owned share balance for one constant-product pool.
+    pub struct LiquidityPositionV1 {
+        version: 1;
+        1 => position_id: [u8; 32],
+        2 => pool_id: [u8; 32],
+        3 => provider: [u8; 32],
+        4 => shares: u128,
+    }
+}
+
+define_object! {
+    /// Governance-created three-reporter price feed.
+    pub struct OracleFeedV1 {
+        version: 1;
+        1 => feed_id: [u8; 32],
+        2 => base_asset: [u8; 32],
+        3 => quote_asset: [u8; 32],
+        4 => reporter_0: [u8; 32],
+        5 => reporter_1: [u8; 32],
+        6 => reporter_2: [u8; 32],
+        7 => max_age_blocks: u64,
+    }
+}
+
+define_object! {
+    /// Monotonic authenticated report for one feed member.
+    pub struct OracleReportV1 {
+        version: 1;
+        1 => report_id: [u8; 32],
+        2 => feed_id: [u8; 32],
+        3 => reporter: [u8; 32],
+        4 => price_q9: u128,
+        5 => confidence_bps: u16,
+        6 => sequence: u64,
+        7 => observed_height: u64,
+    }
+}
+
+define_object! {
+    /// Dynamically issued stable asset whose supply equals market debt.
+    pub struct StableAssetV1 {
+        version: 1;
+        1 => asset_id: [u8; 32],
+        2 => market_id: [u8; 32],
+        3 => symbol: BoundedBytes<12>,
+        4 => name: BoundedBytes<64>,
+        5 => decimals: u8,
+        6 => minted_supply: u128,
+        7 => kind: u8,
+    }
+}
+
+define_object! {
+    /// One isolated overcollateralized stable-debt market.
+    pub struct LendingMarketV1 {
+        version: 1;
+        1 => market_id: [u8; 32],
+        2 => collateral_asset: [u8; 32],
+        3 => stable_asset: [u8; 32],
+        4 => oracle_feed_id: [u8; 32],
+        5 => collateral_factor_bps: u16,
+        6 => liquidation_threshold_bps: u16,
+        7 => liquidation_bonus_bps: u16,
+        8 => debt_ceiling: u128,
+        9 => min_debt: u128,
+        10 => total_debt: u128,
+    }
+}
+
+define_object! {
+    /// Owner-isolated collateral and stable debt.
+    pub struct DebtPositionV1 {
+        version: 1;
+        1 => position_id: [u8; 32],
+        2 => market_id: [u8; 32],
+        3 => owner: [u8; 32],
+        4 => collateral: u128,
+        5 => debt: u128,
     }
 }
 define_object! {
@@ -605,6 +688,36 @@ pub fn pool_id(asset_a: &Hash32, asset_b: &Hash32) -> Hash32 {
         (asset_b, asset_a)
     };
     domain_hash("NOOS/POOL/ID/V1", &[asset_0, asset_1])
+}
+
+#[must_use]
+pub fn liquidity_position_id(pool: &Hash32, provider: &Hash32) -> Hash32 {
+    domain_hash("NOOS/POOL/POSITION/ID/V1", &[pool, provider])
+}
+
+#[must_use]
+pub fn oracle_feed_id(base_asset: &Hash32, quote_asset: &Hash32) -> Hash32 {
+    domain_hash("NOOS/ORACLE/FEED/ID/V1", &[base_asset, quote_asset])
+}
+
+#[must_use]
+pub fn oracle_report_id(feed: &Hash32, reporter: &Hash32) -> Hash32 {
+    domain_hash("NOOS/ORACLE/REPORT/ID/V1", &[feed, reporter])
+}
+
+#[must_use]
+pub fn lending_market_id(collateral: &Hash32, feed: &Hash32) -> Hash32 {
+    domain_hash("NOOS/LENDING/MARKET/ID/V1", &[collateral, feed])
+}
+
+#[must_use]
+pub fn stable_asset_id(market: &Hash32) -> Hash32 {
+    domain_hash("NOOS/STABLE/ASSET/ID/V1", &[market])
+}
+
+#[must_use]
+pub fn debt_position_id(market: &Hash32, owner: &Hash32) -> Hash32 {
+    domain_hash("NOOS/LENDING/POSITION/ID/V1", &[market, owner])
 }
 #[must_use]
 pub fn compute_job_id(creating_txid: &Hash32, action_index: u32) -> Hash32 {
@@ -746,10 +859,89 @@ pub enum ActionV1 {
     AcceptComputeResult { requester: Hash32, job_id: Hash32 },
     /// 20 — requester cancels an unclaimed or expired job and receives escrow.
     CancelComputeJob { requester: Hash32, job_id: Hash32 },
+    /// 21 — add proportional reserves and receive non-dilutive pool shares.
+    AddLiquidity {
+        provider: Hash32,
+        pool_id: Hash32,
+        max_amount_0: u128,
+        max_amount_1: u128,
+        min_shares: u128,
+    },
+    /// 22 — burn owned shares for proportional reserves.
+    RemoveLiquidity {
+        provider: Hash32,
+        pool_id: Hash32,
+        shares: u128,
+        min_amount_0: u128,
+        min_amount_1: u128,
+    },
+    /// 23 — governance creates a fixed three-reporter feed.
+    CreateOracleFeed {
+        base_asset: Hash32,
+        quote_asset: Hash32,
+        reporter_0: Hash32,
+        reporter_1: Hash32,
+        reporter_2: Hash32,
+        max_age_blocks: u64,
+    },
+    /// 24 — one feed member advances its authenticated report.
+    SubmitOracleReport {
+        reporter: Hash32,
+        feed_id: Hash32,
+        price_q9: u128,
+        confidence_bps: u16,
+        sequence: u64,
+        observed_height: u64,
+    },
+    /// 25 — governance creates an isolated overcollateralized stable market.
+    CreateLendingMarket {
+        collateral_asset: Hash32,
+        oracle_feed_id: Hash32,
+        symbol: BoundedBytes<12>,
+        name: BoundedBytes<64>,
+        decimals: u8,
+        collateral_factor_bps: u16,
+        liquidation_threshold_bps: u16,
+        liquidation_bonus_bps: u16,
+        debt_ceiling: u128,
+        min_debt: u128,
+    },
+    /// 26 — lock signed collateral in the owner's isolated position.
+    DepositCollateral {
+        owner: Hash32,
+        market_id: Hash32,
+        amount: u128,
+    },
+    /// 27 — withdraw collateral while preserving the borrow ratio.
+    WithdrawCollateral {
+        owner: Hash32,
+        market_id: Hash32,
+        amount: u128,
+    },
+    /// 28 — mint stable debt to a healthy signed position.
+    BorrowStable {
+        owner: Hash32,
+        market_id: Hash32,
+        amount: u128,
+    },
+    /// 29 — burn stable balance and reduce signed debt.
+    RepayStable {
+        owner: Hash32,
+        market_id: Hash32,
+        amount: u128,
+    },
+    /// 30 — repay unhealthy debt and seize bounded collateral.
+    LiquidatePosition {
+        liquidator: Hash32,
+        market_id: Hash32,
+        owner: Hash32,
+        repay_amount: u128,
+        min_collateral_out: u128,
+    },
 }
 
 impl ActionV1 {
-    pub const VARIANT_COUNT: u16 = 21;
+    pub const VARIANT_COUNT: u16 = 31;
 }
 
 impl NoosEncode for ActionV1 {
@@ -886,6 +1078,34 @@ impl NoosEncode for ActionV1 {
                 w.put_u128(*amount_in);
                 w.put_u128(*min_amount_out);
             }
+            ActionV1::AddLiquidity {
+                provider,
+                pool_id,
+                max_amount_0,
+                max_amount_1,
+                min_shares,
+            } => {
+                w.put_u16(21);
+                w.put_array32(provider);
+                w.put_array32(pool_id);
+                w.put_u128(*max_amount_0);
+                w.put_u128(*max_amount_1);
+                w.put_u128(*min_shares);
+            }
+            ActionV1::RemoveLiquidity {
+                provider,
+                pool_id,
+                shares,
+                min_amount_0,
+                min_amount_1,
+            } => {
+                w.put_u16(22);
+                w.put_array32(provider);
+                w.put_array32(pool_id);
+                w.put_u128(*shares);
+                w.put_u128(*min_amount_0);
+                w.put_u128(*min_amount_1);
+            }
             ActionV1::RegisterComputeWorker {
                 worker,
                 capabilities,
@@ -948,6 +1168,116 @@ impl NoosEncode for ActionV1 {
                 w.put_u16(20);
                 w.put_array32(requester);
                 w.put_array32(job_id);
+            }
+            ActionV1::CreateOracleFeed {
+                base_asset,
+                quote_asset,
+                reporter_0,
+                reporter_1,
+                reporter_2,
+                max_age_blocks,
+            } => {
+                w.put_u16(23);
+                w.put_array32(base_asset);
+                w.put_array32(quote_asset);
+                w.put_array32(reporter_0);
+                w.put_array32(reporter_1);
+                w.put_array32(reporter_2);
+                w.put_u64(*max_age_blocks);
+            }
+            ActionV1::SubmitOracleReport {
+                reporter,
+                feed_id,
+                price_q9,
+                confidence_bps,
+                sequence,
+                observed_height,
+            } => {
+                w.put_u16(24);
+                w.put_array32(reporter);
+                w.put_array32(feed_id);
+                w.put_u128(*price_q9);
+                w.put_u16(*confidence_bps);
+                w.put_u64(*sequence);
+                w.put_u64(*observed_height);
+            }
+            ActionV1::CreateLendingMarket {
+                collateral_asset,
+                oracle_feed_id,
+                symbol,
+                name,
+                decimals,
+                collateral_factor_bps,
+                liquidation_threshold_bps,
+                liquidation_bonus_bps,
+                debt_ceiling,
+                min_debt,
+            } => {
+                w.put_u16(25);
+                w.put_array32(collateral_asset);
+                w.put_array32(oracle_feed_id);
+                symbol.encode(w);
+                name.encode(w);
+                w.put_u8(*decimals);
+                w.put_u16(*collateral_factor_bps);
+                w.put_u16(*liquidation_threshold_bps);
+                w.put_u16(*liquidation_bonus_bps);
+                w.put_u128(*debt_ceiling);
+                w.put_u128(*min_debt);
+            }
+            ActionV1::DepositCollateral {
+                owner,
+                market_id,
+                amount,
+            } => {
+                w.put_u16(26);
+                w.put_array32(owner);
+                w.put_array32(market_id);
+                w.put_u128(*amount);
+            }
+            ActionV1::WithdrawCollateral {
+                owner,
+                market_id,
+                amount,
+            } => {
+                w.put_u16(27);
+                w.put_array32(owner);
+                w.put_array32(market_id);
+                w.put_u128(*amount);
+            }
+            ActionV1::BorrowStable {
+                owner,
+                market_id,
+                amount,
+            } => {
+                w.put_u16(28);
+                w.put_array32(owner);
+                w.put_array32(market_id);
+                w.put_u128(*amount);
+            }
+            ActionV1::RepayStable {
+                owner,
+                market_id,
+                amount,
+            } => {
+                w.put_u16(29);
+                w.put_array32(owner);
+                w.put_array32(market_id);
+                w.put_u128(*amount);
+            }
+            ActionV1::LiquidatePosition {
+                liquidator,
+                market_id,
+                owner,
+                repay_amount,
+                min_collateral_out,
+            } => {
+                w.put_u16(30);
+                w.put_array32(liquidator);
+                w.put_array32(market_id);
+                w.put_array32(owner);
+                w.put_u128(*repay_amount);
+                w.put_u128(*min_collateral_out);
             }
         }
     }
@@ -1064,6 +1394,75 @@ impl NoosDecode for ActionV1 {
             20 => Ok(ActionV1::CancelComputeJob {
                 requester: r.get_array32()?,
                 job_id: r.get_array32()?,
+            }),
+            21 => Ok(ActionV1::AddLiquidity {
+                provider: r.get_array32()?,
+                pool_id: r.get_array32()?,
+                max_amount_0: r.get_u128()?,
+                max_amount_1: r.get_u128()?,
+                min_shares: r.get_u128()?,
+            }),
+            22 => Ok(ActionV1::RemoveLiquidity {
+                provider: r.get_array32()?,
+                pool_id: r.get_array32()?,
+                shares: r.get_u128()?,
+                min_amount_0: r.get_u128()?,
+                min_amount_1: r.get_u128()?,
+            }),
+            23 => Ok(ActionV1::CreateOracleFeed {
+                base_asset: r.get_array32()?,
+                quote_asset: r.get_array32()?,
+                reporter_0: r.get_array32()?,
+                reporter_1: r.get_array32()?,
+                reporter_2: r.get_array32()?,
+                max_age_blocks: r.get_u64()?,
+            }),
+            24 => Ok(ActionV1::SubmitOracleReport {
+                reporter: r.get_array32()?,
+                feed_id: r.get_array32()?,
+                price_q9: r.get_u128()?,
+                confidence_bps: r.get_u16()?,
+                sequence: r.get_u64()?,
+                observed_height: r.get_u64()?,
+            }),
+            25 => Ok(ActionV1::CreateLendingMarket {
+                collateral_asset: r.get_array32()?,
+                oracle_feed_id: r.get_array32()?,
+                symbol: BoundedBytes::decode(r)?,
+                name: BoundedBytes::decode(r)?,
+                decimals: r.get_u8()?,
+                collateral_factor_bps: r.get_u16()?,
+                liquidation_threshold_bps: r.get_u16()?,
+                liquidation_bonus_bps: r.get_u16()?,
+                debt_ceiling: r.get_u128()?,
+                min_debt: r.get_u128()?,
+            }),
+            26 => Ok(ActionV1::DepositCollateral {
+                owner: r.get_array32()?,
+                market_id: r.get_array32()?,
+                amount: r.get_u128()?,
+            }),
+            27 => Ok(ActionV1::WithdrawCollateral {
+                owner: r.get_array32()?,
+                market_id: r.get_array32()?,
+                amount: r.get_u128()?,
+            }),
+            28 => Ok(ActionV1::BorrowStable {
+                owner: r.get_array32()?,
+                market_id: r.get_array32()?,
+                amount: r.get_u128()?,
+            }),
+            29 => Ok(ActionV1::RepayStable {
+                owner: r.get_array32()?,
+                market_id: r.get_array32()?,
+                amount: r.get_u128()?,
+            }),
+            30 => Ok(ActionV1::LiquidatePosition {
+                liquidator: r.get_array32()?,
+                market_id: r.get_array32()?,
+                owner: r.get_array32()?,
+                repay_amount: r.get_u128()?,
+                min_collateral_out: r.get_u128()?,
             }),
             _ => Err(CodecError::UnknownDiscriminant),
         }

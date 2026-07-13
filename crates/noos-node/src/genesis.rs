@@ -434,6 +434,9 @@ pub struct GenesisSpec {
     /// their operator accounts here. REFUSED unless `is_test_network = true`
     /// (plan §2.5); mainnet allocations are OWNER_BLOCKED by design.
     pub extra_accounts: Vec<(Hash32, u128)>,
+    /// Governance authority override for isolated engineering networks.
+    /// The production/default fixture remains [`GOV_AUTHORITY_ACCOUNT`].
+    pub gov_authority: Hash32,
     /// Immutable test-network Grain code registry. Its canonical commitment
     /// is installed as an unspendable zero-balance genesis account, binding
     /// the complete registry to `genesis_hash`.
@@ -460,6 +463,7 @@ impl GenesisSpec {
             genesis_time_ms,
             initial_ground_target: U256::MAX,
             extra_accounts: Vec::new(),
+            gov_authority: GOV_AUTHORITY_ACCOUNT,
             contract_codes: BTreeMap::new(),
         }
     }
@@ -610,6 +614,13 @@ impl GenesisSpec {
                     .into(),
             ));
         }
+        if self.gov_authority != GOV_AUTHORITY_ACCOUNT && !self.params.is_test_network {
+            return Err(NodeError::Config(
+                "governance authority override is a test-network-only mechanism \
+                 (is_test_network = false)"
+                    .into(),
+            ));
+        }
         let faucet = Self::fixture_account(self.params.faucet_pubkey, &self.params.faucet_pubkey);
         let mut accounts = vec![
             (
@@ -643,6 +654,14 @@ impl GenesisSpec {
         {
             return Err(NodeError::Config(
                 "genesis accounts must have unique canonical account IDs".into(),
+            ));
+        }
+        if !accounts
+            .iter()
+            .any(|(account, _)| account.account_id == self.gov_authority)
+        {
+            return Err(NodeError::Config(
+                "governance authority must be a provisioned genesis account".into(),
             ));
         }
         Ok(accounts)
@@ -690,7 +709,7 @@ impl GenesisSpec {
                 shares: EmissionSharesV1::testnet_fixture(),
                 controls: &controls,
                 accounts: &accounts,
-                gov_authority: GOV_AUTHORITY_ACCOUNT,
+                gov_authority: self.gov_authority,
                 emergency_authority: EMERGENCY_AUTHORITY_ACCOUNT,
             })
             .map_err(|error| NodeError::Config(format!("invalid genesis ledger: {error:?}")))?;
@@ -948,6 +967,22 @@ mod production_proposal_refusal_tests {
             registered.genesis_hash().unwrap(),
             changed.genesis_hash().unwrap()
         );
+    }
+
+    #[test]
+    fn devnet_governance_override_requires_a_provisioned_account() {
+        let params = DevnetParams::parse(DEVNET).unwrap();
+        let default = GenesisSpec::devnet(params.clone(), 1_760_000_000_000);
+        let mut missing = GenesisSpec::devnet(params.clone(), 1_760_000_000_000);
+        missing.gov_authority = [0x71; 32];
+        assert!(missing.build().is_err());
+
+        let mut configured = GenesisSpec::devnet(params, 1_760_000_000_000);
+        configured.extra_accounts = vec![([0x71; 32], 0)];
+        configured.gov_authority = [0x71; 32];
+        let built = configured.build().unwrap();
+        assert_eq!(default.chain_id().unwrap(), built.chain_id);
+        assert_ne!(default.genesis_hash().unwrap(), built.genesis_hash);
     }
 
     #[test]

@@ -132,7 +132,7 @@ fn read_request(stream: &mut std::net::TcpStream) -> Vec<u8> {
         let Some(header_end) = request
             .windows(4)
             .position(|window| window == b"\r\n\r\n")
-            .map(|position| position + 4)
+            .and_then(|position| position.checked_add(4))
         else {
             continue;
         };
@@ -143,7 +143,7 @@ fn read_request(stream: &mut std::net::TcpStream) -> Vec<u8> {
                 .eq_ignore_ascii_case("content-length")
                 .then(|| value.trim().parse::<usize>().unwrap())
         });
-        if request.len() >= header_end + content_length.unwrap_or(0) {
+        if request.len() >= header_end.saturating_add(content_length.unwrap_or(0)) {
             break;
         }
     }
@@ -275,6 +275,37 @@ async fn unavailable_and_malformed_node_responses_fail_closed() {
     assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(response_json(response).await["code"], "unavailable");
     assert_not_indexed(app, &hash('9')).await;
+}
+
+#[tokio::test]
+async fn lending_state_is_identity_checked_and_forwarded_read_only() {
+    let item = serde_json::json!({
+        "items": [{
+            "market_id": hash('1'),
+            "stable_asset": hash('2'),
+            "total_debt": "7000"
+        }]
+    });
+    let node = FakeNode::spawn(vec![
+        (200, status_body(&identity())),
+        (200, item.to_string()),
+    ]);
+    let (_dir, app) = configured_app(&node);
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/lending-markets")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response_json(response).await, item);
+    let requests = node.requests();
+    assert_eq!(requests.len(), 2);
+    assert!(requests[0].starts_with(b"GET /status HTTP/1.1\r\n"));
+    assert!(requests[1].starts_with(b"GET /lending/markets HTTP/1.1\r\n"));
 }
 
 #[tokio::test]

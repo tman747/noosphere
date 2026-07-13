@@ -10,7 +10,10 @@
 
 use noos_cli::{from_hex, to_hex, CliError};
 use noos_codec::{NoosDecode, NoosEncode};
-use noos_lumen::objects::{asset_id, object_id, pool_id, ActionV1, BoundedBytes, TransactionV1};
+use noos_lumen::objects::{
+    asset_id, lending_market_id, object_id, oracle_feed_id, pool_id, stable_asset_id, ActionV1,
+    BoundedBytes, TransactionV1,
+};
 use serde_json::{json, Value};
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -302,6 +305,66 @@ fn tx_build_encodes_launch_and_swap_actions() {
         ActionV1::SwapExactIn {
             amount_in: 1000,
             min_amount_out: 1,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn tx_build_encodes_oracle_and_lending_market_actions() {
+    let collateral = [0x51; 32];
+    let quote = [0x52; 32];
+    let feed = oracle_feed_id(&collateral, &quote);
+    let market = lending_market_id(&collateral, &feed);
+    let mut spec = minimal_spec();
+    spec["actions"] = json!([
+        {
+            "type": "create_oracle_feed",
+            "base_asset": to_hex(&collateral),
+            "quote_asset": to_hex(&quote),
+            "reporter_0": h(0x61),
+            "reporter_1": h(0x62),
+            "reporter_2": h(0x63),
+            "max_age_blocks": "64"
+        },
+        {
+            "type": "create_lending_market",
+            "collateral_asset": to_hex(&collateral),
+            "oracle_feed_id": to_hex(&feed),
+            "symbol": "MUSD",
+            "name": "Mind USD",
+            "decimals": 9,
+            "collateral_factor_bps": 5000,
+            "liquidation_threshold_bps": 7500,
+            "liquidation_bonus_bps": 500,
+            "debt_ceiling": "1000000000",
+            "min_debt": "1000"
+        }
+    ]);
+    let built = noos_cli::tx_build(&spec.to_string()).unwrap();
+    assert_eq!(built["created_oracle_feeds"][0]["feed_id"], to_hex(&feed));
+    assert_eq!(
+        built["created_lending_markets"][0]["market_id"],
+        to_hex(&market)
+    );
+    assert_eq!(
+        built["created_lending_markets"][0]["stable_asset"],
+        to_hex(&stable_asset_id(&market))
+    );
+    let tx =
+        TransactionV1::decode_canonical(&from_hex(built["tx"].as_str().unwrap()).unwrap()).unwrap();
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[0].as_slice()).unwrap(),
+        ActionV1::CreateOracleFeed {
+            max_age_blocks: 64,
+            ..
+        }
+    ));
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[1].as_slice()).unwrap(),
+        ActionV1::CreateLendingMarket {
+            collateral_factor_bps: 5000,
+            liquidation_threshold_bps: 7500,
             ..
         }
     ));

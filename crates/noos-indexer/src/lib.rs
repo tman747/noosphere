@@ -335,6 +335,12 @@ fn build_router(indexer: Indexer, submission_source: Option<ingest::LineProtocol
         .route("/api/v1/transactions/{txid}", get(entity_transaction))
         .route("/api/v1/assets", get(market_assets))
         .route("/api/v1/pools", get(market_pools))
+        .route("/api/v1/liquidity-positions", get(liquidity_positions))
+        .route("/api/v1/oracle-feeds", get(oracle_feeds))
+        .route("/api/v1/oracle-reports", get(oracle_reports))
+        .route("/api/v1/lending-markets", get(lending_markets))
+        .route("/api/v1/stable-assets", get(stable_assets))
+        .route("/api/v1/debt-positions", get(debt_positions))
         .route("/api/v1/balances/{account}/{asset}", get(market_balance))
         .route("/api/v1/notes/{noteid}", get(hash_not_found))
         .route("/api/v1/addresses/{address}/notes", get(address_page))
@@ -620,6 +626,30 @@ async fn market_pools(State(s): State<AppState>, headers: HeaderMap) -> ApiResul
     market_query(s, headers, "/pools".to_owned()).await
 }
 
+async fn liquidity_positions(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    market_query(s, headers, "/liquidity/positions".to_owned()).await
+}
+
+async fn oracle_feeds(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    market_query(s, headers, "/oracle/feeds".to_owned()).await
+}
+
+async fn oracle_reports(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    market_query(s, headers, "/oracle/reports".to_owned()).await
+}
+
+async fn lending_markets(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    market_query(s, headers, "/lending/markets".to_owned()).await
+}
+
+async fn stable_assets(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    market_query(s, headers, "/stable/assets".to_owned()).await
+}
+
+async fn debt_positions(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    market_query(s, headers, "/lending/positions".to_owned()).await
+}
+
 async fn compute_workers(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
     market_query(s, headers, "/compute/workers".to_owned()).await
 }
@@ -659,7 +689,7 @@ async fn market_receipt(
 }
 
 fn canonical_hex(value: &str) -> bool {
-    value.len() % 2 == 0
+    value.len().is_multiple_of(2)
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
