@@ -112,6 +112,30 @@
                     <p class="helper">Optional. Sources help other people inspect factual claims.</p>
                   </div>
                 </details>
+                <details class="soft-disclosure backup-restore">
+                  <summary>Restore from private backup</summary>
+                  <div class="field-block disclosure-field">
+                    <label for="backup-input">Private backup file</label>
+                    <input id="backup-input" name="backup" type="file" accept="application/json,.json,.mindchain-backup.json">
+                    <p class="helper">Plaintext <code>.mindchain-backup.json</code> only. It contains your private contribution and control key; do not share it.</p>
+                    <div id="backup-preview" class="backup-preview" hidden>
+                      <p class="panel-label">Backup preview</p>
+                      <dl class="backup-preview-list">
+                        <div><dt>Title</dt><dd id="backup-preview-title">Untitled contribution</dd></div>
+                        <div><dt>Exact words</dt><dd id="backup-preview-words">No words loaded.</dd></div>
+                        <div><dt>Visibility</dt><dd id="backup-preview-visibility">Unknown</dd></div>
+                        <div><dt>Source</dt><dd id="backup-preview-source">None</dd></div>
+                        <div><dt>Created</dt><dd id="backup-preview-date">Unknown</dd></div>
+                      </dl>
+                      <p id="backup-conflict" class="helper"></p>
+                      <button class="button button-primary" id="restore-backup" type="button">
+                        <span>Restore on this device</span>
+                        <span class="button-orb" aria-hidden="true">↗</span>
+                      </button>
+                    </div>
+                    <p id="backup-status" class="helper" role="status">No backup selected.</p>
+                  </div>
+                </details>
                 <div class="button-row">
                   <button class="button button-primary" type="submit">
                     <span>Continue</span>
@@ -227,13 +251,15 @@
                 <div class="control-grid" aria-label="Contribution controls">
                   <button class="control-button" id="edit-current" type="button">Edit</button>
                   <button class="control-button" id="unpublish-current" type="button">Unpublish</button>
-                  <button class="control-button" id="export-current" type="button">Export</button>
+                  <button class="control-button" id="export-current" type="button">Export MindLink</button>
+                  <button class="control-button" id="download-backup" type="button">Download private backup</button>
+                  <button class="control-button" id="retry-sync" type="button">Retry sync</button>
                   <button class="control-button" id="report-current" type="button">Report problem</button>
                 </div>
                 <p id="moderation-status" class="moderation-status">Moderation status: not reported.</p>
                 <details class="soft-disclosure verification-details">
                   <summary>How this is verified</summary>
-                  <p>The export preserves your exact words, suggested structure, visibility state, rights choices, relations, challenge state, and content hash. Chain anchoring is a later durability proof, not required for participation.</p>
+                  <p>The MindLink export preserves your exact words, suggested structure, visibility state, rights choices, relations, challenge state, and content hash. The private backup is plaintext and also carries local control metadata, so it restores edit/unpublish controls on another browser. Chain anchoring is a later durability proof, not required for participation.</p>
                   <p class="verification-links"><a href="mindlinks.html">Open the renderer</a> · <a href="mindlink-v0.schema.json">Read the schema</a> · <a href="../explorer/">Open the explorer</a></p>
                   <pre id="mindlink-json" aria-label="MindLink JSON export preview"></pre>
                 </details>

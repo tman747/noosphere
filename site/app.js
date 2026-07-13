@@ -2,6 +2,10 @@
   const STORAGE_KEY = "mindchain.worldWideMind.contributions.v1";
   const DRAFT_KEY = "mindchain.worldWideMind.rawDraft.v1";
   const API_ROOT = "/api";
+  const BACKUP_VERSION = "0.1";
+  const BACKUP_TYPE = "mindchain-private-backup";
+  const BACKUP_WARNING = "Plaintext backup. Contains your private contribution and control key—do not share.";
+  const MAX_BACKUP_BYTES = 256000;
 
   const seedIdeas = [
     {
@@ -45,6 +49,16 @@
     form: document.getElementById("contribution-form"),
     input: document.getElementById("contribution-input"),
     source: document.getElementById("source-input"),
+    backupInput: document.getElementById("backup-input"),
+    backupPreview: document.getElementById("backup-preview"),
+    backupStatus: document.getElementById("backup-status"),
+    backupPreviewTitle: document.getElementById("backup-preview-title"),
+    backupPreviewWords: document.getElementById("backup-preview-words"),
+    backupPreviewVisibility: document.getElementById("backup-preview-visibility"),
+    backupPreviewSource: document.getElementById("backup-preview-source"),
+    backupPreviewDate: document.getElementById("backup-preview-date"),
+    backupConflict: document.getElementById("backup-conflict"),
+    restoreBackup: document.getElementById("restore-backup"),
     error: document.getElementById("contribution-error"),
     alert: document.getElementById("system-alert"),
     flowStatus: document.getElementById("flow-status"),
@@ -67,6 +81,8 @@
     editCurrent: document.getElementById("edit-current"),
     unpublishCurrent: document.getElementById("unpublish-current"),
     exportCurrent: document.getElementById("export-current"),
+    downloadBackup: document.getElementById("download-backup"),
+    retrySync: document.getElementById("retry-sync"),
     reportCurrent: document.getElementById("report-current"),
     moderationStatus: document.getElementById("moderation-status"),
     mindlinkJson: document.getElementById("mindlink-json"),
@@ -83,7 +99,8 @@
     sourceUrl: "",
     suggested: null,
     current: null,
-    usingExactWords: false
+    usingExactWords: false,
+    pendingBackup: null
   };
 
   function readContributions() {
@@ -272,6 +289,17 @@
     return `${prefix}_${suffix}`;
   }
 
+  function generateToken(prefix) {
+    const bytes = new Uint8Array(24);
+    if (crypto && crypto.getRandomValues) {
+      crypto.getRandomValues(bytes);
+    } else {
+      for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
+    }
+    const suffix = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `${prefix}_${suffix}`;
+  }
+
   async function hashText(text) {
     if (crypto && crypto.subtle && window.TextEncoder) {
       const encoded = new TextEncoder().encode(text);
@@ -312,7 +340,8 @@
     const sourceUrls = state.suggested.source_urls || [];
     const contribution = {
       id: state.current && state.current.id ? state.current.id : generateId("mindlink"),
-      recovery_token: state.current && state.current.recovery_token ? state.current.recovery_token : generateId("recover"),
+      recovery_token: state.current && state.current.recovery_token ? state.current.recovery_token : generateToken("recover"),
+      control_token: state.current && state.current.control_token ? state.current.control_token : generateToken("control"),
       created_at: state.current && state.current.created_at ? state.current.created_at : now,
       updated_at: now,
       original_text: original,
@@ -470,6 +499,10 @@
       nodes.syncStatus.textContent = "Index sync: private drafts stay in this browser.";
       return;
     }
+    if (sync.state === "control_restored") {
+      nodes.syncStatus.textContent = sync.detail || "Private backup restored control. Retry sync to confirm API state.";
+      return;
+    }
     if (sync.state === "synced") {
       nodes.syncStatus.textContent = "Index sync: saved to the local MindLink API.";
       return;
@@ -511,7 +544,7 @@
       const response = await fetch(`${API_ROOT}/mindlinks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(toMindLink(contribution))
+        body: JSON.stringify({ mindlink: toMindLink(contribution), control_token: contribution.control_token || null })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.ok === false) {
@@ -608,6 +641,13 @@
       ? `${location.href.split("#")[0]}#recover=${encodeURIComponent(contribution.recovery_token)}`
       : `${location.href.split("#")[0]}#${contribution.id}`;
     if (nodes.seeMap) nodes.seeMap.hidden = !isPublic;
+    const hasControl = Boolean(contribution.control_token);
+    if (nodes.unpublishCurrent) nodes.unpublishCurrent.disabled = !hasControl && contribution.sync_status && contribution.sync_status.stored;
+    if (nodes.retrySync) nodes.retrySync.disabled = !hasControl && contribution.visibility !== "only_me";
+    if (nodes.downloadBackup) nodes.downloadBackup.disabled = !hasControl;
+    if (!hasControl && contribution.sync_status && contribution.sync_status.stored) {
+      nodes.resultCopy.textContent = "View-only public object. Import a private backup to regain edit and unpublish control.";
+    }
     nodes.moderationStatus.textContent = `Moderation status: ${readableStatus(contribution.moderation_status)}.`;
     nodes.mindlinkJson.textContent = JSON.stringify(toMindLink(contribution), null, 2);
     renderSyncStatus(contribution);
@@ -671,17 +711,201 @@
       .replace(/'/g, "&#39;");
   }
 
-  function downloadContribution(contribution) {
-    const mindlink = toMindLink(contribution);
-    const blob = new Blob([JSON.stringify(mindlink, null, 2)], { type: "application/json" });
+  function downloadJson(filename, value) {
+    const blob = new Blob([JSON.stringify(value, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${contribution.id}.mindlink.json`;
+    anchor.download = filename;
     document.body.append(anchor);
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(url);
+  }
+
+  function downloadContribution(contribution) {
+    downloadJson(`${contribution.id}.mindlink.json`, toMindLink(contribution));
+  }
+
+  function sanitizeContributionForBackup(contribution) {
+    return {
+      id: String(contribution.id || ""),
+      recovery_token: String(contribution.recovery_token || ""),
+      control_token: String(contribution.control_token || ""),
+      created_at: String(contribution.created_at || ""),
+      updated_at: String(contribution.updated_at || ""),
+      original_text: String(contribution.original_text || ""),
+      suggested: {
+        type: String(contribution.suggested && contribution.suggested.type || "contribution"),
+        title: String(contribution.suggested && contribution.suggested.title || "Untitled contribution"),
+        summary: String(contribution.suggested && contribution.suggested.summary || contribution.original_text || ""),
+        source_urls: Array.isArray(contribution.suggested && contribution.suggested.source_urls) ? contribution.suggested.source_urls.filter((item) => typeof item === "string") : [],
+        structured_by: String(contribution.suggested && contribution.suggested.structured_by || "local-rule-preview")
+      },
+      visibility: ["only_me", "link", "public"].includes(contribution.visibility) ? contribution.visibility : "only_me",
+      attribution: {
+        mode: contribution.attribution && contribution.attribution.mode === "named" ? "named" : "anonymous",
+        display_name: String(contribution.attribution && contribution.attribution.display_name || "Anonymous contributor")
+      },
+      rights: {
+        ai_training: contribution.rights && contribution.rights.ai_training || "deny",
+        commercial_use: contribution.rights && contribution.rights.commercial_use || "deny",
+        cultural_authority: contribution.rights && contribution.rights.cultural_authority || null,
+        license: contribution.rights && contribution.rights.license || "conservative-default"
+      },
+      source_urls: Array.isArray(contribution.source_urls) ? contribution.source_urls.filter((item) => typeof item === "string") : [],
+      status: String(contribution.status || "private_draft"),
+      moderation_status: String(contribution.moderation_status || "not_reported"),
+      challenge_status: String(contribution.challenge_status || "unchallenged"),
+      relations: Array.isArray(contribution.relations) ? contribution.relations.map((relation) => ({
+        id: String(relation.id || ""),
+        title: String(relation.title || ""),
+        text: String(relation.text || ""),
+        reason: String(relation.reason || ""),
+        score: Number(relation.score || 0),
+        feedback: String(relation.feedback || "unreviewed")
+      })).filter((relation) => relation.id && relation.title) : [],
+      content_hash: String(contribution.content_hash || ""),
+      versions: Array.isArray(contribution.versions) ? contribution.versions : []
+    };
+  }
+
+  function backupPayloadForChecksum(contribution, createdAt, mindlink) {
+    return {
+      backup_version: BACKUP_VERSION,
+      type: BACKUP_TYPE,
+      warning: BACKUP_WARNING,
+      created_at: createdAt,
+      contribution,
+      mindlink
+    };
+  }
+
+  async function checksumBackupPayload(payload) {
+    return hashText(JSON.stringify(payload));
+  }
+
+  async function createPrivateBackup(contribution) {
+    const backupContribution = sanitizeContributionForBackup(contribution);
+    const createdAt = new Date().toISOString();
+    const mindlink = toMindLink(backupContribution);
+    const payload = backupPayloadForChecksum(backupContribution, createdAt, mindlink);
+    const backupChecksum = await checksumBackupPayload(payload);
+    return { ...payload, backup_checksum: backupChecksum };
+  }
+
+  function hasUnsafeKeys(value) {
+    if (!value || typeof value !== "object") return false;
+    return Object.keys(value).some((key) => (
+      key === "__proto__" ||
+      key === "constructor" ||
+      key === "prototype" ||
+      hasUnsafeKeys(value[key])
+    ));
+  }
+
+  function validControlToken(value) {
+    return typeof value === "string" && /^control_[a-f0-9]{48,}$/i.test(value);
+  }
+
+  function describeVisibility(value) {
+    return value === "public" ? "Public on the map" : value === "link" ? "Anyone with the link" : "Only me";
+  }
+
+  function backupConflictFor(contribution) {
+    const existing = readContributions().find((item) => item.id === contribution.id);
+    if (!existing) return { mode: "new", message: "No local copy with this ID exists. Restore will add it to this browser." };
+    if (existing.backup_checksum && contribution.backup_checksum && existing.backup_checksum === contribution.backup_checksum) {
+      return { mode: "duplicate", existing, message: "This exact backup is already restored on this device." };
+    }
+    if (existing.content_hash === contribution.content_hash && existing.control_token === contribution.control_token) {
+      return { mode: "duplicate", existing, message: "This contribution is already restored on this device." };
+    }
+    return { mode: "copy", existing, message: "A different local copy uses this ID. Restore will keep both by creating a separate local copy." };
+  }
+
+  async function validatePrivateBackup(parsed) {
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Backup must be a JSON object.");
+    if (hasUnsafeKeys(parsed)) throw new Error("Backup contains unsafe object keys.");
+    if (parsed.backup_version !== BACKUP_VERSION || parsed.type !== BACKUP_TYPE) throw new Error("Backup version is not supported.");
+    if (parsed.warning !== BACKUP_WARNING) throw new Error("Backup warning is missing or changed.");
+    if (typeof parsed.created_at !== "string" || !parsed.created_at) throw new Error("Backup created-at timestamp is required.");
+    if (typeof parsed.backup_checksum !== "string" || parsed.backup_checksum.length < 8) throw new Error("Backup checksum is required.");
+    const contribution = sanitizeContributionForBackup(parsed.contribution || {});
+    if (!contribution.id || !contribution.recovery_token || !validControlToken(contribution.control_token)) {
+      throw new Error("Backup does not contain a valid private control key.");
+    }
+    if (!contribution.original_text.trim() || contribution.original_text.length > 1200) throw new Error("Backup contribution text is invalid.");
+    if (!contribution.content_hash || contribution.content_hash.length < 8) throw new Error("Backup content hash is invalid.");
+    const mindlink = parsed.mindlink && typeof parsed.mindlink === "object" ? parsed.mindlink : toMindLink(contribution);
+    const payload = backupPayloadForChecksum(contribution, parsed.created_at, mindlink);
+    const expectedChecksum = await checksumBackupPayload(payload);
+    if (expectedChecksum !== parsed.backup_checksum) throw new Error("Backup checksum does not match the file contents.");
+    contribution.backup_checksum = parsed.backup_checksum;
+    return contribution;
+  }
+
+  function renderBackupPreview(contribution) {
+    const conflict = backupConflictFor(contribution);
+    state.pendingBackup = contribution;
+    nodes.backupPreviewTitle.textContent = contribution.suggested.title;
+    nodes.backupPreviewWords.textContent = contribution.original_text;
+    nodes.backupPreviewVisibility.textContent = describeVisibility(contribution.visibility);
+    nodes.backupPreviewSource.textContent = contribution.source_urls[0] || "None";
+    nodes.backupPreviewDate.textContent = contribution.created_at || "Unknown";
+    nodes.backupConflict.textContent = conflict.message;
+    nodes.backupPreview.hidden = false;
+    const container = nodes.backupInput.closest("details");
+    if (container) container.open = true;
+    nodes.backupStatus.textContent = "Backup loaded. Review the preview before restoring on this device.";
+  }
+
+  function restorePendingBackup() {
+    if (!state.pendingBackup) return;
+    const conflict = backupConflictFor(state.pendingBackup);
+    let restored = { ...state.pendingBackup };
+    let message = "Restored on this device. This plaintext backup was not uploaded or synced.";
+    let markRestored = true;
+    if (conflict.mode === "duplicate") {
+      restored = conflict.existing;
+      message = "This backup was already restored on this device.";
+      markRestored = false;
+    } else if (conflict.mode === "copy") {
+      restored = {
+        ...restored,
+        id: generateId("mindlink"),
+        recovery_token: generateToken("recover"),
+        restored_from_id: state.pendingBackup.id
+      };
+      message = "Restored on this device as a separate local copy. The existing local version was not overwritten.";
+    }
+    if (markRestored) {
+      restored = {
+        ...restored,
+        restored_at: new Date().toISOString(),
+        sync_status: restored.visibility === "only_me"
+          ? {
+              state: "local_only",
+              stored: false,
+              reason: "restored_from_private_backup",
+              detail: "Restored on this device. It has not been synced."
+            }
+          : {
+              state: "control_restored",
+              stored: true,
+              reason: "restored_from_private_backup",
+              detail: "Private backup restored control for this public/link object. Retry sync to confirm API state."
+            }
+      };
+    }
+    state.originalText = restored.original_text;
+    state.sourceUrl = restored.source_urls[0] || "";
+    state.suggested = restored.suggested;
+    nodes.input.value = restored.original_text;
+    nodes.source.value = restored.source_urls[0] || "";
+    updateCurrent(restored);
+    showStep(4);
+    showAlert(message);
   }
 
   function copyText(input) {
@@ -801,7 +1025,8 @@
       showAlert("We could not complete every enrichment step, but the raw contribution remains saved as a draft.");
       const fallback = {
         id: generateId("mindlink"),
-        recovery_token: generateId("recover"),
+        recovery_token: generateToken("recover"),
+        control_token: generateToken("control"),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         original_text: state.originalText,
@@ -842,8 +1067,13 @@
 
   nodes.editCurrent.addEventListener("click", () => {
     if (!state.current) return;
-    nodes.input.value = state.current.original_text;
-    nodes.source.value = state.current.source_urls[0] || "";
+    const current = state.current;
+    if (!current.control_token) {
+      state.current = null;
+      showAlert("Editing a public view creates a new local copy. Import a private backup to control the original.");
+    }
+    nodes.input.value = current.original_text;
+    nodes.source.value = current.source_urls[0] || "";
     showStep(1);
   });
 
@@ -877,6 +1107,64 @@
   nodes.exportCurrent.addEventListener("click", () => {
     if (!state.current) return;
     downloadContribution(state.current);
+    showAlert("MindLink export downloaded. This is the portable public object, not the private backup.");
+  });
+
+  nodes.downloadBackup.addEventListener("click", async () => {
+    if (!state.current || !state.current.control_token) {
+      showAlert("Private backup is unavailable for view-only objects. Import an existing private backup to regain control.");
+      return;
+    }
+    const backup = await createPrivateBackup(state.current);
+    updateCurrent({ ...state.current, backup_checksum: backup.backup_checksum });
+    downloadJson(`${state.current.id}.mindchain-backup.json`, backup);
+    showAlert("Plaintext private backup downloaded. It contains your private contribution and control key—do not share it.");
+  });
+
+  nodes.retrySync.addEventListener("click", async () => {
+    if (!state.current) return;
+    if (!state.current.control_token && state.current.visibility !== "only_me") {
+      showAlert("Cannot sync a view-only object. Import a private backup to regain control.");
+      return;
+    }
+    const syncStatus = await syncContributionToIndex(state.current);
+    updateCurrent({ ...state.current, sync_status: syncStatus });
+    showAlert(syncStatus.state === "synced"
+      ? "Saved and recoverable through the local MindLink API."
+      : syncStatus.detail || "Sync attempt finished.");
+  });
+
+  nodes.backupInput.addEventListener("change", async () => {
+    state.pendingBackup = null;
+    nodes.backupPreview.hidden = true;
+    const file = nodes.backupInput.files && nodes.backupInput.files[0];
+    if (!file) {
+      nodes.backupStatus.textContent = "No backup selected.";
+      return;
+    }
+    if (file.size > MAX_BACKUP_BYTES) {
+      nodes.backupStatus.textContent = "Backup rejected: file is larger than 256 KB.";
+      return;
+    }
+    if (file.type && file.type !== "application/json") {
+      nodes.backupStatus.textContent = "Backup rejected: file must be JSON.";
+      return;
+    }
+    if (!/\.json$/i.test(file.name) || !/\.mindchain-backup\.json$/i.test(file.name)) {
+      nodes.backupStatus.textContent = "Backup rejected: use a .mindchain-backup.json file.";
+      return;
+    }
+    try {
+      const parsed = JSON.parse(await file.text());
+      const contribution = await validatePrivateBackup(parsed);
+      renderBackupPreview(contribution);
+    } catch (error) {
+      nodes.backupStatus.textContent = `Backup rejected: ${error.message}`;
+    }
+  });
+
+  nodes.restoreBackup.addEventListener("click", () => {
+    restorePendingBackup();
   });
 
   nodes.reportCurrent.addEventListener("click", async () => {

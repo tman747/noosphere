@@ -506,6 +506,36 @@ select:focus {
   gap: 1rem;
   margin-top: 1rem;
 }
+.backup-preview {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(168, 68, 50, 0.28);
+  border-radius: 1rem;
+  background: rgba(168, 68, 50, 0.07);
+}
+.backup-preview-list {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+}
+.backup-preview-list div {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: 0.85rem;
+}
+.backup-preview-list dt {
+  color: var(--muted);
+  font: 800 0.72rem/1.4 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.backup-preview-list dd {
+  margin: 0;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
 .result-card {
   border: 1px solid rgba(168, 68, 50, 0.35);
   border-radius: 1.25rem;
@@ -550,9 +580,14 @@ select:focus {
 .control-button:hover { transform: translateY(-1px); background: var(--paper-soft); border-color: var(--line-strong); }
 .mini-button:active,
 .control-button:active { transform: scale(0.98); }
+.control-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  transform: none;
+}
 .control-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
   gap: 0.65rem;
   margin-top: 1rem;
 }

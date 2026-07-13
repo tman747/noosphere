@@ -57,11 +57,17 @@ class WorldWideMindServerTests(unittest.TestCase):
             "content_hash": "1234567890abcdef",
         }
 
+    def control_token(self, fill="a"):
+        return "control_" + fill * 48
+
+    def api_payload(self, mindlink, fill="a"):
+        return {"mindlink": mindlink, "control_token": self.control_token(fill)}
+
     def test_public_and_link_mindlinks_are_indexed(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = world_wide_mind_server.WorldWideMindStore(Path(tmp) / "mindlinks.sqlite3")
-            public_result = store.save_mindlink(self.sample_mindlink("public"))
-            link_result = store.save_mindlink(self.sample_mindlink("link"))
+            public_result = store.save_mindlink(self.sample_mindlink("public"), self.control_token())
+            link_result = store.save_mindlink(self.sample_mindlink("link"), self.control_token("b"))
             self.assertTrue(public_result["stored"])
             self.assertTrue(link_result["stored"])
             self.assertEqual(len(store.list_mindlinks()), 2)
@@ -84,17 +90,29 @@ class WorldWideMindServerTests(unittest.TestCase):
             public = self.sample_mindlink("public")
             private = self.sample_mindlink("only_me")
             private["id"] = public["id"]
-            store.save_mindlink(public)
-            result = store.save_mindlink(private)
+            store.save_mindlink(public, self.control_token())
+            result = store.save_mindlink(private, self.control_token())
             self.assertFalse(result["stored"])
             self.assertTrue(result["removed"])
             self.assertEqual(store.list_mindlinks(), [])
+
+    def test_invalid_control_token_cannot_remove_indexed_copy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = world_wide_mind_server.WorldWideMindStore(Path(tmp) / "mindlinks.sqlite3")
+            public = self.sample_mindlink("public")
+            private = self.sample_mindlink("only_me")
+            private["id"] = public["id"]
+            store.save_mindlink(public, self.control_token())
+            result = store.save_mindlink(private, self.control_token("b"))
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["errors"], ["invalid_control_token"])
+            self.assertEqual(len(store.list_mindlinks()), 1)
 
     def test_report_and_relation_feedback_update_stored_object(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = world_wide_mind_server.WorldWideMindStore(Path(tmp) / "mindlinks.sqlite3")
             mindlink = self.sample_mindlink("public")
-            store.save_mindlink(mindlink)
+            store.save_mindlink(mindlink, self.control_token())
             reported = store.report_mindlink(mindlink["id"])
             self.assertEqual(reported["moderation"]["status"], "reported_pending_review")
             updated = store.record_relation_feedback(
@@ -119,7 +137,7 @@ class WorldWideMindServerTests(unittest.TestCase):
             thread.start()
             base = f"http://127.0.0.1:{server.server_port}"
             try:
-                public = self.post_json(f"{base}/api/mindlinks", self.sample_mindlink("public"))
+                public = self.post_json(f"{base}/api/mindlinks", self.api_payload(self.sample_mindlink("public")))
                 private = self.post_json(f"{base}/api/mindlinks", self.sample_mindlink("only_me"))
                 index = self.get_json(f"{base}/api/mindlinks")
                 self.assertTrue(public["stored"])

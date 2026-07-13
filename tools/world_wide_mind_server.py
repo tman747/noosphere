@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import json
 import sqlite3
 import tempfile
@@ -68,6 +70,7 @@ VALID_RELATION_FEEDBACK = {
     "user_wants_to_add_evidence",
 }
 PRIVATE_SKIP_REASON = "private_draft_not_indexed"
+CONTROL_HASH_PREFIX = "mindchain-control-v0:"
 MAX_REQUEST_BYTES = 1_000_000
 
 
@@ -195,6 +198,28 @@ def should_index(mindlink: dict[str, Any]) -> bool:
     return visibility != "only_me" and mindlink.get("state") != "private_draft"
 
 
+def hash_control_token(token: str) -> str:
+    return hashlib.sha256(f"{CONTROL_HASH_PREFIX}{token}".encode("utf-8")).hexdigest()
+
+
+def valid_control_token(token: Any) -> bool:
+    return isinstance(token, str) and token.startswith("control_") and len(token) >= 40
+
+
+def extract_mindlink_payload(payload: Any) -> tuple[Any, str | None]:
+    if isinstance(payload, dict) and "mindlink" in payload:
+        control_token = payload.get("control_token")
+        return payload.get("mindlink"), control_token if isinstance(control_token, str) else None
+    return payload, None
+
+
+def control_matches(stored_hash: str | None, token: str | None) -> bool:
+    if not stored_hash:
+        return True
+    if not valid_control_token(token):
+        return False
+    return hmac.compare_digest(stored_hash, hash_control_token(token))
+
 class WorldWideMindStore:
     def __init__(self, path: Path):
         self.path = path
@@ -219,19 +244,26 @@ class WorldWideMindStore:
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     content_hash TEXT NOT NULL,
-                    body TEXT NOT NULL
+                    body TEXT NOT NULL,
+                    control_hash TEXT
                 )
                 """
             )
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(mindlinks)").fetchall()}
+            if "control_hash" not in columns:
+                connection.execute("ALTER TABLE mindlinks ADD COLUMN control_hash TEXT")
             connection.execute("CREATE INDEX IF NOT EXISTS idx_mindlinks_visibility ON mindlinks(visibility)")
             connection.execute("CREATE INDEX IF NOT EXISTS idx_mindlinks_updated_at ON mindlinks(updated_at)")
 
-    def save_mindlink(self, mindlink: dict[str, Any]) -> dict[str, Any]:
+    def save_mindlink(self, mindlink: dict[str, Any], control_token: str | None = None) -> dict[str, Any]:
         errors = validate_mindlink(mindlink)
         if errors:
-            return {"ok": False, "stored": False, "errors": errors}
+            return {"ok": False, "stored": False, "status": "unprocessable", "errors": errors}
         if not should_index(mindlink):
-            removed = self.remove_mindlink(mindlink["id"])
+            try:
+                removed = self.remove_mindlink(mindlink["id"], control_token)
+            except PermissionError:
+                return {"ok": False, "stored": False, "status": "forbidden", "errors": ["invalid_control_token"]}
             return {
                 "ok": True,
                 "stored": False,
@@ -240,16 +272,24 @@ class WorldWideMindStore:
                 "mindlink": mindlink,
             }
 
+        existing = self.get_record(mindlink["id"])
+        existing_control_hash = existing["control_hash"] if existing else None
+        if existing_control_hash and not control_matches(existing_control_hash, control_token):
+            return {"ok": False, "stored": False, "status": "forbidden", "errors": ["invalid_control_token"]}
+        if not existing_control_hash and not valid_control_token(control_token):
+            return {"ok": False, "stored": False, "status": "unprocessable", "errors": ["missing_control_token"]}
+
         rights = mindlink["rights"]
         moderation = mindlink["moderation"]
+        control_hash = existing_control_hash or hash_control_token(control_token or "")
         body = json.dumps(mindlink, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         with self.connect() as connection:
             connection.execute(
                 """
                 INSERT INTO mindlinks (
                     id, visibility, state, title, moderation_status,
-                    created_at, updated_at, content_hash, body
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    created_at, updated_at, content_hash, body, control_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     visibility=excluded.visibility,
                     state=excluded.state,
@@ -257,7 +297,8 @@ class WorldWideMindStore:
                     moderation_status=excluded.moderation_status,
                     updated_at=excluded.updated_at,
                     content_hash=excluded.content_hash,
-                    body=excluded.body
+                    body=excluded.body,
+                    control_hash=COALESCE(mindlinks.control_hash, excluded.control_hash)
                 """,
                 (
                     mindlink["id"],
@@ -269,11 +310,17 @@ class WorldWideMindStore:
                     mindlink["updated_at"],
                     mindlink["content_hash"],
                     body,
+                    control_hash,
                 ),
             )
         return {"ok": True, "stored": True, "mindlink": mindlink}
 
-    def remove_mindlink(self, mindlink_id: str) -> bool:
+    def remove_mindlink(self, mindlink_id: str, control_token: str | None = None) -> bool:
+        record = self.get_record(mindlink_id)
+        if record is None:
+            return False
+        if not control_matches(record["control_hash"], control_token):
+            raise PermissionError("invalid_control_token")
         with self.connect() as connection:
             cursor = connection.execute("DELETE FROM mindlinks WHERE id = ?", (mindlink_id,))
         return cursor.rowcount > 0
@@ -292,6 +339,13 @@ class WorldWideMindStore:
             ).fetchall()
         return [json.loads(row["body"]) for row in rows]
 
+    def get_record(self, mindlink_id: str) -> sqlite3.Row | None:
+        with self.connect() as connection:
+            return connection.execute(
+                "SELECT body, control_hash FROM mindlinks WHERE id = ?",
+                (mindlink_id,),
+            ).fetchone()
+
     def count_mindlinks(self) -> int:
         with self.connect() as connection:
             row = connection.execute("SELECT COUNT(*) AS count FROM mindlinks").fetchone()
@@ -302,13 +356,37 @@ class WorldWideMindStore:
             row = connection.execute("SELECT body FROM mindlinks WHERE id = ?", (mindlink_id,)).fetchone()
         return json.loads(row["body"]) if row else None
 
+    def update_mindlink_body(self, mindlink: dict[str, Any]) -> None:
+        rights = mindlink["rights"]
+        moderation = mindlink["moderation"]
+        body = json.dumps(mindlink, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        with self.connect() as connection:
+            connection.execute(
+                """
+                UPDATE mindlinks
+                SET visibility = ?, state = ?, title = ?, moderation_status = ?,
+                    updated_at = ?, content_hash = ?, body = ?
+                WHERE id = ?
+                """,
+                (
+                    rights["visibility"],
+                    mindlink["state"],
+                    mindlink["title"],
+                    moderation["status"],
+                    mindlink["updated_at"],
+                    mindlink["content_hash"],
+                    body,
+                    mindlink["id"],
+                ),
+            )
+
     def report_mindlink(self, mindlink_id: str) -> dict[str, Any] | None:
         mindlink = self.get_mindlink(mindlink_id)
         if mindlink is None:
             return None
         mindlink["moderation"]["status"] = "reported_pending_review"
         mindlink["updated_at"] = now_iso()
-        self.save_mindlink(mindlink)
+        self.update_mindlink_body(mindlink)
         return mindlink
 
     def record_relation_feedback(self, mindlink_id: str, relation_id: str, feedback: str) -> dict[str, Any] | None:
@@ -322,7 +400,7 @@ class WorldWideMindStore:
             if relation.get("id") == relation_id:
                 relation["feedback"] = feedback
                 mindlink["updated_at"] = now_iso()
-                self.save_mindlink(mindlink)
+                self.update_mindlink_body(mindlink)
                 return mindlink
         raise KeyError("relation_not_found")
 
@@ -395,9 +473,11 @@ class WorldWideMindRequestHandler(SimpleHTTPRequestHandler):
             payload = self.read_json_body()
             if payload is None:
                 return
-            result = self.store.save_mindlink(payload)
+            mindlink, control_token = extract_mindlink_payload(payload)
+            result = self.store.save_mindlink(mindlink, control_token)
             if not result["ok"]:
-                self.send_json(HTTPStatus.UNPROCESSABLE_ENTITY, result)
+                status = HTTPStatus.FORBIDDEN if result.get("status") == "forbidden" else HTTPStatus.UNPROCESSABLE_ENTITY
+                self.send_json(status, result)
                 return
             self.send_json(HTTPStatus.CREATED if result["stored"] else HTTPStatus.ACCEPTED, result)
             return
