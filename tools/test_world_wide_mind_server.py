@@ -136,6 +136,25 @@ class WorldWideMindServerTests(unittest.TestCase):
                 "<h1>MindScan</h1>",
                 encoding="utf-8",
             )
+            (root / "wallet").mkdir()
+            (root / "wallet" / "chain-profiles.json").write_text(
+                json.dumps(
+                    {
+                        "profiles": [
+                            {
+                                "id": "test-profile",
+                                "label": "Test profile",
+                                "chain_id": "11" * 32,
+                                "genesis_hash": "22" * 32,
+                                "api_version": "v1",
+                                "api_base_url": "http://127.0.0.1:18080",
+                                "max_freshness_ms": "15000",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
             server = world_wide_mind_server.serve(
                 "127.0.0.1",
                 0,
@@ -150,6 +169,7 @@ class WorldWideMindServerTests(unittest.TestCase):
                 private = self.post_json(f"{base}/api/mindlinks", self.sample_mindlink("only_me"))
                 index = self.get_json(f"{base}/api/mindlinks")
                 connect = self.get_json(f"{base}/api/connect")
+                profile = self.get_json(f"{base}/api/connect/profile")
                 with urllib.request.urlopen(f"{base}/apps/mindscan/", timeout=5) as response:
                     mindscan_html = response.read().decode("utf-8")
                 self.assertTrue(public["stored"])
@@ -157,6 +177,12 @@ class WorldWideMindServerTests(unittest.TestCase):
                 self.assertEqual(index["count"], 1)
                 self.assertEqual(index["mindlinks"][0]["rights"]["visibility"], "public")
                 self.assertEqual(connect["schema"], "mindchain/connect-manifest/v0")
+                self.assertEqual(profile["schema"], "mindchain/universal-connection-profile/v0")
+                self.assertEqual(profile["network"]["chain_id"], "11" * 32)
+                self.assertFalse(profile["policy"]["operator_rpc_included"])
+                self.assertFalse(profile["policy"]["secrets_included"])
+                self.assertFalse(profile["policy"]["portable_to_other_device"])
+                self.assertNotIn("token", json.dumps(profile).lower())
                 self.assertIn("MindScan", mindscan_html)
             finally:
                 server.shutdown()

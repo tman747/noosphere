@@ -14,7 +14,8 @@
     "local_origin": "http://127.0.0.1:8766",
     "health": "/api/health",
     "mindlinks": "/api/mindlinks",
-    "connect_manifest": "/api/connect"
+    "connect_manifest": "/api/connect",
+    "connection_profile": "/api/connect/profile"
   },
   "surfaces": [
     {

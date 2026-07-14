@@ -970,6 +970,56 @@ select:focus {
   display: grid;
   gap: 1.25rem;
 }
+.profile-download-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.38fr);
+  gap: 2rem;
+  align-items: end;
+  padding: clamp(1.2rem, 3vw, 2rem);
+  border: 1px solid rgba(168, 68, 50, 0.32);
+  border-radius: 1.25rem;
+  background: rgba(168, 68, 50, 0.07);
+}
+.profile-download-card h3 {
+  margin: 0.3rem 0 0.65rem;
+  font-size: clamp(1.6rem, 3vw, 2.6rem);
+}
+.profile-download-card p:not(.panel-label) {
+  max-width: 65ch;
+  color: var(--muted);
+}
+.profile-identity {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+}
+.profile-identity div {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr);
+  gap: 0.75rem;
+}
+.profile-identity dt {
+  color: var(--muted);
+  font: 800 0.68rem/1.4 var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.profile-identity dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font: 700 0.76rem/1.45 var(--font-mono);
+}
+.profile-action {
+  display: grid;
+  gap: 0.65rem;
+}
+.profile-action .button {
+  width: 100%;
+  justify-content: space-between;
+}
+.profile-action .helper {
+  margin: 0;
+}
 .connection-ladder {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1086,6 +1136,7 @@ select:focus {
   .connection-card-grid,
   .platform-grid,
   .connection-ladder { grid-template-columns: 1fr; }
+  .profile-download-card { grid-template-columns: 1fr; }
   .connection-card,
   .platform-card { min-height: 18rem; }
   .button { width: 100%; justify-content: space-between; }

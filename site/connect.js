@@ -6,8 +6,15 @@
     surfaceGrid: document.getElementById("surface-grid"),
     platformGrid: document.getElementById("platform-grid"),
     ladder: document.getElementById("connection-ladder"),
-    blockers: document.getElementById("public-blockers")
+    blockers: document.getElementById("public-blockers"),
+    profileTitle: document.getElementById("profile-title"),
+    profileCopy: document.getElementById("profile-copy"),
+    profileChainId: document.getElementById("profile-chain-id"),
+    profileGenesis: document.getElementById("profile-genesis"),
+    downloadProfile: document.getElementById("download-profile"),
+    profileStatus: document.getElementById("profile-status")
   };
+  let connectionProfile = null;
 
   function escapeHtml(value) {
     return String(value == null ? "" : value)
@@ -108,8 +115,55 @@
     }
   }
 
+  async function loadConnectionProfile() {
+    try {
+      const response = await fetch("/api/connect/profile", { headers: { "Accept": "application/json" } });
+      const profile = await response.json();
+      if (
+        !response.ok ||
+        profile.schema !== "mindchain/universal-connection-profile/v0" ||
+        !profile.network ||
+        !profile.network.chain_id ||
+        !profile.network.genesis_hash ||
+        !profile.policy ||
+        profile.policy.operator_rpc_included !== false ||
+        profile.policy.secrets_included !== false
+      ) {
+        throw new Error("invalid connection profile");
+      }
+      connectionProfile = profile;
+      nodes.profileTitle.textContent = `${profile.label} identity ready.`;
+      nodes.profileCopy.textContent = "Local-device profile only. It carries chain identity and sanitized service addresses, but no wallet seed, control key, operator RPC, or other secret.";
+      nodes.profileChainId.textContent = profile.network.chain_id;
+      nodes.profileGenesis.textContent = profile.network.genesis_hash;
+      nodes.downloadProfile.disabled = false;
+      nodes.profileStatus.textContent = "Sanitized local profile ready. No secrets or operator RPC included.";
+    } catch (error) {
+      connectionProfile = null;
+      nodes.profileTitle.textContent = "Local connection profile unavailable.";
+      nodes.profileCopy.textContent = "Start the connection server before configuring compatible local clients.";
+      nodes.downloadProfile.disabled = true;
+      nodes.profileStatus.textContent = "Connection profile unavailable.";
+    }
+  }
+
+  function downloadConnectionProfile() {
+    if (!connectionProfile) return;
+    nodes.profileStatus.textContent = "Local connection profile downloaded. It only works on this device until public service addresses exist.";
+    const blob = new Blob([JSON.stringify(connectionProfile, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${connectionProfile.id}.mindchain-connection.json`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
   async function initialize() {
     checkApi();
+    loadConnectionProfile();
     try {
       const manifest = await loadManifest();
       renderSurfaces(manifest.surfaces || []);
@@ -120,6 +174,8 @@
       nodes.platformGrid.innerHTML = "";
     }
   }
+
+  nodes.downloadProfile.addEventListener("click", downloadConnectionProfile);
 
   initialize();
 })();

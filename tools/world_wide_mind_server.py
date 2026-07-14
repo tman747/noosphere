@@ -454,6 +454,45 @@ class WorldWideMindRequestHandler(SimpleHTTPRequestHandler):
                 return
             self.send_json(HTTPStatus.OK, manifest)
             return
+        if parsed.path == "/api/connect/profile":
+            try:
+                profiles = json.loads(
+                    (self.repo_dir / "wallet" / "chain-profiles.json").read_text(encoding="utf-8")
+                )
+                profile = profiles["profiles"][0]
+                port = int(self.server.server_address[1])
+                connection_profile = {
+                    "schema": "mindchain/universal-connection-profile/v0",
+                    "id": profile["id"],
+                    "label": profile["label"],
+                    "network": {
+                        "chain_id": profile["chain_id"],
+                        "genesis_hash": profile["genesis_hash"],
+                        "api_version": profile["api_version"],
+                        "is_test_network": True,
+                    },
+                    "services": {
+                        "chain_api": profile["api_base_url"],
+                        "world_wide_mind": f"http://127.0.0.1:{port}",
+                        "connection_manifest": f"http://127.0.0.1:{port}/api/connect",
+                        "mindlink_index": f"http://127.0.0.1:{port}/api/mindlinks",
+                    },
+                    "policy": {
+                        "max_freshness_ms": profile["max_freshness_ms"],
+                        "operator_rpc_included": False,
+                        "secrets_included": False,
+                        "portable_to_other_device": False,
+                    },
+                    "status": "local_device_profile",
+                }
+            except (OSError, KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
+                self.send_json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"ok": False, "errors": ["connection_profile_unavailable"]},
+                )
+                return
+            self.send_json(HTTPStatus.OK, connection_profile)
+            return
         if parsed.path == "/api/health":
             self.send_json(
                 HTTPStatus.OK,

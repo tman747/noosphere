@@ -76,6 +76,24 @@
             <p class="panel-label">Connection ladder</p>
             <h2 id="ladder-title">One easy path. Explicit trust at every step.</h2>
           </div>
+          <article class="profile-download-card">
+            <div>
+              <p class="panel-label">Universal local profile</p>
+              <h3 id="profile-title">Checking chain identity.</h3>
+              <p id="profile-copy">This profile lets compatible desktop, mobile, and web clients use the same chain identity and sanitized service map.</p>
+              <dl class="profile-identity">
+                <div><dt>Chain ID</dt><dd id="profile-chain-id">Unavailable</dd></div>
+                <div><dt>Genesis</dt><dd id="profile-genesis">Unavailable</dd></div>
+              </dl>
+            </div>
+            <div class="profile-action">
+              <button class="button button-primary" id="download-profile" type="button" disabled>
+                <span>Download local connection profile</span>
+                <span class="button-orb" aria-hidden="true">↓</span>
+              </button>
+              <p id="profile-status" class="helper" role="status">Waiting for a sanitized profile.</p>
+            </div>
+          </article>
           <ol id="connection-ladder" class="connection-ladder"></ol>
           <details class="soft-disclosure">
             <summary>What blocks a public all-platform launch?</summary>
