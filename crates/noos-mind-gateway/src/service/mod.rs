@@ -276,10 +276,10 @@ async fn state_handler(State(service): State<GatewayService>, headers: HeaderMap
     let disclosure = if enabled {
         match service.inner.config.pin_mode {
             PinMode::StrictIndependent => {
-                "TEST ONLY. The model is bound to an independent finalized-state read quorum; no WWM evidence gate or production control is enabled."
+                "TEST ONLY. The model is bound to an independent finalized-state read quorum, but inference uses one local model with no executor committee match; no WWM evidence gate or production control is enabled."
             }
             PinMode::TestSingleNode => {
-                "TEST ONLY. A single node pins chain identity and finalized state. This is not an independent quorum, production activation, or external evidence."
+                "TEST ONLY. A single node pins chain identity and finalized state, and one local model executes without an executor committee match. This is not independent quorum, production activation, or external evidence."
             }
         }
     } else if let Some(error) = chain_error {
@@ -314,6 +314,9 @@ async fn state_handler(State(service): State<GatewayService>, headers: HeaderMap
             "controls_enabled": false,
             "model_ready": model_ready,
             "model": service.inner.backend.model_name(),
+            "execution_mode": "LOCAL_SINGLE_MODEL",
+            "executor_claim_count": 1,
+            "soft_committee_quorum_met": false,
             "minimum_state_endpoints": minimum_state_endpoints,
             "pin": pin_json,
             "disclosure": disclosure,
@@ -818,7 +821,17 @@ async fn execute_job_inner(
         .inner
         .store
         .complete_job(pending.job_id, receipt_id, &wire)?;
-    let _ = send_event(sender, "finality", json!({"actual_finality": "SOFT"})).await;
+    let _ = send_event(
+        sender,
+        "finality",
+        json!({
+            "actual_finality": "SOFT",
+            "execution_mode": "LOCAL_SINGLE_MODEL",
+            "executor_claim_count": 1,
+            "soft_committee_quorum_met": false
+        }),
+    )
+    .await;
     let _ = send_event(sender, "receipt", wire).await;
     Ok(())
 }
@@ -895,6 +908,9 @@ fn receipt_json(receipt: &ReceiptView, pin: &ChainPin, model: &str) -> Value {
         "retrieval_receipt_id": receipt.retrieval_receipt_id.as_ref().map(hex_hash),
         "sources": receipt.source_mindlink_ids.iter().map(|id| json!({"mindlink_id": hex_hash(id)})).collect::<Vec<_>>(),
         "actual_finality": receipt.assurance_label,
+        "execution_mode": "LOCAL_SINGLE_MODEL",
+        "executor_claim_count": 1,
+        "soft_committee_quorum_met": false,
         "settlement_id": hex_hash(&receipt.settlement_id),
         "charged_micro_noos": receipt.charged_micro_noos,
         "refunded_micro_noos": receipt.refunded_micro_noos,
@@ -906,7 +922,7 @@ fn receipt_json(receipt: &ReceiptView, pin: &ChainPin, model: &str) -> Value {
         "evidence_gates_passed": false,
         "on_chain_receipt": false,
         "chain_anchor_status": "PINNED_FINALIZED_STATE_ONLY",
-        "disclosure": "Execution assurance does not establish factual accuracy. This signed test receipt was not submitted as a chain transaction."
+        "disclosure": "One local model executed this test job; no executor committee match was performed. The gateway signature does not establish factual accuracy, and this receipt was not submitted as a chain transaction."
     })
 }
 
@@ -1340,6 +1356,9 @@ mod tests {
         let state = body_json(state_response).await;
         assert_eq!(state["test_only"], true);
         assert_eq!(state["pin"]["pin_mode"], "TEST_SINGLE_NODE");
+        assert_eq!(state["execution_mode"], "LOCAL_SINGLE_MODEL");
+        assert_eq!(state["executor_claim_count"], 1);
+        assert_eq!(state["soft_committee_quorum_met"], false);
         let pin_id = state["pin"]["pin_id"].as_str().unwrap().to_owned();
 
         let prompt = "private raw question";
@@ -1413,6 +1432,9 @@ mod tests {
         assert_eq!(receipt_response.status(), StatusCode::OK);
         let receipt = body_json(receipt_response).await;
         assert_eq!(receipt["actual_finality"], "SOFT");
+        assert_eq!(receipt["execution_mode"], "LOCAL_SINGLE_MODEL");
+        assert_eq!(receipt["executor_claim_count"], 1);
+        assert_eq!(receipt["soft_committee_quorum_met"], false);
         assert_eq!(receipt["on_chain_receipt"], false);
         assert_eq!(
             receipt["chain_anchor_status"],

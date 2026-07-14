@@ -119,6 +119,12 @@ def run(origin: str, prompt: str, output_tokens: int, timeout: int) -> dict[str,
     state = request_json(opener, f"{origin}/api/wwm/v1/state")
     if state.get("enabled") is not True or state.get("test_only") is not True:
         raise RuntimeError(f"gateway is not enabled in disclosed test-only mode: {state}")
+    if (
+        state.get("execution_mode") != "LOCAL_SINGLE_MODEL"
+        or state.get("executor_claim_count") != 1
+        or state.get("soft_committee_quorum_met") is not False
+    ):
+        raise RuntimeError("gateway omitted the required single-model execution disclosure")
     pin = state.get("pin")
     if not isinstance(pin, dict):
         raise RuntimeError("state response has no pin")
@@ -192,6 +198,9 @@ def run(origin: str, prompt: str, output_tokens: int, timeout: int) -> dict[str,
         or receipt.get("test_only") is not True
         or receipt.get("on_chain_receipt") is not False
         or receipt.get("chain_anchor_status") != "PINNED_FINALIZED_STATE_ONLY"
+        or receipt.get("execution_mode") != "LOCAL_SINGLE_MODEL"
+        or receipt.get("executor_claim_count") != 1
+        or receipt.get("soft_committee_quorum_met") is not False
     ):
         raise RuntimeError("receipt did not preserve the test job and chain-pin contract")
     require_hash(receipt.get("token_history_root"), "token_history_root")
@@ -204,7 +213,7 @@ def run(origin: str, prompt: str, output_tokens: int, timeout: int) -> dict[str,
     if stored.get("receipt_id") != receipt_id:
         raise RuntimeError("persisted receipt differs from the streamed receipt")
     return {
-        "verdict": "PASS_TEST_ONLY",
+        "verdict": "PASS_TEST_ONLY_SINGLE_MODEL",
         "chain_id": chain_id,
         "genesis_hash": genesis_hash,
         "pin_id": pin_id,
@@ -214,6 +223,9 @@ def run(origin: str, prompt: str, output_tokens: int, timeout: int) -> dict[str,
         "receipt_id": receipt_id,
         "actual_finality": "SOFT",
         "on_chain_receipt": False,
+        "execution_mode": "LOCAL_SINGLE_MODEL",
+        "executor_claim_count": 1,
+        "soft_committee_quorum_met": False,
         "answer": answer,
     }
 

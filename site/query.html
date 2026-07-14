@@ -61,7 +61,7 @@
             <dd id="pin-readers">0 / 3</dd>
           </div>
         </dl>
-        <p id="pin-disclosure" class="trust-disclosure">No request leaves this page until at least two independently controlled read endpoints agree on the complete finalized state.</p>
+        <p id="pin-disclosure" class="trust-disclosure">No request leaves this page until the gateway declares its chain, model, and execution boundary.</p>
       </aside>
     </section>
 
@@ -77,9 +77,9 @@
 
         <div class="field-block query-field">
           <label for="query-input">Question</label>
-          <textarea id="query-input" rows="7" maxlength="12000" required aria-describedby="query-helper query-error" placeholder="Ask one specific question. The public profile sends this text to the selected executor committee."></textarea>
+          <textarea id="query-input" rows="7" maxlength="12000" required aria-describedby="query-helper query-error" placeholder="Ask one specific question after the gateway declares who will see it."></textarea>
           <div class="field-meta">
-            <p id="query-helper" class="helper">Public mode: executors may see the prompt and retrieved context. The chain receives bounded commitments, not this text.</p>
+            <p id="query-helper" class="helper">The configured open execution path can see this prompt. The chain receives bounded commitments, not this text.</p>
             <span id="query-count" class="query-count">0 / 12,000</span>
           </div>
           <p id="query-error" class="inline-error" role="alert" hidden></p>
@@ -90,7 +90,7 @@
             <legend>Compute privacy</legend>
             <label class="mode-choice selected">
               <input type="radio" name="compute-mode" value="public" checked>
-              <span><strong>Public committee</strong><small>Prompt is visible to selected executors.</small></span>
+              <span><strong>Open execution</strong><small>Gateway state must disclose who sees the prompt.</small></span>
             </label>
             <label class="mode-choice unavailable" aria-disabled="true">
               <input type="radio" name="compute-mode" value="p1" disabled>
@@ -102,7 +102,7 @@
             <legend>Required finality</legend>
             <label class="finality-choice">
               <input type="radio" name="finality" value="SOFT" checked>
-              <span><strong>SOFT</strong><small>Two matching stream claims. Reversible.</small></span>
+              <span><strong>SOFT</strong><small>Execution criteria come from the pinned gateway state.</small></span>
             </label>
             <label class="finality-choice">
               <input type="radio" name="finality" value="ANCHORED">
@@ -147,28 +147,28 @@
           <div>
             <p class="panel-label">Answer stream</p>
             <h2 id="answer-title">Nothing has been sent.</h2>
-            <p>When a gateway is activated, matching executor claims appear here first as SOFT. Anchoring and assurance update separately; neither label certifies that the answer is true.</p>
+            <p>The gateway's disclosed execution status appears here. Anchoring and assurance update separately; no label certifies that the answer is true.</p>
           </div>
         </div>
 
-        <div id="answer-loading" class="answer-loading" hidden aria-label="Waiting for executor committee">
+        <div id="answer-loading" class="answer-loading" hidden aria-label="Waiting for disclosed execution path">
           <div class="skeleton skeleton-label"></div>
           <div class="skeleton skeleton-line wide"></div>
           <div class="skeleton skeleton-line"></div>
           <div class="skeleton skeleton-line short"></div>
-          <p>Waiting for two matching executor streams.</p>
+          <p>Waiting for the disclosed execution path.</p>
         </div>
 
         <article id="answer-result" class="answer-result" hidden>
           <header class="answer-result-head">
             <div>
-              <p class="panel-label">Committed answer</p>
-              <h2>Executor response</h2>
+              <p class="panel-label">Bounded answer</p>
+              <h2>Execution response</h2>
             </div>
             <span id="answer-finality" class="finality-badge finality-soft">SOFT</span>
           </header>
           <p id="answer-copy" class="answer-copy"></p>
-          <p id="answer-warning" class="answer-warning">Execution agreement is not truth. Inspect sources and challenges.</p>
+          <p id="answer-warning" class="answer-warning">Execution status is not truth. Inspect the disclosed evidence boundary.</p>
           <button id="receipt-toggle" class="control-button" type="button" aria-expanded="false" aria-controls="receipt-drawer">Inspect sources and receipt</button>
         </article>
 

@@ -120,7 +120,9 @@ This implementation is deliberately narrower than the production architecture:
 
 - the supplied launcher requires `test_network=true`, binds to loopback, and
   uses a disclosed `TEST_SINGLE_NODE` pin rather than independent quorum;
-- only public `P0_OPEN` compute and `SOFT` execution finality are available;
+- only the public `P0_OPEN` / `SOFT` request shape is accepted; one local model
+  executes without an executor committee match, so the wire contract reports
+  `soft_committee_quorum_met=false` and the browser labels it `LOCAL TEST`;
 - the model runs off-chain through a loopback Ollama-native or
   OpenAI-compatible API;
 - the raw prompt exists transiently for inference, while persistent storage

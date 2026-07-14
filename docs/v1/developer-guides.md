@@ -125,10 +125,15 @@ python tools/e2e/wwm_gateway_smoke.py --origin http://localhost:18787
 
 The launcher refuses a profile without `test_network=true`. The service
 requires an explicit test-only acknowledgement, binds only to loopback, keeps
-the state bearer token server-side, exposes only `P0_OPEN` / `SOFT`, and labels
-the single-node state pin as `TEST_SINGLE_NODE`. The browser sends the raw
-prompt to the selected local model, but SQLite persists only prompt
-commitments, job metadata, signed quotes, and signed receipts.
+the state bearer token server-side, and labels the single-node state pin as
+`TEST_SINGLE_NODE`. It accepts only the bounded `P0_OPEN` / `SOFT` request
+shape, but executes exactly one local model: no executor committee match is
+performed. State, stream, and receipt messages therefore disclose
+`execution_mode=LOCAL_SINGLE_MODEL`, `executor_claim_count=1`, and
+`soft_committee_quorum_met=false`; the browser displays `LOCAL TEST` instead of
+claiming ordinary SOFT assurance. The browser sends the raw prompt to that
+local model, but SQLite persists only prompt commitments, job metadata, signed
+quotes, and signed receipts.
 
 The default `OLLAMA` backend uses Ollama's native `/api/chat` contract and sets
 `num_gpu=0`; this avoids the corrupt tokens observed on the local AMD path.

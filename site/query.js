@@ -10,6 +10,7 @@
     input: document.getElementById("query-input"),
     inputCount: document.getElementById("query-count"),
     inputError: document.getElementById("query-error"),
+    queryHelper: document.getElementById("query-helper"),
     outputLimit: document.getElementById("output-limit"),
     submit: document.getElementById("query-submit"),
     activation: document.getElementById("activation-label"),
@@ -23,9 +24,16 @@
     paymentLabel: document.getElementById("payment-label"),
     answerEmpty: document.getElementById("answer-empty"),
     answerLoading: document.getElementById("answer-loading"),
+    answerLoadingText: document.querySelector("#answer-loading p"),
     answerResult: document.getElementById("answer-result"),
+    answerEmptyDescription: document.querySelector("#answer-empty p:last-child"),
+    answerResultLabel: document.querySelector("#answer-result .panel-label"),
+    answerHeading: document.querySelector("#answer-result h2"),
     answerCopy: document.getElementById("answer-copy"),
     answerFinality: document.getElementById("answer-finality"),
+    softFinalityNote: document.querySelector('input[name="finality"][value="SOFT"] + span small'),
+    publicModeTitle: document.querySelector('input[name="compute-mode"][value="public"] + span strong'),
+    publicModeNote: document.querySelector('input[name="compute-mode"][value="public"] + span small'),
     answerWarning: document.getElementById("answer-warning"),
     receiptToggle: document.getElementById("receipt-toggle"),
     receiptDrawer: document.getElementById("receipt-drawer"),
@@ -39,6 +47,7 @@
     pin: null,
     enabled: false,
     testOnly: false,
+    singleLocalExecution: false,
     availableFinality: new Set(["SOFT"]),
     busy: false,
     stream: null,
@@ -175,6 +184,12 @@
       state.pin = payload.pin;
       state.enabled = payload.enabled === true;
       state.testOnly = payload.test_only === true;
+      state.singleLocalExecution = payload.execution_mode === "LOCAL_SINGLE_MODEL"
+        && payload.executor_claim_count === 1
+        && payload.soft_committee_quorum_met === false;
+      if (state.testOnly && !state.singleLocalExecution) {
+        throw new Error("The test gateway did not disclose its single-model execution boundary.");
+      }
       state.availableFinality = new Set(
         Array.isArray(payload.available_finality) ? payload.available_finality : ["SOFT"]
       );
@@ -183,6 +198,34 @@
       nodes.pinModel.textContent = shortHash(payload.pin.capsule_id);
       nodes.pinSnapshot.textContent = shortHash(payload.pin.knowledge_snapshot_id);
       nodes.pinReaders.textContent = `${new Set(payload.pin.agreeing_endpoints).size} / ${payload.minimum_state_endpoints || 3}`;
+      nodes.input.placeholder = state.singleLocalExecution
+        ? "Ask one specific question. This text is sent to one local test model."
+        : "Ask one specific question. The public profile sends this text to the selected executor committee.";
+      nodes.queryHelper.textContent = state.singleLocalExecution
+        ? "Local open mode: one local model sees the prompt. The chain receives bounded commitments, not this text."
+        : "Public mode: executors may see the prompt and retrieved context. The chain receives bounded commitments, not this text.";
+      nodes.publicModeTitle.textContent = state.singleLocalExecution ? "Local open model" : "Public committee";
+      nodes.publicModeNote.textContent = state.singleLocalExecution
+        ? "Prompt is visible to one local test model."
+        : "Prompt is visible to selected executors.";
+      nodes.softFinalityNote.textContent = state.singleLocalExecution
+        ? "One local model execution. No committee match."
+        : "Two matching stream claims. Reversible.";
+      nodes.answerEmptyDescription.textContent = state.singleLocalExecution
+        ? "This loopback pilot runs one local model. Its gateway receipt is not an executor committee match or a chain anchor."
+        : "When a gateway is activated, matching executor claims appear here first as SOFT. Anchoring and assurance update separately; neither label certifies that the answer is true.";
+      nodes.answerLoading.setAttribute(
+        "aria-label",
+        state.singleLocalExecution ? "Waiting for one local test model" : "Waiting for executor committee"
+      );
+      nodes.answerLoadingText.textContent = state.singleLocalExecution
+        ? "Waiting for one local test model. No committee execution is running."
+        : "Waiting for two matching executor streams.";
+      nodes.answerResultLabel.textContent = state.singleLocalExecution ? "Local test answer" : "Committed answer";
+      nodes.answerHeading.textContent = state.singleLocalExecution ? "Local model response" : "Executor response";
+      nodes.answerWarning.textContent = state.singleLocalExecution
+        ? "One local model executed. No executor agreement, chain anchor, or factual guarantee."
+        : "Execution agreement is not truth. Inspect sources and challenges.";
       if (state.enabled) {
         setNetworkState("ready", state.testOnly ? "Test pinned" : "Pinned");
         nodes.activation.textContent = state.testOnly ? "Local model · test only" : "Public test profile";
@@ -200,6 +243,8 @@
     } catch (error) {
       state.pin = null;
       state.enabled = false;
+      state.testOnly = false;
+      state.singleLocalExecution = false;
       setNetworkState("blocked", "Unavailable");
       nodes.activation.textContent = "Fail closed";
       nodes.pinDisclosure.textContent = error instanceof Error ? error.message : "Independent state pinning failed.";
@@ -215,7 +260,9 @@
   function renderFinality(finality) {
     const allowed = new Set(["SOFT", "ANCHORED", "ASSURED"]);
     const label = allowed.has(finality) ? finality : "SOFT";
-    nodes.answerFinality.textContent = label;
+    nodes.answerFinality.textContent = state.singleLocalExecution && label === "SOFT"
+      ? "LOCAL TEST"
+      : label;
     nodes.answerFinality.className = `finality-badge finality-${label.toLowerCase()}`;
   }
 
@@ -244,13 +291,28 @@
   }
 
   function renderReceipt(receipt) {
+    if (
+      state.singleLocalExecution
+      && (
+        receipt.execution_mode !== "LOCAL_SINGLE_MODEL"
+        || receipt.executor_claim_count !== 1
+        || receipt.soft_committee_quorum_met !== false
+      )
+    ) {
+      throw new Error("The receipt omitted the disclosed single-model execution boundary.");
+    }
     state.receipt = receipt;
     nodes.receiptFacts.replaceChildren(
       fact("Job", shortHash(receipt.job_id)),
       fact("Quote", shortHash(receipt.quote_id)),
       fact("Model", shortHash(receipt.capsule_id)),
       fact("Snapshot", shortHash(receipt.knowledge_snapshot_id)),
-      fact("Finality", receipt.actual_finality || "SOFT"),
+      fact(
+        "Assurance",
+        receipt.soft_committee_quorum_met === false
+          ? "LOCAL TEST · NO COMMITTEE"
+          : (receipt.actual_finality || "SOFT")
+      ),
       fact("Charged", `${Number(receipt.charged_micro_noos || 0).toLocaleString()} micro-NOOS`)
     );
     nodes.sourceList.replaceChildren();
@@ -286,22 +348,40 @@
         appendToken(payload.token);
       } catch {
         closeStream();
-        setError("The executor stream returned malformed token data.");
+        setError(
+          state.singleLocalExecution
+            ? "The local model stream returned malformed token data."
+            : "The executor stream returned malformed token data."
+        );
       }
     });
     state.stream.addEventListener("finality", (event) => {
       try {
         const payload = JSON.parse(event.data);
+        if (
+          state.singleLocalExecution
+          && (
+            payload.execution_mode !== "LOCAL_SINGLE_MODEL"
+            || payload.executor_claim_count !== 1
+            || payload.soft_committee_quorum_met !== false
+          )
+        ) {
+          throw new Error("Missing single-model execution disclosure.");
+        }
         renderFinality(payload.actual_finality);
       } catch {
-        renderFinality("SOFT");
+        closeStream();
+        setBusy(false);
+        setError("The execution status omitted a required assurance disclosure.");
       }
     });
     state.stream.addEventListener("receipt", (event) => {
       try {
         const receipt = JSON.parse(event.data);
         renderReceipt(receipt);
-        nodes.answerWarning.textContent = "Receipt received. Execution assurance remains separate from factual accuracy.";
+        nodes.answerWarning.textContent = state.singleLocalExecution
+          ? "Receipt received for one local model execution. No committee match, chain anchor, or factual guarantee."
+          : "Receipt received. Execution assurance remains separate from factual accuracy.";
       } catch {
         setError("The gateway returned a malformed receipt.");
       } finally {
@@ -310,7 +390,9 @@
       }
     });
     state.stream.addEventListener("gateway-error", (event) => {
-      let message = "The committee stopped before a receipt was available. No direct fallback was attempted.";
+      let message = state.singleLocalExecution
+        ? "The local test model stopped before a receipt was available. No fallback was attempted."
+        : "The committee stopped before a receipt was available. No direct fallback was attempted.";
       try {
         const payload = JSON.parse(event.data);
         if (typeof payload.error === "string") message = payload.error;
@@ -325,7 +407,11 @@
       if (!state.receipt) {
         closeStream();
         setBusy(false);
-        setError("The committee stream connection failed. The client did not retry through a direct or unpinned route.");
+        setError(
+          state.singleLocalExecution
+            ? "The local model stream failed. The client did not retry through an undisclosed route."
+            : "The committee stream connection failed. The client did not retry through a direct or unpinned route."
+        );
       }
     };
   }
