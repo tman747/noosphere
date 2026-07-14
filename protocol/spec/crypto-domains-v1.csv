@@ -84,3 +84,43 @@ D-BODY-RECEIPT-ROOT,BLAKE3_CONTEXT,NOOS/BODY/RECEIPT/V1,BLAKE3-256,noos-node,ASS
 D-BODY-CERT-ROOT,BLAKE3_CONTEXT,NOOS/BODY/CERT/V1,BLAKE3-256,noos-node,ASSIGNED per header-body.md field 20; finality_certificate_root = H(ctx || canonical finality_certificates list bytes); node-v1.md §3; G0 review
 D-BODY-TICKET-ROOT,BLAKE3_CONTEXT,NOOS/BODY/TICKET/V1,BLAKE3-256,noos-node,ASSIGNED per header-body.md field 24 (mandatory ticket every block; ch01 §4.2); ground_ticket_root = H(ctx || canonical 76-byte GroundTicketV1); node-v1.md §3; G0 review
 D-BLS-PROPOSER,BLS_DST,NOOS-BLS-PROPOSER-V1_BLS12381G2_XMD:SHA-256_SSWU_RO_,BLS12-381 G2 min-sig,noos-node,ASSIGNED per header-body.md fields 6/29 (Bytes48 proposer key / Bytes96 signature are BLS-shaped; the D-SIG-HEADER Ed25519 row cannot carry them); proposer signature over the 32-byte proposal_commitment; node-v1.md §3.3; G0 review
+D-WWM-MODEL-CAPSULE,BLAKE3_CONTEXT,NOOS/WWM/MODEL-CAPSULE/V1,BLAKE3-256,noos-species,ASSIGNED by wwm-v1.md §2; immutable ModelCapsuleV1 identity; experimental and non-consensus
+D-WWM-WEIGHT-MANIFEST,BLAKE3_CONTEXT,NOOS/WWM/WEIGHT-MANIFEST/V1,BLAKE3-256,noos-species,ASSIGNED by wwm-v1.md §2; ordered tensor and weight-shard manifest identity; experimental and non-consensus
+D-WWM-EXECUTOR-PROFILE,BLAKE3_CONTEXT,NOOS/WWM/EXECUTOR-PROFILE/V1,BLAKE3-256,noos-mind,ASSIGNED by wwm-v1.md §2; optional AI executor profile with no consensus weight
+D-WWM-QUERY-POLICY,BLAKE3_CONTEXT,NOOS/WWM/QUERY-POLICY/V1,BLAKE3-256,noos-mind,ASSIGNED by wwm-v1.md §2; bounded query and settlement policy
+D-WWM-PRIVATE-ENVELOPE,BLAKE3_CONTEXT,NOOS/WWM/PRIVATE-ENVELOPE/V1,BLAKE3-256,noos-umbra,ASSIGNED by wwm-v1.md §2; blinded private job envelope commitment
+D-WWM-MINDLINK,BLAKE3_CONTEXT,NOOS/WWM/MINDLINK/V1,BLAKE3-256,noos-mind,ASSIGNED by wwm-v1.md §2; immutable rights-aware knowledge contribution
+D-WWM-MINDLINK-TRANSITION,BLAKE3_CONTEXT,NOOS/WWM/MINDLINK-TRANSITION/V1,BLAKE3-256,noos-mind,ASSIGNED by wwm-v1.md §2; append-only knowledge lifecycle transition
+D-WWM-KNOWLEDGE-SNAPSHOT,BLAKE3_CONTEXT,NOOS/WWM/KNOWLEDGE-SNAPSHOT/V1,BLAKE3-256,noos-mind,ASSIGNED by wwm-v1.md §2; immutable eligible knowledge and index snapshot
+D-WWM-RETRIEVAL-RECEIPT,BLAKE3_CONTEXT,NOOS/WWM/RETRIEVAL-RECEIPT/V1,BLAKE3-256,noos-mind,ASSIGNED by wwm-v1.md §2; retrieval selection and citation receipt
+D-WWM-EVALUATION-REPORT,BLAKE3_CONTEXT,NOOS/WWM/EVALUATION-REPORT/V1,BLAKE3-256,noos-mind,ASSIGNED by wwm-v1.md §2; immutable candidate evaluation report
+D-WWM-ACTIVATION-PROPOSAL,BLAKE3_CONTEXT,NOOS/WWM/ACTIVATION-PROPOSAL/V1,BLAKE3-256,noos-mind,ASSIGNED by wwm-v1.md §2; delayed canary activation proposal
+D-WWM-SERVING-ALIAS,BLAKE3_CONTEXT,NOOS/WWM/SERVING-ALIAS/V1,BLAKE3-256,noos-mind,ASSIGNED by wwm-v1.md §2; immutable serving alias transition
+D-WWM-ROUTE-DESCRIPTOR,BLAKE3_CONTEXT,NOOS/WWM/ROUTE-DESCRIPTOR/V1,BLAKE3-256,noos-route,ASSIGNED by wwm-v1.md §2; bounded direct fast private deep mix or remote browser route
+D-WWM-BROWSER-BUILD,BLAKE3_CONTEXT,NOOS/WWM/BROWSER-BUILD/V1,BLAKE3-256,noos-mind,ASSIGNED by wwm-v1.md §2; reproducible signed browser build manifest identity
+D-WWM-CAPACITY-QUOTE,BLAKE3_CONTEXT,NOOS/WWM/CAPACITY-QUOTE/V1,BLAKE3-256,noos-mind,ASSIGNED by wwm-v1.md §2; bounded application escrow quote
+D-WWM-CUSTODY-POLICY,BLAKE3_CONTEXT,NOOS/WWM/CUSTODY-POLICY/V1,BLAKE3-256,noos-da,ASSIGNED by wwm-v1.md §3.2; bounded artifact custody replication and probe policy
+D-WWM-CUSTODY-COMMITMENT,BLAKE3_CONTEXT,NOOS/WWM/CUSTODY-COMMITMENT/V1,BLAKE3-256,noos-da,ASSIGNED by wwm-v1.md §3.2; signed custodian shard and retention commitment
+D-WWM-CUSTODY-SHARD,BLAKE3_CONTEXT,NOOS/WWM/CUSTODY-SHARD/V1,BLAKE3-256,noos-da,ASSIGNED by wwm-v1.md §3.2; policy and index bound retrieved artifact shard digest
+D-WWM-CUSTODY-PROBE,BLAKE3_CONTEXT,NOOS/WWM/CUSTODY-PROBE/V1,BLAKE3-256,noos-da,ASSIGNED by wwm-v1.md §3.2; verified custody challenge response record
+D-WWM-CUSTODY-CERTIFICATE,BLAKE3_CONTEXT,NOOS/WWM/CUSTODY-CERTIFICATE/V1,BLAKE3-256,noos-da,ASSIGNED by wwm-v1.md §3.2; point-in-time failure-domain availability certificate
+D-WWM-INFERENCE-PROFILE,BLAKE3_CONTEXT,NOOS/WWM/INFERENCE-PROFILE/V1,BLAKE3-256,noos-nel,ASSIGNED by wwm-v1.md §3.3; registered complete deterministic model and arithmetic profile
+D-WWM-INFERENCE-TRANSCRIPT,BLAKE3_CONTEXT,NOOS/WWM/INFERENCE-TRANSCRIPT/V1,BLAKE3-256,noos-nel,ASSIGNED by wwm-v1.md §3.3; independently produced tokenizer operator KV logits and decode transcript
+D-WWM-PUBLIC-COMMITTEE,BLAKE3_CONTEXT,NOOS/WWM/PUBLIC-COMMITTEE/V1,BLAKE3-256,noos-nel,ASSIGNED by wwm-v1.md §3.4; finalized-randomness committee selection result
+D-WWM-STREAM-CLAIM,BLAKE3_CONTEXT,NOOS/WWM/STREAM-CLAIM/V1,BLAKE3-256,noos-nel,ASSIGNED by wwm-v1.md §3.4; quorum stream chunk and tail reassignment claim
+D-WWM-PUBLIC-QUOTE,BLAKE3_CONTEXT,NOOS/WWM/PUBLIC-QUOTE/V1,BLAKE3-256,noos-mind-gateway,ASSIGNED by wwm-v1.md §3.5; pinned public query quote
+D-WWM-PUBLIC-RECEIPT,BLAKE3_CONTEXT,NOOS/WWM/PUBLIC-RECEIPT/V1,BLAKE3-256,noos-mind-gateway,ASSIGNED by wwm-v1.md §3.5; final public job status and settlement receipt
+D-WWM-ATTESTATION-POLICY,BLAKE3_CONTEXT,NOOS/WWM/ATTESTATION-POLICY/V1,BLAKE3-256,noos-umbra,ASSIGNED by wwm-v1.md §3.6; admitted CPU GPU firmware runtime and revocation policy
+D-WWM-ATTESTATION-QUOTE,BLAKE3_CONTEXT,NOOS/WWM/ATTESTATION-QUOTE/V1,BLAKE3-256,noos-umbra,ASSIGNED by wwm-v1.md §3.6; challenge bound composite attestation statement
+D-WWM-BLINDED-RECEIPT,BLAKE3_CONTEXT,NOOS/WWM/BLINDED-RECEIPT/V1,BLAKE3-256,noos-umbra,ASSIGNED by wwm-v1.md §3.6; unlinkable private completion and refund receipt
+D-WWM-MIX-PACKET,BLAKE3_CONTEXT,NOOS/WWM/MIX-PACKET/V1,BLAKE3-256,noos-mix,ASSIGNED by wwm-v1.md §3.7; fixed bucket deep route packet
+D-WWM-MIND-NAME,BLAKE3_CONTEXT,NOOS/WWM/MIND-NAME/V1,BLAKE3-256,noos-wallet,ASSIGNED by wwm-v1.md §3.8; publisher and immutable content bound native name
+D-WWM-PERMISSION-RECEIPT,BLAKE3_CONTEXT,NOOS/WWM/PERMISSION-RECEIPT/V1,BLAKE3-256,noos-wallet,ASSIGNED by wwm-v1.md §3.8; origin partitioned local capability decision
+D-WWM-DATASET-SNAPSHOT,BLAKE3_CONTEXT,NOOS/WWM/DATASET-SNAPSHOT/V1,BLAKE3-256,noos-training,ASSIGNED by wwm-v1.md §3.11; immutable rights filtered train eval split
+D-WWM-TRAINING-RECIPE,BLAKE3_CONTEXT,NOOS/WWM/TRAINING-RECIPE/V1,BLAKE3-256,noos-training,ASSIGNED by wwm-v1.md §3.11; bounded deterministic adapter recipe
+D-WWM-UPDATE-PACKET,BLAKE3_CONTEXT,NOOS/WWM/UPDATE-PACKET/V1,BLAKE3-256,noos-training,ASSIGNED by wwm-v1.md §3.11; immutable adapter delta and checkpoint lineage
+D-WWM-TRAINER-RECEIPT,BLAKE3_CONTEXT,NOOS/WWM/TRAINER-RECEIPT/V1,BLAKE3-256,noos-training,ASSIGNED by wwm-v1.md §3.11; signed trainer execution and fidelity receipt
+D-WWM-TELEMETRY-ROOT,BLAKE3_CONTEXT,NOOS/WWM/TELEMETRY-ROOT/V1,BLAKE3-256,noos-workerd,ASSIGNED by wwm-v1.md §3.14; bounded aggregate privacy-safe operational window
+D-WWM-RELEASE-MANIFEST,BLAKE3_CONTEXT,NOOS/WWM/RELEASE-MANIFEST/V1,BLAKE3-256,noos-mind,ASSIGNED by wwm-v1.md §3.15; reproducible source artifact builder and rollback manifest
+D-WWM-EVIDENCE-BUNDLE,BLAKE3_CONTEXT,NOOS/WWM/EVIDENCE-BUNDLE/V1,BLAKE3-256,noos-mind,ASSIGNED by wwm-v1.md §3.15; immutable experiment input log result and reproduction bundle
+D-SIG-WWM,ED25519_PREFIX,NOOS/SIG/WWM/V1,Ed25519,noos-mind,ASSIGNED by wwm-v1.md §1; WWM object signatures additionally bind the object-specific hash-domain identifier and canonical body

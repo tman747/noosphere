@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "claim_registry": "protocol/claims/wwm-registry.json",
+  "evidence_bundle_schema": "protocol/release/wwm-evidence-bundle.schema.json",
+  "controls_enabled": false,
+  "common_policy": {
+    "exact_source_revision_required": true,
+    "sealed_content_addressed_bundle_required": true,
+    "minimum_independent_attestations": 3,
+    "minimum_distinct_control_clusters": 3,
+    "required_attestation_roles": ["experiment_operator", "independent_reproducer", "independent_verifier"],
+    "minimum_independent_reproductions": 2,
+    "all_dependency_receipts_must_pass": true,
+    "maximum_unresolved_severity_1_findings": 0,
+    "promotion_record_required": true,
+    "controls_remain_disabled_after_pass": true
+  },
+  "claim_policies": [
+    {
+      "claim_id": "E-WWM-01",
+      "required_artifact_kinds": ["operator_transcripts", "cross_vendor_vectors", "hardware_manifests"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["rollback"]
+    },
+    {
+      "claim_id": "E-WWM-02",
+      "required_artifact_kinds": ["load_traces", "signed_job_receipts", "base_chain_telemetry"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["failure_refund", "rollback"]
+    },
+    {
+      "claim_id": "E-WWM-03",
+      "required_artifact_kinds": ["custody_receipts", "repair_traces", "concentration_report"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["region_loss", "rollback"]
+    },
+    {
+      "claim_id": "E-WWM-04",
+      "required_artifact_kinds": ["attack_corpus", "dispute_transcripts", "settlement_ledger"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 0,
+      "red_team_required": true,
+      "required_drills": ["rollback"]
+    },
+    {
+      "claim_id": "E-WWM-05",
+      "required_artifact_kinds": ["attestation_matrix", "forensic_report", "revocation_traces"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["revocation", "rollback"]
+    },
+    {
+      "claim_id": "E-WWM-06",
+      "required_artifact_kinds": ["complete_relation_manifest", "backend_benchmarks", "cryptanalysis_report"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["abort_refund", "rollback"]
+    },
+    {
+      "claim_id": "E-WWM-07",
+      "required_artifact_kinds": ["attack_corpus", "leakage_measurements", "linkability_report"],
+      "second_client_vectors_required": false,
+      "minimum_independent_builders": 0,
+      "red_team_required": true,
+      "required_drills": ["commitment_withdrawal"]
+    },
+    {
+      "claim_id": "E-WWM-08",
+      "required_artifact_kinds": ["route_descriptors", "packet_captures", "linkability_report"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["no_direct_fallback", "rollback"]
+    },
+    {
+      "claim_id": "E-WWM-09",
+      "required_artifact_kinds": ["mix_topology", "packet_traces", "traffic_analysis_report"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["region_loss", "rollback"]
+    },
+    {
+      "claim_id": "E-WWM-10",
+      "required_artifact_kinds": ["origin_matrix", "reproducible_builds", "update_attack_results"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["install", "update", "rollback"]
+    },
+    {
+      "claim_id": "E-WWM-11",
+      "required_artifact_kinds": ["poison_corpus", "moderation_decisions", "retrieval_contamination_report"],
+      "second_client_vectors_required": false,
+      "minimum_independent_builders": 0,
+      "red_team_required": true,
+      "required_drills": ["snapshot_rollback"]
+    },
+    {
+      "claim_id": "E-WWM-12",
+      "required_artifact_kinds": ["secure_aggregation_transcripts", "poison_attack_results", "dropout_report"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["cohort_abort", "rollback"]
+    },
+    {
+      "claim_id": "E-WWM-13",
+      "required_artifact_kinds": ["evaluation_reports", "canary_telemetry", "alias_transition_log"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["install", "canary", "automatic_rollback"]
+    },
+    {
+      "claim_id": "E-WWM-14",
+      "required_artifact_kinds": ["market_simulation", "pilot_settlements", "concentration_report"],
+      "second_client_vectors_required": false,
+      "minimum_independent_builders": 0,
+      "red_team_required": true,
+      "required_drills": ["sponsor_cap", "refund"]
+    },
+    {
+      "claim_id": "E-WWM-15",
+      "required_artifact_kinds": ["blackout_timeline", "recovery_telemetry", "refund_audit"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["install", "region_loss", "blackout", "rollback"]
+    },
+    {
+      "claim_id": "E-WWM-16",
+      "required_artifact_kinds": ["usability_protocol", "accessibility_results", "consent_comprehension_report"],
+      "second_client_vectors_required": false,
+      "minimum_independent_builders": 0,
+      "red_team_required": false,
+      "required_drills": ["onboarding_recovery"]
+    },
+    {
+      "claim_id": "E-WWM-17",
+      "required_artifact_kinds": ["rights_corpus", "revocation_transitions", "snapshot_exclusion_report"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 0,
+      "red_team_required": true,
+      "required_drills": ["revocation", "snapshot_rollback"]
+    },
+    {
+      "claim_id": "E-WWM-18",
+      "required_artifact_kinds": ["governance_simulation", "control_cluster_audit", "activation_decision_log"],
+      "second_client_vectors_required": false,
+      "minimum_independent_builders": 0,
+      "red_team_required": true,
+      "required_drills": ["emergency_expiry", "fork", "rollback"]
+    },
+    {
+      "claim_id": "E-WWM-19",
+      "required_artifact_kinds": ["private_cache_forensics", "telemetry_windows", "deletion_receipts"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["cache_purge", "crash_recovery"]
+    },
+    {
+      "claim_id": "E-WWM-20",
+      "required_artifact_kinds": ["identity_matrix", "downgrade_attack_results", "client_interop_vectors"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["install", "update", "rollback"]
+    },
+    {
+      "claim_id": "E-WWM-21",
+      "required_artifact_kinds": ["query_corpus", "retrieval_receipts", "cross_builder_index_roots"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": false,
+      "required_drills": ["index_rebuild", "snapshot_rollback"]
+    },
+    {
+      "claim_id": "E-WWM-22",
+      "required_artifact_kinds": ["memorization_canaries", "extraction_results", "privacy_accounting"],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": ["candidate_quarantine", "rollback"]
+    }
+  ]
+}

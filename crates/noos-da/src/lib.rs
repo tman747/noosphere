@@ -37,6 +37,7 @@
 #![forbid(unsafe_code)]
 
 mod body;
+pub mod custody;
 mod descriptor;
 mod error;
 mod merkle;

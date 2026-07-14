@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindchain.example/protocol/release/wwm-release-manifest.schema.json",
+  "title": "World Wide Mind exact-revision release evidence manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_revision",
+    "wwm_registry_sha256",
+    "experiment_registry_sha256",
+    "claim_bundle_ids",
+    "independent_control_clusters",
+    "reproducible_artifact_roots",
+    "unresolved_severity1_findings",
+    "controls_enabled",
+    "promotion_effect",
+    "manifest_id"
+  ],
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "bundle_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "properties": {
+    "schema_version": {"const": 1},
+    "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "wwm_registry_sha256": {"$ref": "#/$defs/hash"},
+    "experiment_registry_sha256": {"$ref": "#/$defs/hash"},
+    "claim_bundle_ids": {
+      "type": "object",
+      "minProperties": 22,
+      "maxProperties": 22,
+      "patternProperties": {
+        "^E-WWM-(0[1-9]|1[0-9]|2[0-2])$": {"$ref": "#/$defs/bundle_id"}
+      },
+      "additionalProperties": false
+    },
+    "independent_control_clusters": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/hash"}
+    },
+    "reproducible_artifact_roots": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/hash"}
+    },
+    "unresolved_severity1_findings": {"const": 0},
+    "controls_enabled": {"const": false},
+    "promotion_effect": {"const": "NONE_REQUIRES_SEPARATE_SIGNED_DECISION"},
+    "manifest_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

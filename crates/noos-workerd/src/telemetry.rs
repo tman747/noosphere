@@ -6,6 +6,8 @@
 //! this module re-reads the frozen spec and fails if an emission drifts out
 //! of the bounded enums or touches a prohibited label key.
 
+pub mod wwm;
+
 /// Completed jobs, reported as terminal-state NEL jobs.
 pub const TERMINAL_JOBS_FAMILY: &str = "noos_nel_finality_state_jobs";
 const TERMINAL_JOBS_LABEL_KEY: &str = "state";

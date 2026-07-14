@@ -10,6 +10,8 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod inference;
 pub mod lab;
 pub mod luts;
+pub mod public;
+pub mod registered;
 
 pub type Hash32 = [u8; 32];
 pub type PublicKey = [u8; 32];

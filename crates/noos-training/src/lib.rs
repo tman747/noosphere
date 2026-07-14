@@ -16,6 +16,7 @@ pub mod adjoint;
 pub mod reaction;
 pub mod rl_lag;
 pub mod toploc;
+pub mod wwm;
 
 pub use reaction::{
     CandidateState, PromotionController, Reaction, ReactionCapsule, ReactionReplay,

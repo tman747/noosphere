@@ -1,0 +1,329 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindchain.network/noosphere/protocol/schemas/mindlink-v1.schema.json",
+  "title": "MindLink v1",
+  "description": "Canonical rights-aware World Wide Mind knowledge contribution interchange object. JSON member order is not consensus identity; implementations derive the ID from the wwm-v1 canonical binary projection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mindlink_version",
+    "id",
+    "predecessors",
+    "supersedes",
+    "type",
+    "title",
+    "content",
+    "language",
+    "locale",
+    "domain_tags",
+    "uncertainty",
+    "contributor",
+    "authority",
+    "provenance",
+    "relations",
+    "rights",
+    "challenge",
+    "moderation",
+    "lifecycle",
+    "created_height",
+    "updated_height",
+    "content_root",
+    "provenance_root",
+    "rights_root",
+    "relations_root",
+    "signature"
+  ],
+  "properties": {
+    "mindlink_version": { "const": "1.0" },
+    "id": { "$ref": "#/$defs/hash32" },
+    "predecessors": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/hash32" }
+    },
+    "supersedes": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/hash32" }
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "observation",
+        "claim",
+        "question",
+        "correction",
+        "counterclaim",
+        "source",
+        "method",
+        "experience",
+        "warning",
+        "translation",
+        "cultural_record"
+      ]
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 180 },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["original_text", "encrypted_content_root", "summary", "summary_derived"],
+      "properties": {
+        "original_text": { "type": "string", "maxLength": 65536 },
+        "encrypted_content_root": {
+          "oneOf": [
+            { "$ref": "#/$defs/hash32" },
+            { "type": "null" }
+          ]
+        },
+        "summary": { "type": "string", "maxLength": 4096 },
+        "summary_derived": { "type": "boolean" }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "original_text": { "type": "string", "minLength": 1 },
+            "encrypted_content_root": { "type": "null" }
+          }
+        },
+        {
+          "properties": {
+            "original_text": { "const": "" },
+            "encrypted_content_root": { "$ref": "#/$defs/hash32" }
+          }
+        }
+      ]
+    },
+    "language": { "type": "string", "minLength": 2, "maxLength": 35 },
+    "locale": { "type": "string", "maxLength": 35 },
+    "domain_tags": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+    },
+    "uncertainty": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "contributor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "public_key", "credential_root", "display_name"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["named", "pseudonymous", "blind_credential"] },
+        "public_key": {
+          "oneOf": [
+            { "$ref": "#/$defs/hash32" },
+            { "type": "null" }
+          ]
+        },
+        "credential_root": {
+          "oneOf": [
+            { "$ref": "#/$defs/hash32" },
+            { "type": "null" }
+          ]
+        },
+        "display_name": { "type": "string", "maxLength": 160 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "blind_credential" } } },
+          "then": {
+            "properties": {
+              "public_key": { "type": "null" },
+              "credential_root": { "$ref": "#/$defs/hash32" }
+            }
+          },
+          "else": {
+            "properties": {
+              "public_key": { "$ref": "#/$defs/hash32" },
+              "credential_root": { "type": "null" }
+            }
+          }
+        }
+      ]
+    },
+    "authority": {
+      "type": "array",
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/authority" }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sources", "evidence_ids", "derived_from", "c2pa_manifest_refs"],
+      "properties": {
+        "sources": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/source" }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/hash32" }
+        },
+        "derived_from": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/hash32" }
+        },
+        "c2pa_manifest_refs": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 2048 }
+        }
+      }
+    },
+    "relations": {
+      "type": "array",
+      "maxItems": 256,
+      "items": { "$ref": "#/$defs/relation" }
+    },
+    "rights": { "$ref": "#/$defs/rights" },
+    "challenge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "policy_root", "bond_micro_noos", "open_challenge_ids"],
+      "properties": {
+        "status": { "type": "string", "enum": ["unchallenged", "open", "resolved_upheld", "resolved_rejected"] },
+        "policy_root": { "$ref": "#/$defs/hash32" },
+        "bond_micro_noos": { "$ref": "#/$defs/u64" },
+        "open_challenge_ids": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/hash32" }
+        }
+      }
+    },
+    "moderation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace_root", "status", "decision_ids"],
+      "properties": {
+        "namespace_root": { "$ref": "#/$defs/hash32" },
+        "status": {
+          "type": "string",
+          "enum": ["not_reviewed", "quarantined", "reviewed_eligible", "reviewed_rejected", "revoked_future_use"]
+        },
+        "decision_ids": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/hash32" }
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "string",
+      "enum": [
+        "local_draft",
+        "submitted",
+        "quarantined",
+        "provenance_checked",
+        "challenged",
+        "retrieval_eligible",
+        "snapshot_candidate",
+        "snapshot_accepted",
+        "training_candidate",
+        "dataset_accepted",
+        "rejected",
+        "revoked_future_use"
+      ]
+    },
+    "created_height": { "$ref": "#/$defs/u64" },
+    "updated_height": { "$ref": "#/$defs/u64" },
+    "content_root": { "$ref": "#/$defs/hash32" },
+    "provenance_root": { "$ref": "#/$defs/hash32" },
+    "rights_root": { "$ref": "#/$defs/hash32" },
+    "relations_root": { "$ref": "#/$defs/hash32" },
+    "signature": { "$ref": "#/$defs/signature64" }
+  },
+  "$defs": {
+    "hash32": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "signature64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "u64": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "JSON-safe subset; binary canonical form supports full u64. APIs use a decimal string extension if values exceed the JSON-safe range."
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "statement", "evidence_root", "valid_from_height", "expires_height"],
+      "properties": {
+        "domain": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "evidence_root": { "$ref": "#/$defs/hash32" },
+        "valid_from_height": { "$ref": "#/$defs/u64" },
+        "expires_height": {
+          "oneOf": [
+            { "$ref": "#/$defs/u64" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "content_hash", "title", "publisher", "retrieved_at"],
+      "properties": {
+        "uri": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "content_hash": { "$ref": "#/$defs/hash32" },
+        "title": { "type": "string", "maxLength": 256 },
+        "publisher": { "type": "string", "maxLength": 256 },
+        "retrieved_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "target_id", "reason"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["supports", "contradicts", "corrects", "translates", "derives", "duplicates", "contextualizes"]
+        },
+        "target_id": { "$ref": "#/$defs/hash32" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 1024 }
+      }
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visibility",
+        "retrieval_permission",
+        "training_permission",
+        "commercial_use",
+        "derivative_model_permission",
+        "attribution_required",
+        "license",
+        "retention_request",
+        "cultural_constraints"
+      ],
+      "properties": {
+        "visibility": { "type": "string", "enum": ["sealed_group", "unlisted", "public", "revoked_future_use"] },
+        "retrieval_permission": { "type": "string", "enum": ["deny", "conditional", "allow"] },
+        "training_permission": { "type": "string", "enum": ["deny", "conditional", "allow"] },
+        "commercial_use": { "type": "string", "enum": ["deny", "conditional", "allow"] },
+        "derivative_model_permission": { "type": "string", "enum": ["deny", "conditional", "allow"] },
+        "attribution_required": { "type": "boolean" },
+        "license": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "retention_request": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "cultural_constraints": { "type": "string", "maxLength": 512 }
+      }
+    }
+  }
+}

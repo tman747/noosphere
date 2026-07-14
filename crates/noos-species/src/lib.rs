@@ -6,8 +6,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod activation;
 pub mod artifact;
 mod canonical;
+pub mod capsule;
 pub mod quotient;
 mod update;
 
@@ -15,6 +17,7 @@ pub use artifact::{
     topology_local_indices, ArtifactShard, DerivationEdge, EncodedArtifact, ErasureProfile,
     ServingTraffic, ShardLocation,
 };
+pub use capsule::{ModelCapsule, PublisherSignature, WWM_MODEL_ACTIVATION_ENABLED};
 pub use quotient::{
     build_finite_quotient, FiniteQuotient, NonTransitiveCounterexample, SuiteMember,
 };
@@ -336,6 +339,8 @@ pub enum SpeciesError {
     MutableCurrentWeightsForbidden,
     ToleranceTransitivityForbidden,
     ConsensusEvidenceForbidden,
+    InvalidCapsule,
+    InvalidCapsuleSignature,
     InvalidArtifactSchema,
     ArtifactLengthMismatch,
     ArtifactDigestMismatch,
@@ -423,6 +428,7 @@ pub struct Registry {
     serving_profiles: BTreeMap<Hash32, ServingProfile>,
     updates: BTreeMap<Hash32, UpdatePacket>,
     learning_records: BTreeMap<Hash32, LearningRecord>,
+    capsules: BTreeMap<Hash32, ModelCapsule>,
 }
 
 fn insert_once<T>(map: &mut BTreeMap<Hash32, T>, id: Hash32, value: T) -> Result<(), SpeciesError> {
@@ -513,6 +519,46 @@ impl Registry {
             return Err(SpeciesError::InvalidRevision);
         }
         insert_once(&mut self.revisions, value.revision_id, value)
+    }
+    pub fn register_capsule(&mut self, value: ModelCapsule) -> Result<(), SpeciesError> {
+        value.validate()?;
+        let revision = self
+            .revisions
+            .get(&value.revision_id)
+            .ok_or(SpeciesError::InvalidCapsule)?;
+        if revision.species_id != value.species_id
+            || !self
+                .numeric_profiles
+                .contains_key(&value.numeric_profile_id)
+            || !revision
+                .required_artifacts
+                .contains(&value.weight_manifest_root)
+            || !revision.required_artifacts.contains(&value.tokenizer_root)
+            || value
+                .parents
+                .iter()
+                .any(|id| !self.revisions.contains_key(id))
+            || self
+                .revisions
+                .get(&value.rollback_revision_id)
+                .is_none_or(|rollback| rollback.species_id != value.species_id)
+        {
+            return Err(SpeciesError::InvalidCapsule);
+        }
+        insert_once(&mut self.capsules, value.capsule_id, value)
+    }
+
+    #[must_use]
+    pub fn capsule(&self, id: &Hash32) -> Option<&ModelCapsule> {
+        self.capsules.get(id)
+    }
+
+    #[must_use]
+    pub fn capsules_for_species(&self, species_id: &Hash32) -> Vec<&ModelCapsule> {
+        self.capsules
+            .values()
+            .filter(|capsule| &capsule.species_id == species_id)
+            .collect()
     }
     pub fn register_claim(&mut self, value: EquivalenceClaim) -> Result<(), SpeciesError> {
         if !self.revisions.contains_key(&value.candidate)

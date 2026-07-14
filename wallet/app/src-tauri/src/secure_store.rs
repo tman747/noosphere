@@ -12,6 +12,8 @@ use zeroize::Zeroizing;
 const SERVICE: &str = "org.noosphere.mindchain-wallet.seed.v1";
 const MIN_SEED_BYTES: usize = 16;
 const MAX_SEED_BYTES: usize = 128;
+const BROWSER_VAULT_SERVICE: &str = "org.noosphere.mindchain-browser-vault.v1";
+const BROWSER_VAULT_KEY_BYTES: usize = 32;
 
 #[derive(Debug, Error)]
 pub enum SecureStoreError {
@@ -19,15 +21,26 @@ pub enum SecureStoreError {
     InvalidWalletId,
     #[error("invalid_seed")]
     InvalidSeed,
+    #[error("invalid_browser_vault_key")]
+    InvalidBrowserVaultKey,
     #[error("secure_store_unavailable")]
     Unavailable,
     #[error("wallet_not_found")]
     NotFound,
+    #[error("browser_vault_not_found")]
+    BrowserVaultNotFound,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WalletHandle {
     pub wallet_id: String,
+    pub protection: String,
+    pub secret_exported_to_ui: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BrowserVaultHandle {
+    pub profile_id: String,
     pub protection: String,
     pub secret_exported_to_ui: bool,
 }
@@ -46,6 +59,11 @@ fn validate_wallet_id(wallet_id: &str) -> Result<(), SecureStoreError> {
 fn entry(wallet_id: &str) -> Result<Entry, SecureStoreError> {
     validate_wallet_id(wallet_id)?;
     Entry::new(SERVICE, wallet_id).map_err(|_| SecureStoreError::Unavailable)
+}
+
+fn browser_vault_entry(profile_id: &str) -> Result<Entry, SecureStoreError> {
+    validate_wallet_id(profile_id)?;
+    Entry::new(BROWSER_VAULT_SERVICE, profile_id).map_err(|_| SecureStoreError::Unavailable)
 }
 
 /// Import seed material into the logged-in user's native credential vault.
@@ -95,6 +113,51 @@ pub fn delete_seed(wallet_id: &str) -> Result<(), SecureStoreError> {
         })
 }
 
+/// Store a 32-byte browser-vault root generated inside the trusted native
+/// process. UI commands must never accept or return this key.
+pub fn store_browser_vault_key(
+    profile_id: &str,
+    key: Zeroizing<Vec<u8>>,
+) -> Result<BrowserVaultHandle, SecureStoreError> {
+    if key.len() != BROWSER_VAULT_KEY_BYTES {
+        return Err(SecureStoreError::InvalidBrowserVaultKey);
+    }
+    browser_vault_entry(profile_id)?
+        .set_secret(key.as_slice())
+        .map_err(|_| SecureStoreError::Unavailable)?;
+    Ok(BrowserVaultHandle {
+        profile_id: profile_id.to_owned(),
+        protection: platform_protection().to_owned(),
+        secret_exported_to_ui: false,
+    })
+}
+
+/// Load the root only into zeroizing Rust memory for per-origin key
+/// derivation. Callers must not serialize, log, or return it to web content.
+pub fn load_browser_vault_key(
+    profile_id: &str,
+) -> Result<Zeroizing<Vec<u8>>, SecureStoreError> {
+    let secret = browser_vault_entry(profile_id)?
+        .get_secret()
+        .map_err(|error| match error {
+            keyring::Error::NoEntry => SecureStoreError::BrowserVaultNotFound,
+            _ => SecureStoreError::Unavailable,
+        })?;
+    if secret.len() != BROWSER_VAULT_KEY_BYTES {
+        return Err(SecureStoreError::InvalidBrowserVaultKey);
+    }
+    Ok(Zeroizing::new(secret))
+}
+
+pub fn delete_browser_vault_key(profile_id: &str) -> Result<(), SecureStoreError> {
+    browser_vault_entry(profile_id)?
+        .delete_credential()
+        .map_err(|error| match error {
+            keyring::Error::NoEntry => SecureStoreError::BrowserVaultNotFound,
+            _ => SecureStoreError::Unavailable,
+        })
+}
+
 fn platform_protection() -> &'static str {
     #[cfg(target_os = "windows")]
     {
@@ -127,6 +190,16 @@ mod tests {
                 "invalid_wallet_id"
             );
         }
+    }
+
+    #[test]
+    fn browser_vault_root_is_exactly_32_bytes() {
+        let error = store_browser_vault_key(
+            "browser-primary",
+            Zeroizing::new(vec![7; BROWSER_VAULT_KEY_BYTES - 1]),
+        )
+        .unwrap_err();
+        assert_eq!(error.to_string(), "invalid_browser_vault_key");
     }
 
     #[test]

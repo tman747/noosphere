@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "namespace": "noos_wwm",
+  "status": "EXPERIMENTAL_G0_DISABLED",
+  "authority": "docs/world-wide-mind-architecture-and-rd-plan.md#wp14--privacy-preserving-operations-and-observability",
+  "semantics": {
+    "aggregation_only": true,
+    "raw_prompts_or_outputs": false,
+    "private_canaries_in_logs": false,
+    "unknown_value": "UNKNOWN",
+    "unknown_never_passes_gate": true,
+    "maximum_series_per_window": 256,
+    "maximum_points_per_series": 100000000,
+    "maximum_retention_blocks": 201600,
+    "signed_window_domain": "D-WWM-TELEMETRY-ROOT",
+    "consensus_weight": 0,
+    "finality_weight": 0,
+    "activation_authority": false
+  },
+  "prohibited_label_keys": [
+    "address",
+    "block_hash",
+    "browser_origin",
+    "canary",
+    "destination",
+    "dispute_id",
+    "job",
+    "job_id",
+    "knowledge_snapshot_id",
+    "mindlink_id",
+    "model_root",
+    "output",
+    "peer_id",
+    "prompt",
+    "receipt_id",
+    "request_id",
+    "route_descriptor_id",
+    "session_id",
+    "transaction",
+    "txid",
+    "user_id",
+    "vault_id",
+    "wallet",
+    "website"
+  ],
+  "labels": {
+    "privacy_profile": ["open", "attested", "sealed_witness", "deep_sealed"],
+    "outcome": ["ok", "rejected", "timeout", "refunded", "error"],
+    "route_class": ["direct", "fast_ohttp", "fast_onion", "deep_mix", "remote_confidential_browser"],
+    "assurance": ["soft", "anchored", "assured_tee", "proven"],
+    "region_class": ["primary", "secondary", "tertiary", "other"]
+  },
+  "metric_families": [
+    "query_latency",
+    "token_throughput",
+    "availability",
+    "retrieval_latency",
+    "route_latency",
+    "queue_depth",
+    "private_cache_bytes",
+    "refund_latency",
+    "contract_violation",
+    "region_health"
+  ],
+  "histogram_upper_bounds_microseconds": [100000, 250000, 500000, 1000000, 2000000, 5000000, 10000000, "MAX_U64"],
+  "window_fields": [
+    "window_start_height",
+    "window_end_height",
+    "retention_until_height",
+    "policy_root",
+    "producer_key",
+    "producer_control_cluster",
+    "ordered_aggregate_points",
+    "metrics_root",
+    "window_id",
+    "signature"
+  ],
+  "retention": {
+    "expired_windows_are_unavailable": true,
+    "deletion_receipt_required": true,
+    "deletion_receipt_fields": ["deleted_window_ids", "policy_root", "deletion_height", "operator_key", "receipt_id", "signature"]
+  },
+  "audit_access": {
+    "aggregate_windows_only": true,
+    "roles": ["operator", "independent_auditor", "incident_responder"],
+    "purpose_binding_required": true,
+    "expiry_required": true,
+    "signed_receipt_required": true
+  },
+  "incident_modes": {
+    "normal": ["freeze_model_activation", "continue_aggregate_telemetry"],
+    "region_degraded": ["freeze_model_activation", "freeze_new_private_jobs", "preserve_refund_path", "fail_over_healthy_regions", "purge_private_caches", "continue_aggregate_telemetry", "await_consecutive_healthy_windows"],
+    "blackout": ["freeze_model_activation", "freeze_new_private_jobs", "preserve_refund_path", "require_independent_state_quorum", "purge_private_caches", "continue_aggregate_telemetry", "await_consecutive_healthy_windows"]
+  },
+  "recovery": {
+    "minimum_healthy_regions": 3,
+    "minimum_independent_state_reads": 2,
+    "consecutive_healthy_windows": 3,
+    "private_cache_purge_required": true
+  }
+}

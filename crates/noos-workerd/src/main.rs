@@ -54,7 +54,6 @@
 mod config;
 mod hex;
 mod runtime;
-mod telemetry;
 
 use std::io::BufRead as _;
 use std::process::ExitCode;

@@ -10,8 +10,31 @@ permissions:
   contents: read
 
 jobs:
+  wwm-evidence-contract:
+    name: WWM evidence contract stays fail-closed
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out bound revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install pinned Python contract runtime
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.13.5"
+
+      - name: Validate disabled WWM claims and evidence policies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/gates/wwm_evidence_bundle.py validate-contract
+          python tools/gates/run_wwm_claim.py --validate-only
+
   candidate:
     name: candidate ${{ matrix.target }}
+    needs: wwm-evidence-contract
     strategy:
       fail-fast: false
       matrix:

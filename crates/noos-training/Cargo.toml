@@ -8,7 +8,9 @@ license.workspace = true
 [dependencies]
 blake3 = "1.8"
 noos-analytics = { path = "../noos-analytics" }
+noos-crypto = { path = "../noos-crypto" }
 noos-nel = { path = "../noos-nel" }
+noos-mind = { path = "../noos-mind" }
 noos-species = { path = "../noos-species" }
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"

@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindchain.example/protocol/release/wwm-evidence-bundle.schema.json",
+  "title": "World Wide Mind immutable evidence bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim_id",
+    "source_revision",
+    "preregistration_sha256",
+    "environment",
+    "result",
+    "artifacts",
+    "dependency_receipts",
+    "reproductions",
+    "second_client_vectors",
+    "reproducible_builds",
+    "red_team_engagements",
+    "drills",
+    "promotion_record",
+    "severity1_open_findings",
+    "attestations",
+    "sealed",
+    "bundle_id"
+  ],
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "sha256", "bytes"],
+      "properties": {
+        "kind": {"type": "string", "pattern": "^[a-z0-9_][a-z0-9_.-]{0,63}$"},
+        "path": {"type": "string", "pattern": "^artifacts/[a-z0-9_][a-z0-9_.-]{0,63}/[0-9a-f]{64}$"},
+        "sha256": {"$ref": "#/$defs/hash"},
+        "bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requirement_id", "source_revision", "verdict", "evidence_sha256"],
+      "properties": {
+        "requirement_id": {"type": "string", "minLength": 1},
+        "source_revision": {"$ref": "#/$defs/revision"},
+        "verdict": {"const": "PASS"},
+        "evidence_sha256": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "reproduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator_id", "control_cluster_id", "source_revision", "environment_sha256", "artifact_sha256", "verdict"],
+      "properties": {
+        "operator_id": {"type": "string", "minLength": 1},
+        "control_cluster_id": {"$ref": "#/$defs/hash"},
+        "source_revision": {"$ref": "#/$defs/revision"},
+        "environment_sha256": {"$ref": "#/$defs/hash"},
+        "artifact_sha256": {"$ref": "#/$defs/hash"},
+        "verdict": {"enum": ["PASS", "PARTIAL", "KILLED"]}
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["builder_id", "control_cluster_id", "source_revision", "artifact_sha256", "bit_identical"],
+      "properties": {
+        "builder_id": {"type": "string", "minLength": 1},
+        "control_cluster_id": {"$ref": "#/$defs/hash"},
+        "source_revision": {"$ref": "#/$defs/revision"},
+        "artifact_sha256": {"$ref": "#/$defs/hash"},
+        "bit_identical": {"type": "boolean"}
+      }
+    },
+    "red_team": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engagement_id", "control_cluster_id", "funding_proof_sha256", "report_sha256", "severity1_open"],
+      "properties": {
+        "engagement_id": {"type": "string", "minLength": 1},
+        "control_cluster_id": {"$ref": "#/$defs/hash"},
+        "funding_proof_sha256": {"$ref": "#/$defs/hash"},
+        "report_sha256": {"$ref": "#/$defs/hash"},
+        "severity1_open": {"type": "integer", "minimum": 0}
+      }
+    },
+    "drill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "artifact_sha256", "verdict"],
+      "properties": {
+        "kind": {"type": "string", "pattern": "^[a-z0-9_][a-z0-9_.-]{0,63}$"},
+        "artifact_sha256": {"$ref": "#/$defs/hash"},
+        "verdict": {"enum": ["PASS", "FAIL"]}
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "record_sha256", "approver_control_clusters"],
+      "properties": {
+        "decision": {"enum": ["HOLD", "ELIGIBLE_FOR_SEPARATE_PROMOTION"]},
+        "record_sha256": {"$ref": "#/$defs/hash"},
+        "approver_control_clusters": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/hash"}
+        }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator_id", "control_cluster_id", "role", "external_to_release_owner", "public_key_base64", "key_id", "payload_sha256", "signature_base64"],
+      "properties": {
+        "operator_id": {"type": "string", "minLength": 1},
+        "control_cluster_id": {"$ref": "#/$defs/hash"},
+        "role": {"enum": ["experiment_operator", "independent_reproducer", "independent_verifier"]},
+        "external_to_release_owner": {"const": true},
+        "public_key_base64": {"type": "string", "minLength": 44, "maxLength": 44},
+        "key_id": {"$ref": "#/$defs/hash"},
+        "payload_sha256": {"$ref": "#/$defs/hash"},
+        "signature_base64": {"type": "string", "minLength": 88, "maxLength": 88}
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {"const": 1},
+    "claim_id": {"type": "string", "pattern": "^E-WWM-(0[1-9]|1[0-9]|2[0-2])$"},
+    "source_revision": {"$ref": "#/$defs/revision"},
+    "preregistration_sha256": {"$ref": "#/$defs/hash"},
+    "environment": {"$ref": "#/$defs/artifact"},
+    "result": {"$ref": "#/$defs/artifact"},
+    "artifacts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifact"}},
+    "dependency_receipts": {"type": "array", "items": {"$ref": "#/$defs/dependency"}},
+    "reproductions": {"type": "array", "items": {"$ref": "#/$defs/reproduction"}},
+    "second_client_vectors": {"type": "array", "items": {"$ref": "#/$defs/artifact"}},
+    "reproducible_builds": {"type": "array", "items": {"$ref": "#/$defs/build"}},
+    "red_team_engagements": {"type": "array", "items": {"$ref": "#/$defs/red_team"}},
+    "drills": {"type": "array", "items": {"$ref": "#/$defs/drill"}},
+    "promotion_record": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/promotion"}]},
+    "severity1_open_findings": {"type": "integer", "minimum": 0},
+    "attestations": {"type": "array", "items": {"$ref": "#/$defs/attestation"}},
+    "sealed": {"type": "boolean"},
+    "bundle_id": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}]}
+  }
+}

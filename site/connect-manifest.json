@@ -15,9 +15,20 @@
     "health": "/api/health",
     "mindlinks": "/api/mindlinks",
     "connect_manifest": "/api/connect",
-    "connection_profile": "/api/connect/profile"
+    "connection_profile": "/api/connect/profile",
+    "wwm_state": "/api/wwm/v1/state",
+    "wwm_quotes": "/api/wwm/v1/quotes",
+    "wwm_jobs": "/api/wwm/v1/jobs"
   },
   "surfaces": [
+    {
+      "id": "mind-query",
+      "label": "Mind Query",
+      "kind": "bounded_public_inference",
+      "href": "./query.html",
+      "status": "implemented_control_disabled",
+      "trust_boundary": "requires independent finalized-state quorum; public executors may see prompts; SOFT, ANCHORED, and ASSURED describe execution finality rather than truth; no direct fallback"
+    },
     {
       "id": "world-wide-mind",
       "label": "World Wide Mind",

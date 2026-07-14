@@ -10,6 +10,7 @@ use noos_lumen::engine::{EscrowError as LumenEscrowError, WorkJobEscrow};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod economics;
+pub mod wwm;
 
 pub type Hash32 = [u8; 32];
 pub type AccountId = Hash32;

@@ -1,6 +1,7 @@
 //! NOOS wallet primitives. Every operation that observes or authorizes chain state
 //! requires a successful [`IdentityGate`] handshake first.
 #![forbid(unsafe_code)]
+pub mod browser;
 
 use ed25519_dalek::{Signer, SigningKey};
 use hkdf::Hkdf;
@@ -1025,10 +1026,8 @@ mod tests {
         assert_eq!(opened.memo, b"agent inference invoice 7");
         assert_ne!(plan.memo_commitment, [0; 32]);
         assert_ne!(plan.recipient_commitment, [0; 32]);
-        assert!(
-            open_private_payment(&gate(), [0x32; 32], &plan).is_err()
-                || open_private_payment(&gate(), [0x32; 32], &plan).unwrap() == None
-        );
+        let wrong_key_open = open_private_payment(&gate(), [0x32; 32], &plan);
+        assert!(matches!(wrong_key_open, Err(_) | Ok(None)));
     }
 
     #[test]
