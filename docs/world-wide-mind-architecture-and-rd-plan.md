@@ -1,6 +1,7 @@
 # World Wide Mind: Chain-Coordinated AI, Private Inference, and Decentralized Browser
 
-**Architecture and R&D plan — proposed, not implemented**  
+**Architecture and R&D plan — protocol core and loopback pilot implemented; production rollout remains proposed**
+
 **Repository:** NOOSPHERE protocol / MindChain product  
 **Date:** 2026-07-14  
 **Decision owner:** protocol and product owners  
@@ -106,6 +107,33 @@ As of this document’s date:
 - `G0`, `G1`, `G2`, `G3`, `GENESIS`, `G4`, and `G5` are all `BLOCKED` in `protocol/release/promotion-blockers.json`.
 
 A World Wide Mind pilot may run on a local devnet or explicitly valueless public testnet, but it cannot be described as production, mainnet, or generally available while those base release gates remain blocked.
+
+#### Implemented loopback pilot boundary
+
+`crates/noos-mind-gateway` now contains the replaceable public-query protocol
+core and a runnable HTTP service. The service pins declared model and policy
+identities to a live finalized test-network checkpoint, issues bounded signed
+quotes, streams a local model response, settles the test sponsor accounting,
+and persists a signed gateway receipt. `site/query.html` consumes that contract.
+
+This implementation is deliberately narrower than the production architecture:
+
+- the supplied launcher requires `test_network=true`, binds to loopback, and
+  uses a disclosed `TEST_SINGLE_NODE` pin rather than independent quorum;
+- only public `P0_OPEN` compute and `SOFT` execution finality are available;
+- the model runs off-chain through a loopback Ollama-native or
+  OpenAI-compatible API;
+- the raw prompt exists transiently for inference, while persistent storage
+  contains its commitment and bounded receipt metadata, not the prompt text;
+- the receipt is signed by the local gateway and bound to finalized state, but
+  it is not submitted as a chain transaction;
+- `WWM_PUBLIC_GATEWAY_ENABLED` remains false and
+  `WWM_GATEWAY_CONSENSUS_WEIGHT` remains zero.
+
+This is an executable engineering pilot, not production activation, independent
+execution evidence, or proof that an answer is true. See the
+[loopback pilot guide](v1/developer-guides.md#world-wide-mind-loopback-pilot)
+for the launcher and end-to-end smoke commands.
 
 ### 3.2 Existing primitives to preserve
 

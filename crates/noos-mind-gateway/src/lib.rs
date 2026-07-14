@@ -6,6 +6,7 @@
 //! It stores prompt commitments only. Production activation remains disabled.
 
 #![forbid(unsafe_code)]
+pub mod service;
 
 use noos_crypto::{hash_domain, verify_domain, DomainId, Keypair, PublicKey, Signature};
 use noos_nel::{FinalityClass, Hash32};
@@ -190,8 +191,24 @@ pub struct GatewayManifest {
 
 impl GatewayManifest {
     pub fn validate(&self) -> Result<(), GatewayError> {
+        self.validate_with_minimums(MIN_STATE_ENDPOINTS, STATE_QUORUM)
+    }
+
+    /// Validate an explicitly local, test-only manifest.
+    ///
+    /// This does not satisfy the independent state-quorum requirement and must
+    /// never be interpreted as WWM production activation.
+    pub fn validate_test_only(&self) -> Result<(), GatewayError> {
+        self.validate_with_minimums(1, 1)
+    }
+
+    fn validate_with_minimums(
+        &self,
+        minimum_endpoints: usize,
+        minimum_clusters: usize,
+    ) -> Result<(), GatewayError> {
         if self.gateway_key == [0; 32]
-            || self.state_endpoint_ids.len() < MIN_STATE_ENDPOINTS
+            || self.state_endpoint_ids.len() < minimum_endpoints
             || self.state_endpoint_ids.len() > MAX_GATEWAY_NODES
             || self.state_endpoint_ids.len() != self.state_control_clusters.len()
             || !strictly_sorted(&self.state_endpoint_ids)
@@ -202,7 +219,7 @@ impl GatewayManifest {
                 .iter()
                 .collect::<BTreeSet<_>>()
                 .len()
-                < STATE_QUORUM
+                < minimum_clusters
             || self.api_version != 1
             || self.maximum_quote_lifetime_blocks == 0
         {
@@ -427,6 +444,7 @@ pub struct GatewayJob {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReceiptView {
+    pub gateway_key: Hash32,
     pub job_id: Hash32,
     pub quote_id: Hash32,
     pub capsule_id: Hash32,
@@ -440,6 +458,39 @@ pub struct ReceiptView {
     pub charged_micro_noos: u64,
     pub refunded_micro_noos: u64,
     pub receipt_id: Hash32,
+    pub signature: [u8; 64],
+}
+
+impl ReceiptView {
+    pub fn validate(&self) -> Result<(), GatewayError> {
+        if self.gateway_key == [0; 32]
+            || self.job_id == [0; 32]
+            || self.quote_id == [0; 32]
+            || self.capsule_id == [0; 32]
+            || self.knowledge_snapshot_id == [0; 32]
+            || self.token_history_root == [0; 32]
+            || self.retrieval_receipt_id == Some([0; 32])
+            || self.source_mindlink_ids.len() > MAX_RECEIPT_SOURCES
+            || !strictly_sorted(&self.source_mindlink_ids)
+            || self.source_mindlink_ids.contains(&[0; 32])
+            || self.assurance_label != assurance_label(self.actual_finality)
+            || self.settlement_id == [0; 32]
+            || self.receipt_id == [0; 32]
+        {
+            return Err(GatewayError::InvalidReceipt);
+        }
+        let body = encode_receipt_body(self)?;
+        if digest(DomainId::WwmPublicReceipt, &[&body])? != self.receipt_id {
+            return Err(GatewayError::InvalidReceipt);
+        }
+        verify(
+            self.gateway_key,
+            DomainId::WwmPublicReceipt,
+            self.receipt_id,
+            &body,
+            self.signature,
+        )
+    }
 }
 
 pub struct Gateway {
@@ -448,6 +499,7 @@ pub struct Gateway {
     pub pinned_state: PinnedState,
     pub fee_schedule: FeeSchedule,
     pub rate_policy: RatePolicy,
+    test_only: bool,
     rate_usage: BTreeMap<Hash32, RateUsage>,
     sponsors: BTreeMap<Hash32, SponsorAccount>,
     jobs: BTreeMap<Hash32, GatewayJob>,
@@ -462,12 +514,55 @@ impl Gateway {
         fee_schedule: FeeSchedule,
         rate_policy: RatePolicy,
     ) -> Result<Self, GatewayError> {
-        manifest.validate()?;
+        Self::new_with_mode(
+            signer,
+            manifest,
+            pinned_state,
+            fee_schedule,
+            rate_policy,
+            false,
+        )
+    }
+
+    /// Construct a loopback test gateway without claiming independent state quorum.
+    ///
+    /// Production controls remain hard-off; callers must disclose this mode.
+    pub fn new_test_only(
+        signer: Keypair,
+        manifest: GatewayManifest,
+        pinned_state: PinnedState,
+        fee_schedule: FeeSchedule,
+        rate_policy: RatePolicy,
+    ) -> Result<Self, GatewayError> {
+        Self::new_with_mode(
+            signer,
+            manifest,
+            pinned_state,
+            fee_schedule,
+            rate_policy,
+            true,
+        )
+    }
+
+    fn new_with_mode(
+        signer: Keypair,
+        manifest: GatewayManifest,
+        pinned_state: PinnedState,
+        fee_schedule: FeeSchedule,
+        rate_policy: RatePolicy,
+        test_only: bool,
+    ) -> Result<Self, GatewayError> {
+        if test_only {
+            manifest.validate_test_only()?;
+        } else {
+            manifest.validate()?;
+        }
         if manifest.gateway_key != signer.public_key().into_bytes()
             || fee_schedule.schedule_id != pinned_state.fee_schedule_id
             || rate_policy.window_blocks == 0
             || rate_policy.maximum_requests == 0
             || rate_policy.maximum_output_tokens == 0
+            || !valid_pin_shape(&manifest, &pinned_state, test_only)
         {
             return Err(GatewayError::InvalidManifest);
         }
@@ -477,11 +572,36 @@ impl Gateway {
             pinned_state,
             fee_schedule,
             rate_policy,
+            test_only,
             rate_usage: BTreeMap::new(),
             sponsors: BTreeMap::new(),
             jobs: BTreeMap::new(),
             receipts: BTreeMap::new(),
         })
+    }
+
+    #[must_use]
+    pub const fn is_test_only(&self) -> bool {
+        self.test_only
+    }
+
+    pub fn update_pinned_state(&mut self, next: PinnedState) -> Result<(), GatewayError> {
+        if !valid_pin_shape(&self.manifest, &next, self.test_only)
+            || next.chain_id != self.pinned_state.chain_id
+            || next.genesis_hash != self.pinned_state.genesis_hash
+            || next.capsule_id != self.pinned_state.capsule_id
+            || next.query_policy_id != self.pinned_state.query_policy_id
+            || next.knowledge_snapshot_id != self.pinned_state.knowledge_snapshot_id
+            || next.executor_registry_epoch != self.pinned_state.executor_registry_epoch
+            || next.fee_schedule_id != self.pinned_state.fee_schedule_id
+            || next.finalized_height < self.pinned_state.finalized_height
+            || (next.finalized_height == self.pinned_state.finalized_height
+                && next.finalized_hash != self.pinned_state.finalized_hash)
+        {
+            return Err(GatewayError::InvalidObservation);
+        }
+        self.pinned_state = next;
+        Ok(())
     }
 
     pub fn register_sponsor(&mut self, sponsor: SponsorAccount) -> Result<(), GatewayError> {
@@ -636,26 +756,9 @@ impl Gateway {
             .escrow_micro_noos
             .checked_sub(charged_micro_noos)
             .ok_or(GatewayError::ArithmeticOverflow)?;
-        let mut body = Vec::new();
-        body.extend(job_id);
-        body.extend(job.quote_id);
-        body.extend(job.capsule_id);
-        body.extend(job.knowledge_snapshot_id);
-        body.extend(token_history_root);
-        match retrieval_receipt_id {
-            Some(id) => {
-                body.push(1);
-                body.extend(id);
-            }
-            None => body.push(0),
-        }
-        push_hashes(&mut body, &source_mindlink_ids)?;
-        body.push(finality_code(actual_finality)?);
-        body.extend(settlement_id);
-        body.extend(charged_micro_noos.to_le_bytes());
-        body.extend(refunded.to_le_bytes());
-        let receipt_id = digest(DomainId::WwmPublicReceipt, &[&body])?;
-        let view = ReceiptView {
+        let gateway_key = self.signer.public_key().into_bytes();
+        let mut view = ReceiptView {
+            gateway_key,
             job_id,
             quote_id: job.quote_id,
             capsule_id: job.capsule_id,
@@ -668,8 +771,18 @@ impl Gateway {
             settlement_id,
             charged_micro_noos,
             refunded_micro_noos: refunded,
-            receipt_id,
+            receipt_id: [0; 32],
+            signature: [0; 64],
         };
+        let body = encode_receipt_body(&view)?;
+        view.receipt_id = digest(DomainId::WwmPublicReceipt, &[&body])?;
+        view.signature = sign(
+            &self.signer,
+            DomainId::WwmPublicReceipt,
+            view.receipt_id,
+            &body,
+        )?;
+        let receipt_id = view.receipt_id;
         if let Some(sponsor_id) = job.sponsor_id {
             let sponsor = self
                 .sponsors
@@ -730,6 +843,55 @@ impl Gateway {
         usage.output_tokens = tokens;
         Ok(())
     }
+}
+
+fn encode_receipt_body(receipt: &ReceiptView) -> Result<Vec<u8>, GatewayError> {
+    let mut body = Vec::new();
+    body.extend(receipt.gateway_key);
+    body.extend(receipt.job_id);
+    body.extend(receipt.quote_id);
+    body.extend(receipt.capsule_id);
+    body.extend(receipt.knowledge_snapshot_id);
+    body.extend(receipt.token_history_root);
+    match receipt.retrieval_receipt_id {
+        Some(id) => {
+            body.push(1);
+            body.extend(id);
+        }
+        None => body.push(0),
+    }
+    push_hashes(&mut body, &receipt.source_mindlink_ids)?;
+    body.push(finality_code(receipt.actual_finality)?);
+    body.extend(receipt.settlement_id);
+    body.extend(receipt.charged_micro_noos.to_le_bytes());
+    body.extend(receipt.refunded_micro_noos.to_le_bytes());
+    Ok(body)
+}
+
+fn valid_pin_shape(manifest: &GatewayManifest, pin: &PinnedState, test_only: bool) -> bool {
+    let minimum = if test_only { 1 } else { STATE_QUORUM };
+    pin.pin_id != [0; 32]
+        && pin.chain_id != [0; 32]
+        && pin.genesis_hash != [0; 32]
+        && pin.finalized_height != 0
+        && pin.finalized_hash != [0; 32]
+        && pin.capsule_id != [0; 32]
+        && pin.query_policy_id != [0; 32]
+        && pin.knowledge_snapshot_id != [0; 32]
+        && pin.executor_registry_epoch != 0
+        && pin.fee_schedule_id != [0; 32]
+        && pin.agreeing_endpoints.len() >= minimum
+        && pin.agreeing_control_clusters.len() >= minimum
+        && strictly_sorted(&pin.agreeing_endpoints)
+        && strictly_sorted(&pin.agreeing_control_clusters)
+        && pin
+            .agreeing_endpoints
+            .iter()
+            .all(|value| manifest.state_endpoint_ids.contains(value))
+        && pin
+            .agreeing_control_clusters
+            .iter()
+            .all(|value| manifest.state_control_clusters.contains(value))
 }
 
 #[must_use]
@@ -941,6 +1103,10 @@ mod tests {
             )
             .unwrap();
         let view = gateway.receipt(&receipt).unwrap();
+        view.validate().unwrap();
+        let mut tampered = view.clone();
+        tampered.signature[0] ^= 1;
+        assert_eq!(tampered.validate(), Err(GatewayError::InvalidSignature));
         assert_eq!(view.assurance_label, "ANCHORED");
         assert_eq!(view.refunded_micro_noos, 134);
     }

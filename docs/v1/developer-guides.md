@@ -94,6 +94,56 @@ identity-gated indexer and signs with the deterministic local developer
 account. It is a local test harness, binds only to loopback, and must never be
 deployed with its fixture seed.
 
+## World Wide Mind loopback pilot
+
+The runnable World Wide Mind path is a **test-only local gateway**. It binds a
+local model request to one live test-network chain identity, finalized
+checkpoint, model capsule, policy, knowledge snapshot, and fee schedule. It
+does not activate the production gateway, submit inference receipts as chain
+transactions, or claim independent state quorum.
+
+Install Ollama, pull the default local model, and start a test-network node:
+
+```text
+ollama pull qwen2.5:0.5b
+```
+
+Then launch the gateway from the repository root. Supply the public profile and
+the node's status endpoint. Supply the operator-secret file only when that
+status endpoint requires its bearer token:
+
+```text
+python tools/e2e/run_wwm_test_gateway.py --profile <public-profile.json> --state-url <http://node/status> [--operator-secret <operator-secret.json>]
+```
+
+Open `http://localhost:18787/query.html`, or run the complete state-pin,
+quote, inference-stream, and signed-receipt smoke:
+
+```text
+python tools/e2e/wwm_gateway_smoke.py --origin http://localhost:18787
+```
+
+The launcher refuses a profile without `test_network=true`. The service
+requires an explicit test-only acknowledgement, binds only to loopback, keeps
+the state bearer token server-side, exposes only `P0_OPEN` / `SOFT`, and labels
+the single-node state pin as `TEST_SINGLE_NODE`. The browser sends the raw
+prompt to the selected local model, but SQLite persists only prompt
+commitments, job metadata, signed quotes, and signed receipts.
+
+The default `OLLAMA` backend uses Ollama's native `/api/chat` contract and sets
+`num_gpu=0`; this avoids the corrupt tokens observed on the local AMD path.
+Opt into GPU layers only after validating that exact Ollama, model, and driver
+combination with `--model-num-gpu <layers>`. A different loopback
+OpenAI-compatible backend requires `--model-api OPEN_AI`, its `/v1` base URL,
+and an explicit immutable `--model-digest`.
+
+Every returned receipt states `test_only=true`,
+`on_chain_receipt=false`, and
+`chain_anchor_status=PINNED_FINALIZED_STATE_ONLY`. Its gateway signature proves
+the receipt was produced by that local test gateway key; it does not prove
+factual accuracy, independent execution, on-chain inclusion, or production
+activation.
+
 ## Wallet guide
 
 Before balance, planning, signing, or submission, compare expected chain ID, genesis hash, and API version with `/api/status`; mismatch fails before reading wallet state or signing. Use purpose-separated hardened sign/view/Umbra/agent/recovery paths. Never grant spend authority to view or agent keys. Construct canonical transaction bodies and segregated witnesses, show maximum/actual five-resource fee, expiry, effects, capability use, and change before consent. Report `MEMPOOL`, `INCLUDED`, `JUSTIFIED`, `FINALIZED`, `REVERTED`, and `REJECTED` distinctly; inclusion is not finality.

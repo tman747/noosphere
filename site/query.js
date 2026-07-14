@@ -2,7 +2,7 @@
   "use strict";
 
   const API_ROOT = "/api/wwm/v1";
-  const STATE_TIMEOUT_MS = 6500;
+  const STATE_TIMEOUT_MS = 20_000;
   const MAX_PROMPT_BYTES = 48_000;
 
   const nodes = {
@@ -38,6 +38,8 @@
   const state = {
     pin: null,
     enabled: false,
+    testOnly: false,
+    availableFinality: new Set(["SOFT"]),
     busy: false,
     stream: null,
     answer: "",
@@ -65,7 +67,7 @@
     nodes.input.disabled = busy;
     nodes.outputLimit.disabled = busy;
     document.querySelectorAll('input[name="finality"]').forEach((input) => {
-      input.disabled = busy;
+      input.disabled = busy || !state.availableFinality.has(input.value);
     });
     nodes.submit.disabled = busy || !state.enabled || !state.pin;
     nodes.submit.querySelector("span").textContent = busy ? label : "Request quote and ask";
@@ -136,6 +138,12 @@
     return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
   }
 
+  function estimatedInputTokens(text) {
+    let characters = 0;
+    for (const _character of text) characters += 1;
+    return Math.max(1, Math.ceil(characters / 4));
+  }
+
   function validPin(payload) {
     const pin = payload && payload.pin;
     if (!pin || typeof pin !== "object") return false;
@@ -143,13 +151,18 @@
     const clusters = Array.isArray(pin.agreeing_control_clusters) ? pin.agreeing_control_clusters : [];
     const uniqueReads = new Set(reads);
     const uniqueClusters = new Set(clusters);
+    const loopback = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+    const singleNodeTest = payload.test_only === true
+      && pin.pin_mode === "TEST_SINGLE_NODE"
+      && loopback;
+    const minimum = singleNodeTest ? 1 : 2;
     return typeof pin.pin_id === "string"
       && typeof pin.chain_id === "string"
       && typeof pin.genesis_hash === "string"
       && typeof pin.capsule_id === "string"
       && typeof pin.knowledge_snapshot_id === "string"
-      && uniqueReads.size >= 2
-      && uniqueClusters.size >= 2;
+      && uniqueReads.size >= minimum
+      && uniqueClusters.size >= minimum;
   }
 
   async function loadState() {
@@ -157,21 +170,26 @@
     try {
       const payload = await fetchJson(`${API_ROOT}/state`);
       if (!validPin(payload)) {
-        throw new Error("Gateway state did not contain an independently controlled quorum.");
+        throw new Error("Gateway state did not contain a valid finalized-state pin.");
       }
       state.pin = payload.pin;
       state.enabled = payload.enabled === true;
+      state.testOnly = payload.test_only === true;
+      state.availableFinality = new Set(
+        Array.isArray(payload.available_finality) ? payload.available_finality : ["SOFT"]
+      );
+      setBusy(false);
       nodes.pinChain.textContent = `${shortHash(payload.pin.chain_id)} / ${shortHash(payload.pin.genesis_hash)}`;
       nodes.pinModel.textContent = shortHash(payload.pin.capsule_id);
       nodes.pinSnapshot.textContent = shortHash(payload.pin.knowledge_snapshot_id);
       nodes.pinReaders.textContent = `${new Set(payload.pin.agreeing_endpoints).size} / ${payload.minimum_state_endpoints || 3}`;
       if (state.enabled) {
-        setNetworkState("ready", "Pinned");
-        nodes.activation.textContent = "Public test profile";
+        setNetworkState("ready", state.testOnly ? "Test pinned" : "Pinned");
+        nodes.activation.textContent = state.testOnly ? "Local model · test only" : "Public test profile";
         nodes.activation.classList.add("active");
         nodes.submit.disabled = false;
         nodes.submit.querySelector("span").textContent = "Request quote and ask";
-        nodes.pinDisclosure.textContent = "The complete finalized state matched across independently controlled endpoints. A quote must preserve this exact pin.";
+        nodes.pinDisclosure.textContent = payload.disclosure || "A quote must preserve this exact finalized-state pin.";
       } else {
         setNetworkState("blocked", "Disabled");
         nodes.activation.textContent = "Evidence gate closed";
@@ -340,6 +358,11 @@
     setBusy(true);
 
     try {
+      await loadState();
+      if (!state.enabled || !state.pin) {
+        throw new Error("A current finalized-state pin is required before quoting.");
+      }
+      setBusy(true);
       const promptCommitment = await hashText(prompt);
       const clientNonce = randomHex(32);
       const quote = await fetchJson(`${API_ROOT}/quotes`, {
@@ -348,6 +371,7 @@
           pin_id: state.pin.pin_id,
           prompt_commitment: promptCommitment,
           client_nonce: clientNonce,
+          input_tokens: estimatedInputTokens(prompt),
           compute_profile: "P0_OPEN",
           requested_finality: selectedFinality(),
           maximum_output_tokens: Number(nodes.outputLimit.value),
