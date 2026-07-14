@@ -127,6 +127,15 @@ class WorldWideMindServerTests(unittest.TestCase):
             root = Path(tmp)
             (root / "site").mkdir()
             (root / "site" / "index.html").write_text("<h1>World Wide Mind</h1>", encoding="utf-8")
+            (root / "site" / "connect-manifest.json").write_text(
+                json.dumps({"schema": "mindchain/connect-manifest/v0", "surfaces": [], "platforms": []}),
+                encoding="utf-8",
+            )
+            (root / "apps" / "mindscan").mkdir(parents=True)
+            (root / "apps" / "mindscan" / "index.html").write_text(
+                "<h1>MindScan</h1>",
+                encoding="utf-8",
+            )
             server = world_wide_mind_server.serve(
                 "127.0.0.1",
                 0,
@@ -140,10 +149,15 @@ class WorldWideMindServerTests(unittest.TestCase):
                 public = self.post_json(f"{base}/api/mindlinks", self.api_payload(self.sample_mindlink("public")))
                 private = self.post_json(f"{base}/api/mindlinks", self.sample_mindlink("only_me"))
                 index = self.get_json(f"{base}/api/mindlinks")
+                connect = self.get_json(f"{base}/api/connect")
+                with urllib.request.urlopen(f"{base}/apps/mindscan/", timeout=5) as response:
+                    mindscan_html = response.read().decode("utf-8")
                 self.assertTrue(public["stored"])
                 self.assertFalse(private["stored"])
                 self.assertEqual(index["count"], 1)
                 self.assertEqual(index["mindlinks"][0]["rights"]["visibility"], "public")
+                self.assertEqual(connect["schema"], "mindchain/connect-manifest/v0")
+                self.assertIn("MindScan", mindscan_html)
             finally:
                 server.shutdown()
                 server.server_close()

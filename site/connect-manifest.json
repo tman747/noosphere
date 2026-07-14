@@ -1,0 +1,153 @@
+{
+  "schema": "mindchain/connect-manifest/v0",
+  "generated_at": "2026-07-14T00:00:00.000Z",
+  "name": "MindChain connection surface map",
+  "status": "local_prototype",
+  "purpose": "One machine-readable map of every current MindChain surface, platform artifact, trust boundary, and next connection path.",
+  "network_identity": {
+    "channel": "devnet",
+    "chain_id": "EXTERNAL_BLOCKED_QUIET_WEEK",
+    "genesis_hash": "EXTERNAL_BLOCKED_CEREMONY",
+    "source": "release/manifest.json"
+  },
+  "api": {
+    "local_origin": "http://127.0.0.1:8766",
+    "health": "/api/health",
+    "mindlinks": "/api/mindlinks",
+    "connect_manifest": "/api/connect"
+  },
+  "surfaces": [
+    {
+      "id": "world-wide-mind",
+      "label": "World Wide Mind",
+      "kind": "contribution_flow",
+      "href": "./index.html#contribution-input",
+      "status": "working_local_api",
+      "trust_boundary": "private drafts stay in browser; public/link objects sync only through explicit local API calls"
+    },
+    {
+      "id": "mindlink-renderer",
+      "label": "MindLink renderer",
+      "kind": "verification_surface",
+      "href": "./mindlinks.html",
+      "status": "working_local_api",
+      "trust_boundary": "renders public schema objects; does not grant edit/unpublish authority"
+    },
+    {
+      "id": "mindlink-schema",
+      "label": "MindLink v0 schema",
+      "kind": "schema",
+      "href": "./mindlink-v0.schema.json",
+      "status": "working_static",
+      "trust_boundary": "schema validation only; not a persistence guarantee"
+    },
+    {
+      "id": "mindscan",
+      "label": "MindScan explorer",
+      "kind": "chain_explorer",
+      "href": "../apps/mindscan/",
+      "status": "local_app_surface",
+      "trust_boundary": "must bind chain ID, genesis hash, unsafe head, justified state, and finalized state before public claims"
+    },
+    {
+      "id": "network-dashboard",
+      "label": "Network dashboard",
+      "kind": "operator_dashboard",
+      "href": "../apps/network-dashboard/",
+      "status": "local_app_surface",
+      "trust_boundary": "operator RPC and secrets must remain private; dashboard data must be sanitized"
+    },
+    {
+      "id": "compute-market",
+      "label": "Compute Market",
+      "kind": "bounded_compute",
+      "href": "../apps/compute-market/",
+      "status": "local_app_surface",
+      "trust_boundary": "untrusted requester code remains blocked until sandbox and challenge verification pass"
+    },
+    {
+      "id": "mind-market",
+      "label": "Mind Market",
+      "kind": "asset_liquidity_surface",
+      "href": "../apps/mind-market/",
+      "status": "local_app_surface",
+      "trust_boundary": "asset and swap actions must stay separate from wallet custody and chain finality claims"
+    }
+  ],
+  "platforms": [
+    {
+      "id": "web-local",
+      "label": "Web / local API",
+      "status": "working_local_prototype",
+      "entry": "./connect.html",
+      "next": "Deploy public TLS edge after bootstrap nodes and rate limits exist."
+    },
+    {
+      "id": "windows-wallet",
+      "label": "Windows wallet installer",
+      "status": "development_signed_not_production_trusted",
+      "artifacts": [
+        {
+          "kind": "setup_exe",
+          "href": "../release/installers/windows-x86_64-dev-signed/MindChain Wallet_0.1.0_x64-setup.exe",
+          "sha256": "33c3be302ad816184e49727fa73015e0b26c7674c7acdeb2a90185a935e4ef1a"
+        },
+        {
+          "kind": "msi",
+          "href": "../release/installers/windows-x86_64-dev-signed/MindChain Wallet_0.1.0_x64_en-US.msi",
+          "sha256": "87d4b268959ca0b2d8b40e66167dc5dbd88eebd3f94b55960db82f9b0b1ae370"
+        },
+        {
+          "kind": "signature_manifest",
+          "href": "../release/installers/windows-x86_64-dev-signed/signatures.json"
+        }
+      ],
+      "next": "Replace development signing with production-trusted code signing and signed update metadata."
+    },
+    {
+      "id": "macos-host",
+      "label": "macOS host/wallet",
+      "status": "planned",
+      "entry": null,
+      "next": "Apple Developer ID notarized universal package and launchd service wrapper."
+    },
+    {
+      "id": "linux-host",
+      "label": "Linux host/wallet",
+      "status": "planned",
+      "entry": null,
+      "next": "systemd package, signed repository metadata, and independent builder evidence."
+    },
+    {
+      "id": "android-security-module",
+      "label": "Android wallet security module",
+      "status": "source_present_no_user_app",
+      "entry": null,
+      "next": "Turn security module into a user-installable app after profile and API connection flows exist."
+    },
+    {
+      "id": "ios-security-module",
+      "label": "iOS wallet security module",
+      "status": "source_present_no_user_app",
+      "entry": null,
+      "next": "Turn Swift package into a TestFlight-ready app after key recovery and profile binding are defined."
+    }
+  ],
+  "connection_ladder": [
+    "Open the connection hub.",
+    "Choose the surface: contribute, verify, explore, operate, compute, market, or install.",
+    "Check the displayed trust boundary before crossing into another app.",
+    "For chain-connected apps, verify chain ID and genesis hash before submitting actions.",
+    "For private data, prefer private backup or encrypted backup once available; never use public MindLinks as control authority."
+  ],
+  "blocked_before_public_everywhere": [
+    "production-trusted installers",
+    "public TLS/API edge with rate limits",
+    "bootstrap node rotation manifest",
+    "durable indexer readiness",
+    "mobile app packaging",
+    "operator secret isolation audit",
+    "signed update flow",
+    "independent release evidence"
+  ]
+}

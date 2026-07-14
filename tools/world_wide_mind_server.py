@@ -410,6 +410,8 @@ class WorldWideMindRequestHandler(SimpleHTTPRequestHandler):
 
     def __init__(self, *args: Any, directory: str, store: WorldWideMindStore, **kwargs: Any):
         self.store = store
+        self.site_dir = Path(directory).resolve()
+        self.repo_dir = self.site_dir.parent
         super().__init__(*args, directory=directory, **kwargs)
 
     def end_headers(self) -> None:
@@ -427,8 +429,31 @@ class WorldWideMindRequestHandler(SimpleHTTPRequestHandler):
         self.send_response(HTTPStatus.NO_CONTENT)
         self.end_headers()
 
+    def translate_path(self, path: str) -> str:
+        parsed_path = unquote(urlparse(path).path)
+        public_roots = ("/apps/", "/explorer/", "/protocol/", "/release/")
+        if any(parsed_path.startswith(prefix) for prefix in public_roots):
+            candidate = (self.repo_dir / parsed_path.lstrip("/")).resolve()
+            try:
+                candidate.relative_to(self.repo_dir)
+            except ValueError:
+                return str(self.site_dir / "__not_found__")
+            return str(candidate)
+        return super().translate_path(path)
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == "/api/connect":
+            try:
+                manifest = json.loads((self.site_dir / "connect-manifest.json").read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                self.send_json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"ok": False, "errors": ["connect_manifest_unavailable"]},
+                )
+                return
+            self.send_json(HTTPStatus.OK, manifest)
+            return
         if parsed.path == "/api/health":
             self.send_json(
                 HTTPStatus.OK,

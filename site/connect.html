@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f3f0e7">
+  <meta name="description" content="One honest map of MindChain surfaces, platforms, trust boundaries, installers, and connection status.">
+  <title>MindChain — Connect everything</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <nav class="shell nav" aria-label="Primary navigation">
+      <a class="brand" href="index.html" aria-label="MindChain home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>MindChain</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="index.html#contribution-input">Contribute</a></li>
+        <li><a href="connect.html" aria-current="page">Connect</a></li>
+        <li><a href="mindlinks.html">Verify</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section class="connect-hero shell" aria-labelledby="connect-title">
+      <div class="section-heading connect-heading reveal">
+        <p class="eyebrow">One route into every surface</p>
+        <h1 id="connect-title">Connect everything without hiding the boundaries.</h1>
+        <p>MindChain spans contributions, verification, chain exploration, network operations, compute, markets, desktop installers, and mobile security modules. This hub shows what works, what is local, what is planned, and what must be verified before each connection is trusted.</p>
+      </div>
+      <div class="connection-status-grid reveal" aria-label="Connection status">
+        <article>
+          <span id="connect-api-light" class="connection-light checking" aria-hidden="true"></span>
+          <div><strong id="connect-api-title">Checking local API</strong><p id="connect-api-copy">Waiting for the World Wide Mind server.</p></div>
+        </article>
+        <article>
+          <span class="connection-light development" aria-hidden="true"></span>
+          <div><strong>Development channel</strong><p>Current artifacts are not production releases.</p></div>
+        </article>
+        <article>
+          <span class="connection-light planned" aria-hidden="true"></span>
+          <div><strong>Cross-platform work remains</strong><p>Windows is ahead; macOS, Linux, Android, and iOS need complete distribution paths.</p></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="shell connect-section" aria-labelledby="surfaces-title">
+      <div class="section-heading reveal">
+        <p class="eyebrow">Choose what you want to do</p>
+        <h2 id="surfaces-title">Product surfaces.</h2>
+        <p>Each surface stays separate so a read-only explorer cannot quietly become a wallet, an operator dashboard cannot leak private RPC, and a public MindLink cannot grant private control.</p>
+      </div>
+      <div id="surface-grid" class="connection-card-grid" aria-live="polite">
+        <article class="connection-card loading-card"><p class="panel-label">Loading</p><h3>Reading connection manifest.</h3></article>
+      </div>
+    </section>
+
+    <section class="shell connect-section" aria-labelledby="platforms-title">
+      <div class="section-heading reveal">
+        <p class="eyebrow">Windows · macOS · Linux · Android · iOS · Web</p>
+        <h2 id="platforms-title">Platform availability.</h2>
+        <p>A source directory is not an installable product. This list distinguishes working local prototypes, development-signed artifacts, source-only modules, and platforms that still require packaging.</p>
+      </div>
+      <div id="platform-grid" class="platform-grid" aria-live="polite"></div>
+    </section>
+
+    <section class="shell connect-section" aria-labelledby="ladder-title">
+      <div class="bezel reveal">
+        <div class="core connection-ladder-core">
+          <div>
+            <p class="panel-label">Connection ladder</p>
+            <h2 id="ladder-title">One easy path. Explicit trust at every step.</h2>
+          </div>
+          <ol id="connection-ladder" class="connection-ladder"></ol>
+          <details class="soft-disclosure">
+            <summary>What blocks a public all-platform launch?</summary>
+            <ul id="public-blockers" class="plain-list"></ul>
+          </details>
+          <p class="verification-links"><a href="connect-manifest.json">Open machine-readable manifest</a> · <a href="../release/manifest.json">Inspect release manifest</a> · <a href="../release/SHA256SUMS">Check release hashes</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-grid">
+      <p>Connection hub status: local prototype. It is a truthful routing layer, not a production deployment claim.</p>
+      <nav aria-label="Footer navigation">
+        <a href="index.html">Home</a>
+        <a href="mindlinks.html">Renderer</a>
+        <a href="mindlink-v0.schema.json">MindLink schema</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="connect.js" defer></script>
+</body>
+</html>
