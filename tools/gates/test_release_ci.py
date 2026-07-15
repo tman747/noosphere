@@ -75,8 +75,8 @@ class ReleaseCiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             environ, lock = self._windows_fixture(Path(directory))
             versions = {
-                "cl.exe": lock["targets"]["windows-x86_64"]["msvc_binary_file_version"],
-                "link.exe": lock["targets"]["windows-x86_64"]["msvc_binary_file_version"],
+                "cl.exe": lock["targets"]["windows-x86_64"]["msvc_cl_file_version"],
+                "link.exe": lock["targets"]["windows-x86_64"]["msvc_link_file_version"],
                 "rc.exe": lock["targets"]["windows-x86_64"]["windows_sdk_rc_file_version"],
             }
             resolved = repro_build.resolve_windows_toolchain(

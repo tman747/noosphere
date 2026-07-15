@@ -36,6 +36,9 @@ OPTIONS:
                            default: 127.0.0.1:8632)
     --rpc-token <token>    Bearer token for the operator RPC (required to
                            serve RPC; without it RPC stays off)
+    --rpc-token-file <path>
+                           Read the bearer token from a private file instead
+                           of exposing it in the process command line
     --validator            Devnet fixture validator (TEST NETWORKS ONLY):
                            installs the fixture witness set, produces blocks
                            on a fixed cadence, and drives fixture finality
@@ -110,6 +113,7 @@ fn main() -> ExitCode {
     let mut genesis_time_ms: u64 = 1_760_000_000_000;
     let mut rpc_bind: SocketAddr = "127.0.0.1:8632".parse().unwrap_or_else(|_| unreachable!());
     let mut rpc_token: Option<String> = None;
+    let mut rpc_token_file: Option<PathBuf> = None;
     let mut observer = false;
     let mut validator = false;
     let mut devnet_producer = false;
@@ -182,6 +186,10 @@ fn main() -> ExitCode {
             },
             "--rpc-token" => match take("--rpc-token") {
                 Some(v) => rpc_token = Some(v),
+                None => return ExitCode::from(2),
+            },
+            "--rpc-token-file" => match take("--rpc-token-file") {
+                Some(v) => rpc_token_file = Some(PathBuf::from(v)),
                 None => return ExitCode::from(2),
             },
             "--p2p-listen" => match take("--p2p-listen").and_then(|v| v.parse().ok()) {
@@ -294,6 +302,25 @@ fn main() -> ExitCode {
                 return ExitCode::from(2);
             }
         }
+    }
+    if rpc_token.is_some() && rpc_token_file.is_some() {
+        eprintln!("error: --rpc-token and --rpc-token-file are mutually exclusive");
+        return ExitCode::from(2);
+    }
+    if let Some(path) = rpc_token_file {
+        let raw = match std::fs::read_to_string(&path) {
+            Ok(value) => value,
+            Err(error) => {
+                eprintln!("error: read --rpc-token-file {}: {error}", path.display());
+                return ExitCode::from(2);
+            }
+        };
+        let token = raw.trim();
+        if token.len() < 32 || token.chars().any(char::is_whitespace) {
+            eprintln!("error: --rpc-token-file must contain one non-whitespace token of at least 32 characters");
+            return ExitCode::from(2);
+        }
+        rpc_token = Some(token.to_owned());
     }
 
     let params = match DevnetParams::load(&params_path) {

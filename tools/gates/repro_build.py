@@ -391,8 +391,8 @@ def resolve_windows_toolchain(
         )
     binary_file_versions = {name: file_version_reader(path) for name, path in sorted(binaries.items())}
     expected_versions = {
-        "cl.exe": expected["msvc_binary_file_version"],
-        "link.exe": expected["msvc_binary_file_version"],
+        "cl.exe": expected["msvc_cl_file_version"],
+        "link.exe": expected["msvc_link_file_version"],
         "rc.exe": expected["windows_sdk_rc_file_version"],
     }
     if binary_file_versions != expected_versions:

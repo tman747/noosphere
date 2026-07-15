@@ -1,0 +1,20 @@
+# Testnet-only Cloudflare Tunnel ingress. Copy outside the repository and replace
+# the two secret-bearing path placeholders. The tunnel UUID is public identity;
+# the credentials JSON is not and must never enter source control.
+tunnel: 2f10ea2e-278e-4bd0-b104-90f4dc5c1ee8
+credentials-file: C:\absolute\private\path\mindchain-wwm-testnet-credentials.json
+protocol: http2
+
+ingress:
+  - hostname: wwm.mindchain.network
+    path: ^/api/wwm-web-capacity/v1(/.*)?$
+    service: http://127.0.0.1:29772
+  - hostname: wwm.mindchain.network
+    service: http://127.0.0.1:29680
+  - hostname: wwm-rpc.mindchain.network
+    service: http://127.0.0.1:29680
+  - hostname: wwm-artifacts.mindchain.network
+    service: http://127.0.0.1:29681
+  - hostname: wwm-status.mindchain.network
+    service: http://127.0.0.1:29680
+  - service: http_status:404

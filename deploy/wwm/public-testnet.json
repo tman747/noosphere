@@ -1,0 +1,89 @@
+{
+  "schema": "noos/wwm-public-testnet/v1",
+  "environment": "public-testnet",
+  "production": false,
+  "production_capable": false,
+  "promotion_effect": "NONE",
+  "application_profile": "BONSAI_PUBLIC_TEXT_V1",
+  "chain_binding": {
+    "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+    "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e"
+  },
+  "model_binding": {
+    "alias": "bonsai-q1",
+    "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+    "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+    "model_sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+    "model_bytes": 3803452480,
+    "encoded_bytes": 5707063296,
+    "positions": 12,
+    "reconstruction_threshold": 8,
+    "schedulable_minimum": 9
+  },
+  "local_services": {
+    "node_rpc": "127.0.0.1:29652",
+    "node_p2p": "/ip4/0.0.0.0/udp/29650/quic-v1",
+    "public_gateway": "127.0.0.1:29680",
+    "static_artifact_host": "127.0.0.1:29681",
+    "artifact_store_api": "127.0.0.1:29682",
+    "web_capacity_coordinator": "127.0.0.1:29772",
+    "inference_worker_sidecar": "127.0.0.1:29807",
+    "prometheus": "127.0.0.1:29901"
+  },
+  "public_endpoints": {
+    "site": "https://wwm.mindchain.network",
+    "read_gateway": "https://wwm-rpc.mindchain.network",
+    "status": "https://wwm-status.mindchain.network",
+    "artifacts": "https://wwm-artifacts.mindchain.network"
+  },
+  "authorized_browser_origins": [
+    "https://mindchain.network",
+    "https://wwm.mindchain.network"
+  ],
+  "cloudflare": {
+    "tunnel_name": "mindchain-wwm-testnet",
+    "tunnel_id": "2f10ea2e-278e-4bd0-b104-90f4dc5c1ee8",
+    "r2_bucket": "mindchain-wwm-artifacts-pilot",
+    "dashboard_auth_required_for_r2": true
+  },
+  "workstation_control_domain": {
+    "provider": "owner-workstation",
+    "region": "us-central-owner-site",
+    "control_cluster": "owner-workstation-01",
+    "beneficial_owner": "project-owner",
+    "independent": false,
+    "eligible_for_production_independence": false
+  },
+  "required_testnet_roles": [
+    "producer",
+    "witness-0",
+    "witness-1",
+    "witness-2",
+    "witness-3",
+    "read-gateway",
+    "artifact-service",
+    "executor",
+    "web-capacity-coordinator",
+    "monitor"
+  ],
+  "public_pilot": {
+    "browser_rewards": false,
+    "production_custody": false,
+    "availability_certificate_effect": false,
+    "training": false,
+    "min_quota_shares": 16,
+    "max_quota_shares": 256,
+    "duration_days": 30,
+    "started_at": null,
+    "promotion_before_completion": false
+  },
+  "budget": {
+    "currency": "USD",
+    "hard_cap": 100,
+    "r2_cap": 10,
+    "compute_cap": 60,
+    "monitoring_cap": 10,
+    "reserve": 20,
+    "spent": 0
+  }
+}
