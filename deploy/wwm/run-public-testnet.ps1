@@ -162,6 +162,7 @@ $Specs = @(
             '--evidence-dir', $MonitorEvidenceDir,
             '--signing-key', $MonitorSigningKey,
             '--r2-report', $R2Report,
+            '--worker-config', $WorkerdConfig,
             '--source-revision', $SourceRevision,
             '--interval-seconds', '60',
             '--seed-hostname', $SeedHostname,

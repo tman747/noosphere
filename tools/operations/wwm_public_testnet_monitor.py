@@ -49,6 +49,7 @@ class MonitorConfig:
     evidence_dir: Path
     signing_key_path: Path
     r2_report_path: Path
+    worker_bearer_token: str
     source_revision: str
     interval_seconds: int
     request_timeout_seconds: float
@@ -136,6 +137,29 @@ def require_hex32(value: object, label: str) -> str:
     return value
 
 
+def load_worker_bearer_token(path: Path) -> str:
+    resolved = path.resolve(strict=True)
+    if resolved.stat().st_size > 65_536:
+        raise MonitorError("workerd configuration exceeds byte bound")
+    try:
+        text = resolved.read_text(encoding="utf-8")
+    except UnicodeError as error:
+        raise MonitorError("workerd configuration is not UTF-8") from error
+    sections = list(re.finditer(r"(?m)^\s*\[worker\]\s*(?:#.*)?$", text))
+    if len(sections) != 1:
+        raise MonitorError("workerd configuration must contain one worker section")
+    following = re.search(r"(?m)^\s*\[", text[sections[0].end():])
+    end = sections[0].end() + following.start() if following else len(text)
+    block = text[sections[0].end():end]
+    tokens = re.findall(
+        r'(?m)^\s*sidecar_token_hex\s*=\s*"([0-9a-f]{64})"\s*(?:#.*)?$',
+        block,
+    )
+    if len(tokens) != 1 or tokens[0] == "0" * 64:
+        raise MonitorError("workerd configuration has no unique valid sidecar token")
+    return tokens[0]
+
+
 def load_config(args: argparse.Namespace) -> MonitorConfig:
     listen_host, listen_port = parse_listen(args.listen)
     if not HEX40.fullmatch(args.source_revision):
@@ -184,6 +208,7 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
         evidence_dir=evidence_dir,
         signing_key_path=signing_key,
         r2_report_path=r2_report,
+        worker_bearer_token=load_worker_bearer_token(args.worker_config),
         source_revision=args.source_revision,
         interval_seconds=args.interval_seconds,
         request_timeout_seconds=args.request_timeout_seconds,
@@ -271,15 +296,20 @@ def request_bytes(url: str, timeout: float, *, headers: dict[str, str] | None = 
         return int(response.status), response.headers, body
 
 
-def request_json(url: str, timeout: float) -> tuple[int, object, dict[str, object]]:
-    status, headers, body = request_bytes(url, timeout)
+def request_json(
+    url: str,
+    timeout: float,
+    *,
+    headers: dict[str, str] | None = None,
+) -> tuple[int, object, dict[str, object]]:
+    status, response_headers, body = request_bytes(url, timeout, headers=headers)
     try:
         value = json.loads(body)
     except ValueError as error:
         raise MonitorError("endpoint returned malformed JSON") from error
     if not isinstance(value, dict):
         raise MonitorError("endpoint JSON must be an object")
-    return status, headers, value
+    return status, response_headers, value
 
 
 def run_check(name: str, function: Callable[[], dict[str, object]]) -> CheckResult:
@@ -308,6 +338,17 @@ def tls_probe(origin: str, timeout: float) -> dict[str, object]:
     if remaining < 7 * 86_400:
         raise MonitorError("TLS certificate expires within seven days")
     return {"hostname": hostname, "expires_at": expires_at, "remaining_days": remaining // 86_400}
+
+
+def worker_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
+    status, _, body = request_json(
+        "http://127.0.0.1:29807/health/ready",
+        timeout,
+        headers={"Authorization": f"Bearer {config.worker_bearer_token}"},
+    )
+    if status != 200:
+        raise MonitorError("inference worker is not ready")
+    return {"status": status, "ready": body.get("ready", True)}
 
 
 def collect_checks(config: MonitorConfig) -> list[CheckResult]:
@@ -372,10 +413,7 @@ def collect_checks(config: MonitorConfig) -> list[CheckResult]:
         return {"status": status, "experiment_state": body.get("experiment_state")}
 
     def worker() -> dict[str, object]:
-        status, _, body = request_json("http://127.0.0.1:29807/health/ready", timeout)
-        if status != 200:
-            raise MonitorError("inference worker is not ready")
-        return {"status": status, "ready": body.get("ready", True)}
+        return worker_probe(config, timeout)
 
     def r2() -> dict[str, object]:
         report = load_object(config.r2_report_path)
@@ -749,6 +787,7 @@ def parse_args() -> argparse.Namespace:
     monitor.add_argument("--evidence-dir", type=Path, required=True)
     monitor.add_argument("--signing-key", type=Path, required=True)
     monitor.add_argument("--r2-report", type=Path, required=True)
+    monitor.add_argument("--worker-config", type=Path, required=True)
     monitor.add_argument("--source-revision", required=True)
     monitor.add_argument("--interval-seconds", type=int, default=60)
     monitor.add_argument("--request-timeout-seconds", type=float, default=10.0)

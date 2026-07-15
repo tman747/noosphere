@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import json
 import tempfile
 import threading
@@ -8,6 +9,8 @@ import unittest
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+from unittest import mock
 
 from tools.operations import wwm_public_testnet_monitor as monitor
 
@@ -22,6 +25,13 @@ class PublicTestnetMonitorTests(unittest.TestCase):
         self.key_document = monitor.generate_key(self.private_key, self.public_key)
         self.deployment = self.root / "public-testnet.json"
         self.r2_report = self.root / "r2-report.json"
+        self.workerd_config = self.root / "secrets" / "workerd.toml"
+        self.worker_token = "77" * 32
+        self.workerd_config.parent.mkdir(parents=True, exist_ok=True)
+        self.workerd_config.write_text(
+            f'[worker]\nsidecar_token_hex = "{self.worker_token}"\n[engine]\nkind = "mock"\n',
+            encoding="utf-8",
+        )
         self.deployment_document = {
             "schema": "noos/wwm-public-testnet/v1",
             "environment": "public-testnet",
@@ -58,6 +68,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
             evidence_dir=self.root / "evidence",
             signing_key=self.private_key,
             r2_report=self.r2_report,
+            worker_config=self.workerd_config,
             source_revision="55" * 20,
             interval_seconds=60,
             request_timeout_seconds=5.0,
@@ -82,11 +93,27 @@ class PublicTestnetMonitorTests(unittest.TestCase):
         config = monitor.load_config(self.arguments())
         self.assertEqual(config.chain_id, "11" * 32)
         self.assertEqual(config.artifact_origin, "https://artifacts.example")
+        self.assertEqual(config.worker_bearer_token, self.worker_token)
 
         self.deployment_document["production"] = True
         self.deployment.write_text(json.dumps(self.deployment_document), encoding="utf-8")
         with self.assertRaisesRegex(monitor.MonitorError, "fail-closed public testnet"):
             monitor.load_config(self.arguments())
+
+    def test_worker_probe_authenticates_without_exposing_token(self) -> None:
+        config = monitor.load_config(self.arguments())
+        with mock.patch.object(
+            monitor,
+            "request_json",
+            return_value=(200, {}, {"ready": True}),
+        ) as request:
+            detail = monitor.worker_probe(config, 5.0)
+        request.assert_called_once_with(
+            "http://127.0.0.1:29807/health/ready",
+            5.0,
+            headers={"Authorization": f"Bearer {self.worker_token}"},
+        )
+        self.assertNotIn(self.worker_token, json.dumps(detail))
 
     def test_sample_ledger_is_signed_chained_and_summarized_immutably(self) -> None:
         key = monitor.load_signing_key(self.private_key)
@@ -111,7 +138,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
             monitor.verify_envelope(tampered, monitor.SAMPLE_DOMAIN, "sample_id")
 
     def test_status_server_exposes_fail_closed_metrics_and_signed_sample(self) -> None:
-        config = monitor.load_config(self.arguments())
+        config = replace(monitor.load_config(self.arguments()), listen_port=0)
         state = monitor.MonitorState(config)
         key = monitor.load_signing_key(self.private_key)
         payload = {
