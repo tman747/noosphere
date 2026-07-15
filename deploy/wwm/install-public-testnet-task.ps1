@@ -16,13 +16,17 @@ $BinaryDir = Join-Path $RuntimeRoot 'bin'
 $SecretDir = Join-Path $RuntimeRoot 'secrets'
 $InstalledNode = Join-Path $BinaryDir 'noosd.exe'
 $TokenFile = Join-Path $SecretDir 'rpc-token.txt'
+$MonitorScript = Join-Path $RepoRoot 'tools\operations\wwm_public_testnet_monitor.py'
+$EvidenceDir = Join-Path $RuntimeRoot 'evidence'
+$MonitorSeed = Join-Path $SecretDir 'monitor-ed25519.seed'
+$MonitorPublicKey = Join-Path $EvidenceDir 'monitor-public-key.json'
 
-foreach ($file in @($Supervisor, $NodeBinarySource, $TunnelConfig, $CloudflaredBinary)) {
+foreach ($file in @($Supervisor, $MonitorScript, $NodeBinarySource, $TunnelConfig, $CloudflaredBinary)) {
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
         throw "Required installer input is missing: $file"
     }
 }
-foreach ($directory in @($RuntimeRoot, $BinaryDir, $SecretDir, (Join-Path $RuntimeRoot 'node'), (Join-Path $RuntimeRoot 'logs'))) {
+foreach ($directory in @($RuntimeRoot, $BinaryDir, $SecretDir, $EvidenceDir, (Join-Path $RuntimeRoot 'node'), (Join-Path $RuntimeRoot 'logs'))) {
     New-Item -ItemType Directory -Force -Path $directory | Out-Null
 }
 Copy-Item -LiteralPath $NodeBinarySource -Destination $InstalledNode -Force
@@ -39,6 +43,14 @@ if ($tokenValue.Length -lt 32 -or $tokenValue -match '\s') {
     throw 'Existing RPC token is invalid; refusing to replace it implicitly.'
 }
 Remove-Variable tokenValue
+
+if ((Test-Path -LiteralPath $MonitorSeed) -xor (Test-Path -LiteralPath $MonitorPublicKey)) {
+    throw 'Monitor keypair is incomplete; refusing to replace either half implicitly.'
+}
+if (-not (Test-Path -LiteralPath $MonitorSeed -PathType Leaf)) {
+    & python.exe $MonitorScript keygen --private-key $MonitorSeed --public-key $MonitorPublicKey
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to create the insert-once testnet monitor keypair.' }
+}
 
 & icacls.exe $SecretDir /inheritance:r /grant:r "${env:USERNAME}:(OI)(CI)F" | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Failed to restrict the testnet secret directory ACL.' }

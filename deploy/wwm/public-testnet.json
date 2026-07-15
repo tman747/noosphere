@@ -36,6 +36,43 @@
     "status": "https://wwm-status.mindchain.network",
     "artifacts": "https://wwm-artifacts.mindchain.network"
   },
+  "public_seeds": [
+    {
+      "hostname": "wwm-seed.mindchain.network",
+      "ipv4": "20.15.164.29",
+      "multiaddr": "/ip4/20.15.164.29/udp/31004/quic-v1",
+      "witness_index": 0,
+      "provider": "azure",
+      "region": "centralus",
+      "machine": "mindchain-seed-1",
+      "operator_rpc": "loopback-only",
+      "independent": false
+    },
+    {
+      "hostname": "wwm-seed-2.mindchain.network",
+      "ipv4": "172.202.41.123",
+      "multiaddr": "/ip4/172.202.41.123/udp/31005/quic-v1",
+      "witness_index": 1,
+      "provider": "azure",
+      "region": "centralus",
+      "machine": "mindchain-seed-2",
+      "operator_rpc": "loopback-only",
+      "independent": false
+    }
+  ],
+  "monitoring": {
+    "prometheus_endpoint": "https://wwm-status.mindchain.network/metrics",
+    "status_endpoint": "https://wwm-status.mindchain.network/status.json",
+    "sample_interval_seconds": 60,
+    "sample_schema": "noos/wwm-public-testnet-monitor-sample/v1",
+    "daily_summary_schema": "noos/wwm-public-testnet-monitor-daily-summary/v1",
+    "signer_key_id": "edaabc9658bdeb58dd093bb7992bd2862e39efb4953771113801bcf125e366d7",
+    "external_probe_vms": [
+      "mindchain-seed-1",
+      "mindchain-seed-2"
+    ],
+    "formal_e_wwm_23_evidence": false
+  },
   "authorized_browser_origins": [
     "https://mindchain.network",
     "https://wwm.mindchain.network"
@@ -44,7 +81,11 @@
     "tunnel_name": "mindchain-wwm-testnet",
     "tunnel_id": "2f10ea2e-278e-4bd0-b104-90f4dc5c1ee8",
     "r2_bucket": "mindchain-wwm-artifacts-pilot",
-    "dashboard_auth_required_for_r2": true
+    "r2_public_access": false,
+    "r2_object_count": 4090,
+    "r2_bundle_bytes": 4281829563,
+    "r2_production_custody": false,
+    "r2_independent_beneficial_owner": false
   },
   "workstation_control_domain": {
     "provider": "owner-workstation",
@@ -71,6 +112,7 @@
     "production_custody": false,
     "availability_certificate_effect": false,
     "training": false,
+    "consent_version": "wwm-web-capacity-consent/v1",
     "min_quota_shares": 16,
     "max_quota_shares": 256,
     "duration_days": 30,
@@ -84,6 +126,10 @@
     "compute_cap": 60,
     "monitoring_cap": 10,
     "reserve": 20,
-    "spent": 0
+    "spent": 0,
+    "new_monthly_compute_estimate": 44.17,
+    "pricing_observed_at": "2026-07-15",
+    "pricing_source": "Azure Retail Prices API",
+    "remaining_estimate": 55.83
   }
 }

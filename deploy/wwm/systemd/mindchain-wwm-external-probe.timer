@@ -1,0 +1,12 @@
+[Unit]
+Description=Run MindChain WWM external probe every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=15s
+Persistent=true
+Unit=mindchain-wwm-external-probe.service
+
+[Install]
+WantedBy=timers.target

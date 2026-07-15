@@ -16,6 +16,11 @@ param(
     [string]$CoordinatorConfig = 'C:\mindchain\wwm-testnet\web-capacity\coordinator.json',
     [string]$CoordinatorSeedFile = 'C:\mindchain\wwm-testnet\secrets\web-capacity-coordinator-seed.hex',
     [string]$TunnelConfig = 'C:\mindchain\wwm-testnet\cloudflared.yml',
+    [string]$MonitorSigningKey = 'C:\mindchain\wwm-testnet\secrets\monitor-ed25519.seed',
+    [string]$MonitorEvidenceDir = 'C:\mindchain\wwm-testnet\evidence',
+    [string]$R2Report = 'C:\mindchain\wwm-testnet\web-capacity\r2-sync-20260715.json',
+    [string]$SeedHostname = 'wwm-seed.mindchain.network',
+    [string]$SeedIp = '20.15.164.29',
     [switch]$SkipTunnel
 )
 
@@ -28,8 +33,10 @@ $LogDir = Join-Path $RuntimeRoot 'logs'
 $SiteRoot = Join-Path $RepoRoot 'site'
 $GatewayScript = Join-Path $RepoRoot 'tools\operations\wwm_public_gateway.py'
 $StaticHostScript = Join-Path $RepoRoot 'tools\operations\wwm_static_bundle_server.py'
+$MonitorScript = Join-Path $RepoRoot 'tools\operations\wwm_public_testnet_monitor.py'
+$DeploymentManifest = Join-Path $RepoRoot 'deploy\wwm\public-testnet.json'
 
-foreach ($directory in @($DataDir, $LogDir)) {
+foreach ($directory in @($DataDir, $LogDir, $MonitorEvidenceDir)) {
     New-Item -ItemType Directory -Force -Path $directory | Out-Null
 }
 foreach ($file in @(
@@ -42,7 +49,11 @@ foreach ($file in @(
     $WorkerdBinary,
     $WorkerdConfig,
     $CoordinatorConfig,
-    $CoordinatorSeedFile
+    $CoordinatorSeedFile,
+    $MonitorScript,
+    $DeploymentManifest,
+    $MonitorSigningKey,
+    $R2Report
 )) {
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
         throw "Required public-testnet file is missing: $file"
@@ -75,6 +86,10 @@ $CoordinatorSeed = (Get-Content -LiteralPath $CoordinatorSeedFile -Raw).Trim()
 if ($CoordinatorSeed -notmatch '^[0-9a-f]{64}$') {
     throw 'Web-capacity coordinator seed must be canonical lowercase hex32.'
 }
+$SourceRevision = (& git.exe -C $RepoRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $SourceRevision -notmatch '^[0-9a-f]{40}$') {
+    throw 'Repository source revision could not be resolved to a canonical Git commit.'
+}
 
 $GovernanceAccount = '17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce'
 $Specs = @(
@@ -90,6 +105,8 @@ $Specs = @(
             '--produce-interval-ms', '1000',
             '--devnet-governance-account', $GovernanceAccount,
             '--p2p-listen', '/ip4/0.0.0.0/udp/29650/quic-v1',
+            '--peer', '/ip4/20.15.164.29/udp/31004/quic-v1',
+            '--peer', '/ip4/172.202.41.123/udp/31005/quic-v1',
             '--data-dir', $DataDir
         )
     },
@@ -135,6 +152,23 @@ $Specs = @(
         }
     },
     [pscustomobject]@{
+        Name = 'monitor'
+        Exe = $PythonBinary
+        Args = @(
+            $MonitorScript,
+            'serve',
+            '--listen', '127.0.0.1:29901',
+            '--deployment', $DeploymentManifest,
+            '--evidence-dir', $MonitorEvidenceDir,
+            '--signing-key', $MonitorSigningKey,
+            '--r2-report', $R2Report,
+            '--source-revision', $SourceRevision,
+            '--interval-seconds', '60',
+            '--seed-hostname', $SeedHostname,
+            '--seed-ip', $SeedIp
+        )
+    },
+    [pscustomobject]@{
         Name = 'gateway'
         Exe = $PythonBinary
         Args = @(
@@ -144,7 +178,8 @@ $Specs = @(
             '--node-token-file', $TokenFile,
             '--site-root', $SiteRoot,
             '--allow-origin', 'https://mindchain.network',
-            '--allow-origin', 'https://wwm.mindchain.network'
+            '--allow-origin', 'https://wwm.mindchain.network',
+            '--connect-origin', $StaticBundleOrigin
         )
     }
 )

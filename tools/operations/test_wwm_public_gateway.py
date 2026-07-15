@@ -82,6 +82,7 @@ class PublicGatewayTests(unittest.TestCase):
             node_token=UpstreamHandler.expected_token,
             site_root=self.site.resolve(),
             allowed_origins=frozenset({"https://mindchain.network", "https://wwm.mindchain.network"}),
+            connect_origins=frozenset({"https://wwm-artifacts.mindchain.network"}),
         )
         self.public = gateway.GatewayServer(config)
         self.public_thread = threading.Thread(target=self.public.serve_forever, daemon=True)
@@ -173,6 +174,10 @@ class PublicGatewayTests(unittest.TestCase):
         self.assertEqual(headers["Vary"], "Origin")
         self.assertEqual(headers["Strict-Transport-Security"], "max-age=31536000; includeSubDomains")
         self.assertIn("frame-ancestors 'none'", headers["Content-Security-Policy"])
+        self.assertIn(
+            "connect-src 'self' https://wwm-artifacts.mindchain.network",
+            headers["Content-Security-Policy"],
+        )
 
         status, _, body = self.request(
             "/api/status",
@@ -213,6 +218,7 @@ class PublicGatewayTests(unittest.TestCase):
             node_token_file=self.token_path,
             site_root=self.site,
             allow_origin=[],
+            connect_origin=[],
         )
         with self.assertRaisesRegex(gateway.GatewayError, "loopback"):
             gateway.load_config(arguments)
@@ -229,6 +235,11 @@ class PublicGatewayTests(unittest.TestCase):
 
         self.token_path.write_text(UpstreamHandler.expected_token + "\n", encoding="ascii")
         arguments.allow_origin = ["https://mindchain.network/path"]
+        with self.assertRaisesRegex(gateway.GatewayError, "exact HTTPS origins"):
+            gateway.load_config(arguments)
+
+        arguments.allow_origin = []
+        arguments.connect_origin = ["https://artifacts.example/path"]
         with self.assertRaisesRegex(gateway.GatewayError, "exact HTTPS origins"):
             gateway.load_config(arguments)
 

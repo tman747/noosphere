@@ -132,7 +132,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          controlled="release/candidates/${{ matrix.target }}/.controlled-build"
+          controlled="../.noosphere-controlled-build/${{ matrix.target }}"
           mkdir -p "$controlled/cargo-home" "$controlled/go-home/pkg"
           cargo_home="${CARGO_HOME:-$HOME/.cargo}"
           for cache in registry git; do

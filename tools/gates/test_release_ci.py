@@ -181,6 +181,9 @@ class ReleaseCiTests(unittest.TestCase):
         self.assertIn("--builder-profile github-hosted-owner-smoke", candidate)
         self.assertIn("promotion effect NONE", candidate)
         self.assertIn("Provision isolated offline dependency homes", candidate)
+        self.assertIn('controlled="../.noosphere-controlled-build/${{ matrix.target }}"', candidate)
+        self.assertNotIn('controlled="release/candidates/', candidate)
+        self.assertFalse(repro_build.CONTROLLED_BUILD_ROOT.is_relative_to(repro_build.ROOT))
         with tempfile.TemporaryDirectory() as directory:
             target_dir = Path(directory)
             env = repro_build.deterministic_environment(

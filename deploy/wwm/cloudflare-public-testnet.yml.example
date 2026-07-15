@@ -16,5 +16,5 @@ ingress:
   - hostname: wwm-artifacts.mindchain.network
     service: http://127.0.0.1:29681
   - hostname: wwm-status.mindchain.network
-    service: http://127.0.0.1:29680
+    service: http://127.0.0.1:29901
   - service: http_status:404

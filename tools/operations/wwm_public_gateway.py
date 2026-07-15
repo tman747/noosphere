@@ -33,6 +33,7 @@ class GatewayConfig:
     node_token: str
     site_root: Path
     allowed_origins: frozenset[str]
+    connect_origins: frozenset[str]
 
 
 def canonical_json(value: object) -> bytes:
@@ -87,6 +88,7 @@ def load_config(args: argparse.Namespace) -> GatewayConfig:
     if not site_root.is_dir():
         raise GatewayError("site root must be a directory")
     allowed_origins = frozenset(validate_origin(value) for value in args.allow_origin)
+    connect_origins = frozenset(validate_origin(value) for value in args.connect_origin)
     return GatewayConfig(
         listen_host=listen_host,
         listen_port=listen_port,
@@ -94,6 +96,7 @@ def load_config(args: argparse.Namespace) -> GatewayConfig:
         node_token=token,
         site_root=site_root,
         allowed_origins=allowed_origins,
+        connect_origins=connect_origins,
     )
 
 
@@ -263,10 +266,11 @@ class PublicGatewayHandler(http.server.BaseHTTPRequestHandler):
 
     def _security_headers(self, cache_control: str) -> None:
         self.send_header("Cache-Control", cache_control)
+        connect_sources = " ".join(["'self'", *sorted(self.config.connect_origins)])
         self.send_header(
             "Content-Security-Policy",
             "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; "
-            "form-action 'self'; connect-src 'self'; img-src 'self' data:; "
+            f"form-action 'self'; connect-src {connect_sources}; img-src 'self' data:; "
             "script-src 'self'; style-src 'self'; worker-src 'self'",
         )
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
@@ -351,6 +355,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--node-token-file", type=Path, required=True)
     parser.add_argument("--site-root", type=Path, required=True)
     parser.add_argument("--allow-origin", action="append", default=[])
+    parser.add_argument("--connect-origin", action="append", default=[])
     return parser.parse_args()
 
 

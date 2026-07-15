@@ -75,7 +75,7 @@ def create_bundle(
     out = repro_build.safe_repository_output(out)
     if out.exists():
         for child in out.iterdir():
-            if child.name not in {".cargo-target", ".controlled-build"}:
+            if child.name != ".cargo-target":
                 if child.is_dir():
                     shutil.rmtree(child)
                 else:

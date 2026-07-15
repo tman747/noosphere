@@ -33,6 +33,7 @@ POLICY = ROOT / "protocol/release/repro-policy-v1.toml"
 POLICY_SIGNATURES = ROOT / "protocol/release/repro-policy-v1.signatures.json"
 TOOLCHAINS = ROOT / "protocol/release/repro-toolchains-v1.json"
 GO_MODULE = ROOT / "go"
+CONTROLLED_BUILD_ROOT = ROOT.parent / ".noosphere-controlled-build"
 REQUIRED_TARGETS = {"windows-x86_64", "linux-x86_64", "linux-aarch64"}
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 TARGETS = {
@@ -523,7 +524,7 @@ def build_target(target: str, out: Path, *, revision: str | None = None, smoke: 
 
     out = safe_repository_output(out)
     out.mkdir(parents=True, exist_ok=True)
-    target_dir = out / ".controlled-build"
+    target_dir = CONTROLLED_BUILD_ROOT / target
     windows_toolchain = resolve_windows_toolchain(locks) if target == "windows-x86_64" else None
     with materialized_revision(identity["revision"]) as source_root:
         source_go = source_root / "go"
