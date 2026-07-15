@@ -105,9 +105,18 @@ def validate_gateway(
 
 
 def validate_artifacts(status: int, document: dict[str, object]) -> dict[str, object]:
-    require_public_testnet(document)
     count = document.get("share_count")
-    if status != 200 or document.get("production_custody") is not False or not isinstance(count, int) or count < 9:
+    if (
+        status != 200
+        or document.get("schema") != "noos/wwm-public-static-host/v1"
+        or document.get("environment") != "public-testnet"
+        or document.get("status") != "ok"
+        or document.get("production") is not False
+        or document.get("production_custody") is not False
+        or document.get("rewards") is not False
+        or not isinstance(count, int)
+        or count < 9
+    ):
         raise ProbeError("artifact host is unavailable or production-promoting")
     return {"share_count": count, "share_bytes": document.get("share_bytes")}
 

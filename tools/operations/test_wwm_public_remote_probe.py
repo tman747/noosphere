@@ -49,9 +49,12 @@ class PublicRemoteProbeTests(unittest.TestCase):
 
     def test_artifact_host_cannot_claim_production_custody(self) -> None:
         document = {
+            "schema": "noos/wwm-public-static-host/v1",
+            "environment": "public-testnet",
+            "status": "ok",
             "production": False,
-            "promotion_effect": "NONE",
             "production_custody": False,
+            "rewards": False,
             "share_count": 4086,
             "share_bytes": 4_280_297_472,
         }
