@@ -1,0 +1,125 @@
+{
+  "schema": "noos/registered-experiment/v1",
+  "experiment_id": "E-WWM-23",
+  "title": "Opt-in web capacity, churn, consent, and repair",
+  "status": "EXPERIMENTAL_OFF_CHAIN",
+  "contract_identity": "noos/wwm-web-capacity/v1",
+  "model_binding": {
+    "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+    "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+    "source_bytes": 3803452480,
+    "source_sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+    "share_bytes": 1047552,
+    "stripes": 454,
+    "positions": 12,
+    "coordinates": 5448,
+    "reconstruction_positions": 8
+  },
+  "duration_days": 30,
+  "minimums": {
+    "origins": 30,
+    "providers": 5,
+    "regions": 3,
+    "control_clusters": 5,
+    "copies_per_coordinate": 3,
+    "share_files": 16344,
+    "browser_opt_ins": 300,
+    "synthetic_sessions": 1000000,
+    "casual_availability_bps": 3000
+  },
+  "maximums": {
+    "base_chain_p95_degradation_bps": 500,
+    "provider_concentration_bps": 2500,
+    "origin_concentration_bps": 500,
+    "control_cluster_concentration_bps": 2500,
+    "access_log_retention_days": 7,
+    "synthetic_state_records": 4096,
+    "synthetic_queue_depth": 256
+  },
+  "required_browsers": ["Chromium", "Firefox", "WebKit"],
+  "required_device_modes": ["desktop", "mobile"],
+  "required_storage_modes": ["OPFS", "IndexedDB"],
+  "required_drills": [
+    "storage_pressure",
+    "private_browsing",
+    "site_data_deletion",
+    "seven_day_inactivity",
+    "host_expiry_removal",
+    "provider_outage",
+    "coordinator_outage",
+    "artifact_service_outage",
+    "poison",
+    "replay",
+    "redirect",
+    "ssrf",
+    "quota",
+    "interrupted_write"
+  ],
+  "gate_ids": [
+    "registered-identity",
+    "real-duration",
+    "static-origin-diversity",
+    "triple-coordinate-coverage",
+    "explicit-cross-browser-opt-ins",
+    "required-failure-drills",
+    "zero-pre-opt-in-activity",
+    "quota-egress-deletion",
+    "privacy-telemetry-retention",
+    "invalid-share-rejection",
+    "largest-provider-loss-reconstruction",
+    "browser-restore-observed",
+    "advisory-reporting",
+    "zero-production-effects",
+    "outage-isolation",
+    "base-chain-p95-isolation",
+    "bounded-synthetic-million",
+    "license-notice-concentration",
+    "review-approvals"
+  ],
+  "kill_rule_ids": [
+    "kill-covert-or-misleading-consent",
+    "kill-incomplete-deletion-or-quota-bypass",
+    "kill-hidden-work-or-cross-site-identity",
+    "kill-unauthorized-hosting",
+    "kill-false-production-claim",
+    "kill-unavailable-remains-schedulable",
+    "kill-corrupt-share-or-reconstruction-failure",
+    "kill-base-chain-degradation",
+    "kill-unbounded-or-correctness-dependency",
+    "kill-advisory-overclaim",
+    "kill-legal-privacy-accessibility-security"
+  ],
+  "demotion_rule": {
+    "id": "browser-copies-below-casual-threshold",
+    "disposition": "PERSONAL_LOCAL_CACHE_ONLY"
+  },
+  "promotion_order": [
+    "LOCAL_DETERMINISTIC_FIXTURE",
+    "HOSTED_MODEL_DEVNET_PROOF",
+    "MULTI_ORIGIN_WEB_CAPACITY_DEVNET",
+    "OPT_IN_TESTNET_PILOT",
+    "STATIC_OPERATOR_NORMAL_CUSTODIAN_ADMISSION",
+    "BROWSER_ADVISORY_REMAINS_NON_CUSTODIAL"
+  ],
+  "participant_boundaries": {
+    "production_custody": false,
+    "rewards": false,
+    "availability_certificate_effect": false,
+    "schedulability_effect": false,
+    "browser_inference": false,
+    "browser_training": false,
+    "browser_mining": false,
+    "browser_arbitrary_code": false
+  },
+  "claim_policy": {
+    "allowed": "Simulated E-WWM-23 laboratory evidence for experimental static and advisory web capacity.",
+    "prohibited": [
+      "production availability",
+      "mainnet readiness",
+      "browser custody",
+      "custody rewards",
+      "millions of real websites",
+      "every validator stores model weights"
+    ]
+  }
+}

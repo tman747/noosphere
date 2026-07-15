@@ -1,0 +1,77 @@
+{
+  "schema": "noos/wwm-hosted-model-proof-panel/v1",
+  "captured_at": "2026-07-15T10:17:43.552Z",
+  "environment": "LOCAL_TESTNET_FIXTURE",
+  "production_claimed": false,
+  "repository_revision": "adf1325428507b4f06f7c9568066985240fc8747",
+  "surface": "site/query.html",
+  "verified_contract": {
+    "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+    "genesis_hash": "d9e39327675856f5160846ee07b2e432598c6b2b96ad9779e480b912320d7874",
+    "finalized_height": 1792,
+    "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+    "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+    "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+    "source_bytes": 3803452480,
+    "encoded_bytes": 5707063296,
+    "custodian_positions": 12,
+    "reconstruction_threshold": 8,
+    "schedulable_minimum": 9,
+    "availability_certificate_id": "510db55c2d08e02f5aee28c0391a5d4159cc9157b4fa23e47adb45dce2ddd4d9",
+    "runtime_root": "690d9bbd8d44631fb971e0b0677e10c8d0bb1e08a743bb720eeaab728e30ba27",
+    "publisher_or_gateway_fallback": false
+  },
+  "source_sha256": {
+    "site/query.html": "01c526b11de9fb8a94340c8f4efe39d0234dc6c8670bd8388248488749cf0fd6",
+    "site/query.js": "4048a2983977c3941a19ebdf0311e08aaefee5f956ba479ebddce1e5bdf4abd6",
+    "site/styles.css": "9ce440500d0afc71aae2eb8fa4b33dc670fd420cea8a957996a7de184664237b",
+    "site/wwm/client.mjs": "0de5fe9473c07855b6721062f85b15c1e0082b4d4c37d03552d4263895c65340",
+    "site/wwm/client.test.mjs": "8ce23c13a181395677049b72e1311ead476141cf50ac812a82eec69e5f849f67"
+  },
+  "verification": {
+    "node_test_command": "node --test site/wwm/client.test.mjs",
+    "node_tests_passed": 9,
+    "node_tests_failed": 0,
+    "syntax_command": "node --check site/query.js",
+    "syntax_passed": true,
+    "verified_browser": {
+      "viewport": "1440x1000",
+      "panel_state": "17 leaves + runtime",
+      "custodian_rows": 12,
+      "fallback_label": "FALSE \u00b7 disabled",
+      "horizontal_overflow": false,
+      "query_enabled_after_verified_ready_state": true
+    },
+    "blocked_browser": {
+      "panel_state": "Unproved",
+      "network_state": "Verifier unavailable",
+      "query_disabled": true,
+      "hosting_label_withheld": true
+    },
+    "mobile_browser": {
+      "viewport": "390x844",
+      "body_scroll_width": 390,
+      "custodian_columns": 1,
+      "horizontal_overflow": false
+    },
+    "proof_trail_browser": {
+      "job_link_rendered": true,
+      "receipt_link_rendered": true,
+      "settlement_link_rendered": true,
+      "settlement_state": "FINALIZED_PAID",
+      "answer_evidence_state": "MATCHED_QUORUM"
+    },
+    "verdict": "PASS"
+  },
+  "screenshot": {
+    "path": "evidence/live/wwm-hosted-model-proof-panel/assets/6039cd7c0c7efec4cb8377aaad14890eac7da8cab6d367b1e41a8aa579c48573.webp",
+    "sha256": "6039cd7c0c7efec4cb8377aaad14890eac7da8cab6d367b1e41a8aa579c48573",
+    "bytes": 85550,
+    "note": "Browser rendering used the actual current finalized proof values with a test-only installed-verifier adapter; cryptographic verifier integration remains an external fail-closed prerequisite."
+  },
+  "scope_and_non_claims": [
+    "The UI never trusts a gateway proofs_verified boolean; it renders only the installed verifier result after exact identity, geometry, certificate, custodian, runtime, and no-fallback checks.",
+    "The browser smoke adapter is test-only and does not itself establish production-grade browser light-client cryptography.",
+    "Without an installed verifier the panel displays Unproved and query admission remains disabled."
+  ]
+}

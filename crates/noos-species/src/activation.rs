@@ -1,9 +1,8 @@
 //! Immutable evaluation evidence and fail-closed model activation control.
 //!
 //! Evaluation reports are insert-once, including unfavorable reports. Canary
-//! routing is deterministic and bounded by traffic ceilings. The production
-//! alias mutation path remains unavailable until the external activation claim
-//! gate changes the compile-time control in a separately reviewed release.
+//! routing is deterministic and bounded by traffic ceilings. This evidence
+//! module has no capsule or production-alias activation path.
 
 use crate::Hash32;
 use noos_crypto::{hash_domain, verify_domain, DomainId, Keypair, PublicKey, Signature};
@@ -15,8 +14,6 @@ pub const MIN_INDEPENDENT_EVALUATORS: usize = 2;
 pub const MAX_EVALUATORS: usize = 64;
 pub const MAX_ACTIVATORS: usize = 32;
 pub const MAX_EMERGENCY_DURATION_BLOCKS: u64 = 7_200;
-pub const WWM_MODEL_ACTIVATION_ENABLED: bool = false;
-pub const WWM_AUTOMATIC_PRODUCTION_ACTIVATION_ENABLED: bool = false;
 pub const WWM_ACTIVATION_CONSENSUS_WEIGHT: u64 = 0;
 pub const WWM_ACTIVATION_FINALITY_WEIGHT: u64 = 0;
 
@@ -39,7 +36,6 @@ pub enum ActivationError {
     AlreadyTerminal,
     InvalidEmergencyRestriction,
     UnavailableRevision,
-    ProductionActivationDisabled,
     ArithmeticOverflow,
 }
 
@@ -1080,10 +1076,6 @@ impl ActivationController {
         }
     }
 
-    pub fn activate_production_alias(&mut self) -> Result<(), ActivationError> {
-        Err(ActivationError::ProductionActivationDisabled)
-    }
-
     pub fn apply_emergency_restriction(
         &mut self,
         restriction: &EmergencyRestriction,
@@ -1662,11 +1654,7 @@ mod tests {
         }
         assert_eq!(controller.state(), CanaryState::CanaryComplete);
         assert_eq!(controller.production_alias_revision_id(), h(41));
-        assert_eq!(
-            controller.activate_production_alias(),
-            Err(ActivationError::ProductionActivationDisabled)
-        );
-        assert!(!WWM_MODEL_ACTIVATION_ENABLED);
+        // Species evidence cannot activate or mutate the production alias.
         assert_eq!(WWM_ACTIVATION_CONSENSUS_WEIGHT, 0);
         assert_eq!(WWM_ACTIVATION_FINALITY_WEIGHT, 0);
     }

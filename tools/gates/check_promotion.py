@@ -6,18 +6,18 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from promotion_records import PromotionValidationError, validate_promotion_ledger
+from promotion_records import (
+    PromotionValidationError,
+    REQUIRED_REQUIREMENTS_V1,
+    REQUIRED_REQUIREMENTS_V2,
+    validate_promotion_ledger,
+)
 
 ORDER = ["G0", "G1", "G2", "G3", "GENESIS", "G4", "G5"]
 HASH = re.compile(r"^[0-9a-f]{64}$")
 REQUIRED_REQUIREMENTS = {
-    "G0": {"G0.REGISTRY_SCHEMA", "G0.OWNER_CONSTANTS"},
-    "G1": {"G1.DETERMINISTIC_LAB"},
-    "G2": {"G2.INDEPENDENT_DEVNET"},
-    "G3": {"G3.PUBLIC_DURATION", "G3.A_BRAID_AI_OFF", "G3.EXTERNAL_ASSURANCE"},
-    "GENESIS": {"GENESIS.QUIET_WEEK", "GENESIS.BITCOIN_ANCHOR", "GENESIS.DKG", "GENESIS.MAINNET_ECONOMICS", "GENESIS.REPRO_DEMO"},
-    "G4": {"G4.CANARY_DURATION", "G4.EXIT_AND_FAULT_DRILLS", "G4.HARDWARE_BUILDERS"},
-    "G5": {"G5.EXACT_LOWER_GATES", "G5.CLAIM_COMPLETENESS", "G5.EXTERNAL_REVIEWS", "G5.LIVE_DIVERSITY", "G5.SIGNATURES"},
+    1: {gate: set(requirements) for gate, requirements in REQUIRED_REQUIREMENTS_V1.items()},
+    2: {gate: set(requirements) for gate, requirements in REQUIRED_REQUIREMENTS_V2.items()},
 }
 VALID_STATUS = {"UNSATISFIED", "SATISFIED", "OWNER_BLOCKED", "EXTERNAL_BLOCKED", "KILLED", "NOT_APPLICABLE"}
 VALID_VERDICT = {"PASS", "FAIL", "BLOCKED", "NOT_RUN", "KILLED"}
@@ -34,36 +34,59 @@ def load(path: Path, errors: list[str]):
 
 def validate(root: Path, keyring=None, trusted_role_keyring_sha256: str | None = None,
              expected_revision: str | None = None, expected_chain_id: str | None = None,
-             expected_genesis_hash: str | None = None) -> list[str]:
+             expected_genesis_hash: str | None = None, *, schema_version: int = 2,
+             ledger_path: Path | None = None) -> list[str]:
     errors: list[str] = []
-    path = root / "protocol/release/promotion-blockers.json"
+    relative = (
+        Path("protocol/release/promotion-blockers.json")
+        if schema_version == 1
+        else Path("protocol/release/promotion-blockers-v2.json")
+    )
+    path = ledger_path or root / relative
     doc = load(path, errors)
-    schema = load(root / "protocol/release/promotion-blockers-schema-v1.json", errors)
+    schema_name = f"promotion-blockers-schema-v{schema_version}.json"
+    schema = load(root / "protocol/release" / schema_name, errors)
     if errors:
         return errors
-    if doc.get("$schema") != "promotion-blockers-schema-v1.json" or schema.get("$id") != "urn:noos:promotion-blockers:v1":
-        errors.append("ledger/schema binding mismatch")
+    expected_schema_id = f"urn:noos:promotion-blockers:v{schema_version}"
+    if doc.get("$schema") != schema_name or doc.get("schema_version") != schema_version or schema.get("$id") != expected_schema_id:
+        errors.append(f"explicit V{schema_version} ledger/schema binding mismatch")
     policy = doc.get("ledger_policy", {})
     if policy != {"append_only": True, "no_waivers": True, "no_fabricated_evidence": True, "promotion_order": ORDER}:
         errors.append("immutable no-waiver/no-fabrication ledger policy changed")
     binding = doc.get("protocol_binding", {})
-    for key in ("protocol_version", "api_version", "release_version", "revision", "chain_id", "genesis_hash"):
+    expected_wire_version = f"v{schema_version}"
+    for key in ("protocol_version", "api_version"):
+        if binding.get(key) != expected_wire_version:
+            errors.append(f"protocol binding {key} must be {expected_wire_version}")
+    for key in ("release_version", "revision", "chain_id", "genesis_hash"):
         if not isinstance(binding.get(key), str) or not binding[key]:
             errors.append(f"protocol binding {key} absent")
+    if schema_version == 2:
+        if binding.get("protocol_identity") != "noos-protocol-identity-v2" or binding.get("peer_identity") != "v2-only":
+            errors.append("protocol-v2 identity/peer binding is mixed")
     for key in ("chain_id", "genesis_hash"):
         value = binding.get(key)
         if value != "OWNER_BLOCKED" and not (isinstance(value, str) and HASH.fullmatch(value)):
             errors.append(f"{key} must be OWNER_BLOCKED or lowercase hash32")
     authorization_binding = doc.get("authorization_binding", {})
-    if authorization_binding != {
-        "schema_version": 2,
-        "gate_record_domain": "NOOS/PROMOTION/GATE/V2",
-        "role_keyring_sha256": "OWNER_BLOCKED",
-        "final_freeze_sha256": "OWNER_BLOCKED",
-        "ledger_root": "OWNER_BLOCKED",
-    } and not (
+    if schema_version == 1:
+        blocked_authorization = {
+            "schema_version": 2, "gate_record_domain": "NOOS/PROMOTION/GATE/V2",
+            "role_keyring_sha256": "OWNER_BLOCKED", "final_freeze_sha256": "OWNER_BLOCKED",
+            "ledger_root": "OWNER_BLOCKED",
+        }
+        pinned_domain = authorization_binding.get("gate_record_domain") == "NOOS/PROMOTION/GATE/V2"
+    else:
+        blocked_authorization = {
+            "schema_version": 2, "gate_record_domain_id": "D-PROMOTION-GATE-V2",
+            "role_keyring_sha256": "OWNER_BLOCKED", "final_freeze_sha256": "OWNER_BLOCKED",
+            "ledger_root": "OWNER_BLOCKED",
+        }
+        pinned_domain = authorization_binding.get("gate_record_domain_id") == "D-PROMOTION-GATE-V2"
+    if authorization_binding != blocked_authorization and not (
         authorization_binding.get("schema_version") == 2
-        and authorization_binding.get("gate_record_domain") == "NOOS/PROMOTION/GATE/V2"
+        and pinned_domain
         and all(HASH.fullmatch(str(authorization_binding.get(k, ""))) for k in ("role_keyring_sha256", "final_freeze_sha256", "ledger_root"))
     ):
         errors.append("promotion authorization binding is neither honestly blocked nor fully pinned")
@@ -111,7 +134,8 @@ def validate(root: Path, keyring=None, trusted_role_keyring_sha256: str | None =
             errors.append(f"{name}: requirements absent")
             reqs = []
         ids = [r.get("requirement_id") for r in reqs if isinstance(r, dict)]
-        if set(ids) != REQUIRED_REQUIREMENTS.get(name, set()) or len(ids) != len(set(ids)):
+        expected_requirements = REQUIRED_REQUIREMENTS.get(schema_version, {}).get(name, set())
+        if set(ids) != expected_requirements or len(ids) != len(set(ids)):
             errors.append(f"{name}: exact engineering requirement set mismatch")
         has_blocker = False
         for req in reqs:
@@ -150,12 +174,16 @@ def validate(root: Path, keyring=None, trusted_role_keyring_sha256: str | None =
     external = doc.get("external_blockers", [])
     if not owner or any(x.get("status") != "OWNER_BLOCKED" for x in owner if isinstance(x, dict)):
         errors.append("unresolved owner decision ledger absent or dishonest")
-    required_external = {"EXT.PUBLIC_TESTNET", "EXT.DKG", "EXT.ECONOMICS_COUNSEL", "EXT.CANARY", "EXT.PRODUCTION_ECOSYSTEM"}
+    required_external = (
+        {"EXT.PUBLIC_TESTNET", "EXT.DKG", "EXT.ECONOMICS_COUNSEL", "EXT.CANARY", "EXT.PRODUCTION_ECOSYSTEM"}
+        if schema_version == 1
+        else {"EXT.W0_REVIEW", "EXT.PUBLIC_TESTNET", "EXT.DKG", "EXT.CANARY", "EXT.PRODUCTION_ECOSYSTEM"}
+    )
     if {x.get("id") for x in external if isinstance(x, dict)} != required_external:
         errors.append("external blocker set incomplete")
     try:
         validate_promotion_ledger(
-            doc, root, keyring,
+            doc, root, keyring, schema_version=schema_version,
             trusted_role_keyring_sha256=trusted_role_keyring_sha256,
             expected_revision=expected_revision, expected_chain_id=expected_chain_id,
             expected_genesis_hash=expected_genesis_hash,
@@ -168,6 +196,8 @@ def validate(root: Path, keyring=None, trusted_role_keyring_sha256: str | None =
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", nargs="?", default=str(Path(__file__).resolve().parents[2]))
+    parser.add_argument("--schema-version", type=int, choices=(1, 2), default=2)
+    parser.add_argument("--ledger", type=Path)
     parser.add_argument("--keyring")
     parser.add_argument("--final-freeze")
     parser.add_argument("--final-freeze-signatures")
@@ -207,8 +237,12 @@ def main(argv: list[str]) -> int:
             )
         except Exception as exc:
             pre_errors.append(f"trusted keyring/final-freeze load failed: {exc}")
+    ledger_path = args.ledger
+    if ledger_path is not None and not ledger_path.is_absolute():
+        ledger_path = root / ledger_path
     errors = pre_errors + validate(
         root, keyring, trust_root, expected_revision, expected_chain_id, expected_genesis_hash,
+        schema_version=args.schema_version, ledger_path=ledger_path,
     )
     if errors:
         for error in errors:

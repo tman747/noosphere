@@ -63,6 +63,26 @@
       <output id="submit-out" for="submit-btn" role="status" aria-live="polite"></output>
     </section>
 
+    <section id="wwm-payment" aria-labelledby="wwm-payment-h">
+      <h2 id="wwm-payment-h">Paid Bonsai authorization</h2>
+      <p>Create a profile-bound payment authorization for a remote WWM quote. The native shell checks the live chain identity first, signs only public model/profile pins and a salted prompt commitment, and never returns the wallet seed or derived secret.</p>
+      <div class="field-grid">
+        <label>Request id <input id="wwm-request-id" maxlength="96" value="wallet-request-01" autocomplete="off" /></label>
+        <label>Resolution pin id <input id="wwm-pin-id" maxlength="96" autocomplete="off" /></label>
+        <label>Active capsule id <input id="wwm-capsule-id" minlength="64" maxlength="64" spellcheck="false" autocomplete="off" /></label>
+        <label>Execution profile id <input id="wwm-execution-profile-id" minlength="64" maxlength="64" spellcheck="false" autocomplete="off" /></label>
+        <label>Query profile id <input id="wwm-query-profile-id" minlength="64" maxlength="64" spellcheck="false" autocomplete="off" /></label>
+        <label>Salted prompt commitment <input id="wwm-prompt-commitment" minlength="64" maxlength="64" spellcheck="false" autocomplete="off" /></label>
+        <label>Maximum fee (micro-NOOS) <input id="wwm-max-fee" type="number" min="1" value="100000" /></label>
+        <label>Authorization expiry height <input id="wwm-expiry-height" type="number" min="1" /></label>
+        <label>Payer nonce <input id="wwm-payer-nonce" type="number" min="0" value="0" /></label>
+        <label>Payment account <input id="wwm-account" type="number" min="0" value="0" /></label>
+        <label>Payment key index <input id="wwm-index" type="number" min="0" value="0" /></label>
+      </div>
+      <button id="wwm-authorize-btn" type="button">Check identity and authorize payment</button>
+      <output id="wwm-authorize-out" for="wwm-authorize-btn" role="status" aria-live="polite"></output>
+    </section>
+
     <section id="update" aria-labelledby="update-h">
       <h2 id="update-h">Update manifest verification</h2>
       <p>An update installs only when the manifest binds this app id, chain identity, platform, arch, and subscribed channel, and the detached Ed25519 signature from the updater key verifies.</p>

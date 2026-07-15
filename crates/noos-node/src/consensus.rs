@@ -54,6 +54,7 @@ use noos_lumen::engine::AuthVerifier;
 use noos_lumen::fees;
 use noos_lumen::objects::{txid, BoundedList, ReceiptV1, TransactionV1, TransactionWitnessesV1};
 use noos_lumen::state::{BlockContext, DeltaEntry, LumenLedger, LumenRoots, StateDelta, TreeId};
+use noos_lumen::wwm::{carrier_len_valid, FinalizedModelResolutionV1, ResolutionSelectorV1};
 use noos_store::{Blob, WriteSet};
 use noos_witness::bond::WitnessBondV1;
 use noos_witness::finality::{
@@ -548,6 +549,133 @@ impl<P: StorePort> NodeCore<P> {
         &self.dag
     }
 
+    fn finalized_ledger_snapshot(
+        &self,
+    ) -> Result<(LumenLedger, BlockHeaderV1, CheckpointRef), NodeError> {
+        let finalized = self.tracker.finalized_head();
+        let height = finalized.expected_height().ok_or(NodeError::Resolution(
+            crate::resolver::ResolutionError::TerminalNotFinalized,
+        ))?;
+        let finalized_ledger = if self.anchor.0 == finalized.checkpoint_hash && self.anchor.1 == height
+        {
+            self.anchor.2.clone()
+        } else {
+            if height <= self.anchor.1 {
+                return Err(NodeError::Resolution(
+                    crate::resolver::ResolutionError::UnsafeStateRoot,
+                ));
+            }
+            let mut path = Vec::new();
+            let mut cursor = finalized.checkpoint_hash;
+            while cursor != self.anchor.0 {
+                let stored = self.dag.get(&cursor).ok_or(NodeError::Resolution(
+                    crate::resolver::ResolutionError::UnsafeStateRoot,
+                ))?;
+                if stored.header.height <= self.anchor.1 {
+                    return Err(NodeError::Resolution(
+                        crate::resolver::ResolutionError::UnsafeStateRoot,
+                    ));
+                }
+                path.push(cursor);
+                cursor = stored.header.parent_hash;
+            }
+            path.reverse();
+            let mut ledger = self.anchor.2.clone();
+            for hash in path {
+                let (replay_header, ticket) = self.load_header(&hash)?;
+                let replay_body = self.load_body(&replay_header, &ticket)?;
+                Self::execute_and_verify_on(
+                    &mut ledger,
+                    self.chain_id,
+                    &self.engine,
+                    self.cfg.stable_safety_activation_height,
+                    &replay_header,
+                    &replay_body,
+                )?;
+            }
+            ledger
+        };
+        let header = self
+            .dag
+            .get(&finalized.checkpoint_hash)
+            .map(|stored| stored.header.clone())
+            .ok_or(NodeError::Resolution(
+                crate::resolver::ResolutionError::TerminalNotFinalized,
+            ))?;
+        if header.height != height || header.objects_root != finalized_ledger.roots().objects_root {
+            return Err(NodeError::Resolution(
+                crate::resolver::ResolutionError::UnsafeStateRoot,
+            ));
+        }
+        Ok((finalized_ledger, header, finalized))
+    }
+
+    /// Returns a proof for one terminal WWM lifecycle record from the exact
+    /// finalized ledger snapshot. No unsafe-head object is observable here.
+    pub fn finalized_wwm_record(
+        &self,
+        kind: noos_lumen::wwm::WwmLeafKind,
+        id: Hash32,
+    ) -> Result<(u64, Hash32, noos_lumen::wwm::ResolutionProofV1), NodeError> {
+        if !matches!(
+            kind,
+            noos_lumen::wwm::WwmLeafKind::Job
+                | noos_lumen::wwm::WwmLeafKind::Receipt
+                | noos_lumen::wwm::WwmLeafKind::Settlement
+        ) {
+            return Err(NodeError::Config("unsupported WWM record kind".into()));
+        }
+        let (ledger, header, finalized) = self.finalized_ledger_snapshot()?;
+        let key = noos_lumen::wwm::wwm_profile_key(kind, &id);
+        Ok((
+            header.height,
+            finalized.checkpoint_hash,
+            ledger.finalized_object_proof(key),
+        ))
+    }
+
+    /// Builds the active WWM graph from the exact finalized rollback anchor.
+    /// A certificate already verified and persisted by this node must name
+    /// that checkpoint as its source; unsafe-head state is never consulted.
+    pub fn finalized_model_resolution(
+        &self,
+        selector: ResolutionSelectorV1,
+        freshness_bound: u64,
+    ) -> Result<FinalizedModelResolutionV1, NodeError> {
+        let (finalized_ledger, header, finalized) = self.finalized_ledger_snapshot()?;
+
+        let mut finality = None;
+        for (_, bytes) in self.port.scan_indices(b"c/")? {
+            let certificate = FinalityCertificateV1::decode_canonical(&bytes)?;
+            if certificate.source == finalized
+                && finality
+                    .as_ref()
+                    .is_none_or(|prior: &FinalityCertificateV1| {
+                        certificate.target.epoch > prior.target.epoch
+                    })
+            {
+                finality = Some(certificate);
+            }
+        }
+        let finality = finality.ok_or(NodeError::Resolution(
+            crate::resolver::ResolutionError::TerminalNotFinalized,
+        ))?;
+        let terminal = crate::resolver::FinalizedResolutionTerminalV1 {
+            header,
+            checkpoint: finalized,
+            finality,
+        };
+        crate::resolver::build_finalized_model_resolution(
+            &finalized_ledger,
+            self.chain_id,
+            self.genesis_hash,
+            selector,
+            freshness_bound,
+            terminal,
+        )
+        .map_err(NodeError::Resolution)
+    }
+
     #[must_use]
     pub fn body_available(&self, body_da_root: &Hash32) -> bool {
         self.availability
@@ -786,6 +914,16 @@ impl<P: StorePort> NodeCore<P> {
         self.registry = registry;
         Ok(())
     }
+    /// Return the locally derived full snapshot after ensuring it exists.
+    pub fn membership_snapshot(
+        &mut self,
+        epoch: u64,
+    ) -> Result<noos_witness::membership::MembershipSnapshotV1, NodeError> {
+        self.ensure_snapshot(epoch)?;
+        self.registry.get(epoch).cloned().ok_or(NodeError::Witness(
+            noos_witness::WitnessError::UnknownSnapshot,
+        ))
+    }
 
     fn ensure_snapshot_for(
         &self,
@@ -1003,6 +1141,23 @@ impl<P: StorePort> NodeCore<P> {
         };
         self.promote_light_orphans(hash);
         Ok(ImportOutcome::HeaderAccepted { hash })
+    }
+    /// Slice-oriented light import used by bounded light-update batches.
+    pub fn import_header_light_with_certificates(
+        &mut self,
+        header: &BlockHeaderV1,
+        ticket: &GroundTicketV1,
+        certificates: &[FinalityCertificateV1],
+    ) -> Result<ImportOutcome, NodeError> {
+        if self.cfg.mode != NodeMode::Light {
+            return Err(NodeError::Config(
+                "header-only import is restricted to light mode".into(),
+            ));
+        }
+        let bounded = BoundedList::new(certificates.to_vec()).ok_or(NodeError::BodyMismatch {
+            what: "finality_certificate_count",
+        })?;
+        self.import_header_for_light_sync(header, ticket, &bounded)
     }
 
     /// Light-mode import: stages 0-2 only (ch01 §10.5 light sync).
@@ -1761,6 +1916,11 @@ impl<P: StorePort> NodeCore<P> {
                     .ok_or(NodeError::LumenReject(
                         noos_lumen::state::RejectReason::OversizedEncoding,
                     ))?;
+            if !carrier_len_valid(tx_bytes.len(), wit_bytes.len()) {
+                return Err(NodeError::LumenReject(
+                    noos_lumen::state::RejectReason::OversizedEncoding,
+                ));
+            }
             let outcome = ledger
                 .apply_canonical_decoded_transaction(&ctx, tx, wits, encoded_len, engine, verifier)
                 .map_err(NodeError::LumenReject)?;
@@ -2077,6 +2237,7 @@ impl<P: StorePort> NodeCore<P> {
         if ws.indices.is_empty() {
             return Ok(());
         }
+        self.stage_refresh_anchor(&mut staged, &BTreeMap::new())?;
         let justified = staged.tracker.justified_head();
         let finalized = staged.tracker.finalized_head();
         ws.indices
@@ -2277,6 +2438,9 @@ impl<P: StorePort> NodeCore<P> {
         tx_bytes: &[u8],
         wit_bytes: &[u8],
     ) -> Result<noos_lumen::state::SimulationOutcome, noos_lumen::state::RejectReason> {
+        if !carrier_len_valid(tx_bytes.len(), wit_bytes.len()) {
+            return Err(noos_lumen::state::RejectReason::OversizedEncoding);
+        }
         let ctx = BlockContext {
             chain_id: self.chain_id,
             height: self.exec_height.saturating_add(1),

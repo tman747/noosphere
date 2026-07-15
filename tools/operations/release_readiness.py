@@ -15,6 +15,10 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "operations"))
 import validator_upgrade
+GATES = ROOT / "tools" / "gates"
+if str(GATES) not in sys.path:
+    sys.path.insert(0, str(GATES))
+from promotion_records import PromotionValidationError, validate_promotion_ledger as validate_cryptographic_promotion_ledger
 
 
 class ReadinessError(RuntimeError):
@@ -98,25 +102,32 @@ def verify_candidate_bundle(bundle_dir: Path, production: bool) -> dict[str, Any
     return manifest
 
 
-def verify_promotion_ledger(path: Path) -> dict[str, Any]:
+def verify_promotion_ledger(
+    path: Path, schema_version: int, *, repository_root: Path = ROOT,
+) -> dict[str, Any]:
     ledger = read_json(path)
+    try:
+        summary = validate_cryptographic_promotion_ledger(
+            ledger, repository_root, schema_version=schema_version,
+        )
+    except PromotionValidationError as error:
+        raise ReadinessError(str(error)) from error
     gates = ledger.get("gates")
-    if not isinstance(gates, list) or not gates:
-        raise ReadinessError("promotion ledger contains no gates")
     blocked: list[str] = []
     for gate in gates:
-        if not isinstance(gate, dict):
-            raise ReadinessError("promotion gate row is malformed")
-        gate_name = str(gate.get("gate", "UNKNOWN"))
-        if gate.get("state") != "PASS":
-            blocked.append(f"{gate_name}:{gate.get('state', 'MISSING')}")
-        requirements = gate.get("requirements", [])
-        if not isinstance(requirements, list):
-            raise ReadinessError(f"{gate_name} requirements are malformed")
-        for requirement in requirements:
+        gate_name = str(gate["gate"])
+        if gate["state"] != "PASSED":
+            blocked.append(f"{gate_name}:{gate['state']}")
+        for requirement in gate["requirements"]:
             if requirement.get("status") != "SATISFIED" or requirement.get("verdict") != "PASS":
                 blocked.append(str(requirement.get("requirement_id", f"{gate_name}:UNKNOWN")))
-    return {"pass": not blocked, "blocked": sorted(set(blocked)), "gate_count": len(gates)}
+    return {
+        "schema_version": schema_version,
+        "pass": summary["all_passed"],
+        "blocked": sorted(set(blocked)),
+        "gate_count": len(gates),
+        "ledger_root": summary["ledger_root"],
+    }
 
 
 def get_json(url: str, token: str | None = None, timeout: float = 4.0) -> dict[str, Any]:
@@ -212,6 +223,7 @@ def verify_full_release(args: argparse.Namespace) -> str:
         "--final-freeze", str(args.final_freeze),
         "--final-freeze-signatures", str(args.final_freeze_signatures),
         "--repro-assurance", str(args.repro_assurance),
+        "--schema-version", str(args.release_schema_version),
     ]
     completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=120)
     output = (completed.stdout + completed.stderr).strip()
@@ -248,7 +260,9 @@ def assess(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         checks["source"] = {"status": "FAIL", "reason": str(error)}
 
     try:
-        promotion = verify_promotion_ledger(args.promotion_ledger)
+        promotion = verify_promotion_ledger(
+            args.promotion_ledger, args.promotion_schema_version,
+        )
         checks["promotion"] = {"status": "PASS" if promotion["pass"] else "BLOCKED", **promotion}
         if production and not promotion["pass"]:
             blockers.extend(promotion["blocked"])
@@ -314,7 +328,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Fail-closed NOOSPHERE release readiness aggregator")
     parser.add_argument("--mode", choices=("candidate", "production"), default="candidate")
     parser.add_argument("--bundle-dir", type=Path, required=True)
-    parser.add_argument("--promotion-ledger", type=Path, default=ROOT / "protocol" / "release" / "promotion-blockers.json")
+    parser.add_argument("--promotion-ledger", type=Path, default=ROOT / "protocol" / "release" / "promotion-blockers-v2.json")
+    parser.add_argument("--promotion-schema-version", type=int, choices=(1, 2), default=2)
     parser.add_argument("--upgrade-manifest", type=Path)
     parser.add_argument("--upgrade-keyring", type=Path)
     parser.add_argument("--node-rpc")
@@ -323,6 +338,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-indexer-lag", type=int, default=2)
     parser.add_argument("--minimum-activation-lead", type=int, default=64)
     parser.add_argument("--release-manifest", type=Path)
+    parser.add_argument("--release-schema-version", type=int, choices=(1, 2), default=2)
     parser.add_argument("--release-keyring", type=Path)
     parser.add_argument("--final-freeze", type=Path)
     parser.add_argument("--final-freeze-signatures", type=Path)

@@ -78,7 +78,9 @@ impl fmt::Display for CommitmentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CommitmentError::WorkCommitMismatch => f.write_str("work commitment mismatch"),
-            CommitmentError::InvalidChunkSize => f.write_str("commitment chunk size must be nonzero"),
+            CommitmentError::InvalidChunkSize => {
+                f.write_str("commitment chunk size must be nonzero")
+            }
         }
     }
 }
@@ -167,11 +169,7 @@ pub fn cpu_commitment_root(
             .unwrap_or(u64::MAX)
             .to_le_bytes(),
     );
-    root.update(
-        &u64::try_from(chunk_size)
-            .unwrap_or(u64::MAX)
-            .to_le_bytes(),
-    );
+    root.update(&u64::try_from(chunk_size).unwrap_or(u64::MAX).to_le_bytes());
     root.update(&u64::try_from(leaf_count).unwrap_or(u64::MAX).to_le_bytes());
     root.update(&level[0]);
     Ok(*root.finalize().as_bytes())

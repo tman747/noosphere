@@ -22,6 +22,7 @@ use std::{
 use tokio::sync::RwLock;
 
 pub mod ingest;
+pub mod wwm;
 
 pub const API_VERSION: &str = "v1";
 pub const MEDIA_TYPE: &str = "application/vnd.noos.v1+json";

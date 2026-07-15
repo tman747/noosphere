@@ -609,15 +609,7 @@ mod tests {
         let (ct_to, proof) = dispatch_refresh(&MASTER, &audit, &ct, &ctx, 2).unwrap();
         let mut verifier = RefreshVerifierState::default();
         assert_eq!(
-            verifier.verify_executed(
-                &MASTER,
-                &audit,
-                &ct,
-                &ct_to,
-                &ctx,
-                Some(&proof),
-                105
-            ),
+            verifier.verify_executed(&MASTER, &audit, &ct, &ct_to, &ctx, Some(&proof), 105),
             Ok(())
         );
         assert_eq!(decrypt(&derive_key(&MASTER, 1), &ct_to), Ok(123_456));

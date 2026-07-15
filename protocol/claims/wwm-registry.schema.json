@@ -4,19 +4,45 @@
   "title": "World Wide Mind experimental claim registry",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "architecture", "controls_enabled", "claims"],
+  "required": ["schema_version", "architecture", "controls_enabled", "applicability_profiles", "claims"],
   "properties": {
     "schema_version": { "const": "1.0.0" },
     "architecture": { "const": "docs/world-wide-mind-architecture-and-rd-plan.md" },
     "controls_enabled": { "const": false },
+    "applicability_profiles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": { "$ref": "#/$defs/applicability_profile" }
+    },
     "claims": {
       "type": "array",
-      "minItems": 22,
-      "maxItems": 22,
+      "minItems": 23,
+      "maxItems": 23,
       "items": { "$ref": "#/$defs/claim" }
     }
   },
   "$defs": {
+    "applicability_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "description", "claim_dispositions"],
+      "properties": {
+        "profile_id": { "const": "BONSAI_PUBLIC_TEXT_V1" },
+        "description": { "type": "string", "minLength": 1 },
+        "claim_dispositions": {
+          "type": "object",
+          "minProperties": 23,
+          "maxProperties": 23,
+          "patternProperties": {
+            "^E-WWM-(0[1-9]|1[0-9]|2[0-3])$": {
+              "enum": ["MANDATORY", "DISABLED_NOT_CLAIMED"]
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
     "claim": {
       "type": "object",
       "additionalProperties": false,
@@ -39,7 +65,7 @@
         "canonical_ref"
       ],
       "properties": {
-        "claim_id": { "type": "string", "pattern": "^E-WWM-(0[1-9]|1[0-9]|2[0-2])$" },
+        "claim_id": { "type": "string", "pattern": "^E-WWM-(0[1-9]|1[0-9]|2[0-3])$" },
         "mechanism_id": { "type": "string", "minLength": 1 },
         "implementation_status": { "enum": ["NOT_STARTED", "PARTIAL", "IMPLEMENTED"] },
         "evidence_status": { "enum": ["UNMEASURED", "MEASURED_LAB", "INDEPENDENTLY_REPRODUCED", "AUDITED", "KILLED"] },
@@ -50,7 +76,7 @@
         "metric": { "type": "string", "minLength": 1 },
         "pass_threshold": { "type": "string", "minLength": 1 },
         "kill_threshold": { "type": "string", "minLength": 1 },
-        "command": { "type": "string", "pattern": "^python tools/gates/run_wwm_claim.py --claim E-WWM-(0[1-9]|1[0-9]|2[0-2])$" },
+        "command": { "type": "string", "pattern": "^python tools/gates/run_wwm_claim.py --claim E-WWM-(0[1-9]|1[0-9]|2[0-3])$" },
         "rollback": { "type": "string", "minLength": 1 },
         "owner_blockers": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
         "external_blockers": { "type": "array", "items": { "type": "string", "minLength": 1 } },

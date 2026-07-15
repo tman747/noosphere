@@ -1,0 +1,145 @@
+{
+  "$schema": "promotion-blockers-schema-v2.json",
+  "schema_version": 2,
+  "predecessor": {
+    "kind": "noosphere-promotion-ledger-predecessor-v1",
+    "ledger_path": "protocol/release/promotion-blockers.json",
+    "schema_version": 1,
+    "protocol_version": "v1",
+    "api_version": "v1",
+    "release_version": "0.0.0-preproduction",
+    "root_algorithm": "SHA-256-EXACT-FILE-BYTES",
+    "predecessor_root": "2509d617934e2c69eea64c6af228ae1b43aa2953269589c9da8b0099f0faf759",
+    "relation": "DIRECT_IMMUTABLE_PREDECESSOR"
+  },
+  "ledger_policy": {
+    "append_only": true,
+    "no_waivers": true,
+    "no_fabricated_evidence": true,
+    "promotion_order": ["G0", "G1", "G2", "G3", "GENESIS", "G4", "G5"]
+  },
+  "protocol_binding": {
+    "protocol_identity": "noos-protocol-identity-v2",
+    "protocol_version": "v2",
+    "api_version": "v2",
+    "peer_identity": "v2-only",
+    "release_version": "0.0.0-bonsai-v2-preproduction",
+    "revision": "OWNER_BLOCKED_UNTIL_G0_FREEZE",
+    "chain_id": "OWNER_BLOCKED",
+    "genesis_hash": "OWNER_BLOCKED"
+  },
+  "authorization_binding": {
+    "schema_version": 2,
+    "gate_record_domain_id": "D-PROMOTION-GATE-V2",
+    "role_keyring_sha256": "OWNER_BLOCKED",
+    "final_freeze_sha256": "OWNER_BLOCKED",
+    "ledger_root": "OWNER_BLOCKED"
+  },
+  "release_manifest": {
+    "schema": "protocol-release-manifest-v2.schema.json",
+    "path": "protocol/release/protocol-release-manifest-v2.json",
+    "status": "OWNER_BLOCKED",
+    "sha256": "OWNER_BLOCKED"
+  },
+  "contracts": {
+    "schema": "protocol/schemas/wwm-v2.md",
+    "crypto_domain_registry": "protocol/spec/crypto-domains-v1.csv",
+    "action_registry": {"container": "ActionV1", "first_discriminant": 40, "last_discriminant": 59, "variant_count": 60},
+    "payload_tags": {
+      "action_41": ["InstallProfile", "TransitionCapability"],
+      "action_50": ["InstallProfile", "TransitionCapability"],
+      "action_52": ["StageFundProfile", "LockFundMutation", "ActivateFundProfile", "CloseFundProfile"],
+      "action_58": ["TransitionServingAlias"],
+      "action_59": ["Activate", "EmergencyDisable", "AuthorizeOperationalConfig", "ApplyOperationalConfig", "Recover"]
+    },
+    "resolver": {
+      "target": "/model-resolution/<selector>", "max_bytes": 262144, "max_proofs": 17, "normal_leaf_count": 17,
+      "authorized_target": "/authorized-config/<config_id>", "authorized_max_bytes": 393216
+    },
+    "light_update": {"protocol": "/noos/sync/light-update/2", "max_items": 128, "max_item_bytes": 262144, "request_min_items": 1},
+    "transaction_bounds": {"action_call_max_bytes": 65536, "tx_plus_witness_max_bytes": 65532, "tx_push_max_bytes": 65536, "tx_push_length_prefix_bytes": 4},
+    "v1_decode_policy": "REJECT_V1_WWM_BYTES",
+    "model_execution": "OFF_CHAIN_ONLY"
+  },
+  "cutover": {
+    "dns_cutover": "PROHIBITED",
+    "execution_authority": "SIGNED_G5_ONLY",
+    "prepared_manifest": "deploy/cutover/cutover-manifest-prepared.json",
+    "rollback_target": "OWNER_BLOCKED_STATIC_MAINTENANCE"
+  },
+  "gates": [
+    {
+      "gate": "G0", "state": "BLOCKED", "immutable_record": true, "signatures": [],
+      "requirements": [
+        {"requirement_id": "G0.PROTOCOL_V2_SCHEMA", "description": "Freeze protocol/API-v2 objects, domains, actions, payload tags, resolvers, light updates, transaction bounds, authorization, rollback, and genesis bootstrap.", "status": "UNSATISFIED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_G0_FREEZE", "threshold": "Every W0 field, domain, bound, negative vector, and independent review is complete for one exact revision", "observed": "The contracts are specified, but no signed owner freeze or independent G0 review exists.", "verdict": "NOT_RUN"},
+        {"requirement_id": "G0.V1_PREDECESSOR", "description": "Bind the protocol-v2 ledger directly to the immutable final protocol-v1 blocker-ledger bytes without mutation or reinterpretation.", "status": "UNSATISFIED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_G0_FREEZE", "threshold": "Exact predecessor bytes and root independently reviewed and signed into G0", "observed": "The exact V1 file root is recorded; independent signed acceptance is absent.", "verdict": "NOT_RUN"},
+        {"requirement_id": "G0.OWNER_CONSTANTS", "description": "Sign all owner-controlled protocol-v2 identity, authority, production, economics, and deployment constants.", "status": "OWNER_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_G0_FREEZE", "threshold": "All OWNER_BLOCKED values resolved by signed exact-revision records", "observed": "Chain ID, genesis, role keyring, final freeze, economics, operators, and production origins remain OWNER_BLOCKED.", "verdict": "BLOCKED"},
+        {"requirement_id": "G0.INDEPENDENT_REVIEW", "description": "Complete independent protocol, cryptographic-domain, bounds, authorization, rollback, and mixed-version review.", "status": "EXTERNAL_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_G0_FREEZE", "threshold": "Named independent reviewers reproduce every frozen contract and all negative vectors with no unresolved severity-1 finding", "observed": "No qualifying independent W0 review bundle is registered.", "verdict": "NOT_RUN"}
+      ],
+      "unresolved": ["Signed protocol-v2 identity and production constants", "Named independent W0 reviewers", "Cross-language negative vectors", "Signed G0 authorization record"]
+    },
+    {
+      "gate": "G1", "state": "BLOCKED", "immutable_record": true, "signatures": [],
+      "requirements": [{"requirement_id": "G1.DETERMINISTIC_LAB", "description": "Canonical protocol-v2 vectors, mutation/fuzz, small-state, model/runtime, authorization, and cross-language lab evidence.", "status": "UNSATISFIED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_G0", "threshold": "Zero false accepts, unauthorized transitions, identity/domain substitution, divergence, or irreproducible measurement", "observed": "G0 has not passed and no complete immutable G1 bundle exists.", "verdict": "NOT_RUN"}],
+      "unresolved": ["G0 pass prerequisite", "Complete raw lab artifacts", "Independent reproducer"]
+    },
+    {
+      "gate": "G2", "state": "BLOCKED", "immutable_record": true, "signatures": [],
+      "requirements": [{"requirement_id": "G2.INDEPENDENT_DEVNET", "description": "Exact protocol-v2 independent devnet with two independently managed client/verifier families and no mixed-version peers.", "status": "EXTERNAL_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_G1", "threshold": "All client pairings, restart, snapshot, proof, unknown-tag, oversize, mixed-peer, fuzz, WAN, and AI-off tests pass", "observed": "No qualifying external operators or immutable G2 bundle exists.", "verdict": "NOT_RUN"}],
+      "unresolved": ["G1 pass prerequisite", "Independent operators", "Exact devnet evidence"]
+    },
+    {
+      "gate": "G3", "state": "BLOCKED", "immutable_record": true, "signatures": [],
+      "requirements": [
+        {"requirement_id": "G3.PUBLIC_DURATION", "description": "Open public adversarial protocol-v2 testnet at the exact G2 revision.", "status": "EXTERNAL_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_G2", "threshold": "At least 90 uninterrupted real days for cryptographic/economic mechanisms and 30 real days for application mechanisms", "observed": "Zero qualifying public-testnet days are evidenced.", "verdict": "NOT_RUN"},
+        {"requirement_id": "G3.A_BRAID_AI_OFF", "description": "Base availability and finality remain live with every AI/model/executor process disabled.", "status": "EXTERNAL_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_G2", "threshold": "Seven uninterrupted real public-testnet days; simulated time forbidden", "observed": "Zero qualifying AI-off days are evidenced.", "verdict": "NOT_RUN"},
+        {"requirement_id": "G3.EXTERNAL_ASSURANCE", "description": "Funded red team, fault drills, independent consensus/network/state/crypto audit and cryptanalysis.", "status": "EXTERNAL_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_G2", "threshold": "All mandatory exact-revision reviews delivered with no gate-killing result", "observed": "No qualifying external assurance exists.", "verdict": "NOT_RUN"}
+      ],
+      "unresolved": ["G2 pass prerequisite", "Public operators", "Public duration", "Independent assurance"]
+    },
+    {
+      "gate": "GENESIS", "state": "BLOCKED", "immutable_record": true, "signatures": [],
+      "requirements": [
+        {"requirement_id": "GENESIS.QUIET_WEEK", "description": "Publish the canonical protocol-v2 parameter manifest and complete Quiet Week.", "status": "OWNER_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_PARAMETER_FREEZE", "threshold": "At least seven uninterrupted published real days; any parameter change restarts the interval", "observed": "No signed parameter manifest, chain ID, or publication interval exists.", "verdict": "NOT_RUN"},
+        {"requirement_id": "GENESIS.BITCOIN_ANCHOR", "description": "Select a published Bitcoin block only after Quiet Week completes.", "status": "OWNER_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_QUIET_WEEK", "threshold": "Anchor follows the completed freeze and is independently verified", "observed": "No anchor is selected.", "verdict": "BLOCKED"},
+        {"requirement_id": "GENESIS.DKG", "description": "Complete signed multiparty production DKG after Quiet Week.", "status": "EXTERNAL_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_QUIET_WEEK", "threshold": "Valid multiparty ceremony, complaints, exclusions, erasure, and independently reproduced root", "observed": "No qualifying DKG participants or transcript exist.", "verdict": "NOT_RUN"},
+        {"requirement_id": "GENESIS.MAINNET_ECONOMICS", "description": "Freeze signed production allocation, supply, issuance, bond, fee, and five-row WWM coverage policy.", "status": "OWNER_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED", "threshold": "Owner signatures, exhaustive conservation tests, independent economic review, and counsel", "observed": "Production economics are deliberately absent.", "verdict": "BLOCKED"},
+        {"requirement_id": "GENESIS.REPRO_DEMO", "description": "Independently reproduce final genesis and protocol-v2 bootstrap with all model execution off.", "status": "UNSATISFIED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_GENESIS", "threshold": "Matching genesis, roots, exactly one zero-money policy-bearing Current fund ledger, and live base finality", "observed": "Final genesis does not exist.", "verdict": "NOT_RUN"}
+      ],
+      "unresolved": ["Signed economics", "Quiet Week", "Bitcoin anchor", "DKG", "Independent genesis reproduction"]
+    },
+    {
+      "gate": "G4", "state": "BLOCKED", "immutable_record": true, "signatures": [],
+      "requirements": [
+        {"requirement_id": "G4.CANARY_DURATION", "description": "Capped-value opt-in canary with one-checkpoint disable and target-specific recovery.", "status": "EXTERNAL_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_GENESIS", "threshold": "At least 180 uninterrupted real days and exposure at most 10 bps", "observed": "Zero qualifying canary days exist.", "verdict": "NOT_RUN"},
+        {"requirement_id": "G4.EXIT_AND_FAULT_DRILLS", "description": "Independent exit, blackout, recovery, WAN, and saturation drills.", "status": "EXTERNAL_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_GENESIS", "threshold": "All required exact-release drills and two independent exit observations", "observed": "No qualifying drills exist.", "verdict": "NOT_RUN"},
+        {"requirement_id": "G4.HARDWARE_BUILDERS", "description": "Independent builders and hardware vendors reproduce all released targets and runtime envelopes.", "status": "EXTERNAL_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_RELEASE", "threshold": "Two independent builders plus all required platform and hardware coverage", "observed": "No qualifying independent builder or vendor attestations exist.", "verdict": "NOT_RUN"}
+      ],
+      "unresolved": ["Genesis prerequisite", "180-day canary", "Independent drills", "Independent builders and hardware vendors"]
+    },
+    {
+      "gate": "G5", "state": "BLOCKED", "immutable_record": true, "signatures": [],
+      "requirements": [
+        {"requirement_id": "G5.EXACT_LOWER_GATES", "description": "Every exact protocol-v2 lower gate is cryptographically passed and immutable.", "status": "UNSATISFIED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_G4", "threshold": "G0, G1, G2, G3, GENESIS, and G4 all validate as PASSED", "observed": "All lower gates remain BLOCKED.", "verdict": "BLOCKED"},
+        {"requirement_id": "G5.CLAIM_COMPLETENESS", "description": "Every actionable claim has complete exact-revision implementation and fresh evidence.", "status": "UNSATISFIED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_G4", "threshold": "Every required claim passes its real falsifier and rollback; registry disposition replay is forbidden", "observed": "No complete protocol-v2 claim/evidence matrix exists.", "verdict": "BLOCKED"},
+        {"requirement_id": "G5.EXTERNAL_REVIEWS", "description": "Independent build, consensus, security, cryptographic, economic, and operations reviews.", "status": "EXTERNAL_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_G4", "threshold": "All exact-version reviews complete with zero unresolved severity-1 findings", "observed": "No qualifying final reviews exist.", "verdict": "NOT_RUN"},
+        {"requirement_id": "G5.LIVE_DIVERSITY", "description": "Live operator, custodian, executor, verifier, builder, region, provider, and demand diversity.", "status": "EXTERNAL_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_G4", "threshold": "Every frozen diversity and failover floor is met by real independently controlled organizations", "observed": "Required production ecosystem and real demand do not exist as verified evidence.", "verdict": "NOT_RUN"},
+        {"requirement_id": "G5.SIGNATURES", "description": "Multiparty signatures bind the exact ledger, release, genesis, evidence, control, and cutover bytes.", "status": "OWNER_BLOCKED", "bundle_refs": [], "exact_revision": "OWNER_BLOCKED_UNTIL_FINAL_REVIEW", "threshold": "All required roles sign identical bytes only after every other G5 predicate passes", "observed": "No production sign-off or cutover authorization exists.", "verdict": "NOT_RUN"}
+      ],
+      "unresolved": ["All lower gates", "Complete evidence", "External reviews", "Production diversity", "Multiparty signatures"]
+    }
+  ],
+  "owner_decisions": [
+    {"id": "OWNER.PROTOCOL_V2_IDENTITY", "description": "Sign protocol/API/peer v2 identity, chain and genesis constants, and V1 predecessor acceptance.", "owner": "Protocol owner", "status": "OWNER_BLOCKED", "required_for": ["G0", "GENESIS"], "resolution_artifact": "signed protocol-v2 identity freeze"},
+    {"id": "OWNER.PROTOCOL_V2_AUTHORITIES", "description": "Name organizations, keys, deputies, thresholds, separation-of-duty, and escalation paths for every v2 authority.", "owner": "Protocol and security owners", "status": "OWNER_BLOCKED", "required_for": ["G0", "G4", "G5"], "resolution_artifact": "signed role and authority keyring"},
+    {"id": "OWNER.MAINNET_ECONOMICS", "description": "Sign production economics and all five nonzero WWM baseline/horizon coverage policies.", "owner": "Protocol and economic owners", "status": "OWNER_BLOCKED", "required_for": ["GENESIS", "G4", "G5"], "resolution_artifact": "signed production parameter manifest"},
+    {"id": "OWNER.DOMAIN_ACCESS", "description": "Authorize production domains and origins only after signed G5 cutover.", "owner": "Domain owner", "status": "OWNER_BLOCKED", "required_for": ["G5"], "resolution_artifact": "signed exact cutover authorization"}
+  ],
+  "external_blockers": [
+    {"id": "EXT.W0_REVIEW", "description": "Independent review of v2 identity, schemas, domains, bounds, authority, rollback, and negative vectors.", "owner": "Independent protocol and security reviewers", "status": "EXTERNAL_BLOCKED", "required_for": ["G0"], "resolution_artifact": "signed immutable W0 review bundles"},
+    {"id": "EXT.PUBLIC_TESTNET", "description": "Independent public operators, red team, audits, and real public durations.", "owner": "Independent public participants", "status": "EXTERNAL_BLOCKED", "required_for": ["G2", "G3"], "resolution_artifact": "immutable G2 and G3 bundles"},
+    {"id": "EXT.DKG", "description": "Multiparty post-Quiet-Week production DKG ceremony.", "owner": "Independent DKG participants", "status": "EXTERNAL_BLOCKED", "required_for": ["GENESIS"], "resolution_artifact": "signed DKG transcript bundle"},
+    {"id": "EXT.CANARY", "description": "External 180-day canary and independently observed disable/recovery drills.", "owner": "Independent canary operators and observers", "status": "EXTERNAL_BLOCKED", "required_for": ["G4"], "resolution_artifact": "immutable G4 bundles"},
+    {"id": "EXT.PRODUCTION_ECOSYSTEM", "description": "Independent operators, custodians, executors, verifiers, builders, auditors, hardware vendors, and real demand.", "owner": "External reviewers and ecosystem participants", "status": "EXTERNAL_BLOCKED", "required_for": ["G3", "G4", "G5"], "resolution_artifact": "signed audit, diversity, capacity, and reproduction evidence"}
+  ]
+}

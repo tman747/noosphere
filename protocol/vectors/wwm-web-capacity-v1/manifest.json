@@ -1,0 +1,21 @@
+{
+  "counts": {
+    "negative": 51,
+    "positive": 19,
+    "runtime_negative": 36,
+    "schema_negative": 15,
+    "top_level_record_kinds": 19
+  },
+  "files": {
+    "vectors.json": {
+      "bytes": 4070984,
+      "sha256": "517125b644bb12b807eb743d503814da4e9b7ddf628dd6321a748c343960fb3d"
+    }
+  },
+  "format": "noos/wwm-web-capacity/v1/vector-manifest/v1",
+  "schema": {
+    "bytes": 37689,
+    "path": "../../schemas/wwm-web-capacity-v1.schema.json",
+    "sha256": "5291789da673b090e7d8921c05e230154b94f852e66110f5643ce12da9b89734"
+  }
+}

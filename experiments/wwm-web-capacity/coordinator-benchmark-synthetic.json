@@ -1,0 +1,21 @@
+{
+  "schema": "noos/wwm-web-capacity-benchmark-distribution/v1",
+  "scope": "SYNTHETIC_FIXTURE",
+  "observed_from": null,
+  "observed_until": null,
+  "signer_public_key": null,
+  "signature": null,
+  "weights": {
+    "offers": 4500,
+    "active_page_heartbeats": 5000,
+    "bounded_reports": 10,
+    "revokes": 100,
+    "expiries": 1,
+    "replacements": 389
+  },
+  "assertions": {
+    "max_total_rows": 8192,
+    "max_sqlite_bytes": 67108864,
+    "max_peak_queue": 0
+  }
+}

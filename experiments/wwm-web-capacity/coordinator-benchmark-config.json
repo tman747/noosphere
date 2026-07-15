@@ -1,0 +1,39 @@
+{
+  "schema": "noos/wwm-web-capacityd-config/v1",
+  "activation_scope": "EXPERIMENTAL_TEST_ONLY",
+  "production": false,
+  "rewards": false,
+  "listen": "127.0.0.1:0",
+  "data_path": "../../target/wwm-web-capacity-bench-config/capacity.sqlite",
+  "quarantine_dir": "../../target/wwm-web-capacity-bench-config/quarantine",
+  "artifact_manifest_path": "../../deploy/wwm/bonsai-artifact.json",
+  "coordinator_seed_env": "NOOS_WEB_CAPACITY_BENCH_COORDINATOR_SEED",
+  "chain_binding": {
+    "chain_id": "0101010101010101010101010101010101010101010101010101010101010101",
+    "genesis_hash": "0202020202020202020202020202020202020202020202020202020202020202",
+    "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+    "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7"
+  },
+  "experiment_state": "LOCAL_FIXTURE",
+  "source_allowlist": [],
+  "registered_origins": ["https://capacity-benchmark.example"],
+  "consent_version": "wwm-web-capacity-benchmark-consent-v1",
+  "session_lifetime_seconds": 604800,
+  "assignment_lifetime_seconds": 300,
+  "restore_lifetime_seconds": 300,
+  "host_probe_count": 1,
+  "request_timeout_ms": 1000,
+  "rate_limit_per_minute": 10000,
+  "max_hosts": 1024,
+  "max_active_sessions": 4096,
+  "max_active_assignments": 4096,
+  "max_pending_restore_tasks": 256,
+  "max_quarantine_bytes": 268173312,
+  "max_concurrent_restore_verifications": 8,
+  "isolation": {
+    "validator_key_path": null,
+    "consensus_store_path": null,
+    "model_execution_path": null,
+    "authority_to_issue_custody_certificates": false
+  }
+}

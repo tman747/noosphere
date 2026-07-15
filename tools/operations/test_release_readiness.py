@@ -108,21 +108,27 @@ class ReleaseReadinessTests(unittest.TestCase):
         return manifest
 
     def promotion_ledger(self, passed: bool) -> Path:
-        state = "PASS" if passed else "BLOCKED"
-        status = "SATISFIED" if passed else "UNSATISFIED"
-        verdict = "PASS" if passed else "NOT_RUN"
+        source = readiness.ROOT / "protocol/release/promotion-blockers-v2.json"
+        document = json.loads(source.read_text("utf-8"))
+        if passed:
+            document["gates"][0]["state"] = "PASSED"
+            document["gates"][0]["signatures"] = [
+                {
+                    "role": role,
+                    "key_id": f"fixture-{index}",
+                    "signature_ed25519_hex": f"{index + 1:02x}" * 64,
+                }
+                for index, role in enumerate(
+                    [
+                        "release-owner",
+                        "independent-build-reviewer",
+                        "operations-owner",
+                        "security-reviewer",
+                    ]
+                )
+            ]
         path = self.root / "promotion.json"
-        path.write_text(json.dumps({
-            "gates": [{
-                "gate": "G0",
-                "state": state,
-                "requirements": [{
-                    "requirement_id": "G0.EXAMPLE",
-                    "status": status,
-                    "verdict": verdict,
-                }],
-            }],
-        }), encoding="utf-8")
+        path.write_text(json.dumps(document), encoding="utf-8")
         return path
 
     def candidate_args(self, ledger: Path) -> SimpleNamespace:
@@ -130,6 +136,7 @@ class ReleaseReadinessTests(unittest.TestCase):
             mode="candidate",
             bundle_dir=self.bundle,
             promotion_ledger=ledger,
+            promotion_schema_version=2,
             upgrade_manifest=None,
             upgrade_keyring=None,
             node_rpc=None,
@@ -142,6 +149,7 @@ class ReleaseReadinessTests(unittest.TestCase):
             final_freeze=None,
             final_freeze_signatures=None,
             repro_assurance=None,
+            release_schema_version=2,
         )
 
     def test_candidate_bundle_requires_exact_hash_and_checksum_coverage(self) -> None:
@@ -168,11 +176,14 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertEqual(report["checks"]["runtime"]["status"], "NOT_REQUESTED")
 
     def test_production_promotion_requires_every_gate_and_requirement(self) -> None:
-        blocked = readiness.verify_promotion_ledger(self.promotion_ledger(False))
+        blocked = readiness.verify_promotion_ledger(self.promotion_ledger(False), 2)
         self.assertFalse(blocked["pass"])
-        self.assertEqual(blocked["blocked"], ["G0.EXAMPLE", "G0:BLOCKED"])
-        passed = readiness.verify_promotion_ledger(self.promotion_ledger(True))
-        self.assertTrue(passed["pass"])
+        self.assertIn("G0:BLOCKED", blocked["blocked"])
+        with self.assertRaisesRegex(
+            readiness.ReadinessError,
+            "PASSED gate requires|authorization[_ ]record",
+        ):
+            readiness.verify_promotion_ledger(self.promotion_ledger(True), 2)
 
     def test_runtime_requires_same_identity_readiness_and_bounded_lag(self) -> None:
         server = RuntimeServer()

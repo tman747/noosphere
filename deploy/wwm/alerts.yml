@@ -1,0 +1,57 @@
+groups:
+  - name: noos-wwm-safety
+    rules:
+      - alert: WwmTelemetryGap
+        expr: min(up{job=~"wwm-.+"}) < 1 or absent(up{job="wwm-gateway"})
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "WWM telemetry gap exceeds five minutes; duration evidence is blocked"
+      - alert: WwmIdentityMismatch
+        expr: count(count by (chain_id, genesis_hash, capsule_id) (wwm_identity_info)) != 1
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: "WWM services do not expose one exact finalized identity"
+      - alert: WwmFalseEvidenceUpgrade
+        expr: increase(wwm_false_evidence_upgrade_total[5m]) > 0
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: "A false evidence-tier upgrade was observed; disable admission"
+      - alert: WwmSettlementConservationFailure
+        expr: increase(wwm_settlement_conservation_failure_total[5m]) > 0
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: "Settlement conservation failed; disable admission and preserve evidence"
+      - alert: WwmAvailabilityBelowSchedulable
+        expr: min(wwm_live_artifact_positions) < 9
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: "Fewer than nine artifact positions are live; new jobs are forbidden"
+      - alert: WwmCertificateExpiresSoon
+        expr: min(wwm_availability_certificate_valid_until_height - wwm_finalized_height) < 128
+        for: 0m
+        labels: {severity: warning}
+        annotations:
+          summary: "Availability certificate horizon is below 128 heights"
+      - alert: WwmGatewayErrorBudgetBurn
+        expr: sum(rate(wwm_gateway_requests_total{terminal_code!="OK"}[5m])) / clamp_min(sum(rate(wwm_gateway_requests_total[5m])), 1) > 0.001
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "Gateway completion SLO is below 99.9 percent"
+      - alert: WwmExecutorQueueUnbounded
+        expr: max(wwm_executor_queue_depth) > max(wwm_executor_queue_capacity)
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: "Executor queue exceeded its configured bound"
+      - alert: WwmIndexerLag
+        expr: max(wwm_finalized_height - wwm_indexer_finalized_height) > 2
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "Indexer is more than two finalized checkpoints behind"

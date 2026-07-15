@@ -1,0 +1,24 @@
+[package]
+name = "noos-executor-edge"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-trait = "=0.1.89"
+axum = "=0.8.8"
+blake3 = "=1.8.5"
+noos-mind-gateway = { path = "../noos-mind-gateway" }
+rusqlite = { version = "=0.37.0", features = ["bundled"] }
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+tokio = { version = "=1.52.3", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
+
+[dev-dependencies]
+tempfile = "=3.24.0"
+tower = { version = "=0.5.3", features = ["util"] }
+
+[lints]
+workspace = true

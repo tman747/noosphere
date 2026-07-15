@@ -1,0 +1,196 @@
+name: noos-wwm
+services:
+  database:
+    image: ${WWM_POSTGRES_IMAGE:?immutable postgres image with @sha256 digest required}
+    restart: unless-stopped
+    read_only: true
+    environment:
+      POSTGRES_DB: wwm
+      POSTGRES_USER: wwm
+      POSTGRES_PASSWORD_FILE: /run/secrets/database_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    secrets:
+      - database_password
+    volumes:
+      - database-data:/var/lib/postgresql/data
+      - type: tmpfs
+        target: /tmp
+      - type: tmpfs
+        target: /var/run/postgresql
+    networks: [data]
+
+  artifact-store:
+    image: ${WWM_ARTIFACT_STORE_IMAGE:?immutable artifact-store image with @sha256 digest required}
+    command:
+      - serve
+      - --listen
+      - 0.0.0.0:9761
+      - --store-root
+      - /var/lib/noos-artifacts
+      - --staging-root
+      - /var/lib/noos-artifacts-staging
+      - --consensus-root
+      - /forbidden/consensus-store
+      - --quota-bytes
+      - ${WWM_ARTIFACT_QUOTA_BYTES:-8589934592}
+      - --max-concurrency
+      - ${WWM_ARTIFACT_MAX_CONCURRENCY:-4}
+      - --queue-capacity
+      - ${WWM_ARTIFACT_QUEUE_CAPACITY:-16}
+      - --per-client-rps
+      - ${WWM_ARTIFACT_PER_CLIENT_RPS:-128}
+      - --egress-bytes-per-second
+      - ${WWM_ARTIFACT_EGRESS_BYTES_PER_SECOND:-67108864}
+      - --metrics-log-seconds
+      - ${WWM_ARTIFACT_METRICS_LOG_SECONDS:-10}
+    restart: unless-stopped
+    read_only: true
+    environment:
+      WWM_ROLE: artifact-store
+      WWM_ARTIFACT_CONFIG: /run/wwm/bonsai-artifact.json
+      WWM_STORE_ROOT: /var/lib/noos-artifacts
+      WWM_STORE_STAGING: /var/lib/noos-artifacts-staging
+      WWM_CONSENSUS_STORE_ROOT: /forbidden/consensus-store
+      WWM_LISTEN: 0.0.0.0:9761
+    volumes:
+      - ./bonsai-artifact.json:/run/wwm/bonsai-artifact.json:ro
+      - artifact-data:/var/lib/noos-artifacts
+      - artifact-staging:/var/lib/noos-artifacts-staging
+      - type: tmpfs
+        target: /tmp
+    networks: [artifact, monitoring]
+
+  custodian:
+    image: ${WWM_CUSTODIAN_IMAGE:?immutable custodian image with @sha256 digest required}
+    restart: unless-stopped
+    read_only: true
+    environment:
+      WWM_ROLE: custodian
+      WWM_ARTIFACT_CONFIG: /run/wwm/bonsai-artifact.json
+      WWM_ARTIFACT_STORE_URL: http://artifact-store:9761
+      WWM_SIGNING_KEY_FILE: /run/secrets/custodian_signing_key
+      WWM_CONTROL_PLANE_URL: ${WWM_CONTROL_PLANE_URL:?finalized devnet/local control-plane URL required}
+      WWM_LISTEN: 0.0.0.0:9762
+    secrets:
+      - custodian_signing_key
+    volumes:
+      - ./bonsai-artifact.json:/run/wwm/bonsai-artifact.json:ro
+      - type: tmpfs
+        target: /tmp
+    depends_on: [artifact-store]
+    networks: [artifact, control, monitoring]
+
+  executor:
+    image: ${WWM_EXECUTOR_IMAGE:?immutable executor image with @sha256 digest required}
+    restart: unless-stopped
+    read_only: true
+    environment:
+      WWM_ROLE: executor
+      WWM_ARTIFACT_CONFIG: /run/wwm/bonsai-artifact.json
+      WWM_RUNTIME_CONFIG: /run/wwm/bonsai-runtime.json
+      WWM_MODEL_PATH: /var/lib/noos-model/Bonsai-27B-Q1_0.gguf
+      WWM_SIGNING_KEY_FILE: /run/secrets/executor_signing_key
+      WWM_CONTROL_PLANE_URL: ${WWM_CONTROL_PLANE_URL:?finalized devnet/local control-plane URL required}
+      WWM_LISTEN: 0.0.0.0:9763
+      WWM_RUNTIME_EGRESS: disabled
+    secrets:
+      - executor_signing_key
+    volumes:
+      - ./bonsai-artifact.json:/run/wwm/bonsai-artifact.json:ro
+      - ./bonsai-runtime.json:/run/wwm/bonsai-runtime.json:ro
+      - verified-model:/var/lib/noos-model
+      - type: tmpfs
+        target: /tmp
+    networks: [control, monitoring]
+
+  edge:
+    image: ${WWM_EDGE_IMAGE:?immutable executor-edge image with @sha256 digest required}
+    restart: unless-stopped
+    read_only: true
+    environment:
+      WWM_ROLE: executor-edge
+      WWM_CONTROL_PLANE_URL: ${WWM_CONTROL_PLANE_URL:?finalized devnet/local control-plane URL required}
+      WWM_EXECUTOR_URL: http://executor:9763
+      WWM_EDGE_SIGNING_KEY_FILE: /run/secrets/edge_signing_key
+      WWM_LISTEN: 0.0.0.0:9764
+    secrets:
+      - edge_signing_key
+    depends_on: [executor]
+    ports:
+      - "${WWM_EDGE_BIND:-127.0.0.1}:${WWM_EDGE_PORT:-9764}:9764"
+    networks: [ingress, control, monitoring]
+
+  gateway:
+    image: ${WWM_GATEWAY_IMAGE:?immutable gateway image with @sha256 digest required}
+    restart: unless-stopped
+    read_only: true
+    environment:
+      WWM_ROLE: gateway
+      WWM_CONTROL_PLANE_URL: ${WWM_CONTROL_PLANE_URL:?finalized devnet/local control-plane URL required}
+      WWM_DATABASE_URL_FILE: /run/secrets/gateway_database_url
+      WWM_SIGNING_KEY_FILE: /run/secrets/gateway_signing_key
+      WWM_EDGE_URL: http://edge:9764
+      WWM_LISTEN: 0.0.0.0:9765
+      WWM_LOG_SENSITIVE_CONTENT: disabled
+    secrets:
+      - gateway_database_url
+      - gateway_signing_key
+    depends_on: [database, edge]
+    ports:
+      - "${WWM_GATEWAY_BIND:-127.0.0.1}:${WWM_GATEWAY_PORT:-9765}:9765"
+    volumes:
+      - gateway-spool:/var/lib/noos-gateway
+      - type: tmpfs
+        target: /tmp
+    networks: [ingress, data, control, monitoring]
+
+  prometheus:
+    image: ${WWM_PROMETHEUS_IMAGE:?immutable prometheus image with @sha256 digest required}
+    restart: unless-stopped
+    read_only: true
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=120d
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+      - type: tmpfs
+        target: /tmp
+    ports:
+      - "${WWM_PROMETHEUS_BIND:-127.0.0.1}:${WWM_PROMETHEUS_PORT:-9091}:9090"
+    networks: [monitoring]
+
+secrets:
+  database_password:
+    file: ${WWM_DATABASE_PASSWORD_FILE:?external database password file required}
+  custodian_signing_key:
+    file: ${WWM_CUSTODIAN_SIGNING_KEY_FILE:?external custodian signing key file required}
+  executor_signing_key:
+    file: ${WWM_EXECUTOR_SIGNING_KEY_FILE:?external executor signing key file required}
+  edge_signing_key:
+    file: ${WWM_EDGE_SIGNING_KEY_FILE:?external edge signing key file required}
+  gateway_signing_key:
+    file: ${WWM_GATEWAY_SIGNING_KEY_FILE:?external gateway signing key file required}
+  gateway_database_url:
+    file: ${WWM_GATEWAY_DATABASE_URL_FILE:?external gateway database URL file required}
+
+volumes:
+  database-data: {}
+  artifact-data: {}
+  artifact-staging: {}
+  verified-model: {}
+  gateway-spool: {}
+  prometheus-data: {}
+
+networks:
+  ingress: {}
+  artifact:
+    internal: true
+  control:
+    internal: true
+  data:
+    internal: true
+  monitoring:
+    internal: true

@@ -1,0 +1,178 @@
+{
+  "schema_version": "noos.live-devnet-smoke.v1",
+  "scenario": "live-product-devnet-smoke",
+  "started": "2026-07-15T07:04:39.406Z",
+  "ended": "2026-07-15T07:07:49.184Z",
+  "topology": {
+    "validator": "127.0.0.1:18632",
+    "peer_observer": "127.0.0.1:18633",
+    "indexer": "127.0.0.1:18080",
+    "p2p": "/ip4/127.0.0.1/udp/19701/quic-v1",
+    "produce_interval_ms": 15
+  },
+  "journey": [
+    "cargo build (noosd, noos-indexer, noos-cli)",
+    "boot validator + QUIC-peered observer",
+    "anchor indexer checkpoint from live block 1 parent",
+    "boot indexer with live RPC ingestion",
+    "noos-cli keygen (recipient identity)",
+    "noos-cli tx build (faucet -> recipient NOOS_TEST transfer)",
+    "faucet fixture D-SIG-TX signature",
+    "noos-cli tx submit (identity-gated line protocol)",
+    "operator /receipt settlement + success receipt",
+    "finalized checkpoint covers settled height",
+    "peer syncs settled height over loopback QUIC",
+    "indexer /api/v1/transactions/<txid> + identity"
+  ],
+  "transfer": {
+    "txid": "e2f2affda7ca98e61412f1ef957da3dad1de2e3c880dae3a1675262fcde40a5a",
+    "settled_height": 25,
+    "fee_charged": "544",
+    "amount_micro": 123456789,
+    "recipient": "3b635be104607dfd4338ab308398818264709871cb0b32f587bd29d4cd86824d"
+  },
+  "checks": [
+    {
+      "name": "cli keygen",
+      "passed": true,
+      "detail": {
+        "path": [
+          "0xce4f4f53",
+          "0x80000001",
+          "0x80000001",
+          "0x80000000",
+          "0x80000000"
+        ],
+        "public_id": "3b635be104607dfd4338ab308398818264709871cb0b32f587bd29d4cd86824d"
+      }
+    },
+    {
+      "name": "validator boot",
+      "passed": true,
+      "detail": {
+        "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+        "genesis_hash": "6b4a001499b7c86452c6bd8dcc0f288b36ddeda700070af6269fb743697658fe",
+        "p2p": "/ip4/127.0.0.1/udp/19701/quic-v1"
+      }
+    },
+    {
+      "name": "peer boot (same identity)",
+      "passed": true,
+      "detail": {
+        "rpc": "127.0.0.1:18633",
+        "peer_of": "/ip4/127.0.0.1/udp/19701/quic-v1"
+      }
+    },
+    {
+      "name": "indexer live genesis anchor",
+      "passed": true,
+      "detail": {
+        "height": 0,
+        "hash": "7d9fccd8acc3e998d656889633b46d1175f37ea50a36424ce70bdb8573311fa4",
+        "derived_from_block": "75366ca08f11af8ff16efb9ec6f4a3a27774986630ef02b40a8fe5d4ebe00c65"
+      }
+    },
+    {
+      "name": "validator producing",
+      "passed": true,
+      "detail": {
+        "height": 23,
+        "hash": "c89bea2f08cf036e3925471716305e5d63bc00369e9b86d31979feb22afedcc2"
+      }
+    },
+    {
+      "name": "cli tx build+submit",
+      "passed": true,
+      "detail": {
+        "accepted": true,
+        "txid": "e2f2affda7ca98e61412f1ef957da3dad1de2e3c880dae3a1675262fcde40a5a"
+      }
+    },
+    {
+      "name": "transfer settled with success receipt",
+      "passed": true,
+      "detail": {
+        "state": {
+          "settled_height": 25,
+          "status_code": 0
+        },
+        "receipt": {
+          "txid": "e2f2affda7ca98e61412f1ef957da3dad1de2e3c880dae3a1675262fcde40a5a",
+          "status": 0,
+          "fee_charged": "544"
+        }
+      }
+    },
+    {
+      "name": "transfer block finalized",
+      "passed": true,
+      "detail": {
+        "finalized": {
+          "epoch": 1,
+          "hash": "f2a90a047da6e7517ce12250f46b3907c370c9840244ac477c6dc8b00fe5141d"
+        },
+        "settled_height": 25
+      }
+    },
+    {
+      "name": "peer synced over QUIC",
+      "passed": true,
+      "detail": {
+        "peer_head": 32,
+        "settled_height": 25
+      }
+    },
+    {
+      "name": "indexer serves transaction",
+      "passed": true,
+      "detail": {
+        "fee": "544",
+        "inclusion": {
+          "hash": "887e5127123dcf915dec1209c0a9c4feddfa661ecb2692f74fa2bc416bca6459",
+          "height": "25",
+          "index": "0"
+        },
+        "resource_counters": {},
+        "state": "INCLUDED",
+        "txid": "e2f2affda7ca98e61412f1ef957da3dad1de2e3c880dae3a1675262fcde40a5a",
+        "wtxid": "e2f2affda7ca98e61412f1ef957da3dad1de2e3c880dae3a1675262fcde40a5a"
+      }
+    },
+    {
+      "name": "indexer identity matches devnet",
+      "passed": true,
+      "detail": {
+        "api_version": "v1",
+        "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+        "evidence_registry_root": "0000000000000000000000000000000000000000000000000000000000000000",
+        "finalized": {
+          "hash": "f2a90a047da6e7517ce12250f46b3907c370c9840244ac477c6dc8b00fe5141d",
+          "height": "256",
+          "state_root": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "freshness_ms": "0",
+        "genesis_hash": "6b4a001499b7c86452c6bd8dcc0f288b36ddeda700070af6269fb743697658fe",
+        "indexed_generation": "35",
+        "justified": {
+          "hash": "d65497c5a7e5ff83c2e627a391feb4006db025d90cc0312d69cfb174b774eac7",
+          "height": "512",
+          "state_root": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "protocol_version": "v1",
+        "readiness": "ready",
+        "ready": true,
+        "release_version": "0.1.0",
+        "unsafe_head": {
+          "hash": "638d1e9349dee4ffc95952ef284b40c96c20fe003997a337d7eb9a7cb5f6b2ba",
+          "height": "513",
+          "state_root": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      }
+    }
+  ],
+  "sources_sha256": {
+    "tools/e2e/live_smoke.py": "02451888d6dd63e7205c9f7146fc897a46e3312247d490859cee215b5f5e91b3",
+    "protocol/genesis/devnet-parameters.toml": "11ddd7c816361830448f9cabb742777482c978ffc3c29ce7b285cd2fbeef9c01"
+  },
+  "verdict": "PASS"
+}

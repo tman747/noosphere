@@ -1,0 +1,51 @@
+{
+  "schema": "noos/wwm-artifact-config/v1",
+  "artifact_name": "Bonsai-27B-Q1_0.gguf",
+  "source_bytes": 3803452480,
+  "sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+  "media_type": "application/vnd.ggml.gguf",
+  "source": {
+    "repository": "prism-ml/Bonsai-27B-gguf",
+    "revision": "0cf7e3d21581b169b4df1de8bf01316000e2fbb7",
+    "path": "Bonsai-27B-Q1_0.gguf",
+    "git_oid": "dea9011c70135768834ab25b59f451280d0766a5",
+    "lfs_sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+    "xet_hash": "80737a9af79f72a12f4a0a2839baf71b0d0491d78e0db83dec7245978b427430"
+  },
+  "identity": {
+    "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+    "payload_root": "d9fd68fd5b262b0b3672f71c633956c93228e6e3f331ed92ef40e2647de475f7",
+    "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+    "metadata_table_root": "0cc47f6379c069e745986bd95c696d78f51d5d4c0f3510f7f3cc5aa1d8311a8f",
+    "tensor_table_root": "ebfc159935469c3c8d40c7ea52dfac26dd996408f70ef36ef981a7dc07b9ee24",
+    "tokenizer_root": "58f310f0412514cea1a31757c9cc9714666b64fb67127914ab08554c4e0b4d56",
+    "chat_template_root": "7ccfac375b7121adfb8c35763b183a7707bb071bd1abbd76128986b16c3b4d33"
+  },
+  "license": {
+    "spdx": "Apache-2.0",
+    "license_path": "licenses/Bonsai-27B/LICENSE.txt",
+    "license_bytes": 10174,
+    "license_sha256": "69849221bfb90053de2134ef5e6d540287b4b98062326492f1f96f5da685524b",
+    "notice_path": "licenses/Bonsai-27B/NOTICE.txt",
+    "notice_bytes": 411,
+    "notice_sha256": "cef33f95425f9802de78b7b22db0faca84d2216661432a9afcf9620949c21f7e",
+    "modified": false,
+    "redistribution_requires_license_and_notice": true
+  },
+  "codec": {
+    "profile": "RS-GF8-V1",
+    "profile_id": 1,
+    "data_positions": 8,
+    "parity_positions": 4,
+    "positions": 12,
+    "share_bytes": 1047552,
+    "source_stripe_bytes": 8380416,
+    "stripes": 454,
+    "final_actual_source_bytes": 7124032,
+    "final_zero_padding_bytes": 1256384,
+    "share_count": 5448,
+    "position_bytes": 475588608,
+    "encoded_bytes": 5707063296
+  },
+  "publisher_fallback_allowed": false
+}

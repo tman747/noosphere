@@ -10,10 +10,11 @@ pub mod address;
 pub mod manifest;
 pub mod ops;
 pub mod secure_store;
+pub mod wwm;
 
 #[cfg(feature = "gui")]
 mod commands {
-    use crate::{address, manifest, ops, secure_store};
+    use crate::{address, manifest, ops, secure_store, wwm};
     use serde::Deserialize;
     use zeroize::Zeroizing;
 
@@ -44,6 +45,23 @@ mod commands {
         pub index: u32,
         pub signer_scope: u8,
         pub transaction_spec: String,
+    }
+
+    #[derive(Deserialize)]
+    pub struct WwmPaidAuthorizationCommandRequest {
+        pub wallet_id: String,
+        pub profile_id: String,
+        pub request_id: String,
+        pub pin_id: String,
+        pub capsule_id: String,
+        pub execution_profile_id: String,
+        pub query_profile_id: String,
+        pub prompt_commitment: String,
+        pub maximum_fee_micro_noos: u64,
+        pub expires_at_height: u64,
+        pub payer_nonce: u64,
+        pub account: u32,
+        pub index: u32,
     }
 
     #[tauri::command]
@@ -113,6 +131,45 @@ mod commands {
         .map_err(code)?
     }
 
+    /// Create a paid WWM authorization after a fresh profile-bound status
+    /// check. Seed material never crosses the native command boundary.
+    #[tauri::command]
+    pub async fn prepare_wwm_paid_authorization_cmd(
+        req: WwmPaidAuthorizationCommandRequest,
+    ) -> Result<wwm::PaidAuthorization, String> {
+        tauri::async_runtime::spawn_blocking(move || {
+            let profile = ops::chain_profiles()
+                .map_err(code)?
+                .into_iter()
+                .find(|profile| profile.id == req.profile_id)
+                .ok_or_else(|| "chain_profile_unavailable".to_owned())?;
+            ops::check_status(&profile.id).map_err(code)?;
+            let live_identity = wwm::profile_identity(&profile).map_err(code)?;
+            let seed = secure_store::load_seed(&req.wallet_id).map_err(code)?;
+            wwm::authorize_paid(
+                &wwm::PaidAuthorizationRequest {
+                    request_id: req.request_id,
+                    pin_id: req.pin_id,
+                    capsule_id: req.capsule_id,
+                    execution_profile_id: req.execution_profile_id,
+                    query_profile_id: req.query_profile_id,
+                    prompt_commitment: req.prompt_commitment,
+                    maximum_fee_micro_noos: req.maximum_fee_micro_noos,
+                    expires_at_height: req.expires_at_height,
+                    payer_nonce: req.payer_nonce,
+                    account: req.account,
+                    index: req.index,
+                },
+                &profile,
+                live_identity,
+                seed.as_slice(),
+            )
+            .map_err(code)
+        })
+        .await
+        .map_err(code)?
+    }
+
     /// Verify an update manifest. The updater key comes from the explicit
     /// argument when present, otherwise from the environment named by the
     /// product-identity policy.
@@ -148,6 +205,7 @@ pub fn run() {
             commands::chain_profiles_cmd,
             commands::check_chain_status_cmd,
             commands::submit_transaction_cmd,
+            commands::prepare_wwm_paid_authorization_cmd,
             commands::verify_update_manifest_cmd,
         ])
         .run(tauri::generate_context!())

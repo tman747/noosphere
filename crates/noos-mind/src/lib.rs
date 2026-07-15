@@ -9,6 +9,7 @@
 use noos_crypto::{hash_domain, verify_domain, DomainId, Keypair, PublicKey, Signature};
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod service;
 pub mod snapshot;
 
 pub type Hash32 = [u8; 32];

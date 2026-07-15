@@ -1,0 +1,326 @@
+{
+  "artifact": {
+    "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+    "encoded_bytes": 5707063296,
+    "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+    "model_bytes": 3803452480,
+    "model_sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+    "positions": 12,
+    "reconstruction_threshold": 8,
+    "schedulable_minimum": 9
+  },
+  "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+  "claims": {
+    "admission_and_inference_resumed": true,
+    "canonical_any_eight_repair_completed": true,
+    "cold_cache_was_disposable": true,
+    "fresh_certificate_finalized": true,
+    "new_job_admission_failed_closed_at_eight": true,
+    "ordinary_chain_finality_continued": true,
+    "production_availability_claimed": false
+  },
+  "environment": "devnet",
+  "external_model_egress": [],
+  "final_chain_status": {
+    "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+    "finalized": {
+      "epoch": 133,
+      "hash": "e0ac2ed67a57d54bbe2b4ddf74e797ad063766f2525fb64b121a7362fa63a988"
+    },
+    "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+    "justified": {
+      "epoch": 134,
+      "hash": "8f336011f9027b76c4472284a94d34323f270f51e5dad1d09a2a2df434c7caef"
+    },
+    "mempool": {
+      "bytes": 0,
+      "txs": 0
+    },
+    "observer": false,
+    "unsafe_head": {
+      "hash": "8f336011f9027b76c4472284a94d34323f270f51e5dad1d09a2a2df434c7caef",
+      "height": 34304
+    }
+  },
+  "finalized_resolution": {
+    "canonical_resolution_body_sha256": "6cad44e41b9f6b2465a8ec607967149dbd2840a4b52d594874e1825f8b0fe7e6",
+    "certificate_id": "4d2254e115bbaf55abcd16fe6ce9ef66da8674fc94c309dad6373a9ceab56245",
+    "hash": "e0ac2ed67a57d54bbe2b4ddf74e797ad063766f2525fb64b121a7362fa63a988",
+    "height": 34048,
+    "objects_root": "8a3e7a0b87c258128455d45a228d642098fdf7f83a0a8cfd28d8e3da58135631"
+  },
+  "generated_at": "2026-07-15T12:00:09.009468+00:00",
+  "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+  "initial_finalized_height": 31744,
+  "phases": [
+    {
+      "offline_positions": [],
+      "ordinary_transaction": {
+        "label": "12-live",
+        "receipt": {
+          "receipt": {
+            "fee_charged": "544",
+            "status": 0,
+            "txid": "1bd39cf9178ebdbdb58b7686a5629491e5e1364748f6a4bcef25cfe537bdde10"
+          },
+          "state": {
+            "settled_height": 32867,
+            "status_code": 0
+          }
+        },
+        "txid": "1bd39cf9178ebdbdb58b7686a5629491e5e1364748f6a4bcef25cfe537bdde10"
+      },
+      "phase": "12_live",
+      "quote": {
+        "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+        "available_concurrency": 1,
+        "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+        "live_custodian_positions": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "max_output_tokens": 8,
+        "prompt_tokens": 1,
+        "queue_available": 5,
+        "resident": true,
+        "schedulable_minimum": 9
+      }
+    },
+    {
+      "offline_positions": [
+        0,
+        1,
+        2
+      ],
+      "ordinary_transaction": {
+        "label": "9-live",
+        "receipt": {
+          "receipt": {
+            "fee_charged": "544",
+            "status": 0,
+            "txid": "44c4280a60206829f6914fce8f9cc69b3a846d43bcc6cd5d3c86d7ecc7c71f3d"
+          },
+          "state": {
+            "settled_height": 32879,
+            "status_code": 0
+          }
+        },
+        "txid": "44c4280a60206829f6914fce8f9cc69b3a846d43bcc6cd5d3c86d7ecc7c71f3d"
+      },
+      "phase": "9_live",
+      "quote": {
+        "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+        "available_concurrency": 1,
+        "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+        "live_custodian_positions": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "max_output_tokens": 8,
+        "prompt_tokens": 1,
+        "queue_available": 5,
+        "resident": true,
+        "schedulable_minimum": 9
+      }
+    },
+    {
+      "canonical_repair": {
+        "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+        "bytes_read": 3804708864,
+        "bytes_written": 475588608,
+        "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+        "position_root": "c551b7b08d4753f2d34c61807a519a0130fb42af3e3ce8c9022906d32e88bc0a",
+        "published": true,
+        "repaired_position": 3,
+        "repaired_shares": 454,
+        "replacement_store_used_bytes": 476368756,
+        "schema": "noos.wwm.artifact-position-repair.v1",
+        "source_positions": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "capacity_quote": {
+        "body": {
+          "error": "availability_not_schedulable",
+          "live_count": 8,
+          "live_positions": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "offline_positions": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "reconstruction_threshold": 8,
+          "schedulable_minimum": 9
+        },
+        "status": 503
+      },
+      "job_admission": {
+        "body": {
+          "error": "availability_not_schedulable",
+          "live_count": 8,
+          "live_positions": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "offline_positions": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "reconstruction_threshold": 8,
+          "schedulable_minimum": 9
+        },
+        "status": 503
+      },
+      "offline_positions": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "ordinary_transaction": {
+        "label": "8-live-admission-closed",
+        "receipt": {
+          "receipt": {
+            "fee_charged": "544",
+            "status": 0,
+            "txid": "ff9ad5204818e57c679176cd2bc8ef0399b0e21cd3b219970c167c3de1487342"
+          },
+          "state": {
+            "settled_height": 32890,
+            "status_code": 0
+          }
+        },
+        "txid": "ff9ad5204818e57c679176cd2bc8ef0399b0e21cd3b219970c167c3de1487342"
+      },
+      "phase": "8_live"
+    },
+    {
+      "inference": {
+        "duration_seconds": 7.89,
+        "job_id": "f01c36c9f6bdea6b6b91b2ed08044870d87f10f900fc094026fb084d76a121a6",
+        "terminal": {
+          "code": "completed",
+          "output_root": "eb42560246c8a16eb2eddbc0de3b2a1c46efbe9a1b2788d638c2c85c8bf75815",
+          "type": "terminal"
+        },
+        "token_chunks": 22
+      },
+      "offline_positions": [
+        0,
+        1,
+        2
+      ],
+      "ordinary_transaction": {
+        "label": "repaired-9-live",
+        "receipt": {
+          "receipt": {
+            "fee_charged": "544",
+            "status": 0,
+            "txid": "3a949d66ff1889101778c48c9e115995e4a64ce9d24f877d63fba6445c409908"
+          },
+          "state": {
+            "settled_height": 33871,
+            "status_code": 0
+          }
+        },
+        "txid": "3a949d66ff1889101778c48c9e115995e4a64ce9d24f877d63fba6445c409908"
+      },
+      "phase": "repaired_9_live",
+      "quote": {
+        "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+        "available_concurrency": 1,
+        "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+        "live_custodian_positions": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "max_output_tokens": 8,
+        "prompt_tokens": 1,
+        "queue_available": 5,
+        "resident": true,
+        "schedulable_minimum": 9
+      },
+      "repair_chain": {
+        "assignment_root": "6895660536a6ab27f1fbb969173186387f0d2bc92caf9bee7d55588a582a1521",
+        "certificate_id": "4d2254e115bbaf55abcd16fe6ce9ef66da8674fc94c309dad6373a9ceab56245",
+        "old_profile_id": "39e9acb0b265416e86451f2f3c7a2542722047d2e9ddaf8c5a226b8790f3d1a1",
+        "order_id": "067a36b9b58e9c7908ba2a05d260c5493944ac71425d2a670de26dc1abffcd0d",
+        "receipt": {
+          "receipt": {
+            "fee_charged": "5652",
+            "status": 0,
+            "txid": "e5df5146c6d13eaafea6951f85f0b964134d1fa53fa4169ddb2443727ce6b1af"
+          },
+          "state": {
+            "settled_height": 33520,
+            "status_code": 0
+          }
+        },
+        "repair_id": "38db59e59e9c60719d0cbfe0a782b025c7b8a893abc95eff853e96bf87fdbbd3",
+        "replacement_commitment_id": "8568912c2a1f31cf793eba51e7c2e3314b7a48cb1901559a0043a46dac4d2497",
+        "replacement_profile_id": "19790a30d47c1a0bf1b72018ff56d549a1b65c84dba8b1acaaad7aea338e008a",
+        "txid": "e5df5146c6d13eaafea6951f85f0b964134d1fa53fa4169ddb2443727ce6b1af"
+      }
+    }
+  ],
+  "production_claimed": false,
+  "publisher_or_gateway_fallback": false,
+  "run_id": "d1a70c60ab2b2b42cf282129",
+  "schema": "noos.wwm.hosted-model-demo-evidence.v1",
+  "signature": {
+    "domain": "NOOS/EVIDENCE/WWM-HOSTED-DEMO/V1",
+    "public_key": "17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce",
+    "signature": "deee10a214400fa47781e4211c3ccd4317d40dfcc3d964af32d119956d2e21bcfef1bdba824a144db5572c255dbc4d20a6532bfa242a7760cd7fce2bf8789c0a",
+    "signed_payload_sha256": "c0af7ade641175b2f5b8d5d9e1716f48150ca6425dc0af4661b9057abdf9ef88",
+    "suite": "Ed25519"
+  }
+}

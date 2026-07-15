@@ -9,6 +9,7 @@ description = "NOOSPHERE Work Loom application escrow, delivery, evidence, and d
 
 [dependencies]
 blake3 = "1.8"
+noos-codec = { path = "../noos-codec" }
 noos-crypto = { path = "../noos-crypto" }
 noos-lumen = { path = "../noos-lumen" }
 

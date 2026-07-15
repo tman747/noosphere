@@ -1,0 +1,212 @@
+{
+  "schema": "noos/wwm-hosted-model-executor-bootstrap/v1",
+  "captured_at": "2026-07-15T09:03:24.767Z",
+  "environment": "LOCAL_TESTNET_FIXTURE",
+  "production_claimed": false,
+  "repository_revision": "adf1325428507b4f06f7c9568066985240fc8747",
+  "executor_binary": {
+    "path": "D:/noosphere-targets/integration/release/noos-workerd.exe",
+    "bytes": 7143936,
+    "sha256": "786010bf9a1e22434073b241dfd990b9440268c8c0754850e9ab29eab86b1f42"
+  },
+  "proof_input": {
+    "path": "C:/tmp/wwm-live-finalized-resolution.json",
+    "bytes": 41984,
+    "sha256": "c1b768e3568103ef8d1a4e7f1b9f31ce3e6038e190ff8b57f21db6a3412d6b68",
+    "schema": "noos/wwm-executor-bootstrap-proof/v1",
+    "only_authoritative_field": "canonical_resolution_body_hex",
+    "local_claim_booleans_accepted": false,
+    "source_rpc": "http://127.0.0.1:8632/model-resolution/bonsai-q1",
+    "source_rpc_proofs_verified": true,
+    "source_rpc_proof_count": 17,
+    "approved_checkpoint": {
+      "epoch": 4,
+      "height": 1024,
+      "hash": "e2c10991bad20f018b660de6f91936f8197596d965ea4dcf34ccd463024b5dc9"
+    }
+  },
+  "wire_correction": {
+    "defect_found": "ResolutionValueV1 encoded a u8 discriminant while its canonical decoder required u16",
+    "source_fix": "crates/noos-lumen/src/wwm.rs now encodes the closed discriminant as u16",
+    "captured_local_replay_migration": "inserted the missing high byte after exactly each of 17 legacy proof-value discriminants",
+    "legacy_body_bytes": 20932,
+    "canonical_body_bytes": 20949,
+    "semantic_fields_changed": false,
+    "regression_test": "wwm::tests::resolution_values_use_the_canonical_u16_discriminant"
+  },
+  "verified_bootstrap": {
+    "schema": "noos.wwm.executor-bootstrap-verified.v1",
+    "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+    "genesis_hash": "3ce9825c83a6e5f0b8346762d3835b544de89101b95a4e6cb364a19ae871a9ce",
+    "finalized_height": 1024,
+    "finalized_hash": "e2c10991bad20f018b660de6f91936f8197596d965ea4dcf34ccd463024b5dc9",
+    "objects_root": "156f2700bba11dfa9eb0866bb65fa31916ce254d6ceb5f1277ee3f4c210cf2cb",
+    "proof_body_blake3": "ccdd0132250551ced07f771fdf10d54a2c6de1e3130a1e05c836a59c3d5f10c0",
+    "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+    "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+    "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+    "certificate_id": "510db55c2d08e02f5aee28c0391a5d4159cc9157b4fa23e47adb45dce2ddd4d9",
+    "certificate_valid_until": 18446744073709551615,
+    "position_count": 12,
+    "reconstruction_threshold": 8,
+    "schedulable_minimum": 9,
+    "service_endpoints": [
+      "http://127.0.0.1:18768/v1"
+    ],
+    "custodian_endpoint_identities": [
+      {
+        "profile_id": "19790a30d47c1a0bf1b72018ff56d549a1b65c84dba8b1acaaad7aea338e008a",
+        "endpoint_root": "035dc7f0552d960c718240d4bf40309da9ed25812bf8c44776ca0aa1fbd6562a",
+        "region_id": "e9374ce45a6003acb540540cc96ffe263b1894e7bf06d6a05ae3d9107f03e7f7",
+        "asn": 65011,
+        "provider_root": "6c518a3423d55dbdec121140ef8b12a06ef67945b4d2cd62b14e41bfe8251b1a",
+        "operator_id": "b9fc1492217f0a530dfd074ed53c8cf759a35ca6ec64a67c4031057d273ab89f"
+      },
+      {
+        "profile_id": "339a008f05959889224a85f8196389fa024834c9d23307732f761303af0f3bc3",
+        "endpoint_root": "52586fa58f037bf0674bcaf2b5df9b15fa95d00506c4b9fd2ef51ae6b828b4fa",
+        "region_id": "cc772b5a62e146760cab857da9f9c902d4f1566dffbe1dee66ff5acbfce9aeda",
+        "asn": 65010,
+        "provider_root": "a050ca8196ea55e97fc6c857568d183a4efc7ac397e893d2414ea77fa02fa7ad",
+        "operator_id": "0390ae5d7432a411be91dac54a2e1c62de13351c61c6361f5bf3434e3fb2936f"
+      },
+      {
+        "profile_id": "364e944f824e2c282a59dc83b8e98638ca49f915063e7aa60425a6d5442bc3f4",
+        "endpoint_root": "6be1d6cfb947e565b85f67dcec657dc56ec7d3f57ff1e12d15d6a9bd301edf57",
+        "region_id": "d804c47a9e39e8c3efc5cc6ce4966aa01ac391cb07d9ce3f4f608b47464da547",
+        "asn": 65000,
+        "provider_root": "2cd716f258e9fdfab14852adb65a03fa6773ddb025a41f4304204fceba763d9a",
+        "operator_id": "cfed7b208f5c6563e1b99a66c7d37b0797afba351ea5e918a59dd7045ab1826a"
+      },
+      {
+        "profile_id": "39e9acb0b265416e86451f2f3c7a2542722047d2e9ddaf8c5a226b8790f3d1a1",
+        "endpoint_root": "8030ecaaf6b57eaad424891283231c1cf9301f03e05404a6c6ecdea0869edc1e",
+        "region_id": "1fe9ab06e96cabe3c71bf4bcaa55d1b1a9a206de1325b7203aab82b1995daf02",
+        "asn": 65009,
+        "provider_root": "e14c59a4783e6474f8b4df74de72df3bcf67be2971aedee62ca3fdc32022882d",
+        "operator_id": "48039b6f627ce60902cc4348f349133b16b88fbe7a565f8adfb7b034681800a2"
+      },
+      {
+        "profile_id": "4730fcbd9219ab94d6d7a762c95d851f1c24db80233316cc64b2631012630e06",
+        "endpoint_root": "d41d6f7b678575377fae320d76c5b6d27753c503da59f4ec5b36099f49a60f05",
+        "region_id": "e9374ce45a6003acb540540cc96ffe263b1894e7bf06d6a05ae3d9107f03e7f7",
+        "asn": 65003,
+        "provider_root": "e14c59a4783e6474f8b4df74de72df3bcf67be2971aedee62ca3fdc32022882d",
+        "operator_id": "e14a38b37d6da5245bc6aa403827c6368170180e67a259840f562720e07615f6"
+      },
+      {
+        "profile_id": "4f9fd90ef0fe5987df4dd91f50946f7ed0d4cf798dc254984ad858451c18f6c4",
+        "endpoint_root": "6c960a581c2994eb04b906c249a4b4a818e29522030ce7c5d2990da99e12ae80",
+        "region_id": "d804c47a9e39e8c3efc5cc6ce4966aa01ac391cb07d9ce3f4f608b47464da547",
+        "asn": 65008,
+        "provider_root": "da3343c411f21801257e92ef68ccd140ec832a15f00961fa0af5e7f556496f55",
+        "operator_id": "6e60135040c743c5b7583fff91f2062d6df242902abc9cb9ac1122f8c82b196a"
+      },
+      {
+        "profile_id": "6a686fb208110b6271f414e1219ee551738b4c8bbdc1cb9ca01d86848936e754",
+        "endpoint_root": "6480b64fd05e24ac828038f33dcfb4351c1925297ba5ceb08b648aca4d16a4f7",
+        "region_id": "e9374ce45a6003acb540540cc96ffe263b1894e7bf06d6a05ae3d9107f03e7f7",
+        "asn": 65007,
+        "provider_root": "97ab40a280c473a72659a345ed3fb0eb4602d687507b3fe4d0d377c3ee9dfb10",
+        "operator_id": "ab5adf934706122c2a51d91977d0d6bec24adcd56b5c9e18402276faf019da31"
+      },
+      {
+        "profile_id": "8d513677a3728787b7f01c78af8a916b618cdfb085d0e8770f809fd19f224538",
+        "endpoint_root": "87ccbd9de1c0aa5711c2595ffe20cbed705b538ac1cf07e61bd04fa7954eb81e",
+        "region_id": "d804c47a9e39e8c3efc5cc6ce4966aa01ac391cb07d9ce3f4f608b47464da547",
+        "asn": 65004,
+        "provider_root": "a050ca8196ea55e97fc6c857568d183a4efc7ac397e893d2414ea77fa02fa7ad",
+        "operator_id": "77b221ac16c79fe55a50151ef220e9bf1da27d244fc7683038b0f98d6064dcdf"
+      },
+      {
+        "profile_id": "bb477ddb818ff16e90c5660f37caecd62c0e03fb747e739d29bd41761c014e0f",
+        "endpoint_root": "04afe1efdd27cf89289f29c781c9b420d6db5cb149713dc62e3bb5c7aa9fb327",
+        "region_id": "cc772b5a62e146760cab857da9f9c902d4f1566dffbe1dee66ff5acbfce9aeda",
+        "asn": 65006,
+        "provider_root": "2cd716f258e9fdfab14852adb65a03fa6773ddb025a41f4304204fceba763d9a",
+        "operator_id": "26bbdf8e70f611f364b901f7d40bcbc210e1d2bea3960f56e41f1538d2bd050e"
+      },
+      {
+        "profile_id": "be765221926b8e51d016b11ca6eac391b66ca3ca85030ee2adb4689b30b370a6",
+        "endpoint_root": "9f72fbfc1f67c7f2a8335d1b8de4f3f704db4e798d236b946fe4fa62bb052e9b",
+        "region_id": "1fe9ab06e96cabe3c71bf4bcaa55d1b1a9a206de1325b7203aab82b1995daf02",
+        "asn": 65001,
+        "provider_root": "97ab40a280c473a72659a345ed3fb0eb4602d687507b3fe4d0d377c3ee9dfb10",
+        "operator_id": "5eebc0971ec94da6113099ff168974eda718c7664657d4769a010900bb22f5a8"
+      },
+      {
+        "profile_id": "cdaabad5bd3456e45072ddebd0410a1290ea2a5c3649a85e6426ecbb66eb9b3c",
+        "endpoint_root": "3b1cb6e398b7a0c4ef732dd0b5e0257b7db73038efbb76656d0d1728323db6ab",
+        "region_id": "1fe9ab06e96cabe3c71bf4bcaa55d1b1a9a206de1325b7203aab82b1995daf02",
+        "asn": 65005,
+        "provider_root": "6c518a3423d55dbdec121140ef8b12a06ef67945b4d2cd62b14e41bfe8251b1a",
+        "operator_id": "13e671b907d40850e1d6feaac431cafa9803209d4a96c37bf020c63252969512"
+      },
+      {
+        "profile_id": "f059f7cd7fbc6717ea35a1e2514a0c6de515bddd79fc0f003336cd142a7f1837",
+        "endpoint_root": "1c9b7e07bffa39ac025d377a3fd36256d5bedb2b530455169f25d3560210b1c9",
+        "region_id": "cc772b5a62e146760cab857da9f9c902d4f1566dffbe1dee66ff5acbfce9aeda",
+        "asn": 65002,
+        "provider_root": "da3343c411f21801257e92ef68ccd140ec832a15f00961fa0af5e7f556496f55",
+        "operator_id": "b6a471b2234dec9da35a01627f998defcc84251ded36cf2af41ad0eaf3a32b7b"
+      }
+    ],
+    "publisher_or_gateway_fallback": false,
+    "production_claimed": false
+  },
+  "local_runtime_binding": {
+    "executable": "D:/noosphere-artifacts/runtime/hip-run/llama-cli.exe",
+    "runtime_executable_sha256": "d09e9f62e2bfc20af43f47dac8adddae47de25ae7678702f109faaa03dfe8a56",
+    "runtime_root": "690d9bbd8d44631fb971e0b0677e10c8d0bb1e08a743bb720eeaab728e30ba27",
+    "build_root": "72b5b1514a6fdf64a275d9ae660cda4db3cb2ce64e37a7ca7e97899729dc3b05",
+    "sbom_root": "a61768de8786670eb2aefcc59751657bcdbddc8d750f5fe1073f586debe2d0eb",
+    "prism_build_id": "1968d95c14975599c5e1b46d5c929b446279d3f56f29534f7433a2e8a067de52",
+    "config_file": {
+      "path": "C:/tmp/wwm-live-workerd.toml",
+      "bytes": 2539,
+      "sha256": "ad8688f153f26a6e3957034361b16adaf3b85a1bd3d3430ead3aab072c38c919"
+    }
+  },
+  "verification_commands": [
+    {
+      "command": "cargo test --release -p noos-workerd",
+      "result": "PASS: 46 tests across 4 suites"
+    },
+    {
+      "command": "cargo test --release -p noos-workerd executor::bootstrap::tests::finalized_proof_bootstrap_accepts_only_the_pinned_complete_graph -- --exact",
+      "result": "PASS: 1 test"
+    },
+    {
+      "command": "cargo test --release -p noos-lumen wwm::tests::resolution_values_use_the_canonical_u16_discriminant -- --exact",
+      "result": "PASS: 1 test"
+    },
+    {
+      "command": "noos-workerd inspect --config C:/tmp/wwm-live-workerd.toml",
+      "result": "PASS: emitted verified 12-position bootstrap summary"
+    },
+    {
+      "command": "noos-workerd inspect --config C:/tmp/wwm-live-workerd-wrong-checkpoint.toml",
+      "result": "EXPECTED REJECTION: approved checkpoint terminal mismatch, exit 1"
+    }
+  ],
+  "checks": {
+    "canonical_resolution_decoded": true,
+    "chain_genesis_and_checkpoint_pinned": true,
+    "terminal_header_and_finality_verified": true,
+    "all_17_smt_proofs_verified": true,
+    "complete_active_graph_verified": true,
+    "manifest_capsule_artifact_runtime_and_policy_roots_match_config": true,
+    "certificate_live_at_resolution_height": true,
+    "executor_active_attested_and_sized": true,
+    "twelve_custodian_profiles_active_unique_diverse_and_sized": true,
+    "strict_envelope_rejects_local_boolean_claims": true,
+    "forged_checkpoint_rejected": true,
+    "bootstrap_runs_before_verify_cold_load": true,
+    "verdict": "PASS"
+  },
+  "scope_and_non_claims": [
+    "This is local-testnet proof verification, not production finality or production custody evidence.",
+    "The proof token derives endpoint identities and the finalized service directory; transport URL-to-endpoint-root binding and cold share reconstruction are the next milestone.",
+    "No publisher, upstream model host, local model copy, or inference gateway fallback is authorized by this bootstrap."
+  ]
+}

@@ -1,0 +1,36 @@
+name: noos-wwm-web-capacity
+services:
+  web-capacity:
+    image: ${WWM_WEB_CAPACITY_IMAGE:?immutable noos-web-capacityd image with @sha256 digest required}
+    profiles: [web-capacity]
+    command:
+      - noos-web-capacityd
+      - --config
+      - /run/wwm/web-capacity.json
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      WWM_ROLE: web-capacity-coordinator
+      WWM_DEPLOYMENT: ${WWM_DEPLOYMENT:-local}
+      WWM_PRODUCTION_CAPABLE: "false"
+      NOOS_WWM_WEB_CAPACITY_SEED: ${WWM_WEB_CAPACITY_SEED:?64 lowercase hex characters required}
+    volumes:
+      - ${WWM_WEB_CAPACITY_CONFIG_PATH:?absolute coordinator config path required}:/run/wwm/web-capacity.json:ro
+      - ${WWM_BONSAI_MANIFEST_PATH:?absolute canonical Bonsai manifest path required}:/run/wwm/bonsai-artifact-manifest.bin:ro
+      - web-capacity-data:/var/lib/noos-web-capacity
+      - web-capacity-quarantine:/var/lib/noos-web-capacity-quarantine
+      - type: tmpfs
+        target: /tmp
+    ports:
+      - "${WWM_WEB_CAPACITY_BIND:-127.0.0.1}:${WWM_WEB_CAPACITY_PORT:-9770}:9770"
+    networks: [web-capacity-public-egress]
+
+volumes:
+  web-capacity-data: {}
+  web-capacity-quarantine: {}
+
+networks:
+  web-capacity-public-egress:
+    internal: false

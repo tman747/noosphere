@@ -1,0 +1,326 @@
+{
+  "schema": "noos/wwm-web-public-infrastructure/v1",
+  "status": "EXPERIMENTAL_OWNER_AUTHORIZED_ONLY",
+  "research_snapshot": "2026-07-15",
+  "model_binding": {
+    "artifact_name": "Bonsai-27B-Q1_0.gguf",
+    "source_revision": "0cf7e3d21581b169b4df1de8bf01316000e2fbb7",
+    "source_bytes": 3803452480,
+    "source_sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+    "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+    "encoded_bytes": 5707063296,
+    "share_bytes": 1047552,
+    "share_count": 5448,
+    "position_bytes": 475588608,
+    "license": {
+      "spdx": "Apache-2.0",
+      "license_bytes": 10174,
+      "license_sha256": "69849221bfb90053de2134ef5e6d540287b4b98062326492f1f96f5da685524b",
+      "notice_bytes": 411,
+      "notice_sha256": "cef33f95425f9802de78b7b22db0faca84d2216661432a9afcf9620949c21f7e"
+    }
+  },
+  "non_claims": {
+    "public_access_is_public_domain": false,
+    "public_access_grants_storage_or_bandwidth_rights": false,
+    "open_protocol_grants_provider_resources": false,
+    "free_tier_is_persistence_or_availability": false,
+    "automatic_or_scanned_enrollment": false,
+    "publisher_or_gateway_full_model_fallback": false,
+    "production_custody": false,
+    "availability_certificate_effect": false,
+    "schedulability_effect": false,
+    "rewards": false
+  },
+  "owner_authorization": {
+    "required_for_every_upload_or_pin": true,
+    "required_evidence": [
+      "ACCOUNT_OR_NAMESPACE_CONTROL",
+      "DNS_AND_TLS_CONTROL_FOR_DIRECT_ORIGIN",
+      "PLATFORM_TERMS_AND_QUOTA_ACCEPTED",
+      "STORAGE_AND_BANDWIDTH_BUDGET",
+      "MODEL_REDISTRIBUTION_RIGHTS",
+      "EXACT_LICENSE_AND_NOTICE_PUBLICATION"
+    ],
+    "forbidden": [
+      "SCAN_FOR_WRITABLE_OR_ABANDONED_HOSTS",
+      "USE_ANOTHER_PARTY_ACCOUNT_BUCKET_REPOSITORY_OR_PIN",
+      "TREAT_PUBLIC_GATEWAY_AS_FREE_STORAGE",
+      "HIDE_VISITOR_STORAGE_OR_BANDWIDTH_USE",
+      "INFER_AUTHORIZATION_FROM_PUBLIC_READABILITY"
+    ]
+  },
+  "direct_static_host_admission": {
+    "decision": "LIVE_EXACT_ORIGIN_PROBE_ONLY",
+    "provider_name_never_preapproves": true,
+    "required": [
+      "OWNER_CONTROLLED_CANONICAL_HTTPS_ORIGIN",
+      "FIXED_SIGNED_WELL_KNOWN_MANIFEST",
+      "NO_REDIRECTS",
+      "CANONICAL_MANIFEST_AND_INVENTORY_WIRE_BYTES",
+      "FULL_GET_AND_BODYLESS_HEAD",
+      "EXACT_1047552_BYTE_SHARE_LENGTH",
+      "VALID_RANGE_RETURNS_EXACT_206_CONTENT_RANGE",
+      "UNSATISFIABLE_RANGE_RETURNS_EXACT_416_TOTAL",
+      "IDENTITY_OR_ABSENT_CONTENT_ENCODING",
+      "PUBLIC_IMMUTABLE_NONCONTRADICTORY_CACHE_POLICY",
+      "WILDCARD_CORS_WITHOUT_CREDENTIALS",
+      "FROZEN_LICENSE_AND_NOTICE_HASHES",
+      "TRANSPORT_SHA256",
+      "NOOS_DA_SHARE_COMMITMENT_AND_PROBE_ROOT",
+      "CONTINUOUS_60_SECOND_FRESHNESS"
+    ]
+  },
+  "recommendation_order": [
+    "OWNER_OBJECT_STORAGE_CDN",
+    "OWNER_FIXED_CID_KUBO_GATEWAY",
+    "OWNER_AR_IO_GATEWAY",
+    "PINNED_PROVENANCE_AND_RECOVERY_MIRRORS",
+    "FUTURE_SEPARATE_P2P_EXPERIMENT"
+  ],
+  "infrastructure": [
+    {
+      "id": "owner-object-storage-cdn",
+      "class": "OWNER_OBJECT_STORAGE_CDN",
+      "role": "DIRECT_STATIC_ORIGIN_CANDIDATE",
+      "direct_static_host_eligibility": "CONDITIONAL_LIVE_PROBE",
+      "supported_variants": [
+        "AMAZON_S3_REST_ORIGIN_OPTIONALLY_CLOUDFRONT_OAC",
+        "GOOGLE_CLOUD_STORAGE_XML_ORIGIN_OPTIONALLY_CLOUD_CDN",
+        "CLOUDFLARE_R2_OWNER_CUSTOM_DOMAIN",
+        "AZURE_BLOB_BEHIND_FRONT_DOOR_STANDARD_OR_PREMIUM"
+      ],
+      "blocked_variants": [
+        "S3_WEBSITE_ENDPOINT_NO_HTTPS",
+        "GCS_AUTHENTICATED_BROWSER_ENDPOINT_NO_CORS",
+        "R2_DEV_RATE_LIMITED_NON_PRODUCTION",
+        "AZURE_STATIC_WEBSITE_NO_CONFIGURABLE_CORS_HEADERS",
+        "EXPIRING_PRESIGNED_URL_AS_CANONICAL_URL"
+      ],
+      "storage_layout": "ONE_IMMUTABLE_OBJECT_PER_CANONICAL_SHARE",
+      "retention": "OWNER_PAID_AND_MONITORED_PROVIDER_POLICY_DEFENSE_IN_DEPTH",
+      "official_sources": [
+        "https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html",
+        "https://docs.aws.amazon.com/AmazonS3/latest/userguide/WebsiteEndpoints.html",
+        "https://cloud.google.com/storage/docs/cross-origin",
+        "https://developers.cloudflare.com/r2/buckets/public-buckets/",
+        "https://learn.microsoft.com/en-us/rest/api/storageservices/get-blob",
+        "https://learn.microsoft.com/en-us/azure/frontdoor/front-door-caching"
+      ]
+    },
+    {
+      "id": "owner-fixed-cid-kubo-gateway",
+      "class": "OWNER_FIXED_CID_KUBO_GATEWAY",
+      "role": "DIRECT_STATIC_ORIGIN_CANDIDATE",
+      "direct_static_host_eligibility": "CONDITIONAL_LIVE_PROBE",
+      "pinned_versions": {
+        "kubo": "0.42.0",
+        "boxo": "0.40.0"
+      },
+      "required_controls": [
+        "COMPLETE_RECURSIVE_LOCAL_PIN",
+        "GATEWAY_NO_FETCH_TRUE",
+        "OWNER_DNS_TLS_AND_REVERSE_PROXY",
+        "FIXED_CID_INTERNAL_REWRITE",
+        "USE_SUBDOMAINS_FALSE",
+        "NO_DNSLINK_FOR_CANONICAL_IMMUTABLE_ROUTE",
+        "NO_COMPRESSION_OR_TRANSFORMATION",
+        "KUBO_RPC_NOT_PUBLIC"
+      ],
+      "cid_authority": "TRANSPORT_ONLY_NOOS_DIGESTS_REMAIN_AUTHORITATIVE",
+      "retention": "OWNER_LOCAL_PIN_AND_REDUNDANT_OWNER_NODES",
+      "official_sources": [
+        "https://docs.ipfs.tech/concepts/persistence/",
+        "https://docs.ipfs.tech/concepts/ipfs-gateway/",
+        "https://github.com/ipfs/kubo/blob/v0.42.0/docs/config.md#gateway",
+        "https://specs.ipfs.tech/http-gateways/path-gateway/"
+      ]
+    },
+    {
+      "id": "managed-ipfs-custom-domain",
+      "class": "MANAGED_IPFS_CUSTOM_DOMAIN",
+      "role": "DIRECT_STATIC_ORIGIN_CANDIDATE",
+      "direct_static_host_eligibility": "CONDITIONAL_LIVE_PROBE",
+      "required_controls": [
+        "OWNER_ACCOUNT_AND_CUSTOM_DOMAIN",
+        "PAID_QUOTA_AND_BANDWIDTH_RIGHTS",
+        "COMPLETE_MONITORED_PIN",
+        "EXACT_NO_REDIRECT_RANGE_CORS_CACHE_BEHAVIOR"
+      ],
+      "retention": "PROVIDER_CONTRACT_AND_CONTINUOUS_PIN_MONITORING",
+      "official_sources": [
+        "https://ipfs.github.io/pinning-services-api-spec/",
+        "https://docs.ipfs.tech/concepts/persistence/"
+      ]
+    },
+    {
+      "id": "owner-ar-io-gateway",
+      "class": "OWNER_AR_IO_GATEWAY",
+      "role": "DIRECT_STATIC_ORIGIN_CANDIDATE_AND_ARCHIVAL_BACKING",
+      "direct_static_host_eligibility": "CONDITIONAL_LIVE_PROBE",
+      "required_controls": [
+        "AUTHORIZED_PAID_PUBLIC_ARWEAVE_UPLOAD",
+        "PINNED_PATH_MANIFEST_TRANSACTION_ID",
+        "OWNER_OPERATED_GATEWAY_DNS_TLS_AND_HEADERS",
+        "NESTED_PATHS_THAT_DO_NOT_TRIGGER_BARE_MANIFEST_301",
+        "PUBLIC_BYTES_ONLY_NO_PERSONAL_OR_REVOCABLE_DATA"
+      ],
+      "erasure": "INTENTIONALLY_DIFFICULT_DO_NOT_UPLOAD_PRIVATE_OR_REVOCABLE_DATA",
+      "official_sources": [
+        "https://docs.arweave.org/developers/development/overview.md",
+        "https://docs.ar.io/build/upload/manifests",
+        "https://docs.ar.io/apis/ar-io-node/data"
+      ]
+    },
+    {
+      "id": "filecoin-pin-position-recovery",
+      "class": "FILECOIN_PIN_RECOVERY",
+      "role": "FUNDED_PROOF_BACKED_RECOVERY_ONLY",
+      "direct_static_host_eligibility": false,
+      "representation_blocker": "DIRECT_RETRIEVAL_RETURNS_CAR_NOT_RAW_SHARE_PATHS",
+      "pinned_version": "filecoin-pin-1.1.1-synapse-sdk-1.0.1",
+      "max_single_upload_bytes": 1065353216,
+      "packaging": {
+        "car_count": 12,
+        "mapping": "ONE_COMPLETE_CANONICAL_POSITION_PER_CAR",
+        "raw_position_bytes": 475588608,
+        "full_encoded_bundle_as_one_car": "FORBIDDEN_OVER_LIMIT",
+        "required_external_bindings": [
+          "WHOLE_CAR_SHA256",
+          "ROOT_CID",
+          "PIECE_CID",
+          "POSITION_AND_SHARE_DIGEST_INDEX"
+        ]
+      },
+      "required_controls": [
+        "OWNER_WALLET_FIL_GAS_AND_USDFC_DEPOSIT",
+        "REQUIRE_ALL_REQUESTED_COPIES_COMPLETE",
+        "MONITOR_PROOFS_PAYMENT_RUNWAY_AND_RETRIEVAL",
+        "RETRIEVE_TO_QUARANTINE_AND_REVERIFY_NOOS_DA"
+      ],
+      "official_sources": [
+        "https://docs.filecoin.io/build-on-filecoin/cookbook/filecoin-pin.md",
+        "https://docs.filecoin.io/build-on-filecoin/cookbook/filecoin-pin/faq.md",
+        "https://github.com/filecoin-project/filecoin-pin/blob/v1.1.1/documentation/retrieval.md"
+      ]
+    },
+    {
+      "id": "pinned-managed-hub-mirrors",
+      "class": "PINNED_MANAGED_HUB_MIRRORS",
+      "role": "PROVENANCE_AND_OPERATOR_DISTRIBUTION_ONLY",
+      "direct_static_host_eligibility": false,
+      "variants": [
+        {
+          "name": "HUGGING_FACE_PINNED_COMMIT",
+          "identity": "FULL_COMMIT_AND_LFS_SHA256",
+          "blocker": "LARGE_FILES_RESOLVE_THROUGH_CDN_OR_XET_AND_NO_FIXED_ROOT_CONTRACT"
+        },
+        {
+          "name": "GITHUB_IMMUTABLE_RELEASES",
+          "identity": "IMMUTABLE_RELEASE_ATTESTATION_AND_ASSET_DIGESTS",
+          "blocker": "DOWNLOAD_MAY_302_AND_LIMITS_1000_ASSETS_PER_RELEASE_2_GIB_PER_ASSET"
+        },
+        {
+          "name": "GHCR_OR_OTHER_OCI_REGISTRY",
+          "identity": "MANIFEST_AND_BLOB_DIGESTS_NOT_TAGS",
+          "blocker": "OCI_AUTH_REDIRECT_CORS_AND_RANGE_DO_NOT_MATCH_STATIC_ORIGIN_CONTRACT"
+        },
+        {
+          "name": "GIT_LFS",
+          "identity": "PINNED_COMMIT_AND_LFS_OID",
+          "blocker": "METERED_MUTABLE_OBJECT_INDIRECTION_NOT_A_STATIC_ORIGIN"
+        },
+        {
+          "name": "INTERNET_ARCHIVE",
+          "identity": "ITEM_AND_FILE_CHECKSUMS",
+          "blocker": "WRITTEN_OWNER_ACCEPTANCE_REQUIRED_307_REDIRECTS_RANGE_IGNORED_500_FILES_PER_ITEM"
+        }
+      ],
+      "bridge": "PREFETCH_PINNED_BYTES_TO_QUARANTINE_VERIFY_THEN_EXPORT_OWNER_STATIC_ORIGIN",
+      "official_sources": [
+        "https://huggingface.co/docs/hub/en/storage-limits",
+        "https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases",
+        "https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md",
+        "https://help.archive.org/help/uploading-what-is-ok-or-not-ok-to-upload/"
+      ]
+    },
+    {
+      "id": "native-bittorrent-v2-mirror",
+      "class": "NATIVE_BITTORRENT_V2_MIRROR",
+      "role": "FUTURE_OPERATOR_MIRROR_EXPERIMENT",
+      "direct_static_host_eligibility": false,
+      "requirements": [
+        "DETERMINISTIC_MULTIFILE_BEP52_METAINFO",
+        "FULL_32_BYTE_V2_INFOHASH_AND_METAINFO_SHA256",
+        "OWNER_LONG_RUNNING_SEEDS",
+        "QUALIFIED_STATIC_ORIGINS_ONLY_AS_BEP19_WEBSEEDS",
+        "DOWNLOAD_TO_QUARANTINE_AND_REVERIFY_NOOS_DA"
+      ],
+      "limitations": [
+        "DHT_STORES_PEER_LOCATIONS_NOT_CONTENT",
+        "INFOHASH_DOES_NOT_PROVE_LIVE_SEEDS",
+        "BEP52_REMAINS_DRAFT"
+      ],
+      "official_sources": [
+        "https://www.bittorrent.org/beps/bep_0005.html",
+        "https://www.bittorrent.org/beps/bep_0019.html",
+        "https://www.bittorrent.org/beps/bep_0052.html"
+      ]
+    },
+    {
+      "id": "webtorrent-browser",
+      "class": "WEBTORRENT_BROWSER",
+      "role": "NOT_IN_V1_SEPARATE_FUTURE_ADVISORY_EXPERIMENT_ONLY",
+      "direct_static_host_eligibility": false,
+      "v1_browser_capacity_transport": "FORBIDDEN",
+      "limitations": [
+        "WEBRTC_ONLY_NO_TCP_UDP_OR_BROWSER_DHT",
+        "BITTORRENT_V2_BEP52_UNIMPLEMENTED_IN_WEBTORRENT_3_0_16",
+        "NO_ALWAYS_ON_HTTPS_HEAD_GET_ORIGIN",
+        "CURRENT_WEBSEED_FETCH_DOES_NOT_ENFORCE_NO_REDIRECT_OR_EXACT_ORIGIN"
+      ],
+      "browser_boundary": "EXPLICIT_OPT_IN_PAGE_ACTIVE_CHORUS_ADVISORY_ONLY",
+      "official_sources": [
+        "https://github.com/webtorrent/webtorrent/blob/6d636c6d4e4578743ea28a135ada7243ad0d2608/README.md",
+        "https://github.com/webtorrent/webtorrent/blob/6d636c6d4e4578743ea28a135ada7243ad0d2608/docs/bep_support.md",
+        "https://w3c.github.io/ServiceWorker/#service-worker-lifetime"
+      ]
+    },
+    {
+      "id": "shared-public-gateways",
+      "class": "SHARED_PUBLIC_GATEWAYS",
+      "role": "DIAGNOSTIC_OR_UNCREDITED_MIRROR_ONLY",
+      "direct_static_host_eligibility": false,
+      "examples": [
+        "IPFS_IO",
+        "DWEB_LINK",
+        "INBROWSER_LINK",
+        "PUBLIC_AR_IO_GATEWAY"
+      ],
+      "blockers": [
+        "OPERATOR_DOES_NOT_CONTROL_ORIGIN_TLS_HEADERS_OR_TERMS",
+        "BEST_EFFORT_RATE_LIMITED_NOT_STORAGE",
+        "REDIRECT_OR_FILTER_POLICY_CAN_CHANGE",
+        "CID_OR_TRANSACTION_ID_PROVES_IDENTITY_NOT_AVAILABILITY"
+      ],
+      "official_sources": [
+        "https://docs.ipfs.tech/concepts/public-utilities/",
+        "https://ipshipyard.com/blog/2026-ipfs-gateways-redirect-inbrowser-link/",
+        "https://docs.ar.io/apis/ar-io-node/data"
+      ]
+    }
+  ],
+  "graduation": {
+    "static_or_mirror_shortcut_to_custody": false,
+    "required_complete_position_bytes": 475588608,
+    "existing_custodian_admission_only": true,
+    "required_independent_evidence": [
+      "BOND",
+      "DIVERSITY",
+      "CANONICAL_PROBES",
+      "MEASURED_AVAILABILITY",
+      "E_WWM_03",
+      "E_WWM_23"
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+/.well-known/noos/wwm-web-capacity-v1.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=60, must-revalidate
+  X-Content-Type-Options: nosniff
+
+/inventory-v1.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=0, no-cache, must-revalidate
+  X-Content-Type-Options: nosniff
+
+/LICENSE.txt
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=31536000, immutable
+  X-Content-Type-Options: nosniff
+
+/NOTICE.txt
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=31536000, immutable
+  X-Content-Type-Options: nosniff
+
+/shares/*
+  Access-Control-Allow-Origin: *
+  Accept-Ranges: bytes
+  Cache-Control: public, max-age=31536000, immutable, no-transform
+  Content-Type: application/octet-stream
+  X-Content-Type-Options: nosniff

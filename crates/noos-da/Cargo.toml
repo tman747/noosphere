@@ -16,6 +16,8 @@ noos-lumen = { path = "../noos-lumen" }
 # path is NOT enabled; default = std only). Pinned exactly: the encoding
 # matrix is consensus-observable through shard bytes and the Merkle root.
 reed-solomon-erasure = "=6.0.0"
+blake3 = "=1.8.5"
+sha2 = "=0.10.9"
 
 [dev-dependencies]
 hex = "=0.4.3"

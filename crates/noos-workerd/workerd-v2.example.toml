@@ -1,0 +1,58 @@
+# Deployment-neutral protocol-v2 example. Replace every operator identity,
+# signer seed, per-boot sidecar token, certificate, binary digest, and path.
+# The values below are development placeholders, never production credentials.
+[worker]
+seed_hex = "0101010101010101010101010101010101010101010101010101010101010101"
+chain_id_hex = "0202020202020202020202020202020202020202020202020202020202020202"
+genesis_hash_hex = "0303030303030303030303030303030303030303030303030303030303030303"
+sidecar_token_hex = "0404040404040404040404040404040404040404040404040404040404040404"
+listen = "tcp://127.0.0.1:9807"
+scratch_dir = "state/workerd/runtime"
+drain_file = "state/workerd/drain"
+
+[model]
+name = "Bonsai-27B-Q1_0.gguf"
+path = "artifacts/bonsai/Bonsai-27B-Q1_0.gguf"
+manifest_path = "artifacts/bonsai/manifest.bin"
+custodian_map_path = "state/workerd/custodians.json"
+bytes = 3803452480
+sha256_hex = "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0"
+manifest_root_hex = "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7"
+artifact_id_hex = "0505050505050505050505050505050505050505050505050505050505050505"
+capsule_id_hex = "0606060606060606060606060606060606060606060606060606060606060606"
+tokenizer_id_hex = "0707070707070707070707070707070707070707070707070707070707070707"
+template_id_hex = "0808080808080808080808080808080808080808080808080808080808080808"
+
+[runtime]
+executable = "runtime/prism-llama/llama-cli"
+source_commit = "62061f91088281e65071cc38c5f69ee95c39f14e"
+target_triple = "x86_64-pc-windows-msvc"
+toolchain = "msvc-19.44"
+build_flags = ["GGML_HIP=ON", "LLAMA_CURL=OFF"]
+binary_sha256_hex = "0101010101010101010101010101010101010101010101010101010101010101"
+runtime_root_hex = "690d9bbd8d44631fb971e0b0677e10c8d0bb1e08a743bb720eeaab728e30ba27"
+build_root_hex = "72b5b1514a6fdf64a275d9ae660cda4db3cb2ce64e37a7ca7e97899729dc3b05"
+sbom_root_hex = "0202020202020202020202020202020202020202020202020202020202020202"
+build_id_hex = "cc3b974794423ff144cb70a6456d954f1f7759e8142d7b86b3d69d238e2142e8"
+extra_args = []
+
+[scheduler]
+max_concurrent = 1
+max_queue = 4
+max_context_tokens = 4096
+max_output_tokens = 512
+job_timeout_ms = 120000
+cancel_grace_ms = 1000
+
+[identity]
+finalized_resolution_path = "state/workerd/finalized-model-resolution-v1.json"
+model_alias = "bonsai-q1"
+trusted_checkpoint_epoch = 0
+trusted_checkpoint_height = 0
+trusted_checkpoint_hash_hex = "0909090909090909090909090909090909090909090909090909090909090909"
+current_finalized_height = 0
+worker_id_hex = "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
+certificate_id_hex = "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+executor_set_epoch = 1
+custodian_set_epoch = 1
+service_directory_epoch = 1

@@ -14,10 +14,10 @@ pub mod quotient;
 mod update;
 
 pub use artifact::{
-    topology_local_indices, ArtifactShard, DerivationEdge, EncodedArtifact, ErasureProfile,
-    ServingTraffic, ShardLocation,
+    ArtifactDerivationV2, ArtifactDescriptorV2, ArtifactManifestV2, ArtifactShareV2,
+    ArtifactStripeV2, PublisherSignatureV2, WeightInspectionReceiptV2, WeightManifestV2,
 };
-pub use capsule::{ModelCapsule, PublisherSignature, WWM_MODEL_ACTIVATION_ENABLED};
+pub use capsule::ModelCapsuleV2;
 pub use quotient::{
     build_finite_quotient, FiniteQuotient, NonTransitiveCounterexample, SuiteMember,
 };
@@ -26,7 +26,7 @@ pub type Hash32 = [u8; 32];
 pub type Height = u64;
 
 pub mod domains {
-    pub const ARTIFACT: &str = "NOOS/ARTIFACT/V1";
+    pub const ARTIFACT: &str = "NOOS/WWM/ARTIFACT/DESCRIPTOR/V2";
     pub const SPECIES: &str = "NOOS/SPECIES/V1";
     pub const REVISION: &str = "NOOS/SPECIES/REVISION/V1";
     pub const CLAIM: &str = "NOOS/SPECIES/EQUIVALENCE/V1";
@@ -60,23 +60,6 @@ pub enum ArtifactKind {
     MemoryCapsule,
     UpdatePacket,
     Report,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Artifact {
-    pub artifact_id: Hash32,
-    pub kind: ArtifactKind,
-    pub media_type: String,
-    pub byte_length: u64,
-    pub chunking_profile: Hash32,
-    pub availability_root: Hash32,
-    pub encoding: Hash32,
-    pub numeric_profile: Option<Hash32>,
-    pub encryption_profile: Option<Hash32>,
-    pub rights_root: Hash32,
-    pub creator: Hash32,
-    pub created_at: Height,
-    pub annotations_root: Hash32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -345,12 +328,11 @@ pub enum SpeciesError {
     ArtifactLengthMismatch,
     ArtifactDigestMismatch,
     ArtifactTooLarge,
+    InvalidArtifactSignature,
+    InvalidWeightManifest,
+    InvalidInspectionReceipt,
+    InvalidInspectionSignature,
     InvalidDerivation,
-    UnsupportedErasureProfile,
-    InvalidShard,
-    PoisonedShard,
-    LossBoundExceeded,
-    WanPerTokenForbidden,
     UnknownEncoding,
     MalformedEncoding,
     NonCanonicalEncoding,
@@ -418,9 +400,8 @@ impl SpeciesView {
 
 #[derive(Debug, Default)]
 pub struct Registry {
-    artifacts: BTreeMap<Hash32, Artifact>,
-    artifact_payloads: BTreeMap<Hash32, Vec<u8>>,
-    derivations: BTreeMap<Hash32, DerivationEdge>,
+    artifacts: BTreeMap<Hash32, ArtifactDescriptorV2>,
+    derivations: BTreeMap<Hash32, ArtifactDerivationV2>,
     manifests: BTreeMap<Hash32, SpeciesManifest>,
     revisions: BTreeMap<Hash32, SpeciesRevision>,
     claims: BTreeMap<Hash32, EquivalenceClaim>,
@@ -428,7 +409,7 @@ pub struct Registry {
     serving_profiles: BTreeMap<Hash32, ServingProfile>,
     updates: BTreeMap<Hash32, UpdatePacket>,
     learning_records: BTreeMap<Hash32, LearningRecord>,
-    capsules: BTreeMap<Hash32, ModelCapsule>,
+    capsules: BTreeMap<Hash32, ModelCapsuleV2>,
 }
 
 fn insert_once<T>(map: &mut BTreeMap<Hash32, T>, id: Hash32, value: T) -> Result<(), SpeciesError> {
@@ -440,32 +421,21 @@ fn insert_once<T>(map: &mut BTreeMap<Hash32, T>, id: Hash32, value: T) -> Result
 }
 
 impl Registry {
-    pub fn register_artifact(&mut self, value: Artifact) -> Result<(), SpeciesError> {
-        value.validate_schema()?;
-        insert_once(&mut self.artifacts, value.artifact_id, value)
+    pub fn register_artifact(&mut self, value: ArtifactDescriptorV2) -> Result<(), SpeciesError> {
+        value.validate()?;
+        insert_once(&mut self.artifacts, value.descriptor_id, value)
     }
-    pub fn register_artifact_content(
-        &mut self,
-        value: Artifact,
-        payload: Vec<u8>,
-    ) -> Result<(), SpeciesError> {
-        value.verify_payload(&payload)?;
-        let id = value.artifact_id;
-        self.register_artifact(value)?;
-        self.artifact_payloads.insert(id, payload);
-        Ok(())
-    }
-    pub fn register_derivation(&mut self, value: DerivationEdge) -> Result<(), SpeciesError> {
+    pub fn register_derivation(&mut self, value: ArtifactDerivationV2) -> Result<(), SpeciesError> {
         value.validate()?;
         if value
             .parents
             .iter()
             .chain(std::iter::once(&value.output))
-            .any(|id| !self.artifact_payloads.contains_key(id))
+            .any(|id| !self.artifacts.contains_key(id))
         {
             return Err(SpeciesError::UnavailableArtifact);
         }
-        insert_once(&mut self.derivations, value.edge_id, value)
+        insert_once(&mut self.derivations, value.derivation_id, value)
     }
     pub fn register_numeric_profile(&mut self, value: NumericProfile) -> Result<(), SpeciesError> {
         insert_once(&mut self.numeric_profiles, value.profile_id, value)
@@ -514,51 +484,20 @@ impl Registry {
                     || value
                         .required_artifacts
                         .iter()
-                        .any(|id| !self.artifact_payloads.contains_key(id))))
+                        .any(|id| !self.artifacts.contains_key(id))))
         {
             return Err(SpeciesError::InvalidRevision);
         }
         insert_once(&mut self.revisions, value.revision_id, value)
     }
-    pub fn register_capsule(&mut self, value: ModelCapsule) -> Result<(), SpeciesError> {
+    pub fn register_capsule(&mut self, value: ModelCapsuleV2) -> Result<(), SpeciesError> {
         value.validate()?;
-        let revision = self
-            .revisions
-            .get(&value.revision_id)
-            .ok_or(SpeciesError::InvalidCapsule)?;
-        if revision.species_id != value.species_id
-            || !self
-                .numeric_profiles
-                .contains_key(&value.numeric_profile_id)
-            || !revision
-                .required_artifacts
-                .contains(&value.weight_manifest_root)
-            || !revision.required_artifacts.contains(&value.tokenizer_root)
-            || value
-                .parents
-                .iter()
-                .any(|id| !self.revisions.contains_key(id))
-            || self
-                .revisions
-                .get(&value.rollback_revision_id)
-                .is_none_or(|rollback| rollback.species_id != value.species_id)
-        {
-            return Err(SpeciesError::InvalidCapsule);
-        }
         insert_once(&mut self.capsules, value.capsule_id, value)
     }
 
     #[must_use]
-    pub fn capsule(&self, id: &Hash32) -> Option<&ModelCapsule> {
+    pub fn capsule(&self, id: &Hash32) -> Option<&ModelCapsuleV2> {
         self.capsules.get(id)
-    }
-
-    #[must_use]
-    pub fn capsules_for_species(&self, species_id: &Hash32) -> Vec<&ModelCapsule> {
-        self.capsules
-            .values()
-            .filter(|capsule| &capsule.species_id == species_id)
-            .collect()
     }
     pub fn register_claim(&mut self, value: EquivalenceClaim) -> Result<(), SpeciesError> {
         if !self.revisions.contains_key(&value.candidate)
@@ -596,8 +535,8 @@ impl Registry {
                 .base_members
                 .iter()
                 .any(|id| !self.revisions.contains_key(id))
-            || !self.artifact_payloads.contains_key(&value.payload)
-            || !self.artifact_payloads.contains_key(&value.tokenizer)
+            || !self.artifacts.contains_key(&value.payload)
+            || !self.artifacts.contains_key(&value.tokenizer)
         {
             return Err(SpeciesError::UnavailableArtifact);
         }
@@ -620,8 +559,8 @@ impl Registry {
             .base_members
             .iter()
             .any(|id| !self.revisions.contains_key(id))
-            || !self.artifact_payloads.contains_key(&value.payload)
-            || !self.artifact_payloads.contains_key(&value.tokenizer)
+            || !self.artifacts.contains_key(&value.payload)
+            || !self.artifacts.contains_key(&value.tokenizer)
         {
             return Err(SpeciesError::UnavailableArtifact);
         }
@@ -674,7 +613,7 @@ impl Registry {
                     && revision
                         .required_artifacts
                         .iter()
-                        .all(|id| self.artifact_payloads.contains_key(id))
+                        .all(|id| self.artifacts.contains_key(id))
             })
             .map(|revision| revision.revision_id)
             .collect::<Vec<_>>();
@@ -743,7 +682,7 @@ impl Registry {
             let available = revision
                 .required_artifacts
                 .iter()
-                .all(|artifact| self.artifact_payloads.contains_key(artifact));
+                .all(|artifact| self.artifacts.contains_key(artifact));
             if revision.species_id == species_id
                 && revision.lifecycle == RevisionLifecycle::Admitted
                 && profile_matches
@@ -792,6 +731,7 @@ impl Registry {
 mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
+    use noos_crypto::Keypair;
     fn h(n: u8) -> Hash32 {
         [n; 32]
     }
@@ -948,35 +888,39 @@ mod tests {
         );
     }
 
-    fn content_artifact(payload: &[u8], kind: ArtifactKind) -> Artifact {
-        let mut artifact = Artifact {
-            artifact_id: [0; 32],
+    fn content_artifact(kind: ArtifactKind) -> ArtifactDescriptorV2 {
+        let key = Keypair::from_seed([77; 32]);
+        let mut artifact = ArtifactDescriptorV2 {
+            version: artifact::ARTIFACT_DESCRIPTOR_VERSION,
             kind,
             media_type: "application/noos-test".into(),
-            byte_length: u64::try_from(payload.len()).unwrap(),
-            chunking_profile: h(51),
-            availability_root: h(52),
-            encoding: h(53),
-            numeric_profile: Some(h(1)),
-            encryption_profile: None,
-            rights_root: h(54),
-            creator: h(55),
-            created_at: 1,
-            annotations_root: h(56),
+            byte_length: artifact::BONSAI_SOURCE_BYTES,
+            payload_root: h(51),
+            source_sha256: h(52),
+            manifest_id: h(53),
+            erasure_profile_id: h(54),
+            stripe_count: artifact::BONSAI_STRIPE_COUNT as u32,
+            license_root: h(55),
+            rights_root: h(56),
+            provenance_root: h(57),
+            publisher_keys: vec![key.public_key().into_bytes()],
+            publisher_threshold: 1,
+            published_height: 1,
+            annotations_root: h(58),
+            descriptor_id: [0; 32],
+            signatures: Vec::new(),
         };
-        artifact.artifact_id = artifact.derived_id(payload);
+        artifact.finalize_id().unwrap();
+        artifact.add_signature(&key).unwrap();
         artifact
     }
 
     #[test]
     fn claim_species_dual_path_view_identity_preserves_direction_and_scope() {
         let mut registry = registry();
-        let payload = b"promoted member";
-        let artifact = content_artifact(payload, ArtifactKind::WeightShard);
-        let artifact_id = artifact.artifact_id;
-        registry
-            .register_artifact_content(artifact, payload.to_vec())
-            .unwrap();
+        let artifact = content_artifact(ArtifactKind::WeightShard);
+        let artifact_id = artifact.descriptor_id;
+        registry.register_artifact(artifact).unwrap();
         for id in [40, 41] {
             let mut value = revision(id);
             value.required_artifacts = vec![artifact_id];

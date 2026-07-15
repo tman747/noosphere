@@ -3,6 +3,37 @@
   "schema_version": "1.0.0",
   "architecture": "docs/world-wide-mind-architecture-and-rd-plan.md",
   "controls_enabled": false,
+  "applicability_profiles": [
+    {
+      "profile_id": "BONSAI_PUBLIC_TEXT_V1",
+      "description": "Exact Bonsai-27B-Q1_0 text-only public local and remote execution; no private, proven, training, retrieval, deterministic-refereed, or local-browser claim.",
+      "claim_dispositions": {
+        "E-WWM-01": "DISABLED_NOT_CLAIMED",
+        "E-WWM-02": "MANDATORY",
+        "E-WWM-03": "MANDATORY",
+        "E-WWM-04": "MANDATORY",
+        "E-WWM-05": "DISABLED_NOT_CLAIMED",
+        "E-WWM-06": "DISABLED_NOT_CLAIMED",
+        "E-WWM-07": "DISABLED_NOT_CLAIMED",
+        "E-WWM-08": "DISABLED_NOT_CLAIMED",
+        "E-WWM-09": "DISABLED_NOT_CLAIMED",
+        "E-WWM-10": "MANDATORY",
+        "E-WWM-11": "DISABLED_NOT_CLAIMED",
+        "E-WWM-12": "DISABLED_NOT_CLAIMED",
+        "E-WWM-13": "MANDATORY",
+        "E-WWM-14": "MANDATORY",
+        "E-WWM-15": "MANDATORY",
+        "E-WWM-16": "MANDATORY",
+        "E-WWM-17": "DISABLED_NOT_CLAIMED",
+        "E-WWM-18": "MANDATORY",
+        "E-WWM-19": "DISABLED_NOT_CLAIMED",
+        "E-WWM-20": "MANDATORY",
+        "E-WWM-21": "DISABLED_NOT_CLAIMED",
+        "E-WWM-22": "DISABLED_NOT_CLAIMED",
+        "E-WWM-23": "DISABLED_NOT_CLAIMED"
+      }
+    }
+  ],
   "claims": [
     {
       "claim_id": "E-WWM-01",
@@ -399,6 +430,24 @@
       "owner_blockers": ["Memorization ceilings and privacy evaluator unresolved."],
       "external_blockers": ["Independent extraction and privacy evaluation are required."],
       "canonical_ref": "docs/world-wide-mind-architecture-and-rd-plan.md#e-wwm-22--memorization-and-training-data-privacy"
+    },
+    {
+      "claim_id": "E-WWM-23",
+      "mechanism_id": "Opt-in web capacity, churn, consent, and repair",
+      "implementation_status": "PARTIAL",
+      "evidence_status": "MEASURED_LAB",
+      "enabled": false,
+      "protected_property": "Authorized static hosts and explicitly opted-in browser caches can contribute bounded off-chain storage and repair capacity without becoming production custodians or dependencies of consensus or inference correctness.",
+      "adversary": "Covert enrollment, misleading consent, quota or egress bypass, churn, provider or control-cluster concentration, corrupt or replayed shares, SSRF and redirects, incomplete deletion, coordinator outages, false availability claims, and base-chain interference.",
+      "dependencies": ["E-WWM-03", "E-WWM-15"],
+      "metric": "Thirty-day authorized-origin coverage, complete browser/device/storage cohort matrix, consent and deletion outcomes, observed churn and restore availability, canonical share rejection and reconstruction, concentration, bounded coordinator load, and base-chain p95 impact.",
+      "pass_threshold": "A real 30-day pilot has at least 30 authorized HTTPS origins across 5 providers, 3 regions, and independently bounded control clusters; three copies of every 5,448 coordinate; at least 300 explicit opt-ins covering every Chromium/Firefox/WebKit by desktop/mobile by OPFS/IndexedDB cohort; zero pre-opt-in activity, quota or egress overrun, incomplete app-owned deletion, invalid share admission, production custody effect, or false claim; exact canonical reconstruction after the registered outage and churn; bounded million-session synthetic load; all registered drills and reviews pass; and base-chain p95 degradation remains below 5%.",
+      "kill_threshold": "Any covert or misleading participation, unauthorized hosting, incomplete deletion, quota bypass, hidden work, cross-site identity, invalid admitted share, reconstruction failure, false production claim, unavailable model remaining schedulable, unbounded state or queue, coordinator correctness dependency, base-chain p95 degradation at or above 5%, failed legal/privacy/accessibility/security review, or use of deterministic laboratory evidence as real-pilot promotion evidence.",
+      "command": "python tools/gates/run_wwm_claim.py --claim E-WWM-23",
+      "rollback": "Expire web assignments and hosts, retain browser copies only as voluntary personal local caches, preserve production custody and rewards as disabled, and keep the immutable failure evidence.",
+      "owner_blockers": ["The required real 30-day public pilot and independent promotion evidence have not completed."],
+      "external_blockers": ["Independent authorized origins, browser cohorts, reproducibility attestations, and legal/privacy/accessibility/security reviewers are required."],
+      "canonical_ref": "docs/world-wide-mind-architecture-and-rd-plan.md#e-wwm-23--opt-in-web-capacity-churn-consent-and-repair"
     }
   ]
 }

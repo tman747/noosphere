@@ -28,6 +28,7 @@ pub mod issuance;
 pub mod objects;
 pub mod smt;
 pub mod state;
+pub mod wwm;
 
 #[doc(hidden)]
 pub mod vector_gen;

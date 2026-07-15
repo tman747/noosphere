@@ -88,7 +88,8 @@ impl TransactionSigner {
         if chain_id.len() != 64 || genesis_hash.len() != 64 || account_id.len() != 64 {
             return Err(OperatorError::Configuration);
         }
-        let token_value = fs::read_to_string(token_file).map_err(|_| OperatorError::Configuration)?;
+        let token_value =
+            fs::read_to_string(token_file).map_err(|_| OperatorError::Configuration)?;
         let token_json: Value =
             serde_json::from_str(&token_value).map_err(|_| OperatorError::Configuration)?;
         let token = token_json
@@ -107,13 +108,8 @@ impl TransactionSigner {
         {
             return Err(OperatorError::Configuration);
         }
-        let key = noos_cli::keygen(
-            &seed,
-            "sign",
-            derivation_account,
-            derivation_index,
-        )
-        .map_err(|_| OperatorError::Wallet)?;
+        let key = noos_cli::keygen(&seed, "sign", derivation_account, derivation_index)
+            .map_err(|_| OperatorError::Wallet)?;
         if key.get("verifying_key").and_then(Value::as_str) != Some(account_id.as_str()) {
             return Err(OperatorError::Configuration);
         }
@@ -272,17 +268,25 @@ pub fn backstop_candidates(
 ) -> Result<Vec<BackstopCandidate>, OperatorError> {
     let mut candidates = Vec::new();
     for position in positions.iter().filter(|position| position.debt > 0) {
-        let Some(market) = markets.iter().find(|market| market.market_id == position.market_id)
+        let Some(market) = markets
+            .iter()
+            .find(|market| market.market_id == position.market_id)
         else {
             continue;
         };
-        let Some(reserve) = safety.iter().find(|item| item.market_id == position.market_id) else {
+        let Some(reserve) = safety
+            .iter()
+            .find(|item| item.market_id == position.market_id)
+        else {
             continue;
         };
         if reserve.stable_reserve < position.debt {
             continue;
         }
-        let Some(feed) = feeds.iter().find(|feed| feed.feed_id == market.oracle_feed_id) else {
+        let Some(feed) = feeds
+            .iter()
+            .find(|feed| feed.feed_id == market.oracle_feed_id)
+        else {
             continue;
         };
         let Some(price) = effective_price(height, feed, reports)? else {
@@ -358,7 +362,10 @@ pub fn effective_price(
     Ok(Some(prices[prices.len() / 2]))
 }
 
-pub fn median_source_price(mut prices: Vec<u128>, maximum_spread_bps: u16) -> Result<u128, OperatorError> {
+pub fn median_source_price(
+    mut prices: Vec<u128>,
+    maximum_spread_bps: u16,
+) -> Result<u128, OperatorError> {
     if prices.len() < 5 || prices.contains(&0) {
         return Err(OperatorError::Malformed);
     }
@@ -442,8 +449,8 @@ mod tests {
                 observed_height: 100,
             })
             .collect::<Vec<_>>();
-        let result = backstop_candidates(100, &markets, &positions, &safety, &[feed], &reports)
-            .unwrap();
+        let result =
+            backstop_candidates(100, &markets, &positions, &safety, &[feed], &reports).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].owner, "44".repeat(32));
     }

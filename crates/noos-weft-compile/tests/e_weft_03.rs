@@ -103,9 +103,7 @@ fn honest_32_cubed_admits_on_both_paths() {
         Ok(())
     );
     assert_eq!(
-        admit_span_certificate_freivalds(
-            &x.cert, &x.a, &x.b, &x.c, &x.c8, x.payout, CHALLENGE,
-        ),
+        admit_span_certificate_freivalds(&x.cert, &x.a, &x.b, &x.c, &x.c8, x.payout, CHALLENGE,),
         Ok(())
     );
 }
@@ -118,9 +116,7 @@ fn honest_64_cubed_admits_on_both_paths() {
         Ok(())
     );
     assert_eq!(
-        admit_span_certificate_freivalds(
-            &x.cert, &x.a, &x.b, &x.c, &x.c8, x.payout, CHALLENGE,
-        ),
+        admit_span_certificate_freivalds(&x.cert, &x.a, &x.b, &x.c, &x.c8, x.payout, CHALLENGE,),
         Ok(())
     );
 }
@@ -362,9 +358,7 @@ fn forged_self_consistent_transcript_dies_on_the_span_relation() {
         "re-derivation path must reject the forgery when recomputing the true product"
     );
     assert_eq!(
-        admit_span_certificate_freivalds(
-            &forged, &x.a, &x.b, &c, &c8, x.payout, CHALLENGE,
-        ),
+        admit_span_certificate_freivalds(&forged, &x.a, &x.b, &c, &c8, x.payout, CHALLENGE,),
         Err(CertificateError::Relation),
         "the Freivalds relation is the only gate left standing — it must hold"
     );
@@ -399,9 +393,7 @@ fn attacker_selected_zero_challenge_rejects_before_relation_check() {
         "mutation no longer reproduces the zero-weight relation bypass"
     );
     assert_eq!(
-        admit_span_certificate_freivalds(
-            &forged, &x.a, &x.b, &c, &c8, x.payout, CHALLENGE,
-        ),
+        admit_span_certificate_freivalds(&forged, &x.a, &x.b, &c, &c8, x.payout, CHALLENGE,),
         Err(CertificateError::Challenge),
         "certificate-selected challenge bypassed the post-commit beacon binding"
     );
@@ -506,9 +498,7 @@ fn shape_gate_rejects_dimension_forgery() {
     let mut cert = x.cert.clone();
     cert.m = 16;
     assert!(matches!(
-        admit_span_certificate_freivalds(
-            &cert, &x.a, &x.b, &x.c, &x.c8, x.payout, CHALLENGE,
-        ),
+        admit_span_certificate_freivalds(&cert, &x.a, &x.b, &x.c, &x.c8, x.payout, CHALLENGE,),
         Err(CertificateError::Shape)
     ));
     assert!(matches!(

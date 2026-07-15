@@ -2,6 +2,8 @@ mod backend;
 mod chain;
 pub mod config;
 mod store;
+pub mod v2;
+pub mod web_capacity;
 
 use crate::{
     FeeSchedule, Gateway, GatewayError, GatewayManifest, PublicQueryRequest, PublicQuote,

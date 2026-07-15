@@ -1,6 +1,6 @@
 //! The transport node: libp2p QUIC swarm, chain-identity handshake driver,
-//! the eight protocol substream servers, per-peer outbound workers, and the
-//! anti-DoS enforcement point (p2p-v1.md §§5–8).
+//! the nine application-protocol substream servers, per-peer outbound workers,
+//! and the anti-DoS enforcement point (p2p-v1.md §§5–8; v2 light sync).
 //!
 //! Architecture: one swarm task owns the [`libp2p::Swarm`]; one accept task
 //! per registered protocol serves inbound substreams; one worker task per
@@ -24,10 +24,11 @@ use tokio::sync::{mpsc, oneshot, watch, Notify};
 use crate::backoff::ReconnectBackoff;
 use crate::envelope::{
     message_digest, BodyReplyV1, BodyRequestV1, Bounded, BoundedList, ChainAttestationV1, Flag,
-    HandshakeMsgV1, HeaderMsgV1, HeaderReplyV1, LoomReceiptPushV1, Protocol, PushReplyV1,
-    RangeReplyV1, RangeRequestV1, RejectCode, ShardReplyV1, ShardRequestV1, SnapshotChunkRequestV1,
-    SnapshotReplyV1, TxPushV1, VotePushV1, APP_PROTOCOLS, MAX_RANGE_HEADERS,
-    RANGE_REPLY_BYTE_BUDGET,
+    HandshakeMsgV1, HeaderMsgV1, HeaderReplyV1, LightUpdateItemV1, LightUpdateReplyV1,
+    LightUpdateRequestV1, LoomReceiptPushV1, Protocol, PushReplyV1, RangeReplyV1, RangeRequestV1,
+    RejectCode, ShardReplyV1, ShardRequestV1, SnapshotChunkRequestV1, SnapshotReplyV1, TxPushV1,
+    VotePushV1, APP_PROTOCOLS, MAX_LIGHT_UPDATE_ITEMS, MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES,
+    MAX_RANGE_HEADERS, RANGE_REPLY_BYTE_BUDGET,
 };
 use crate::frame::{
     read_frame, write_frame, FrameError, MAX_FRAME_BYTES, MAX_HANDSHAKE_FRAME_BYTES,
@@ -104,6 +105,11 @@ pub trait ProtocolStore: Send + Sync + 'static {
     }
     /// Ascending encoded headers from `start_height`, plus a `more` flag.
     fn header_range(&self, _start_height: u64, _max_headers: u32) -> (Vec<Vec<u8>>, bool) {
+        (Vec::new(), false)
+    }
+    /// Ascending finalized light updates from `start_height`, plus whether a
+    /// later height is available. Items are context-free verified by callers.
+    fn light_updates(&self, _start_height: u64, _max_items: u32) -> (Vec<LightUpdateItemV1>, bool) {
         (Vec::new(), false)
     }
     /// `(total_chunks, chunk_bytes)` for a finalized snapshot root.
@@ -218,7 +224,7 @@ struct PeerEntry {
     outbox: Arc<Mutex<Outbox>>,
     notify: Arc<Notify>,
     score: u32,
-    limiters: [TokenBucket; 8],
+    limiters: [TokenBucket; 9],
     attestation: Option<ChainAttestationV1>,
     connected: bool,
     dial_addr: Option<Multiaddr>,
@@ -324,7 +330,7 @@ impl P2pNode {
         // Register every accepted protocol BEFORE listening; anything else —
         // any unknown /noos/ string included — is refused at negotiation by
         // libp2p (identity-v1.md §3 closed-list law).
-        let mut incoming = Vec::with_capacity(9);
+        let mut incoming = Vec::with_capacity(10);
         for protocol in core::iter::once(Protocol::Handshake).chain(APP_PROTOCOLS) {
             let streams = control
                 .clone()
@@ -502,6 +508,39 @@ impl P2pHandle {
         async move { decode_reply::<RangeReplyV1>(rx.await) }
     }
 
+    /// Request finalized light-client history (priority lane). The request and
+    /// reply bind both chain and genesis; transport bytes are never trusted as
+    /// a finality decision.
+    pub fn request_light_updates(
+        &self,
+        peer: PeerId,
+        start_height: u64,
+        max_items: u32,
+    ) -> impl Future<Output = Result<LightUpdateReplyV1, SendError>> {
+        let chain_id = self.chain_id();
+        let genesis_hash = self.shared.config.identity.genesis_hash;
+        let request =
+            LightUpdateRequestV1::checked(chain_id, genesis_hash, start_height, max_items);
+        let rx = request
+            .ok()
+            .map(|env| self.enqueue(peer, Protocol::SyncLightUpdate, env.encode_canonical()));
+        async move {
+            let Some(rx) = rx else {
+                return Err(SendError::BadReply);
+            };
+            let reply = decode_reply::<LightUpdateReplyV1>(rx.await)?;
+            if reply.chain_id != chain_id
+                || reply.genesis_hash != genesis_hash
+                || reply.requested_start != start_height
+                || reply.items.0.len() > max_items as usize
+                || reply.encode_canonical().len() > MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES
+            {
+                return Err(SendError::BadReply);
+            }
+            Ok(reply)
+        }
+    }
+
     /// Request one snapshot chunk (priority lane).
     pub fn request_snapshot_chunk(
         &self,
@@ -625,7 +664,7 @@ fn ensure_peer(shared: &Arc<Shared>, peer: PeerId) {
         shared.config.outbox_capacity_per_lane,
     )));
     let notify = Arc::new(Notify::new());
-    let limiters: [TokenBucket; 8] = core::array::from_fn(|i| {
+    let limiters: [TokenBucket; 9] = core::array::from_fn(|i| {
         let protocol = APP_PROTOCOLS[i];
         shared
             .config
@@ -1219,6 +1258,49 @@ fn dispatch(
             };
             // Never emit an undeliverable oversize frame (Ascent W7 law).
             reply.fit_to_budget(RANGE_REPLY_BYTE_BUDGET);
+            Ok(reply.encode_canonical())
+        }
+        Protocol::SyncLightUpdate => {
+            let req = LightUpdateRequestV1::decode_canonical(payload)
+                .map_err(|_| Violation::MalformedEnvelope)?;
+            check_chain(shared, &req.chain_id)?;
+            if req.genesis_hash != shared.config.identity.genesis_hash {
+                return Err(Violation::WrongChainEnvelope);
+            }
+            let (source_items, source_more) =
+                shared.store.light_updates(req.start_height, req.max_items);
+            let mut items = Vec::with_capacity(
+                source_items
+                    .len()
+                    .min(req.max_items as usize)
+                    .min(MAX_LIGHT_UPDATE_ITEMS as usize),
+            );
+            let mut truncated = source_items.len() > req.max_items as usize;
+            for item in source_items.into_iter().take(req.max_items as usize) {
+                let expected_height = req
+                    .start_height
+                    .checked_add(items.len() as u64)
+                    .ok_or(Violation::MalformedEnvelope)?;
+                if item.height != expected_height || item.verify_bounds().is_err() {
+                    truncated = true;
+                    break;
+                }
+                items.push(item);
+            }
+            let next_height = items
+                .last()
+                .map_or(req.start_height, |item| item.height.saturating_add(1));
+            let mut reply = LightUpdateReplyV1 {
+                chain_id: shared.config.identity.chain_id,
+                genesis_hash: shared.config.identity.genesis_hash,
+                requested_start: req.start_height,
+                items: BoundedList(items),
+                next_height,
+                more: Flag((source_more || truncated) && next_height > req.start_height),
+            };
+            reply
+                .fit_to_budget(MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES)
+                .map_err(|_| Violation::MalformedEnvelope)?;
             Ok(reply.encode_canonical())
         }
         Protocol::SyncSnapshot => {

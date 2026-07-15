@@ -10,7 +10,12 @@
 //! POST /submit_tx   {"tx":"<hex>","witnesses":"<hex>"} → txid;
 //!                   observer mode → 409 feature_disabled with the
 //!                   mechanism id, never empty success
+//! GET  /model-resolution/<alias>
+//!                   finalized 17-leaf WWM graph plus canonical proof bytes;
+//!                   full model weights are never returned or stored on chain
 //! GET  /block/<height|hash-hex>
+//! GET  /wwm-record/<job|receipt|settlement>/<id>
+//!                   one canonical lifecycle record and its finalized object proof
 //! GET  /blocks/<start-height>/<limit> (authenticated, limit 1..64)
 //! GET  /receipt/<txid-hex>
 //! GET  /assets      fixed-supply user asset registry
@@ -38,6 +43,14 @@ use crate::metrics::Metrics;
 use crate::supervisor::{BlockId, ConsensusMsg, StatusSnapshot};
 use crate::view::{TxStatus, ViewLookup};
 use crate::Hash32;
+use noos_braid::EPOCH_LENGTH;
+use noos_codec::{NoosDecode, NoosEncode};
+use noos_lumen::objects::BoundedBytes;
+use noos_lumen::wwm::{
+    carrier_len_valid, ResolutionSelectorKind, ResolutionSelectorV1, ResolutionValueV1,
+    WwmControlMode, WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmSettlementV1,
+    MAX_TX_WITNESS_BYTES,
+};
 
 /// RPC configuration.
 #[derive(Debug, Clone)]
@@ -216,6 +229,12 @@ fn handle_connection(
         ("GET", "/status") => status_route(consensus_tx),
         ("POST", "/submit_tx") => submit_route(cfg, consensus_tx, &body),
         ("POST", "/simulate_tx") => simulate_route(consensus_tx, &body),
+        _ if method == "GET" && path.starts_with("/model-resolution/") => {
+            model_resolution_route(consensus_tx, &path["/model-resolution/".len()..])
+        }
+        _ if method == "GET" && path.starts_with("/wwm-record/") => {
+            wwm_record_route(consensus_tx, &path["/wwm-record/".len()..])
+        }
         _ if method == "GET" && path.starts_with("/blocks/") => {
             blocks_route(consensus_tx, &path["/blocks/".len()..])
         }
@@ -311,6 +330,338 @@ fn status_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
     http("200 OK", "application/json", &body)
 }
 
+fn model_resolution_route(consensus_tx: &SyncSender<ConsensusMsg>, alias: &str) -> String {
+    if alias.is_empty()
+        || alias.len() > 64
+        || !alias
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+    {
+        return json_error(
+            "400 Bad Request",
+            "invalid_selector",
+            "alias must contain 1..64 ASCII letters, digits, '-' or '_'",
+        );
+    }
+    let Some(value) = BoundedBytes::new(alias.as_bytes().to_vec()) else {
+        return json_error(
+            "400 Bad Request",
+            "invalid_selector",
+            "alias exceeds the canonical bound",
+        );
+    };
+    let selector = ResolutionSelectorV1 {
+        kind: ResolutionSelectorKind::Alias,
+        value,
+    };
+    let result = round_trip(consensus_tx, |reply| ConsensusMsg::ResolveModel {
+        selector: selector.clone(),
+        freshness_bound: EPOCH_LENGTH.saturating_mul(2),
+        reply,
+    });
+    let response = match result {
+        Some(Ok(response)) => response,
+        Some(Err(error)) => {
+            let body = serde_json::json!({
+                "error": {
+                    "code": "finalized_resolution_unavailable",
+                    "detail": error,
+                }
+            })
+            .to_string();
+            return http("503 Service Unavailable", "application/json", &body);
+        }
+        None => {
+            return json_error(
+                "503 Service Unavailable",
+                "consensus_unavailable",
+                "no model-resolution reply",
+            )
+        }
+    };
+    let terminal = match crate::resolver::FinalizedResolutionTerminalV1::decode_canonical(
+        response.terminal_material.as_slice(),
+    ) {
+        Ok(terminal) => terminal,
+        Err(_) => {
+            return json_error(
+                "500 Internal Server Error",
+                "invalid_local_resolution",
+                "terminal material failed canonical decoding",
+            )
+        }
+    };
+    let trusted = crate::resolver::TrustedFinalizedCheckpointV1 {
+        checkpoint: terminal.checkpoint,
+        height: response.resolution_height,
+    };
+    let verified = match crate::resolver::verify_finalized_model_resolution(
+        &response,
+        response.chain_id,
+        response.genesis_hash,
+        &selector,
+        trusted,
+        response.resolution_height,
+    ) {
+        Ok(verified) => verified,
+        Err(_) => {
+            return json_error(
+                "500 Internal Server Error",
+                "invalid_local_resolution",
+                "the local full-node verifier rejected its resolution graph",
+            )
+        }
+    };
+    let (
+        Some(config),
+        Some(capsule),
+        Some(artifact),
+        Some(policy),
+        Some(certificate),
+        Some(execution),
+        Some(query),
+        Some(fund),
+        Some(service),
+        Some(executor_set),
+        Some(custodian_set),
+    ) = (
+        verified.config,
+        verified.capsule,
+        verified.artifact,
+        verified.availability_policy,
+        verified.availability_certificate,
+        verified.execution_profile,
+        verified.query_policy,
+        verified.fund_profile,
+        verified.service_directory,
+        verified.executor_set,
+        verified.custodian_set,
+    )
+    else {
+        return json_error(
+            "404 Not Found",
+            "model_not_active",
+            "selector does not resolve an active model graph",
+        );
+    };
+    const BONSAI_SHA256: &str = "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0";
+    const BONSAI_MANIFEST: &str =
+        "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7";
+    if alias != "bonsai-q1"
+        || artifact.source_bytes != 3_803_452_480
+        || hex(&artifact.published_sha256) != BONSAI_SHA256
+        || hex(&artifact.manifest_root) != BONSAI_MANIFEST
+        || verified.control.mode != WwmControlMode::Testnet
+    {
+        return json_error(
+            "409 Conflict",
+            "wrong_bonsai_identity",
+            "active graph does not match the exact Bonsai testnet identity",
+        );
+    }
+    let endpoint = service
+        .endpoint_records
+        .as_slice()
+        .first()
+        .map(|value| String::from_utf8_lossy(value.as_slice()).into_owned())
+        .unwrap_or_default();
+    let active = serde_json::json!({
+        "model_name": "Bonsai-27B-Q1_0.gguf",
+        "capsule_id": hex(&capsule.capsule_id),
+        "artifact_id": hex(&artifact.artifact_id),
+        "artifact_bytes": artifact.source_bytes,
+        "artifact_sha256": BONSAI_SHA256,
+        "payload_root": hex(&artifact.payload_root),
+        "manifest_root": BONSAI_MANIFEST,
+        "codec_profile_id": artifact.codec_profile_id,
+        "stripe_count": artifact.stripe_count,
+        "availability_policy_id": hex(&policy.policy_id),
+        "availability_certificate_id": hex(&certificate.certificate_id),
+        "certificate_issued_height": certificate.issued_height,
+        "certificate_valid_until": certificate.valid_until,
+        "certificate_availability_state": certificate.availability_state,
+        "certificate_assignment_root": hex(&certificate.assignment_root),
+        "certificate_result_root": hex(&certificate.result_root),
+        "custodian_set_id": hex(&custodian_set.set_id),
+        "custodian_set_root": hex(&noos_lumen::domain_hash(
+            "NOOS/WWM/CUSTODIAN-CAPABILITY-SET-ROOT/V1",
+            &[&custodian_set.encode_canonical()],
+        )),
+        "custodian_set_epoch": custodian_set.epoch,
+        "executor_set_id": hex(&executor_set.set_id),
+        "executor_set_root": hex(&noos_lumen::domain_hash(
+            "NOOS/WWM/CAPABILITY-SET-ROOT/V1",
+            &[&executor_set.encode_canonical()],
+        )),
+        "executor_set_epoch": executor_set.epoch,
+        "selected_verifiers": certificate.selected_verifiers.iter().map(|id| hex(id)).collect::<Vec<_>>(),
+        "certificate_signer_ids": certificate.signer_ids.iter().map(|id| hex(id)).collect::<Vec<_>>(),
+        "custodian_profiles": custodian_set.entries.iter().map(|profile| serde_json::json!({
+            "profile_id": hex(&profile.profile_id),
+            "endpoint_root": hex(&profile.endpoint_root),
+            "status": profile.status as u8,
+        })).collect::<Vec<_>>(),
+        "availability_claim": "TESTNET_FIXTURE_ONLY",
+        "runtime_root": hex(&capsule.runtime_root),
+        "sbom_root": hex(&capsule.sbom_root),
+        "fund_profile_id": hex(&fund.profile_id),
+        "executor_profile_ids": executor_set.entries.iter().map(|profile| hex(&profile.profile_id)).collect::<Vec<_>>(),
+        "build_root": hex(&capsule.build_root),
+        "tokenizer_root": hex(&capsule.tokenizer_root),
+        "template_root": hex(&capsule.template_root),
+        "execution_profile_id": hex(&execution.profile_id),
+        "query_policy_id": hex(&query.policy_id),
+        "authorized_config_id": hex(&config.config_id),
+        "service_endpoint": endpoint,
+    });
+    let body = serde_json::json!({
+        "schema": "noos/finalized-model-resolution/v1",
+        "registration_state": "ACTIVE_TESTNET",
+        "production_effect": "NONE",
+        "trust_scope": "LOCAL_FULL_NODE_FINALIZED_STATE",
+        "proofs_verified": true,
+        "weights_on_chain": false,
+        "chain_id": hex(&response.chain_id),
+        "genesis_hash": hex(&response.genesis_hash),
+        "finalized_height": response.resolution_height,
+        "finalized_hash": hex(&terminal.checkpoint.checkpoint_hash),
+        "objects_root": hex(&terminal.header.objects_root),
+        "selector": alias,
+        "control_mode": "TESTNET",
+        "proof_count": response.proofs.len(),
+        "canonical_resolution_body_hex": hex(&response.encode_canonical()),
+        "finality_evidence_hex": hex(&terminal.finality.encode_canonical()),
+        "active": active,
+        "disclosure": "Finalized descriptor/capsule/policy/control/proofs are on chain. The 3.8 GB GGUF remains in local artifact storage. Fixture operators and signatures are not production custody evidence."
+    });
+    match serde_json::to_string(&body) {
+        Ok(body) => http("200 OK", "application/json", &body),
+        Err(_) => json_error(
+            "500 Internal Server Error",
+            "serialization_failed",
+            "model resolution serialization failed",
+        ),
+    }
+}
+
+fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> String {
+    let mut parts = raw.split('/');
+    let (Some(kind_raw), Some(id_raw), None) = (parts.next(), parts.next(), parts.next()) else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "expected /wwm-record/<job|receipt|settlement>/<hex32>",
+        );
+    };
+    let kind = match kind_raw {
+        "job" => WwmLeafKind::Job,
+        "receipt" => WwmLeafKind::Receipt,
+        "settlement" => WwmLeafKind::Settlement,
+        _ => {
+            return json_error(
+                "400 Bad Request",
+                "malformed",
+                "unknown WWM record kind",
+            )
+        }
+    };
+    let Some(id) = unhex32(id_raw) else {
+        return json_error("400 Bad Request", "malformed", "bad WWM record id");
+    };
+    let Some(result) = round_trip(consensus_tx, |reply| ConsensusMsg::GetWwmRecord {
+        kind,
+        id,
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "consensus task did not answer",
+        );
+    };
+    let Ok((height, finalized_hash, proof)) = result else {
+        return json_error(
+            "409 Conflict",
+            "finalized_state_unavailable",
+            "finalized WWM record lookup failed",
+        );
+    };
+    if !proof.verify()
+        || proof.state_key != noos_lumen::wwm::wwm_profile_key(kind, &id)
+    {
+        return json_error(
+            "500 Internal Server Error",
+            "invalid_local_proof",
+            "local finalized WWM record proof failed verification",
+        );
+    }
+    let ResolutionValueV1::Present(value) = &proof.value else {
+        return json_error("404 Not Found", "not_found", "WWM record is not finalized");
+    };
+    let record = match kind {
+        WwmLeafKind::Job => match WwmJobV1::decode_canonical(value.as_slice()) {
+            Ok(job) if job.job_id == id => serde_json::json!({
+                "job_id": hex(&job.job_id),
+                "capsule_id": hex(&job.capsule_id),
+                "execution_profile_id": hex(&job.execution_profile_id),
+                "availability_certificate_id": hex(&job.availability_certificate_id),
+                "fund_profile_id": hex(&job.fund_profile_id),
+                "deadline_height": job.deadline_height,
+            }),
+            _ => return json_error("500 Internal Server Error", "invalid_local_record", "job decode failed"),
+        },
+        WwmLeafKind::Receipt => match WwmReceiptV1::decode_canonical(value.as_slice()) {
+            Ok(receipt) if receipt.receipt_id == id => serde_json::json!({
+                "receipt_id": hex(&receipt.receipt_id),
+                "job_id": hex(&receipt.job_id),
+                "capsule_id": hex(&receipt.capsule_id),
+                "artifact_id": hex(&receipt.artifact_id),
+                "execution_profile_id": hex(&receipt.execution_profile_id),
+                "output_root": hex(&receipt.output_root),
+                "token_history_root": hex(&receipt.token_history_root),
+                "anchor_height": receipt.anchor_height,
+                "anchor_block": hex(&receipt.anchor_block),
+                "terminal_code": receipt.terminal_code as u8,
+            }),
+            _ => return json_error("500 Internal Server Error", "invalid_local_record", "receipt decode failed"),
+        },
+        WwmLeafKind::Settlement => {
+            match WwmSettlementV1::decode_canonical(value.as_slice()) {
+                Ok(settlement) if settlement.settlement_id == id => serde_json::json!({
+                    "settlement_id": hex(&settlement.settlement_id),
+                    "job_id": hex(&settlement.job_id),
+                    "receipt_id": hex(&settlement.receipt_id),
+                    "fund_profile_id": hex(&settlement.fund_profile_id),
+                    "settled_height": settlement.settled_height,
+                }),
+                _ => return json_error("500 Internal Server Error", "invalid_local_record", "settlement decode failed"),
+            }
+        }
+        _ => unreachable!("kind is closed above"),
+    };
+    let body = serde_json::json!({
+        "schema": "noos/finalized-wwm-record/v1",
+        "trust_scope": "LOCAL_FULL_NODE_FINALIZED_STATE",
+        "kind": kind_raw,
+        "id": id_raw,
+        "finalized_height": height,
+        "finalized_hash": hex(&finalized_hash),
+        "objects_root": hex(&proof.objects_root),
+        "canonical_record_hex": hex(value.as_slice()),
+        "proof_hex": hex(&proof.encode_canonical()),
+        "record": record,
+    });
+    match serde_json::to_string(&body) {
+        Ok(body) => http("200 OK", "application/json", &body),
+        Err(_) => json_error(
+            "500 Internal Server Error",
+            "serialization_failed",
+            "WWM record serialization failed",
+        ),
+    }
+}
+
+
 fn submit_route(cfg: &RpcConfig, consensus_tx: &SyncSender<ConsensusMsg>, body: &[u8]) -> String {
     if cfg.observer {
         return feature_disabled(
@@ -402,8 +753,18 @@ fn decode_envelope(body: &[u8]) -> Result<(Vec<u8>, Vec<u8>), ()> {
     let text = std::str::from_utf8(body).map_err(|_| ())?;
     let tx_hex = json_str_field(text, "tx").ok_or(())?;
     let witness_hex = json_str_field(text, "witnesses").ok_or(())?;
+    if tx_hex
+        .len()
+        .checked_add(witness_hex.len())
+        .is_none_or(|hex_len| hex_len > MAX_TX_WITNESS_BYTES.saturating_mul(2))
+    {
+        return Err(());
+    }
     let tx_bytes = unhex(&tx_hex).ok_or(())?;
     let witness_bytes = unhex(&witness_hex).ok_or(())?;
+    if !carrier_len_valid(tx_bytes.len(), witness_bytes.len()) {
+        return Err(());
+    }
     Ok((tx_bytes, witness_bytes))
 }
 

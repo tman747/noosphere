@@ -363,9 +363,7 @@ impl TeeFiberRegistry {
         }
         let verifier_family = verifier.family_id();
         if verifier_family == [0; 32]
-            || !policy
-                .allowed_verifier_families
-                .contains(&verifier_family)
+            || !policy.allowed_verifier_families.contains(&verifier_family)
         {
             return Err(TeeError::VendorPolicy);
         }
@@ -648,7 +646,9 @@ mod tests {
         let untrusted_job = job(2, 2);
         let untrusted = attestation(&untrusted_job, 21, 1);
         let mut untrusted_registry = TeeFiberRegistry::default();
-        untrusted_registry.activate_local_precursor(policy()).unwrap();
+        untrusted_registry
+            .activate_local_precursor(policy())
+            .unwrap();
         assert_eq!(
             untrusted_registry.verify_and_record(
                 &untrusted_job,
@@ -907,11 +907,7 @@ mod tests {
             Err(TeeError::ProfileDisabled)
         );
         assert_eq!(
-            registry.disable_private_profile(
-                113,
-                h(56),
-                RollbackDisposition::WaitForPrivateProof
-            ),
+            registry.disable_private_profile(113, h(56), RollbackDisposition::WaitForPrivateProof),
             Err(TeeError::AlreadyDisabled)
         );
     }

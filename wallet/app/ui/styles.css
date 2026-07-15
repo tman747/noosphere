@@ -75,3 +75,35 @@ output.ok { border-left: 3px solid var(--ok); }
 output.err { border-left: 3px solid var(--err); }
 output.pending { border-left: 3px solid var(--accent); color: var(--muted); }
 footer p { font-size: 0.8rem; }
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 1rem;
+}
+button:hover:not(:disabled) { filter: brightness(1.08); }
+code, output, input { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 40rem) {
+  body { padding: 1rem; }
+  .field-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 20rem) {
+  body { padding: 0.75rem; }
+  section { padding: 0.875rem; }
+  button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  section, input, select, textarea, output { border: 1px solid CanvasText; }
+  output.ok, output.err, output.pending { border-left-width: 0.25rem; }
+}

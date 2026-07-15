@@ -37,6 +37,7 @@ use noos_lumen::engine::AuthVerifier;
 use noos_lumen::fees::{self, Usage};
 use noos_lumen::objects::{txid as compute_txid, ActionV1, TransactionV1, TransactionWitnessesV1};
 use noos_lumen::state::{LumenLedger, NOOS_ASSET};
+use noos_lumen::wwm::{carrier_len_valid, MAX_TX_WITNESS_BYTES};
 
 use crate::auth::NodeAuthVerifier;
 use crate::Hash32;
@@ -64,7 +65,7 @@ impl Default for MempoolConfig {
         MempoolConfig {
             max_count: 4096,
             max_bytes: 8 * 1024 * 1024,
-            max_tx_bytes: 128 * 1024,
+            max_tx_bytes: MAX_TX_WITNESS_BYTES,
             per_source_pending: 256,
             per_account_pending: 64,
             min_fee_micro: 1,
@@ -250,8 +251,13 @@ impl Mempool {
         ledger: &LumenLedger,
     ) -> Result<Hash32, AdmitError> {
         // 1. size caps.
-        let encoded_len = tx_bytes.len().saturating_add(wit_bytes.len());
-        if encoded_len > self.cfg.max_tx_bytes {
+        let encoded_len = tx_bytes
+            .len()
+            .checked_add(wit_bytes.len())
+            .ok_or(AdmitError::Oversized)?;
+        if !carrier_len_valid(tx_bytes.len(), wit_bytes.len())
+            || encoded_len > self.cfg.max_tx_bytes
+        {
             return Err(AdmitError::Oversized);
         }
 

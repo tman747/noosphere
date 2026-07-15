@@ -15,6 +15,8 @@
 #![forbid(unsafe_code)]
 mod invitation;
 mod manifest;
+pub mod wwm;
+pub mod wwm_client;
 
 pub use invitation::invitation_verify;
 pub use manifest::manifest_verify;
@@ -28,6 +30,11 @@ use noos_lumen::objects::{
     txid as lumen_txid, witness_root, AccessEntry, ActionV1, BoundedBytes, BoundedList,
     CapabilityGrantV1, FeeAuthorizationV1, NoteV1, OptionalHash32, OptionalObject, ResourceVector,
     SignedIntentV1, TransactionV1, TransactionWitnessesV1,
+};
+use noos_lumen::wwm::{
+    ArtifactRepairOrderV1, ArtifactRepairPayloadV1, ArtifactRepairReceiptV1,
+    AvailabilityCertificateV2, CustodyPositionCommitmentV2, FundBucketTag, SignatureEntryV1,
+    WwmEvidenceTier, WwmJobV1, WwmReceiptV1, WwmSettlementV1, WwmTerminalCode,
 };
 use noos_wallet::{derive_authority, IdentityGate, NodeIdentity, Purpose};
 use serde_json::{json, Value};
@@ -249,6 +256,146 @@ fn spec_hash_list<const MAX: u32>(v: &Value, key: &str) -> Result<BoundedList<[u
         _ => return Err(CliError::Malformed(format!("{key} must be an array"))),
     };
     BoundedList::new(items).ok_or_else(|| CliError::Malformed(format!("{key} exceeds bound")))
+}
+fn spec_bytes<const MAX: u32>(v: &Value, key: &str) -> Result<BoundedBytes<MAX>> {
+    BoundedBytes::new(from_hex(spec_str(v, key)?)?)
+        .ok_or_else(|| CliError::Malformed(format!("spec field {key} exceeds {MAX} bytes")))
+}
+
+fn spec_signatures<const MAX: u32>(
+    v: &Value,
+    key: &str,
+) -> Result<BoundedList<SignatureEntryV1, MAX>> {
+    let entries = match &v[key] {
+        Value::Array(entries) => entries
+            .iter()
+            .map(|entry| {
+                Ok(SignatureEntryV1 {
+                    signer_id: spec_hash(entry, "signer_id")?,
+                    signature: spec_bytes(entry, "signature")?,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?,
+        Value::Null => Vec::new(),
+        _ => return Err(CliError::Malformed(format!("{key} must be an array"))),
+    };
+    BoundedList::new(entries).ok_or_else(|| CliError::Malformed(format!("{key} exceeds bound")))
+}
+fn spec_u8_list<const MAX: u32>(v: &Value, key: &str) -> Result<BoundedList<u8, MAX>> {
+    let entries = match &v[key] {
+        Value::Array(entries) => entries
+            .iter()
+            .map(|entry| {
+                entry
+                    .as_u64()
+                    .and_then(|value| u8::try_from(value).ok())
+                    .ok_or_else(|| CliError::Malformed(format!("{key} entries must be u8")))
+            })
+            .collect::<Result<Vec<_>>>()?,
+        _ => return Err(CliError::Malformed(format!("{key} must be an array"))),
+    };
+    BoundedList::new(entries).ok_or_else(|| CliError::Malformed(format!("{key} exceeds bound")))
+}
+
+fn spec_evidence_tier(v: &Value, key: &str) -> Result<WwmEvidenceTier> {
+    match spec_str(v, key)? {
+        "local_verified" => Ok(WwmEvidenceTier::LocalVerified),
+        "signed_single" => Ok(WwmEvidenceTier::SignedSingle),
+        "matched_quorum" => Ok(WwmEvidenceTier::MatchedQuorum),
+        "no_quorum" => Ok(WwmEvidenceTier::NoQuorum),
+        _ => Err(CliError::Malformed(format!("unknown {key}"))),
+    }
+}
+
+fn spec_terminal_code(v: &Value, key: &str) -> Result<WwmTerminalCode> {
+    match spec_str(v, key)? {
+        "complete" => Ok(WwmTerminalCode::Complete),
+        "cancelled" => Ok(WwmTerminalCode::Cancelled),
+        "deadline" => Ok(WwmTerminalCode::Deadline),
+        "no_quorum" => Ok(WwmTerminalCode::NoQuorum),
+        "rejected" => Ok(WwmTerminalCode::Rejected),
+        _ => Err(CliError::Malformed(format!("unknown {key}"))),
+    }
+}
+
+fn spec_fund_bucket(v: &Value, key: &str) -> Result<FundBucketTag> {
+    match spec_str(v, key)? {
+        "job" => Ok(FundBucketTag::Job),
+        "custody_retention" => Ok(FundBucketTag::CustodyRetention),
+        "repair" => Ok(FundBucketTag::Repair),
+        "challenge_referee" => Ok(FundBucketTag::ChallengeReferee),
+        "sponsor" => Ok(FundBucketTag::Sponsor),
+        _ => Err(CliError::Malformed(format!("unknown {key}"))),
+    }
+}
+
+fn spec_wwm_job(v: &Value) -> Result<WwmJobV1> {
+    Ok(WwmJobV1 {
+        job_id: spec_hash(v, "job_id")?,
+        chain_id: spec_hash(v, "chain_id")?,
+        genesis_hash: spec_hash(v, "genesis_hash")?,
+        quote_id: spec_hash(v, "quote_id")?,
+        registry_epoch: spec_u64(v, "registry_epoch")?,
+        client_commitment: spec_hash(v, "client_commitment")?,
+        capsule_id: spec_hash(v, "capsule_id")?,
+        execution_profile_id: spec_hash(v, "execution_profile_id")?,
+        query_policy_id: spec_hash(v, "query_policy_id")?,
+        max_input_tokens: spec_u32(v, "max_input_tokens")?,
+        max_output_tokens: spec_u32(v, "max_output_tokens")?,
+        deadline_height: spec_u64(v, "deadline_height")?,
+        selected_executor_ids: spec_hash_list(v, "selected_executor_ids")?,
+        availability_certificate_id: spec_hash(v, "availability_certificate_id")?,
+        fund_profile_id: spec_hash(v, "fund_profile_id")?,
+        reserved_amount: spec_u128(v, "reserved_amount")?,
+        offchain_envelope_root: spec_hash(v, "offchain_envelope_root")?,
+    })
+}
+
+fn spec_wwm_receipt(v: &Value) -> Result<WwmReceiptV1> {
+    Ok(WwmReceiptV1 {
+        receipt_id: spec_hash(v, "receipt_id")?,
+        job_id: spec_hash(v, "job_id")?,
+        capsule_id: spec_hash(v, "capsule_id")?,
+        artifact_id: spec_hash(v, "artifact_id")?,
+        tokenizer_root: spec_hash(v, "tokenizer_root")?,
+        template_root: spec_hash(v, "template_root")?,
+        runtime_root: spec_hash(v, "runtime_root")?,
+        sbom_root: spec_hash(v, "sbom_root")?,
+        execution_profile_id: spec_hash(v, "execution_profile_id")?,
+        input_tokens: spec_u32(v, "input_tokens")?,
+        output_tokens: spec_u32(v, "output_tokens")?,
+        token_history_root: spec_hash(v, "token_history_root")?,
+        output_root: spec_hash(v, "output_root")?,
+        signer_ids: spec_hash_list(v, "signer_ids")?,
+        control_cluster_ids: spec_hash_list(v, "control_cluster_ids")?,
+        evidence_tier: spec_evidence_tier(v, "evidence_tier")?,
+        availability_until: spec_u64(v, "availability_until")?,
+        evidence_until: spec_u64(v, "evidence_until")?,
+        anchor_height: spec_u64(v, "anchor_height")?,
+        anchor_block: spec_hash(v, "anchor_block")?,
+        metered_amount: spec_u128(v, "metered_amount")?,
+        paid_amount: spec_u128(v, "paid_amount")?,
+        refunded_amount: spec_u128(v, "refunded_amount")?,
+        terminal_code: spec_terminal_code(v, "terminal_code")?,
+        signatures: spec_signatures(v, "signatures")?,
+    })
+}
+
+fn spec_wwm_settlement(v: &Value) -> Result<WwmSettlementV1> {
+    Ok(WwmSettlementV1 {
+        settlement_id: spec_hash(v, "settlement_id")?,
+        job_id: spec_hash(v, "job_id")?,
+        receipt_id: spec_hash(v, "receipt_id")?,
+        fund_profile_id: spec_hash(v, "fund_profile_id")?,
+        bucket: spec_fund_bucket(v, "bucket")?,
+        prior_settlement_index: spec_u64(v, "prior_settlement_index")?,
+        paid_amount: spec_u128(v, "paid_amount")?,
+        refunded_amount: spec_u128(v, "refunded_amount")?,
+        released_amount: spec_u128(v, "released_amount")?,
+        settled_height: spec_u64(v, "settled_height")?,
+        authority_epoch: spec_u64(v, "authority_epoch")?,
+        signature: spec_bytes(v, "signature")?,
+    })
 }
 
 fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
@@ -486,6 +633,90 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
             requester: spec_hash(spec, "requester")?,
             job_id: spec_hash(spec, "job_id")?,
         },
+        "commit_custody_positions" => {
+            ActionV1::CommitCustodyPositions(CustodyPositionCommitmentV2 {
+                commitment_id: spec_hash(spec, "commitment_id")?,
+                policy_id: spec_hash(spec, "policy_id")?,
+                artifact_id: spec_hash(spec, "artifact_id")?,
+                position: spec_u8(spec, "position")?,
+                custodian_profile_id: spec_hash(spec, "custodian_profile_id")?,
+                custodian_set_id: spec_hash(spec, "custodian_set_id")?,
+                custodian_set_epoch: spec_u64(spec, "custodian_set_epoch")?,
+                position_root: spec_hash(spec, "position_root")?,
+                committed_bytes: spec_u64(spec, "committed_bytes")?,
+                valid_from: spec_u64(spec, "valid_from")?,
+                valid_until: spec_u64(spec, "valid_until")?,
+                nonce: spec_u64(spec, "nonce")?,
+                signature: spec_bytes(spec, "signature")?,
+            })
+        }
+        "issue_availability_certificate" => {
+            ActionV1::IssueAvailabilityCertificate(AvailabilityCertificateV2 {
+                certificate_id: spec_hash(spec, "certificate_id")?,
+                policy_id: spec_hash(spec, "policy_id")?,
+                artifact_id: spec_hash(spec, "artifact_id")?,
+                custodian_set_id: spec_hash(spec, "custodian_set_id")?,
+                custodian_set_root: spec_hash(spec, "custodian_set_root")?,
+                custodian_set_epoch: spec_u64(spec, "custodian_set_epoch")?,
+                executor_set_id: spec_hash(spec, "executor_set_id")?,
+                executor_set_root: spec_hash(spec, "executor_set_root")?,
+                executor_set_epoch: spec_u64(spec, "executor_set_epoch")?,
+                assignment_root: spec_hash(spec, "assignment_root")?,
+                diversity_root: spec_hash(spec, "diversity_root")?,
+                challenge_root: spec_hash(spec, "challenge_root")?,
+                selected_verifiers: spec_hash_list(spec, "selected_verifiers")?,
+                signer_ids: spec_hash_list(spec, "signer_ids")?,
+                result_root: spec_hash(spec, "result_root")?,
+                availability_state: spec_u8(spec, "availability_state")?,
+                issued_height: spec_u64(spec, "issued_height")?,
+                valid_until: spec_u64(spec, "valid_until")?,
+                signatures: spec_signatures(spec, "signatures")?,
+            })
+        }
+        "record_artifact_repair_order" => {
+            ActionV1::RecordArtifactRepair(ArtifactRepairPayloadV1::Order(
+                ArtifactRepairOrderV1 {
+                    order_id: spec_hash(spec, "order_id")?,
+                    policy_id: spec_hash(spec, "policy_id")?,
+                    artifact_id: spec_hash(spec, "artifact_id")?,
+                    position: spec_u8(spec, "position")?,
+                    prior_commitment_id: spec_hash(spec, "prior_commitment_id")?,
+                    replacement_profile_id: spec_hash(spec, "replacement_profile_id")?,
+                    source_commitment_ids: spec_hash_list(spec, "source_commitment_ids")?,
+                    source_positions: spec_u8_list(spec, "source_positions")?,
+                    source_positions_root: spec_hash(spec, "source_positions_root")?,
+                    expected_position_root: spec_hash(spec, "expected_position_root")?,
+                    issued_height: spec_u64(spec, "issued_height")?,
+                    deadline_height: spec_u64(spec, "deadline_height")?,
+                    authority_epoch: spec_u64(spec, "authority_epoch")?,
+                    nonce: spec_u64(spec, "nonce")?,
+                    signature: spec_bytes(spec, "signature")?,
+                },
+            ))
+        }
+        "record_artifact_repair_receipt" => {
+            ActionV1::RecordArtifactRepair(ArtifactRepairPayloadV1::Receipt(
+                ArtifactRepairReceiptV1 {
+                    repair_id: spec_hash(spec, "repair_id")?,
+                    order_id: spec_hash(spec, "order_id")?,
+                    policy_id: spec_hash(spec, "policy_id")?,
+                    artifact_id: spec_hash(spec, "artifact_id")?,
+                    position: spec_u8(spec, "position")?,
+                    prior_commitment_id: spec_hash(spec, "prior_commitment_id")?,
+                    new_commitment_id: spec_hash(spec, "new_commitment_id")?,
+                    source_positions_root: spec_hash(spec, "source_positions_root")?,
+                    new_position_root: spec_hash(spec, "new_position_root")?,
+                    durable_commit_root: spec_hash(spec, "durable_commit_root")?,
+                    certificate_id: spec_hash(spec, "certificate_id")?,
+                    bytes_read: spec_u64(spec, "bytes_read")?,
+                    bytes_written: spec_u64(spec, "bytes_written")?,
+                    evidence_root: spec_hash(spec, "evidence_root")?,
+                    signer_id: spec_hash(spec, "signer_id")?,
+                    completed_height: spec_u64(spec, "completed_height")?,
+                    signature: spec_bytes(spec, "signature")?,
+                },
+            ))
+        }
         other => {
             return Err(CliError::Malformed(format!(
                 "unsupported structured action type {other}"
@@ -1053,6 +1284,90 @@ fn multi(args: &[String], name: &str) -> Vec<String> {
     out
 }
 
+/// Encode exactly one frozen WWM lifecycle action through the explicit
+/// devnet/test operator surface.
+pub fn wwm_devnet_action(spec_json: &str) -> Result<Value> {
+    let spec: Value =
+        serde_json::from_str(spec_json).map_err(|error| CliError::Malformed(error.to_string()))?;
+    let (kind, id, action) = match spec_str(&spec, "type")? {
+        "open_wwm_job" => {
+            let payload = spec_wwm_job(&spec)?;
+            (
+                "OpenWwmJob",
+                payload.job_id,
+                wwm::open_wwm_job(payload)?,
+            )
+        }
+        "record_wwm_receipt" => {
+            let payload = spec_wwm_receipt(&spec)?;
+            (
+                "RecordWwmReceipt",
+                payload.receipt_id,
+                wwm::record_wwm_receipt(payload)?,
+            )
+        }
+        "settle_wwm_job" => {
+            let payload = spec_wwm_settlement(&spec)?;
+            (
+                "SettleWwmJob",
+                payload.settlement_id,
+                wwm::settle_wwm_job(payload)?,
+            )
+        }
+        _ => {
+            return Err(CliError::Malformed(
+                "devnet operator accepts only OpenWwmJob, RecordWwmReceipt, or SettleWwmJob"
+                    .into(),
+            ))
+        }
+    };
+    Ok(json!({
+        "schema": "noos/wwm-devnet-operator-action/v1",
+        "environment": "DEVNET_TEST_ONLY",
+        "production_capable": false,
+        "kind": kind,
+        "id": to_hex(&id),
+        "action": to_hex(action.as_slice()),
+    }))
+}
+
+/// Build and cross-check the complete devnet/test WWM lifecycle without
+/// inventing an untyped action encoding.
+pub fn wwm_devnet_flow(spec_json: &str) -> Result<Value> {
+    let spec: Value =
+        serde_json::from_str(spec_json).map_err(|error| CliError::Malformed(error.to_string()))?;
+    let flow = wwm::DevnetWwmFlowV1 {
+        job: spec_wwm_job(&spec["job"])?,
+        receipt: spec_wwm_receipt(&spec["receipt"])?,
+        settlement: spec_wwm_settlement(&spec["settlement"])?,
+    };
+    let actions = flow.canonical_actions()?;
+    Ok(json!({
+        "schema": "noos/wwm-devnet-operator-flow/v1",
+        "environment": "DEVNET_TEST_ONLY",
+        "production_capable": false,
+        "finalized_record_route": "/wwm-record/{kind}/{id}",
+        "job_id": to_hex(&flow.job.job_id),
+        "capsule_id": to_hex(&flow.job.capsule_id),
+        "receipt_id": to_hex(&flow.receipt.receipt_id),
+        "settlement_id": to_hex(&flow.settlement.settlement_id),
+        "open_wwm_job_action": to_hex(actions[0].as_slice()),
+        "record_wwm_receipt_action": to_hex(actions[1].as_slice()),
+        "settle_wwm_job_action": to_hex(actions[2].as_slice()),
+    }))
+}
+
+fn read_spec_arg(args: &[String]) -> Result<String> {
+    match flag(args, "--spec") {
+        Some(inline) => Ok(inline),
+        None => {
+            let path = required(args, "--spec-file")?;
+            std::fs::read_to_string(&path)
+                .map_err(|error| CliError::Usage(format!("--spec-file {path}: {error}")))
+        }
+    }
+}
+
 pub const USAGE: &str = "noos-cli <command>\n\
   keygen    --seed <hex> --purpose sign|view|agent|recovery|umbra:<suite> --account <n> --index <n>\n\
   tx build  --spec <json> | --spec-file <path>\n\
@@ -1061,6 +1376,7 @@ pub const USAGE: &str = "noos-cli <command>\n\
   query     block <height|hash> --indexer <addr> | tx <txid> --indexer <addr>\n\
   manifest  verify --file <path> --public-key <hex32> [--now-unix-ms <u64>]\n\
   invitation verify --file <path> --public-key <hex32> [--now-unix-ms <u64>]\n\
+  wwm devnet capabilities | action|flow --spec <json> | --spec-file <path>\n\
   status    --node <addr> --token <t> | --indexer <addr>";
 
 /// Runs one CLI invocation; returns the exact stdout payload.
@@ -1069,6 +1385,28 @@ pub fn run(args: &[String]) -> Result<String> {
         serde_json::to_string_pretty(&v).map_err(|e| CliError::Malformed(e.to_string()))
     };
     match args {
+        [wwm, devnet, capabilities]
+            if wwm == "wwm" && devnet == "devnet" && capabilities == "capabilities" =>
+        {
+            pretty(json!({
+                "schema": "noos/wwm-devnet-operator-capabilities/v1",
+                "typed_open_wwm_job": true,
+                "typed_record_wwm_receipt": true,
+                "typed_settle_wwm_job": true,
+                "finalized_record_route": "/wwm-record/{kind}/{id}",
+                "production_capable": false,
+            }))
+        }
+        [wwm, devnet, action, rest @ ..]
+            if wwm == "wwm" && devnet == "devnet" && action == "action" =>
+        {
+            pretty(wwm_devnet_action(&read_spec_arg(rest)?)?)
+        }
+        [wwm, devnet, flow, rest @ ..]
+            if wwm == "wwm" && devnet == "devnet" && flow == "flow" =>
+        {
+            pretty(wwm_devnet_flow(&read_spec_arg(rest)?)?)
+        }
         [cmd, rest @ ..] if cmd == "keygen" => pretty(keygen(
             &required(rest, "--seed")?,
             &required(rest, "--purpose")?,

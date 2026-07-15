@@ -109,11 +109,9 @@ impl PortableAccessManifest {
         let mut artifacts: BTreeMap<Hash32, (Hash32, BTreeSet<Hash32>, BTreeSet<Option<Hash32>>)> =
             BTreeMap::new();
         for replica in &self.artifact_replicas {
-            let (commitment, domains, providers) = artifacts.entry(replica.artifact_id).or_insert((
-                replica.content_commitment,
-                BTreeSet::new(),
-                BTreeSet::new(),
-            ));
+            let (commitment, domains, providers) = artifacts
+                .entry(replica.artifact_id)
+                .or_insert((replica.content_commitment, BTreeSet::new(), BTreeSet::new()));
             if *commitment != replica.content_commitment {
                 return Err(AccessError::AmbiguousArtifact);
             }

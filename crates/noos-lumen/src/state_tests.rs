@@ -28,6 +28,11 @@ use crate::state::{
     LumenRoots, RejectReason, SimulationOutcome, StateDelta, TreeId, CONTROL_PREFIX, NOOS_ASSET,
     PARAM_ISSUANCE,
 };
+use crate::wwm::{
+    wwm_profile_key, FundBucketTag, ModelCapsuleV2, SignatureEntryV1, WwmControlMode,
+    WwmControlStateV1, WwmEvidenceTier, WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmSettlementV1,
+    WwmTerminalCode,
+};
 use crate::test_util::SplitMix64;
 use crate::Hash32;
 
@@ -2137,6 +2142,263 @@ fn issued_supply_is_explicit_and_deterministic_under_replay() {
             .checked_add(first.emission_minted())
             .unwrap()
     );
+}
+
+fn wwm_flow_fixture(
+    mode: WwmControlMode,
+) -> (LumenLedger, WwmJobV1, WwmReceiptV1, WwmSettlementV1) {
+    let capsule_id = [0x31; 32];
+    let artifact_id = [0x32; 32];
+    let execution_profile_id = [0x33; 32];
+    let query_policy_id = [0x34; 32];
+    let certificate_id = [0x35; 32];
+    let fund_profile_id = [0x36; 32];
+    let config_id = [0x37; 32];
+    let capsule = ModelCapsuleV2 {
+        capsule_id,
+        artifact_id,
+        payload_root: [0x38; 32],
+        manifest_root: [0x39; 32],
+        weight_manifest_root: [0x3a; 32],
+        tokenizer_root: [0x3b; 32],
+        template_root: [0x3c; 32],
+        runtime_root: [0x3d; 32],
+        build_root: [0x3e; 32],
+        sbom_root: [0x3f; 32],
+        execution_profile_ids: BoundedList::new(vec![execution_profile_id]).unwrap(),
+        query_policy_id,
+        availability_policy_id: [0x40; 32],
+        license_root: [0x41; 32],
+        rights_root: [0x42; 32],
+        provenance_root: [0x43; 32],
+        lifecycle: 1,
+        rollback_capsule_id: OptionalHash32(None),
+        publisher_threshold: 1,
+        publisher_signatures: BoundedList::<SignatureEntryV1, 32>::default(),
+    };
+    let control = WwmControlStateV1 {
+        mode,
+        active_capsule_id: OptionalHash32(Some(capsule_id)),
+        last_transition_id: OptionalHash32(Some([0x44; 32])),
+        last_transition_height: 1,
+        direct_prior_live_mode: WwmControlMode::Disabled,
+        direct_prior_config_id: OptionalHash32(None),
+        active_config_id: OptionalHash32(Some(config_id)),
+        latest_authorized_config_id: OptionalHash32(Some(config_id)),
+        resolution_config_id: OptionalHash32(Some(config_id)),
+        release_root: [0x45; 32],
+        promotion_ledger_root: [0x46; 32],
+        capsule_id,
+        artifact_id,
+        availability_policy_id: capsule.availability_policy_id,
+        execution_profile_id,
+        query_policy_id,
+        runway_root: [0x47; 32],
+    };
+    let mut ledger = genesis();
+    ledger.install_wwm_flow_fixture_for_test(
+        &control,
+        &capsule,
+        execution_profile_id,
+        query_policy_id,
+        certificate_id,
+        fund_profile_id,
+    );
+    let job = WwmJobV1 {
+        job_id: [0x48; 32],
+        chain_id: CHAIN,
+        genesis_hash: [0x49; 32],
+        quote_id: [0x4a; 32],
+        registry_epoch: 1,
+        client_commitment: [0x4b; 32],
+        capsule_id,
+        execution_profile_id,
+        query_policy_id,
+        max_input_tokens: 32,
+        max_output_tokens: 16,
+        deadline_height: 100,
+        selected_executor_ids: BoundedList::new(vec![[0x4c; 32]]).unwrap(),
+        availability_certificate_id: certificate_id,
+        fund_profile_id,
+        reserved_amount: 100,
+        offchain_envelope_root: [0x4d; 32],
+    };
+    let receipt = WwmReceiptV1 {
+        receipt_id: [0x4e; 32],
+        job_id: job.job_id,
+        capsule_id,
+        artifact_id,
+        tokenizer_root: capsule.tokenizer_root,
+        template_root: capsule.template_root,
+        runtime_root: capsule.runtime_root,
+        sbom_root: capsule.sbom_root,
+        execution_profile_id,
+        input_tokens: 4,
+        output_tokens: 2,
+        token_history_root: [0x4f; 32],
+        output_root: [0x50; 32],
+        signer_ids: BoundedList::new(vec![[0x51; 32]]).unwrap(),
+        control_cluster_ids: BoundedList::new(vec![[0x52; 32]]).unwrap(),
+        evidence_tier: WwmEvidenceTier::LocalVerified,
+        availability_until: 200,
+        evidence_until: 200,
+        anchor_height: 10,
+        anchor_block: [0x53; 32],
+        metered_amount: 30,
+        paid_amount: 30,
+        refunded_amount: 10,
+        terminal_code: WwmTerminalCode::Complete,
+        signatures: BoundedList::<SignatureEntryV1, 3>::default(),
+    };
+    let settlement = WwmSettlementV1 {
+        settlement_id: [0x54; 32],
+        job_id: job.job_id,
+        receipt_id: receipt.receipt_id,
+        fund_profile_id,
+        bucket: FundBucketTag::Job,
+        prior_settlement_index: 0,
+        paid_amount: 30,
+        refunded_amount: 10,
+        released_amount: 60,
+        settled_height: 12,
+        authority_epoch: 1,
+        signature: BoundedBytes::new(b"TESTNET_FIXTURE_ONLY".to_vec()).unwrap(),
+    };
+    (ledger, job, receipt, settlement)
+}
+
+fn apply_wwm_action(ledger: &mut LumenLedger, height: u64, action: ActionV1) -> ApplyOutcome {
+    let (tx, witnesses, _) = build_tx(
+        height,
+        vec![],
+        vec![PAYER, GOV],
+        vec![action],
+        vec![],
+    );
+    ledger
+        .apply_transaction(
+            &ctx(height),
+            &tx,
+            &witnesses,
+            &StubEngine,
+            &AcceptAll,
+        )
+        .unwrap()
+}
+
+#[test]
+fn testnet_wwm_job_receipt_settlement_flow_is_insert_once_and_bound() {
+    let (mut ledger, job, receipt, settlement) = wwm_flow_fixture(WwmControlMode::Testnet);
+    assert!(matches!(
+        apply_wwm_action(&mut ledger, 10, ActionV1::OpenWwmJob(job.clone())),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply_wwm_action(
+            &mut ledger,
+            11,
+            ActionV1::RecordWwmReceipt(receipt.clone())
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply_wwm_action(
+            &mut ledger,
+            12,
+            ActionV1::SettleWwmJob(settlement.clone())
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    for (kind, id) in [
+        (WwmLeafKind::Job, job.job_id),
+        (WwmLeafKind::Receipt, receipt.receipt_id),
+        (WwmLeafKind::Settlement, settlement.settlement_id),
+    ] {
+        let proof = ledger.finalized_object_proof(wwm_profile_key(kind, &id));
+        assert!(proof.verify());
+        assert!(matches!(
+            proof.value,
+            crate::wwm::ResolutionValueV1::Present(_)
+        ));
+    }
+    assert!(matches!(
+        apply_wwm_action(&mut ledger, 13, ActionV1::OpenWwmJob(job)),
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn testnet_wwm_flow_rejects_disabled_wrong_capsule_job_and_receipt() {
+    let (mut disabled, job, _, _) = wwm_flow_fixture(WwmControlMode::Disabled);
+    assert!(matches!(
+        apply_wwm_action(&mut disabled, 10, ActionV1::OpenWwmJob(job)),
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+
+    let (mut wrong_capsule, mut job, _, _) = wwm_flow_fixture(WwmControlMode::Testnet);
+    job.capsule_id = [0xa1; 32];
+    assert!(matches!(
+        apply_wwm_action(
+            &mut wrong_capsule,
+            10,
+            ActionV1::OpenWwmJob(job)
+        ),
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+
+    let (mut ledger, job, mut receipt, mut settlement) =
+        wwm_flow_fixture(WwmControlMode::Testnet);
+    assert!(matches!(
+        apply_wwm_action(&mut ledger, 10, ActionV1::OpenWwmJob(job)),
+        ApplyOutcome::Applied { .. }
+    ));
+    receipt.job_id = [0xa2; 32];
+    assert!(matches!(
+        apply_wwm_action(
+            &mut ledger,
+            11,
+            ActionV1::RecordWwmReceipt(receipt)
+        ),
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+
+    let (mut ledger, job, receipt, _) = wwm_flow_fixture(WwmControlMode::Testnet);
+    assert!(matches!(
+        apply_wwm_action(&mut ledger, 10, ActionV1::OpenWwmJob(job)),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply_wwm_action(
+            &mut ledger,
+            11,
+            ActionV1::RecordWwmReceipt(receipt)
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    settlement.receipt_id = [0xa3; 32];
+    assert!(matches!(
+        apply_wwm_action(
+            &mut ledger,
+            12,
+            ActionV1::SettleWwmJob(settlement)
+        ),
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
 }
 
 // ---------------------------------------------------------------------------

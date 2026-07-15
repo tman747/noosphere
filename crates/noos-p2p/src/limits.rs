@@ -56,16 +56,16 @@ pub struct RateLimit {
     pub per_second: u32,
 }
 
-/// Per-peer limit table over the eight application protocols.
+/// Per-peer limit table over the nine application protocols.
 #[derive(Debug, Clone)]
 pub struct LimitsConfig {
-    pub per_protocol: [RateLimit; 8],
+    pub per_protocol: [RateLimit; 9],
 }
 
 impl Default for LimitsConfig {
     fn default() -> Self {
         // Indexed by Protocol::app_index(): header, body, vote, tx, range,
-        // snapshot, shard, loom receipt.
+        // snapshot, light update, shard, loom receipt.
         LimitsConfig {
             per_protocol: [
                 RateLimit {
@@ -92,6 +92,10 @@ impl Default for LimitsConfig {
                     burst: 16,
                     per_second: 8,
                 }, // sync/snapshot
+                RateLimit {
+                    burst: 8,
+                    per_second: 4,
+                }, // sync/light-update
                 RateLimit {
                     burst: 32,
                     per_second: 16,

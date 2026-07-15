@@ -8,6 +8,8 @@
     "schema_version",
     "source_revision",
     "wwm_registry_sha256",
+    "applicability_profile",
+    "claim_dispositions",
     "experiment_registry_sha256",
     "claim_bundle_ids",
     "independent_control_clusters",
@@ -26,10 +28,20 @@
     "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "wwm_registry_sha256": {"$ref": "#/$defs/hash"},
     "experiment_registry_sha256": {"$ref": "#/$defs/hash"},
-    "claim_bundle_ids": {
+    "applicability_profile": {"const": "BONSAI_PUBLIC_TEXT_V1"},
+    "claim_dispositions": {
       "type": "object",
       "minProperties": 22,
       "maxProperties": 22,
+      "patternProperties": {
+        "^E-WWM-(0[1-9]|1[0-9]|2[0-2])$": {"enum": ["MANDATORY", "DISABLED_NOT_CLAIMED"]}
+      },
+      "additionalProperties": false
+    },
+    "claim_bundle_ids": {
+      "type": "object",
+      "minProperties": 10,
+      "maxProperties": 10,
       "patternProperties": {
         "^E-WWM-(0[1-9]|1[0-9]|2[0-2])$": {"$ref": "#/$defs/bundle_id"}
       },

@@ -6,6 +6,13 @@
 //! order, canonical `u32`-length-delimited bounded collections, strict
 //! whole-input decode.
 
+use crate::wwm::{
+    ArtifactDescriptorV1, ArtifactRepairPayloadV1, AvailabilityCertificateV2, AvailabilityPolicyV2,
+    CapabilityMutationV1, CustodianCapabilityMutationV2, CustodyChallengeV2,
+    CustodyPositionCommitmentV2, CustodyProbeV2, ExecutionProfileV1, FeePolicyV1, ModelCapsuleV2,
+    QueryPolicyV1, RegisterFundProfilePayloadV1, ServiceDirectoryV1, ServingAliasTransitionV1,
+    TransitionWwmControlPayloadV1, WwmJobV1, WwmReceiptV1, WwmSettlementV1,
+};
 use crate::{domain_hash, domains, Hash32};
 use noos_codec::{define_object, CodecError, NoosDecode, NoosEncode, Reader, Writer};
 
@@ -876,18 +883,30 @@ pub enum ActionV1 {
         activation_height: u64,
     },
     /// 6 — emergency: set a feature control to DISABLED (never enable).
-    EmergencyDisable { control_key: Hash32 },
+    EmergencyDisable {
+        control_key: Hash32,
+    },
     /// 7 — emergency: quarantine an object (set FLAG_QUARANTINED; calls
     /// reject until governance lifts it through the delayed path).
-    EmergencyQuarantine { object_id: Hash32 },
+    EmergencyQuarantine {
+        object_id: Hash32,
+    },
     /// 8 — register an agent identity object.
-    RegisterAgent { agent: AgentIdV1 },
+    RegisterAgent {
+        agent: AgentIdV1,
+    },
     /// 9 — issue a capability grant (issuer must be a signed account input).
-    GrantCapability { grant: CapabilityGrantV1 },
+    GrantCapability {
+        grant: CapabilityGrantV1,
+    },
     /// 10 — revoke a capability grant (issuer must be a signed account input).
-    RevokeCapability { grant_id: Hash32 },
+    RevokeCapability {
+        grant_id: Hash32,
+    },
     /// 11 — submit a typed agent intent through the deterministic policy gate.
-    SubmitIntent { intent: IntentV1 },
+    SubmitIntent {
+        intent: IntentV1,
+    },
     /// 12 — register and issue a fixed-supply user asset to its signed issuer.
     CreateAsset {
         issuer: Hash32,
@@ -934,7 +953,10 @@ pub enum ActionV1 {
         deadline_height: u64,
     },
     /// 17 — bind an open shard to a signed registered worker.
-    ClaimComputeJob { worker: Hash32, job_id: Hash32 },
+    ClaimComputeJob {
+        worker: Hash32,
+        job_id: Hash32,
+    },
     /// 18 — commit delivery; payment remains locked pending requester review.
     SubmitComputeResult {
         worker: Hash32,
@@ -943,9 +965,15 @@ pub enum ActionV1 {
         completed_units: u64,
     },
     /// 19 — requester accepts delivery and atomically settles worker payment.
-    AcceptComputeResult { requester: Hash32, job_id: Hash32 },
+    AcceptComputeResult {
+        requester: Hash32,
+        job_id: Hash32,
+    },
     /// 20 — requester cancels an unclaimed or expired job and receives escrow.
-    CancelComputeJob { requester: Hash32, job_id: Hash32 },
+    CancelComputeJob {
+        requester: Hash32,
+        job_id: Hash32,
+    },
     /// 21 — add proportional reserves and receive non-dilutive pool shares.
     AddLiquidity {
         provider: Hash32,
@@ -1047,7 +1075,10 @@ pub enum ActionV1 {
         claim_secret: Hash32,
     },
     /// 33 — return unclaimed escrow to its signed payer after expiry.
-    RefundPrivatePayment { payer: Hash32, payment_id: Hash32 },
+    RefundPrivatePayment {
+        payer: Hash32,
+        payment_id: Hash32,
+    },
     /// 34 — agent-signed private stable payment under a hard on-chain grant.
     OpenAgentPrivatePayment {
         agent: Hash32,
@@ -1061,7 +1092,10 @@ pub enum ActionV1 {
         capability_ref: Hash32,
     },
     /// 35 — governance selects live, last-good liquidation-only, or frozen mode.
-    SetOracleMode { feed_id: Hash32, mode: u8 },
+    SetOracleMode {
+        feed_id: Hash32,
+        mode: u8,
+    },
     /// 36 — transfer existing stable tokens into the protocol safety reserve.
     FundStableReserve {
         contributor: Hash32,
@@ -1088,10 +1122,32 @@ pub enum ActionV1 {
         stable_in: u128,
         min_collateral_out: u128,
     },
+    /// 40–59 — protocol-v2 WWM application state. Every payload is bounded
+    /// and typed; raw weights, prompts, token streams, and output are absent.
+    RegisterArtifactDescriptor(ArtifactDescriptorV1),
+    RegisterCustodianProfile(CustodianCapabilityMutationV2),
+    RegisterAvailabilityPolicy(AvailabilityPolicyV2),
+    CommitCustodyPositions(CustodyPositionCommitmentV2),
+    RecordCustodyChallenge(CustodyChallengeV2),
+    RecordCustodyProbe(CustodyProbeV2),
+    IssueAvailabilityCertificate(AvailabilityCertificateV2),
+    RecordArtifactRepair(ArtifactRepairPayloadV1),
+    RegisterModelCapsuleV2(ModelCapsuleV2),
+    RegisterExecutionProfile(ExecutionProfileV1),
+    RegisterExecutorProfile(CapabilityMutationV1),
+    RegisterFeePolicy(FeePolicyV1),
+    RegisterFundProfile(RegisterFundProfilePayloadV1),
+    RegisterQueryPolicy(QueryPolicyV1),
+    RegisterServiceDirectory(ServiceDirectoryV1),
+    OpenWwmJob(WwmJobV1),
+    RecordWwmReceipt(WwmReceiptV1),
+    SettleWwmJob(WwmSettlementV1),
+    TransitionServingAlias(ServingAliasTransitionV1),
+    TransitionWwmControl(TransitionWwmControlPayloadV1),
 }
 
 impl ActionV1 {
-    pub const VARIANT_COUNT: u16 = 40;
+    pub const VARIANT_COUNT: u16 = 60;
 }
 
 impl NoosEncode for ActionV1 {
@@ -1543,6 +1599,86 @@ impl NoosEncode for ActionV1 {
                 w.put_u128(*stable_in);
                 w.put_u128(*min_collateral_out);
             }
+            ActionV1::RegisterArtifactDescriptor(v) => {
+                w.put_u16(40);
+                v.encode(w);
+            }
+            ActionV1::RegisterCustodianProfile(v) => {
+                w.put_u16(41);
+                v.encode(w);
+            }
+            ActionV1::RegisterAvailabilityPolicy(v) => {
+                w.put_u16(42);
+                v.encode(w);
+            }
+            ActionV1::CommitCustodyPositions(v) => {
+                w.put_u16(43);
+                v.encode(w);
+            }
+            ActionV1::RecordCustodyChallenge(v) => {
+                w.put_u16(44);
+                v.encode(w);
+            }
+            ActionV1::RecordCustodyProbe(v) => {
+                w.put_u16(45);
+                v.encode(w);
+            }
+            ActionV1::IssueAvailabilityCertificate(v) => {
+                w.put_u16(46);
+                v.encode(w);
+            }
+            ActionV1::RecordArtifactRepair(v) => {
+                w.put_u16(47);
+                v.encode(w);
+            }
+            ActionV1::RegisterModelCapsuleV2(v) => {
+                w.put_u16(48);
+                v.encode(w);
+            }
+            ActionV1::RegisterExecutionProfile(v) => {
+                w.put_u16(49);
+                v.encode(w);
+            }
+            ActionV1::RegisterExecutorProfile(v) => {
+                w.put_u16(50);
+                v.encode(w);
+            }
+            ActionV1::RegisterFeePolicy(v) => {
+                w.put_u16(51);
+                v.encode(w);
+            }
+            ActionV1::RegisterFundProfile(v) => {
+                w.put_u16(52);
+                v.encode(w);
+            }
+            ActionV1::RegisterQueryPolicy(v) => {
+                w.put_u16(53);
+                v.encode(w);
+            }
+            ActionV1::RegisterServiceDirectory(v) => {
+                w.put_u16(54);
+                v.encode(w);
+            }
+            ActionV1::OpenWwmJob(v) => {
+                w.put_u16(55);
+                v.encode(w);
+            }
+            ActionV1::RecordWwmReceipt(v) => {
+                w.put_u16(56);
+                v.encode(w);
+            }
+            ActionV1::SettleWwmJob(v) => {
+                w.put_u16(57);
+                v.encode(w);
+            }
+            ActionV1::TransitionServingAlias(v) => {
+                w.put_u16(58);
+                v.encode(w);
+            }
+            ActionV1::TransitionWwmControl(v) => {
+                w.put_u16(59);
+                v.encode(w);
+            }
         }
     }
 }
@@ -1788,6 +1924,52 @@ impl NoosDecode for ActionV1 {
                 stable_in: r.get_u128()?,
                 min_collateral_out: r.get_u128()?,
             }),
+            40 => Ok(ActionV1::RegisterArtifactDescriptor(
+                ArtifactDescriptorV1::decode(r)?,
+            )),
+            41 => Ok(ActionV1::RegisterCustodianProfile(
+                CustodianCapabilityMutationV2::decode(r)?,
+            )),
+            42 => Ok(ActionV1::RegisterAvailabilityPolicy(
+                AvailabilityPolicyV2::decode(r)?,
+            )),
+            43 => Ok(ActionV1::CommitCustodyPositions(
+                CustodyPositionCommitmentV2::decode(r)?,
+            )),
+            44 => Ok(ActionV1::RecordCustodyChallenge(
+                CustodyChallengeV2::decode(r)?,
+            )),
+            45 => Ok(ActionV1::RecordCustodyProbe(CustodyProbeV2::decode(r)?)),
+            46 => Ok(ActionV1::IssueAvailabilityCertificate(
+                AvailabilityCertificateV2::decode(r)?,
+            )),
+            47 => Ok(ActionV1::RecordArtifactRepair(
+                ArtifactRepairPayloadV1::decode(r)?,
+            )),
+            48 => Ok(ActionV1::RegisterModelCapsuleV2(ModelCapsuleV2::decode(r)?)),
+            49 => Ok(ActionV1::RegisterExecutionProfile(
+                ExecutionProfileV1::decode(r)?,
+            )),
+            50 => Ok(ActionV1::RegisterExecutorProfile(
+                CapabilityMutationV1::decode(r)?,
+            )),
+            51 => Ok(ActionV1::RegisterFeePolicy(FeePolicyV1::decode(r)?)),
+            52 => Ok(ActionV1::RegisterFundProfile(
+                RegisterFundProfilePayloadV1::decode(r)?,
+            )),
+            53 => Ok(ActionV1::RegisterQueryPolicy(QueryPolicyV1::decode(r)?)),
+            54 => Ok(ActionV1::RegisterServiceDirectory(
+                ServiceDirectoryV1::decode(r)?,
+            )),
+            55 => Ok(ActionV1::OpenWwmJob(WwmJobV1::decode(r)?)),
+            56 => Ok(ActionV1::RecordWwmReceipt(WwmReceiptV1::decode(r)?)),
+            57 => Ok(ActionV1::SettleWwmJob(WwmSettlementV1::decode(r)?)),
+            58 => Ok(ActionV1::TransitionServingAlias(
+                ServingAliasTransitionV1::decode(r)?,
+            )),
+            59 => Ok(ActionV1::TransitionWwmControl(
+                TransitionWwmControlPayloadV1::decode(r)?,
+            )),
             _ => Err(CodecError::UnknownDiscriminant),
         }
     }

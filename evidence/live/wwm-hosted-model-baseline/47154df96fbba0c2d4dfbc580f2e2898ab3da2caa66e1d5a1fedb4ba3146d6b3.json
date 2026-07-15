@@ -1,0 +1,374 @@
+{
+  "schema": "noos/wwm-hosted-model-baseline/v1",
+  "captured_at": "2026-07-15T07:08:50.169Z",
+  "environment": "LOCAL_TESTNET_FIXTURE",
+  "production_claimed": false,
+  "bonsai_resolution_and_inference": {
+    "schema": "noos/bonsai-mindchain-local-result/v1",
+    "claim": "LOCAL_CHAIN_RESOLVED_INFERENCE",
+    "chain_registration": {
+      "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+      "genesis_hash": "3ce9825c83a6e5f0b8346762d3835b544de89101b95a4e6cb364a19ae871a9ce",
+      "finalized_height": 1024,
+      "finalized_hash": "e2c10991bad20f018b660de6f91936f8197596d965ea4dcf34ccd463024b5dc9",
+      "objects_root": "156f2700bba11dfa9eb0866bb65fa31916ce254d6ceb5f1277ee3f4c210cf2cb",
+      "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+      "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+      "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+      "execution_profile_id": "780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf182",
+      "query_policy_id": "98021a08b5fa7d364e8c4071d4544441c4c53150134102ae38a754207612688c",
+      "canonical_resolution_bytes": 20932
+    },
+    "local_runtime": {
+      "model_name": "Bonsai-27B-Q1_0.gguf",
+      "artifact_path": "D:\\noosphere-artifacts\\bonsai\\Bonsai-27B-Q1_0.gguf",
+      "artifact_bytes": 3803452480,
+      "artifact_sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+      "runtime_path": "D:\\noosphere-artifacts\\runtime\\hip-run\\llama-cli.exe",
+      "runtime_sha256": "d09e9f62e2bfc20af43f47dac8adddae47de25ae7678702f109faaa03dfe8a56",
+      "runtime_commit": "62061f91088281e65071cc38c5f69ee95c39f14e",
+      "remote_route_used": false
+    },
+    "request": {
+      "prompt_commitment": "fa148dfaff303716bfa1186ac650a6546d99d457692145a19f6b0ef1d49b2a5e",
+      "maximum_output_tokens": 24,
+      "temperature": 0,
+      "seed": 42
+    },
+    "response": {
+      "content": "The checksum invariant states that the sum of all checksums in a valid configuration must equal zero.",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 20,
+        "prompt_tokens": 20,
+        "total_tokens": 40,
+        "prompt_tokens_details": {
+          "cached_tokens": 16
+        }
+      }
+    },
+    "chain_settlement_claimed": false,
+    "production_claimed": false,
+    "disclosure": "The finalized chain proves the Bonsai descriptor/capsule/policy/control graph. Inference ran against the exact locally hashed 3.8 GB GGUF with the pinned Prism runtime. Fixture custody, production operation, assured inference, and chain settlement are not claimed."
+  },
+  "ordinary_chain": {
+    "deterministic_state_throughput": {
+      "checks": {
+        "deterministic_commitment": {
+          "pass": true
+        },
+        "durable_commitment": {
+          "pass": true
+        },
+        "durable_producer_median_tps": {
+          "minimum": 8000,
+          "observed": 10475.052353438741,
+          "pass": true
+        },
+        "durable_producer_sample_spread": {
+          "maximum": 0.3,
+          "observed": 0.030727991935000924,
+          "pass": true
+        },
+        "durable_validator_median_tps": {
+          "minimum": 7500,
+          "observed": 10115.84326512445,
+          "pass": true
+        },
+        "durable_validator_sample_spread": {
+          "maximum": 0.3,
+          "observed": 0.016595457475419007,
+          "pass": true
+        },
+        "maximum_root_share": {
+          "maximum": 0.15,
+          "observed": 0.07529662395967777,
+          "pass": true
+        },
+        "producer_median_tps": {
+          "minimum": 10000,
+          "observed": 17385.06386577062,
+          "pass": true
+        },
+        "producer_sample_spread": {
+          "maximum": 0.3,
+          "observed": 0.0355943785367666,
+          "pass": true
+        },
+        "validator_median_tps": {
+          "minimum": 7500,
+          "observed": 9478.400762518384,
+          "pass": true
+        },
+        "validator_sample_spread": {
+          "maximum": 0.3,
+          "observed": 0.036759306049081265,
+          "pass": true
+        }
+      },
+      "environment": {
+        "authorization": "ed25519-production",
+        "logical_cpus": 32,
+        "node_version": "0.1.0",
+        "release_build": true,
+        "scope": "single-process deterministic state execution; excludes consensus, networking, persistence, and indexer",
+        "target_arch": "x86_64",
+        "target_os": "windows"
+      },
+      "failures": [],
+      "samples": {
+        "durable_producer_tps": [
+          10639.212769183167,
+          10317.335444947988,
+          10475.052353438741
+        ],
+        "durable_validator_tps": [
+          10115.84326512445,
+          10023.655827753499,
+          10191.532874487875
+        ],
+        "producer_state_tps": [
+          17385.06386577062,
+          17086.14870348595,
+          17704.95924761005
+        ],
+        "root_share": [
+          0.03653223381524963,
+          0.03906712442287202,
+          0.037021595562836934,
+          0.07529662395967777,
+          0.06669475629513519,
+          0.06764657714449106
+        ],
+        "validator_state_tps": [
+          9249.181932980984,
+          9478.400762518384,
+          9597.601367466243
+        ]
+      },
+      "schema": "noos/throughput-regression-report/v1",
+      "state_commitment": {
+        "accounts_root": "2444fb6835c9c1cd711c812e787707177ced1986c85939edb48ca48ec7299581",
+        "notes_root": "c3c2ee6903fb8c1cfe5c34010778e5227fbb2228caa363ebdb7af2c97cdfd3f7",
+        "nullifiers_root": "c3c2ee6903fb8c1cfe5c34010778e5227fbb2228caa363ebdb7af2c97cdfd3f7",
+        "objects_root": "f15abe4ac04dd06631e4775d50173ca68a1fb1aa6bf78fcedde2c64d7fcf0239",
+        "params_root": "2b59ede6148c87ffc35aba7725dd0d25e14bd2e41b2649e7a27953ab3ac3f663",
+        "receipts_root": "84fe05c2687b1cd32e9ea871c19bd327479b66dbfaa5287116f4a39c02c72dec"
+      },
+      "verdict": "PASS",
+      "workload": {
+        "accounts": 1024,
+        "batch_size": 256,
+        "contention": "transactions are striped deterministically across fee-payer accounts",
+        "encoded_bytes": "5410000",
+        "kind": "signed-self-transfer",
+        "transactions": 10000,
+        "workload_blake3": "3fc040b271f04de7642b411d74ba093228d435f18b918fc7e1dea1d1049542af"
+      }
+    },
+    "live_transfer_finality_evidence_path": "evidence/live-devnet-smoke/d9eff530f8c96761dd450f79f635c3a955a030f90461ae872ba0b356830d6c00.json",
+    "live_transfer_finality_evidence_sha256": "fa9c6b33799f4005e54e7b87bfe29f4846b838a5192f3acbdc7c9b0baa65e207",
+    "live_transfer_finality": {
+      "schema_version": "noos.live-devnet-smoke.v1",
+      "scenario": "live-product-devnet-smoke",
+      "started": "2026-07-15T07:04:39.406Z",
+      "ended": "2026-07-15T07:07:49.184Z",
+      "topology": {
+        "validator": "127.0.0.1:18632",
+        "peer_observer": "127.0.0.1:18633",
+        "indexer": "127.0.0.1:18080",
+        "p2p": "/ip4/127.0.0.1/udp/19701/quic-v1",
+        "produce_interval_ms": 15
+      },
+      "journey": [
+        "cargo build (noosd, noos-indexer, noos-cli)",
+        "boot validator + QUIC-peered observer",
+        "anchor indexer checkpoint from live block 1 parent",
+        "boot indexer with live RPC ingestion",
+        "noos-cli keygen (recipient identity)",
+        "noos-cli tx build (faucet -> recipient NOOS_TEST transfer)",
+        "faucet fixture D-SIG-TX signature",
+        "noos-cli tx submit (identity-gated line protocol)",
+        "operator /receipt settlement + success receipt",
+        "finalized checkpoint covers settled height",
+        "peer syncs settled height over loopback QUIC",
+        "indexer /api/v1/transactions/<txid> + identity"
+      ],
+      "transfer": {
+        "txid": "e2f2affda7ca98e61412f1ef957da3dad1de2e3c880dae3a1675262fcde40a5a",
+        "settled_height": 25,
+        "fee_charged": "544",
+        "amount_micro": 123456789,
+        "recipient": "3b635be104607dfd4338ab308398818264709871cb0b32f587bd29d4cd86824d"
+      },
+      "checks": [
+        {
+          "name": "cli keygen",
+          "passed": true,
+          "detail": {
+            "path": [
+              "0xce4f4f53",
+              "0x80000001",
+              "0x80000001",
+              "0x80000000",
+              "0x80000000"
+            ],
+            "public_id": "3b635be104607dfd4338ab308398818264709871cb0b32f587bd29d4cd86824d"
+          }
+        },
+        {
+          "name": "validator boot",
+          "passed": true,
+          "detail": {
+            "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+            "genesis_hash": "6b4a001499b7c86452c6bd8dcc0f288b36ddeda700070af6269fb743697658fe",
+            "p2p": "/ip4/127.0.0.1/udp/19701/quic-v1"
+          }
+        },
+        {
+          "name": "peer boot (same identity)",
+          "passed": true,
+          "detail": {
+            "rpc": "127.0.0.1:18633",
+            "peer_of": "/ip4/127.0.0.1/udp/19701/quic-v1"
+          }
+        },
+        {
+          "name": "indexer live genesis anchor",
+          "passed": true,
+          "detail": {
+            "height": 0,
+            "hash": "7d9fccd8acc3e998d656889633b46d1175f37ea50a36424ce70bdb8573311fa4",
+            "derived_from_block": "75366ca08f11af8ff16efb9ec6f4a3a27774986630ef02b40a8fe5d4ebe00c65"
+          }
+        },
+        {
+          "name": "validator producing",
+          "passed": true,
+          "detail": {
+            "height": 23,
+            "hash": "c89bea2f08cf036e3925471716305e5d63bc00369e9b86d31979feb22afedcc2"
+          }
+        },
+        {
+          "name": "cli tx build+submit",
+          "passed": true,
+          "detail": {
+            "accepted": true,
+            "txid": "e2f2affda7ca98e61412f1ef957da3dad1de2e3c880dae3a1675262fcde40a5a"
+          }
+        },
+        {
+          "name": "transfer settled with success receipt",
+          "passed": true,
+          "detail": {
+            "state": {
+              "settled_height": 25,
+              "status_code": 0
+            },
+            "receipt": {
+              "txid": "e2f2affda7ca98e61412f1ef957da3dad1de2e3c880dae3a1675262fcde40a5a",
+              "status": 0,
+              "fee_charged": "544"
+            }
+          }
+        },
+        {
+          "name": "transfer block finalized",
+          "passed": true,
+          "detail": {
+            "finalized": {
+              "epoch": 1,
+              "hash": "f2a90a047da6e7517ce12250f46b3907c370c9840244ac477c6dc8b00fe5141d"
+            },
+            "settled_height": 25
+          }
+        },
+        {
+          "name": "peer synced over QUIC",
+          "passed": true,
+          "detail": {
+            "peer_head": 32,
+            "settled_height": 25
+          }
+        },
+        {
+          "name": "indexer serves transaction",
+          "passed": true,
+          "detail": {
+            "fee": "544",
+            "inclusion": {
+              "hash": "887e5127123dcf915dec1209c0a9c4feddfa661ecb2692f74fa2bc416bca6459",
+              "height": "25",
+              "index": "0"
+            },
+            "resource_counters": {},
+            "state": "INCLUDED",
+            "txid": "e2f2affda7ca98e61412f1ef957da3dad1de2e3c880dae3a1675262fcde40a5a",
+            "wtxid": "e2f2affda7ca98e61412f1ef957da3dad1de2e3c880dae3a1675262fcde40a5a"
+          }
+        },
+        {
+          "name": "indexer identity matches devnet",
+          "passed": true,
+          "detail": {
+            "api_version": "v1",
+            "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+            "evidence_registry_root": "0000000000000000000000000000000000000000000000000000000000000000",
+            "finalized": {
+              "hash": "f2a90a047da6e7517ce12250f46b3907c370c9840244ac477c6dc8b00fe5141d",
+              "height": "256",
+              "state_root": "0000000000000000000000000000000000000000000000000000000000000000"
+            },
+            "freshness_ms": "0",
+            "genesis_hash": "6b4a001499b7c86452c6bd8dcc0f288b36ddeda700070af6269fb743697658fe",
+            "indexed_generation": "35",
+            "justified": {
+              "hash": "d65497c5a7e5ff83c2e627a391feb4006db025d90cc0312d69cfb174b774eac7",
+              "height": "512",
+              "state_root": "0000000000000000000000000000000000000000000000000000000000000000"
+            },
+            "protocol_version": "v1",
+            "readiness": "ready",
+            "ready": true,
+            "release_version": "0.1.0",
+            "unsafe_head": {
+              "hash": "638d1e9349dee4ffc95952ef284b40c96c20fe003997a337d7eb9a7cb5f6b2ba",
+              "height": "513",
+              "state_root": "0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          }
+        }
+      ],
+      "sources_sha256": {
+        "tools/e2e/live_smoke.py": "02451888d6dd63e7205c9f7146fc897a46e3312247d490859cee215b5f5e91b3",
+        "protocol/genesis/devnet-parameters.toml": "11ddd7c816361830448f9cabb742777482c978ffc3c29ce7b285cd2fbeef9c01"
+      },
+      "verdict": "PASS"
+    },
+    "isolated_fixture_sample": {
+      "produce_interval_ms": 25,
+      "elapsed_seconds": 6.011,
+      "unsafe_height_before": 1643,
+      "unsafe_height_after": 1795,
+      "finalized_epoch_before": 5,
+      "finalized_epoch_after": 6
+    }
+  },
+  "artifact_store": {
+    "phase": "PRE_INGEST",
+    "source_bundle_path": "D:\\noosphere-artifacts\\bonsai",
+    "source_bundle_files": 7,
+    "source_bundle_disk_bytes": 7607321337,
+    "service_endpoint": "http://127.0.0.1:9761",
+    "listener_reachable_before": false,
+    "listener_reachable_after": false,
+    "observation_interval_seconds": 1.516,
+    "queue_depth": null,
+    "queue_capacity": null,
+    "download_bytes": 0,
+    "upload_bytes": 0,
+    "metrics_status": "UNAVAILABLE_BEFORE_STANDALONE_ARTIFACT_SERVICE",
+    "measurement_basis": "No listener was reachable at either interval boundary; queue gauges do not exist before the service is installed."
+  }
+}

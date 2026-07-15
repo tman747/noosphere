@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:noos:promotion-blockers:v2",
+  "title": "NOOSPHERE protocol-v2 immutable staged-promotion blocker ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "predecessor", "ledger_policy", "protocol_binding", "authorization_binding", "release_manifest", "contracts", "cutover", "gates", "owner_decisions", "external_blockers"],
+  "properties": {
+    "$schema": {"const": "promotion-blockers-schema-v2.json"},
+    "schema_version": {"const": 2},
+    "predecessor": {"$ref": "#/$defs/predecessor"},
+    "ledger_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["append_only", "no_waivers", "no_fabricated_evidence", "promotion_order"],
+      "properties": {
+        "append_only": {"const": true},
+        "no_waivers": {"const": true},
+        "no_fabricated_evidence": {"const": true},
+        "promotion_order": {"const": ["G0", "G1", "G2", "G3", "GENESIS", "G4", "G5"]}
+      }
+    },
+    "protocol_binding": {"$ref": "#/$defs/v2Binding"},
+    "authorization_binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "gate_record_domain_id", "role_keyring_sha256", "final_freeze_sha256", "ledger_root"],
+      "properties": {
+        "schema_version": {"const": 2},
+        "gate_record_domain_id": {"const": "D-PROMOTION-GATE-V2"},
+        "role_keyring_sha256": {"$ref": "#/$defs/hashOrBlocked"},
+        "final_freeze_sha256": {"$ref": "#/$defs/hashOrBlocked"},
+        "ledger_root": {"$ref": "#/$defs/hashOrBlocked"}
+      }
+    },
+    "release_manifest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "path", "status", "sha256"],
+      "properties": {
+        "schema": {"const": "protocol-release-manifest-v2.schema.json"},
+        "path": {"const": "protocol/release/protocol-release-manifest-v2.json"},
+        "status": {"enum": ["OWNER_BLOCKED", "BOUND"]},
+        "sha256": {"$ref": "#/$defs/hashOrBlocked"}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "OWNER_BLOCKED"}}, "required": ["status"]}, "then": {"properties": {"sha256": {"const": "OWNER_BLOCKED"}}}},
+        {"if": {"properties": {"status": {"const": "BOUND"}}, "required": ["status"]}, "then": {"properties": {"sha256": {"$ref": "#/$defs/hash"}}}}
+      ]
+    },
+    "contracts": {"$ref": "#/$defs/contracts"},
+    "cutover": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dns_cutover", "execution_authority", "prepared_manifest", "rollback_target"],
+      "properties": {
+        "dns_cutover": {"const": "PROHIBITED"},
+        "execution_authority": {"const": "SIGNED_G5_ONLY"},
+        "prepared_manifest": {"type": "string", "minLength": 1},
+        "rollback_target": {"enum": ["OWNER_BLOCKED_STATIC_MAINTENANCE", "SIGNED_STATIC_MAINTENANCE", "SIGNED_LAST_KNOWN_GOOD_NOOSPHERE"]}
+      }
+    },
+    "gates": {
+      "type": "array", "minItems": 7, "maxItems": 7,
+      "items": {"$ref": "#/$defs/gateBase"}
+    },
+    "owner_decisions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/blocker"}},
+    "external_blockers": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/blocker"}}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "hashOrBlocked": {"anyOf": [{"$ref": "#/$defs/hash"}, {"const": "OWNER_BLOCKED"}]},
+    "predecessor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "ledger_path", "schema_version", "protocol_version", "api_version", "release_version", "root_algorithm", "predecessor_root", "relation"],
+      "properties": {
+        "kind": {"const": "noosphere-promotion-ledger-predecessor-v1"},
+        "ledger_path": {"const": "protocol/release/promotion-blockers.json"},
+        "schema_version": {"const": 1},
+        "protocol_version": {"const": "v1"},
+        "api_version": {"const": "v1"},
+        "release_version": {"const": "0.0.0-preproduction"},
+        "root_algorithm": {"const": "SHA-256-EXACT-FILE-BYTES"},
+        "predecessor_root": {"const": "2509d617934e2c69eea64c6af228ae1b43aa2953269589c9da8b0099f0faf759"},
+        "relation": {"const": "DIRECT_IMMUTABLE_PREDECESSOR"}
+      }
+    },
+    "v2Binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["protocol_identity", "protocol_version", "api_version", "peer_identity", "release_version", "revision", "chain_id", "genesis_hash"],
+      "properties": {
+        "protocol_identity": {"const": "noos-protocol-identity-v2"},
+        "protocol_version": {"const": "v2"},
+        "api_version": {"const": "v2"},
+        "peer_identity": {"const": "v2-only"},
+        "release_version": {"const": "0.0.0-bonsai-v2-preproduction"},
+        "revision": {"type": "string", "minLength": 1},
+        "chain_id": {"$ref": "#/$defs/hashOrBlocked"},
+        "genesis_hash": {"$ref": "#/$defs/hashOrBlocked"}
+      }
+    },
+    "contracts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "crypto_domain_registry", "action_registry", "payload_tags", "resolver", "light_update", "transaction_bounds", "v1_decode_policy", "model_execution"],
+      "properties": {
+        "schema": {"const": "protocol/schemas/wwm-v2.md"},
+        "crypto_domain_registry": {"const": "protocol/spec/crypto-domains-v1.csv"},
+        "action_registry": {
+          "type": "object", "additionalProperties": false,
+          "required": ["container", "first_discriminant", "last_discriminant", "variant_count"],
+          "properties": {
+            "container": {"const": "ActionV1"}, "first_discriminant": {"const": 40},
+            "last_discriminant": {"const": 59}, "variant_count": {"const": 60}
+          }
+        },
+        "payload_tags": {
+          "type": "object", "additionalProperties": false,
+          "required": ["action_41", "action_50", "action_52", "action_58", "action_59"],
+          "properties": {
+            "action_41": {"const": ["InstallProfile", "TransitionCapability"]},
+            "action_50": {"const": ["InstallProfile", "TransitionCapability"]},
+            "action_52": {"const": ["StageFundProfile", "LockFundMutation", "ActivateFundProfile", "CloseFundProfile"]},
+            "action_58": {"const": ["TransitionServingAlias"]},
+            "action_59": {"const": ["Activate", "EmergencyDisable", "AuthorizeOperationalConfig", "ApplyOperationalConfig", "Recover"]}
+          }
+        },
+        "resolver": {
+          "type": "object", "additionalProperties": false,
+          "required": ["target", "max_bytes", "max_proofs", "authorized_target", "authorized_max_bytes", "normal_leaf_count"],
+          "properties": {
+            "target": {"const": "/model-resolution/<selector>"}, "max_bytes": {"const": 262144},
+            "max_proofs": {"const": 17}, "normal_leaf_count": {"const": 17},
+            "authorized_target": {"const": "/authorized-config/<config_id>"}, "authorized_max_bytes": {"const": 393216}
+          }
+        },
+        "light_update": {
+          "type": "object", "additionalProperties": false,
+          "required": ["protocol", "max_items", "max_item_bytes", "request_min_items"],
+          "properties": {
+            "protocol": {"const": "/noos/sync/light-update/2"}, "max_items": {"const": 128},
+            "max_item_bytes": {"const": 262144}, "request_min_items": {"const": 1}
+          }
+        },
+        "transaction_bounds": {
+          "type": "object", "additionalProperties": false,
+          "required": ["action_call_max_bytes", "tx_plus_witness_max_bytes", "tx_push_max_bytes", "tx_push_length_prefix_bytes"],
+          "properties": {
+            "action_call_max_bytes": {"const": 65536}, "tx_plus_witness_max_bytes": {"const": 65532},
+            "tx_push_max_bytes": {"const": 65536}, "tx_push_length_prefix_bytes": {"const": 4}
+          }
+        },
+        "v1_decode_policy": {"const": "REJECT_V1_WWM_BYTES"},
+        "model_execution": {"const": "OFF_CHAIN_ONLY"}
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requirement_id", "description", "status", "bundle_refs", "exact_revision", "threshold", "observed", "verdict"],
+      "properties": {
+        "requirement_id": {"type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]+$"},
+        "description": {"type": "string", "minLength": 1},
+        "status": {"enum": ["UNSATISFIED", "SATISFIED", "OWNER_BLOCKED", "EXTERNAL_BLOCKED", "KILLED", "NOT_APPLICABLE"]},
+        "bundle_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "exact_revision": {"type": "string", "minLength": 1},
+        "threshold": {"type": "string", "minLength": 1},
+        "observed": {"type": "string", "minLength": 1},
+        "verdict": {"enum": ["PASS", "FAIL", "BLOCKED", "NOT_RUN", "KILLED"]}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "SATISFIED"}}, "required": ["status"]}, "then": {"properties": {"verdict": {"const": "PASS"}, "bundle_refs": {"minItems": 1}}}},
+        {"if": {"properties": {"verdict": {"const": "PASS"}}, "required": ["verdict"]}, "then": {"properties": {"status": {"const": "SATISFIED"}, "bundle_refs": {"minItems": 1}}}}
+      ]
+    },
+    "signature": {
+      "type": "object", "additionalProperties": false,
+      "required": ["role", "key_id", "signature_ed25519_hex"],
+      "properties": {
+        "role": {"enum": ["release-owner", "independent-build-reviewer", "operations-owner", "security-reviewer"]},
+        "key_id": {"type": "string", "minLength": 1},
+        "signature_ed25519_hex": {"type": "string", "pattern": "^[0-9a-f]{128}$"}
+      }
+    },
+    "authorizationRecord": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "kind", "gate_id", "exact_revision", "chain_id", "genesis_hash", "ordered_prerequisite_record_hashes", "requirement_ids", "evidence_artifacts", "unresolved", "decision", "signer_roles", "signer_key_ids", "predecessor_record_hash", "predecessor_ledger_root", "role_keyring_sha256"],
+      "properties": {
+        "schema_version": {"const": 2}, "kind": {"const": "noosphere-promotion-gate-record-v2"},
+        "gate_id": {"enum": ["G0", "G1", "G2", "G3", "GENESIS", "G4", "G5"]},
+        "exact_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "chain_id": {"$ref": "#/$defs/hash"}, "genesis_hash": {"$ref": "#/$defs/hash"},
+        "ordered_prerequisite_record_hashes": {"type": "array", "items": {"$ref": "#/$defs/hash"}, "uniqueItems": true},
+        "requirement_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true},
+        "evidence_artifacts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidenceArtifact"}},
+        "unresolved": {"const": []}, "decision": {"const": "PASSED"},
+        "signer_roles": {"const": ["release-owner", "independent-build-reviewer", "operations-owner", "security-reviewer"]},
+        "signer_key_ids": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "predecessor_record_hash": {"$ref": "#/$defs/hash"}, "predecessor_ledger_root": {"$ref": "#/$defs/hash"},
+        "role_keyring_sha256": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "evidenceArtifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requirement_id", "path", "sha256", "schema", "kind"],
+      "properties": {
+        "requirement_id": {"type": "string", "minLength": 1}, "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/hash"}, "schema": {"type": "string", "minLength": 1}, "kind": {"type": "string", "minLength": 1}
+      }
+    },
+    "gateBase": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gate", "state", "immutable_record", "requirements", "unresolved", "signatures"],
+      "properties": {
+        "gate": {"enum": ["G0", "G1", "G2", "G3", "GENESIS", "G4", "G5"]},
+        "state": {"enum": ["BLOCKED", "PASSED", "KILLED"]}, "immutable_record": {"const": true},
+        "requirements": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence"}},
+        "unresolved": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "authorization_record": {"$ref": "#/$defs/authorizationRecord"},
+        "signatures": {"type": "array", "items": {"$ref": "#/$defs/signature"}}
+      },
+      "allOf": [
+        {"if": {"properties": {"state": {"const": "PASSED"}}, "required": ["state"]}, "then": {"required": ["authorization_record"], "properties": {"unresolved": {"maxItems": 0}, "signatures": {"minItems": 4, "maxItems": 4}, "requirements": {"items": {"allOf": [{"$ref": "#/$defs/evidence"}, {"properties": {"status": {"const": "SATISFIED"}, "verdict": {"const": "PASS"}, "bundle_refs": {"minItems": 1}}}]}}}}},
+        {"if": {"properties": {"state": {"const": "BLOCKED"}}, "required": ["state"]}, "then": {"properties": {"unresolved": {"minItems": 1}, "signatures": {"maxItems": 0}}, "not": {"required": ["authorization_record"]}}}
+      ]
+    },
+    "g0": {"allOf": [{"$ref": "#/$defs/gateBase"}, {"properties": {"gate": {"const": "G0"}}}]},
+    "g1": {"allOf": [{"$ref": "#/$defs/gateBase"}, {"properties": {"gate": {"const": "G1"}}}]},
+    "g2": {"allOf": [{"$ref": "#/$defs/gateBase"}, {"properties": {"gate": {"const": "G2"}}}]},
+    "g3": {"allOf": [{"$ref": "#/$defs/gateBase"}, {"properties": {"gate": {"const": "G3"}}}]},
+    "genesis": {"allOf": [{"$ref": "#/$defs/gateBase"}, {"properties": {"gate": {"const": "GENESIS"}}}]},
+    "g4": {"allOf": [{"$ref": "#/$defs/gateBase"}, {"properties": {"gate": {"const": "G4"}}}]},
+    "g5": {"allOf": [{"$ref": "#/$defs/gateBase"}, {"properties": {"gate": {"const": "G5"}}}]},
+    "blocker": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "description", "owner", "status", "required_for", "resolution_artifact"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1}, "description": {"type": "string", "minLength": 1},
+        "owner": {"type": "string", "minLength": 1}, "status": {"enum": ["OWNER_BLOCKED", "EXTERNAL_BLOCKED"]},
+        "required_for": {"type": "array", "minItems": 1, "items": {"enum": ["G0", "G1", "G2", "G3", "GENESIS", "G4", "G5"]}, "uniqueItems": true},
+        "resolution_artifact": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

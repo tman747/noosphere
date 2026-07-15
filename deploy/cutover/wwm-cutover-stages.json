@@ -1,0 +1,16 @@
+{
+  "schema": "noos/wwm-cutover-stages/v1",
+  "production_ttl_precondition_seconds": 300,
+  "ttl_precondition_lead_seconds": 172800,
+  "stages": [
+    {"stage_id": "preflight", "traffic_percent": 0, "minimum_observation_seconds": 0, "action": "verify_finalized_production_and_static_target"},
+    {"stage_id": "service_discovery_1", "traffic_percent": 1, "minimum_observation_seconds": 1800, "action": "set_service_discovery_weight"},
+    {"stage_id": "service_discovery_5", "traffic_percent": 5, "minimum_observation_seconds": 3600, "action": "set_service_discovery_weight"},
+    {"stage_id": "service_discovery_25", "traffic_percent": 25, "minimum_observation_seconds": 7200, "action": "set_service_discovery_weight"},
+    {"stage_id": "service_discovery_50", "traffic_percent": 50, "minimum_observation_seconds": 14400, "action": "set_service_discovery_weight"},
+    {"stage_id": "service_discovery_100", "traffic_percent": 100, "minimum_observation_seconds": 86400, "action": "set_service_discovery_weight"},
+    {"stage_id": "dns_cutover", "traffic_percent": 100, "minimum_observation_seconds": 0, "action": "apply_signed_dns_records"},
+    {"stage_id": "cutover_complete", "traffic_percent": 100, "minimum_observation_seconds": 0, "action": "append_cutover_complete_and_restore_steady_ttl"}
+  ],
+  "rollback_stage": {"stage_id": "static_maintenance_rollback", "traffic_percent": 0, "action": "route_signed_static_maintenance"}
+}

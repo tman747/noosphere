@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:noos:protocol-release-manifest:v2",
+  "title": "NOOSPHERE protocol/API-v2 release manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "manifest_kind", "predecessor_binding", "release", "source", "identity", "contracts", "activation_boundary", "toolchain_locks", "artifact_hashes", "checksums", "sbom", "provenance", "reproducibility", "gate_verdicts", "unresolved_findings", "signatures"],
+  "properties": {
+    "$schema": {"const": "protocol-release-manifest-v2.schema.json"},
+    "schema_version": {"const": 2},
+    "manifest_kind": {"const": "noosphere-protocol-release-manifest-v2"},
+    "predecessor_binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["promotion_ledger", "release_schema", "relation"],
+      "properties": {
+        "promotion_ledger": {
+          "type": "object", "additionalProperties": false,
+          "required": ["path", "schema_version", "protocol_version", "api_version", "root_algorithm", "root"],
+          "properties": {
+            "path": {"const": "protocol/release/promotion-blockers.json"},
+            "schema_version": {"const": 1}, "protocol_version": {"const": "v1"}, "api_version": {"const": "v1"},
+            "root_algorithm": {"const": "SHA-256-EXACT-FILE-BYTES"},
+            "root": {"const": "2509d617934e2c69eea64c6af228ae1b43aa2953269589c9da8b0099f0faf759"}
+          }
+        },
+        "release_schema": {
+          "type": "object", "additionalProperties": false,
+          "required": ["path", "schema_version", "root_algorithm", "root"],
+          "properties": {
+            "path": {"const": "protocol/release/manifest-schema-v1.json"}, "schema_version": {"const": 1},
+            "root_algorithm": {"const": "SHA-256-EXACT-FILE-BYTES"},
+            "root": {"const": "10d9f1e939fa304508f483db4023bd3d412458136c4b628c48831e2052fcb6c5"}
+          }
+        },
+        "relation": {"const": "CLEAN_V2_CUTOVER_FROM_IMMUTABLE_V1"}
+      }
+    },
+    "release": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "channel", "date", "protocol_identity", "protocol_version", "api_version", "peer_identity"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1}, "channel": {"enum": ["devnet", "testnet", "beta", "stable"]},
+        "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+        "protocol_identity": {"const": "noos-protocol-identity-v2"}, "protocol_version": {"const": "v2"},
+        "api_version": {"const": "v2"}, "peer_identity": {"const": "v2-only"}
+      }
+    },
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["spec_revision", "plan_revision", "repo_revision"],
+      "properties": {
+        "spec_revision": {"type": "string", "minLength": 1}, "plan_revision": {"type": "string", "minLength": 1},
+        "repo_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      }
+    },
+    "identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["chain_name", "is_test_network", "protocol_identity", "chain_id", "genesis_hash"],
+      "properties": {
+        "chain_name": {"type": "string", "pattern": "^noos-[a-z0-9-]+$"}, "is_test_network": {"type": "boolean"},
+        "protocol_identity": {"const": "noos-protocol-identity-v2"}, "chain_id": {"$ref": "#/$defs/hash"}, "genesis_hash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "contracts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["wwm_v2_schema_sha256", "crypto_domains_sha256", "promotion_ledger_v2_sha256", "action_variant_count", "action_discriminants", "payload_tags", "resolver", "light_update", "transaction_bounds", "v1_wwm_decode"],
+      "properties": {
+        "wwm_v2_schema_sha256": {"$ref": "#/$defs/hash"}, "crypto_domains_sha256": {"$ref": "#/$defs/hash"},
+        "promotion_ledger_v2_sha256": {"$ref": "#/$defs/hash"}, "action_variant_count": {"const": 60},
+        "action_discriminants": {"const": [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59]},
+        "payload_tags": {
+          "type": "object", "additionalProperties": false,
+          "required": ["41", "50", "52", "58", "59"],
+          "properties": {
+            "41": {"const": ["InstallProfile", "TransitionCapability"]}, "50": {"const": ["InstallProfile", "TransitionCapability"]},
+            "52": {"const": ["StageFundProfile", "LockFundMutation", "ActivateFundProfile", "CloseFundProfile"]},
+            "58": {"const": ["TransitionServingAlias"]},
+            "59": {"const": ["Activate", "EmergencyDisable", "AuthorizeOperationalConfig", "ApplyOperationalConfig", "Recover"]}
+          }
+        },
+        "resolver": {"const": {"normal_max_bytes": 262144, "normal_max_proofs": 17, "authorized_max_bytes": 393216}},
+        "light_update": {"const": {"protocol": "/noos/sync/light-update/2", "min_items": 1, "max_items": 128, "max_item_bytes": 262144}},
+        "transaction_bounds": {"const": {"action_call_max_bytes": 65536, "tx_plus_witness_max_bytes": 65532, "tx_push_prefix_bytes": 4, "tx_push_max_bytes": 65536}},
+        "v1_wwm_decode": {"const": "REJECT"}
+      }
+    },
+    "activation_boundary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["controls_enabled", "promotion_effect", "dns_cutover", "model_execution"],
+      "properties": {
+        "controls_enabled": {"const": false}, "promotion_effect": {"const": "NONE"},
+        "dns_cutover": {"const": "PROHIBITED"}, "model_execution": {"const": "OFF_CHAIN_ONLY"}
+      }
+    },
+    "toolchain_locks": {"type": "object", "minProperties": 1},
+    "artifact_hashes": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/hash"}},
+    "checksums": {"$ref": "#/$defs/fileBinding"}, "sbom": {"$ref": "#/$defs/fileBinding"}, "provenance": {"$ref": "#/$defs/fileBinding"},
+    "reproducibility": {
+      "type": "object", "additionalProperties": false,
+      "required": ["target", "trusted_repro_builders_sha256", "assurance_report_sha256"],
+      "properties": {
+        "target": {"enum": ["windows-x86_64", "linux-x86_64", "linux-aarch64"]},
+        "trusted_repro_builders_sha256": {"$ref": "#/$defs/hash"}, "assurance_report_sha256": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "gate_verdicts": {
+      "type": "array", "minItems": 7, "maxItems": 7,
+      "items": {"$ref": "#/$defs/gate"}
+    },
+    "unresolved_findings": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["finding_id", "severity", "summary", "owner", "status"],
+        "properties": {
+          "finding_id": {"type": "string", "minLength": 1}, "severity": {"type": "string", "minLength": 1},
+          "summary": {"type": "string", "minLength": 1}, "owner": {"type": "string", "minLength": 1},
+          "status": {"enum": ["OPEN", "EXTERNAL_BLOCKED"]}
+        }
+      }
+    },
+    "signatures": {
+      "type": "array", "maxItems": 2,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["role", "key_id", "signature_ed25519_hex"],
+        "properties": {
+          "role": {"enum": ["release-owner", "independent-build-reviewer"]}, "key_id": {"type": "string", "minLength": 1},
+          "signature_ed25519_hex": {"type": "string", "pattern": "^[0-9a-f]{128}$"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "fileBinding": {
+      "type": "object", "additionalProperties": false, "required": ["path", "sha256"],
+      "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/hash"}}
+    },
+    "gate": {
+      "type": "object", "additionalProperties": false, "required": ["gate", "verdict", "ledger_record_hash"],
+      "properties": {
+        "gate": {"enum": ["G0", "G1", "G2", "G3", "GENESIS", "G4", "G5"]},
+        "verdict": {"const": "BLOCKED"}, "ledger_record_hash": {"const": "OWNER_BLOCKED"}
+      }
+    },
+    "g0": {"allOf": [{"$ref": "#/$defs/gate"}, {"properties": {"gate": {"const": "G0"}}}]},
+    "g1": {"allOf": [{"$ref": "#/$defs/gate"}, {"properties": {"gate": {"const": "G1"}}}]},
+    "g2": {"allOf": [{"$ref": "#/$defs/gate"}, {"properties": {"gate": {"const": "G2"}}}]},
+    "g3": {"allOf": [{"$ref": "#/$defs/gate"}, {"properties": {"gate": {"const": "G3"}}}]},
+    "genesis": {"allOf": [{"$ref": "#/$defs/gate"}, {"properties": {"gate": {"const": "GENESIS"}}}]},
+    "g4": {"allOf": [{"$ref": "#/$defs/gate"}, {"properties": {"gate": {"const": "G4"}}}]},
+    "g5": {"allOf": [{"$ref": "#/$defs/gate"}, {"properties": {"gate": {"const": "G5"}}}]}
+  }
+}

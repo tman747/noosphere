@@ -1,0 +1,43 @@
+services:
+  artifact-store:
+    environment:
+      WWM_DEPLOYMENT: production
+      WWM_PRODUCTION_AUTHORIZATION_FILE: /run/secrets/production_authorization
+    secrets: [production_authorization]
+  custodian:
+    environment:
+      WWM_DEPLOYMENT: production
+      WWM_PRODUCTION_AUTHORIZATION_FILE: /run/secrets/production_authorization
+    secrets:
+      - custodian_signing_key
+      - production_authorization
+  executor:
+    environment:
+      WWM_DEPLOYMENT: production
+      WWM_PRODUCTION_AUTHORIZATION_FILE: /run/secrets/production_authorization
+    secrets:
+      - executor_signing_key
+      - production_authorization
+  edge:
+    environment:
+      WWM_DEPLOYMENT: production
+      WWM_PRODUCTION_AUTHORIZATION_FILE: /run/secrets/production_authorization
+    secrets:
+      - edge_signing_key
+      - production_authorization
+  gateway:
+    environment:
+      WWM_DEPLOYMENT: production
+      WWM_PRODUCTION_AUTHORIZATION_FILE: /run/secrets/production_authorization
+    secrets:
+      - gateway_database_url
+      - gateway_signing_key
+      - production_authorization
+  prometheus:
+    environment:
+      WWM_DEPLOYMENT: production
+      WWM_PRODUCTION_AUTHORIZATION_FILE: /run/secrets/production_authorization
+    secrets: [production_authorization]
+secrets:
+  production_authorization:
+    file: ${WWM_PRODUCTION_AUTHORIZATION_FILE:?finalized threshold-signed G5 authorization file required}

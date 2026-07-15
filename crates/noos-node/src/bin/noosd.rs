@@ -67,6 +67,10 @@ OPTIONS:
     --devnet-witness-fixture
                            Install fixture witness bonds for certificate
                            verification without signing (TEST NETWORKS ONLY)
+    --devnet-bonsai-fixture
+                           Register the exact Bonsai-27B capsule/artifact/
+                           policy graph in Testnet mode at genesis. Weights
+                           remain off chain (TEST NETWORKS ONLY).
     --observer             Observer mode: transaction submission disabled
                            (explicit feature_disabled, never empty success)
     --p2p-listen <multiaddr>
@@ -115,6 +119,7 @@ fn main() -> ExitCode {
     let mut devnet_governance_account: Option<noos_node::Hash32> = None;
     let mut devnet_contract_fixture = false;
     let mut devnet_witness_fixture = false;
+    let mut devnet_bonsai_fixture = false;
     let mut light = false;
     let mut retention: u64 = 0;
     let mut social: Option<noos_braid::CheckpointRef> = None;
@@ -264,6 +269,7 @@ fn main() -> ExitCode {
             }
             "--devnet-contract-fixture" => devnet_contract_fixture = true,
             "--devnet-witness-fixture" => devnet_witness_fixture = true,
+            "--devnet-bonsai-fixture" => devnet_bonsai_fixture = true,
             "--observer" => observer = true,
             "--light" => light = true,
             "--retention" => match take("--retention").and_then(|v| v.parse().ok()) {
@@ -327,6 +333,13 @@ fn main() -> ExitCode {
         );
         return ExitCode::FAILURE;
     }
+    if devnet_bonsai_fixture && !params.is_test_network {
+        eprintln!(
+            "error: --devnet-bonsai-fixture is a devnet fixture; \
+             is_test_network = false"
+        );
+        return ExitCode::FAILURE;
+    }
     let min_bond = params.min_bond_micro;
     let witness_bonds =
         if validator || devnet_producer || devnet_witness.is_some() || devnet_witness_fixture {
@@ -363,6 +376,7 @@ fn main() -> ExitCode {
         BTreeMap::new()
     };
     spec.contract_codes = contract_codes.clone();
+    spec.wwm_bonsai_fixture = devnet_bonsai_fixture;
     let cfg = NodeConfig {
         mode: if light {
             NodeMode::Light

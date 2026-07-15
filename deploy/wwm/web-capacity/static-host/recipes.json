@@ -1,0 +1,113 @@
+{
+  "schema": "noos/wwm-web-static-host-recipes/v1",
+  "status": "EXPERIMENTAL_UNREWARDED",
+  "bundle_root": "/srv/noos-wwm-web-capacity",
+  "public_infrastructure_catalog": "public-infrastructure.json",
+  "canonical_files": {
+    "host_manifest": "/.well-known/noos/wwm-web-capacity-v1.json",
+    "inventory": "/inventory-v1.json",
+    "license": "/LICENSE.txt",
+    "notice": "/NOTICE.txt",
+    "shares": "/shares/{stripe:06}/{position:02}.share"
+  },
+  "authorization": {
+    "authority": "WEB_CAPACITY_COORDINATOR_OWNER",
+    "config_field": "source_allowlist",
+    "required_fields": ["origin", "provider", "region", "control_cluster"],
+    "duplicate_origins": "REJECT",
+    "registration_endpoint": "/api/wwm-web-capacity/v1/hosts",
+    "well_known_fetch": "SERVER_SIDE_FIXED_PATH",
+    "production_custody": false,
+    "rewards": false
+  },
+  "lifecycle": {
+    "coordinator_refresh_max_seconds": 60,
+    "renewal_publish_order": [
+      "REMOVE_OR_WITHHOLD_NEW_HOST_MANIFEST",
+      "PUBLISH_AND_INVALIDATE_INVENTORY",
+      "VERIFY_LIVE_INVENTORY_BYTES",
+      "PUBLISH_60_SECOND_HOST_MANIFEST_LAST"
+    ],
+    "removed_or_invalid_manifest": "DEACTIVATE_FUTURE_ASSIGNMENTS",
+    "expired_manifest": "DEACTIVATE_FUTURE_ASSIGNMENTS",
+    "existing_browser_assignments": "NOT_REVOKED_BY_HOST_EXPIRY",
+    "cached_public_bytes_may_remain": true,
+    "public_share_license": "Apache-2.0",
+    "third_party_cache_erasure_available": false
+  },
+  "response_contract": {
+    "https": "REQUIRED",
+    "canonical_origin": "EXACT",
+    "redirects": "REJECT",
+    "content_encoding": "IDENTITY_OR_ABSENT",
+    "shares": {
+      "methods": ["GET", "HEAD"],
+      "cors_allow_origin": "*",
+      "credentials": "OMIT",
+      "accept_ranges": "bytes",
+      "cache_control_tokens": ["public", "immutable"],
+      "content_length": 1047552,
+      "transport_sha256": "SIGNED_INVENTORY_MATCH",
+      "protocol_authority": "NOOS_DA_SHARE_COMMITMENT_AND_PROBE_ROOT"
+    },
+    "metadata": {
+      "methods": ["GET", "HEAD"],
+      "cors_allow_origin": "*",
+      "credentials": "OMIT",
+      "host_manifest_cache_control": "public, max-age=60, must-revalidate",
+      "inventory_cache_control": "public, max-age=0, no-cache, must-revalidate",
+      "license_notice_cache_control": "public, max-age=31536000, immutable"
+    }
+  },
+  "recipes": [
+    {
+      "id": "nginx",
+      "kind": "ORIGIN_SERVER",
+      "file": "nginx.conf",
+      "range_support": "NATIVE_STATIC_FILE",
+      "automatic_compression": false,
+      "cache_profile": "MANIFEST_60S_INVENTORY_ALWAYS_REVALIDATE_LEGAL_IMMUTABLE"
+    },
+    {
+      "id": "caddy",
+      "kind": "ORIGIN_SERVER",
+      "file": "Caddyfile",
+      "range_support": "NATIVE_STATIC_FILE",
+      "automatic_compression": false,
+      "cache_profile": "MANIFEST_60S_INVENTORY_ALWAYS_REVALIDATE_LEGAL_IMMUTABLE"
+    },
+    {
+      "id": "pages",
+      "kind": "STATIC_CDN",
+      "file": "_headers",
+      "providers": ["Cloudflare Pages", "Netlify"],
+      "range_support": "PROVIDER_NATIVE_STATIC_FILE",
+      "automatic_compression": false,
+      "cache_profile": "MANIFEST_60S_INVENTORY_ALWAYS_REVALIDATE_LEGAL_IMMUTABLE"
+    },
+    {
+      "id": "cloudfront",
+      "kind": "STATIC_CDN",
+      "file": "cloudfront.tf",
+      "range_support": "CLOUDFRONT_NATIVE_RANGE_GET",
+      "automatic_compression": false,
+      "cache_profile": "MANIFEST_60S_INVENTORY_ALWAYS_REVALIDATE_LEGAL_IMMUTABLE"
+    }
+  ],
+  "verification": {
+    "command": "python tools/operations/wwm_static_host.py register",
+    "coordinator_checks": [
+      "owner_authorized_exact_origin",
+      "public_dns_and_ssrf_policy",
+      "https_without_redirects",
+      "signed_manifest_and_inventory",
+      "exact_inventory_and_license_hashes",
+      "range_cors_cache_and_content_length_headers",
+      "sample_transport_sha256",
+      "canonical_noos_da_commitments"
+    ],
+    "success_class": "StatelessReissueable",
+    "production_custody": false,
+    "rewards": false
+  }
+}

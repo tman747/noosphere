@@ -1,0 +1,28 @@
+services:
+  artifact-store:
+    environment:
+      WWM_DEPLOYMENT: devnet
+      WWM_PRODUCTION_CAPABLE: "false"
+  custodian:
+    environment:
+      WWM_DEPLOYMENT: devnet
+      WWM_PRODUCTION_CAPABLE: "false"
+  executor:
+    environment:
+      WWM_DEPLOYMENT: devnet
+      WWM_PRODUCTION_CAPABLE: "false"
+    deploy:
+      resources:
+        reservations:
+          memory: 8G
+  edge:
+    environment:
+      WWM_DEPLOYMENT: devnet
+      WWM_PRODUCTION_CAPABLE: "false"
+  gateway:
+    environment:
+      WWM_DEPLOYMENT: devnet
+      WWM_PRODUCTION_CAPABLE: "false"
+  prometheus:
+    environment:
+      WWM_DEPLOYMENT: devnet

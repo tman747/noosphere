@@ -1,0 +1,44 @@
+{
+  "schema": "noos/wwm-runtime-config/v1",
+  "runtime": "prism-ml/llama.cpp",
+  "source_revision": "62061f91088281e65071cc38c5f69ee95c39f14e",
+  "source_repository": "https://github.com/PrismML-Eng/llama.cpp",
+  "runtime_root": "690d9bbd8d44631fb971e0b0677e10c8d0bb1e08a743bb720eeaab728e30ba27",
+  "build_root": "72b5b1514a6fdf64a275d9ae660cda4db3cb2ce64e37a7ca7e97899729dc3b05",
+  "sbom_root": "a61768de8786670eb2aefcc59751657bcdbddc8d750f5fe1073f586debe2d0eb",
+  "build_artifacts": {
+    "runtime_executable_sha256": "d09e9f62e2bfc20af43f47dac8adddae47de25ae7678702f109faaa03dfe8a56",
+    "runtime_implementation_sha256": "b1708e3878a9b7b92753acb45b4981d340372313dd9310e656b259638c5a6dd1",
+    "llama_library_sha256": "9feb0af2a625b6789cdd94b378132e2267d19bcea951f2efbe36f15aa114e4cd",
+    "hip_backend_sha256": "b81d95e240a46da13ccbb1f71e2bf6c2f74e347c2aa3c9638073454b1b6eac65",
+    "hip_archive_sha256": "9b225a990bcde6022b94741866d67d08d1239080954bd43169a74a75c911ca95"
+  },
+  "model_file": "Bonsai-27B-Q1_0.gguf",
+  "model_bytes": 3803452480,
+  "model_sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+  "model_roots": {
+    "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+    "tokenizer_root": "58f310f0412514cea1a31757c9cc9714666b64fb67127914ab08554c4e0b4d56",
+    "chat_template_root": "7ccfac375b7121adfb8c35763b183a7707bb071bd1abbd76128986b16c3b4d33"
+  },
+  "execution": {
+    "text_only": true,
+    "max_context_tokens": 4096,
+    "max_output_tokens": 512,
+    "temperature": 0,
+    "top_p": 1,
+    "top_k": 0,
+    "lowest_token_id_tie_break": true,
+    "attachments_allowed": false,
+    "network_allowed": false
+  },
+  "unsupported_claims": [
+    "ASSURED",
+    "CRYPTOGRAPHICALLY_PROVEN_INFERENCE",
+    "PRIVATE_REMOTE_INFERENCE",
+    "TRAINING",
+    "RETRIEVAL",
+    "VISION",
+    "LOCAL_BROWSER_WEBGPU"
+  ]
+}

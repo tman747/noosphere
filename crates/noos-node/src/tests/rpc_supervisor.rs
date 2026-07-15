@@ -96,20 +96,14 @@ fn rpc_status_reports_the_three_heads_separately_and_auth_gates_routes() {
     assert!(body.contains(r#""observer":false"#));
 
     // Consensus-owned reserve state is served directly; genesis has no markets.
-    let (safety_status, safety_body) =
-        http_request(addr, "GET", "/stable/safety", token, None);
+    let (safety_status, safety_body) = http_request(addr, "GET", "/stable/safety", token, None);
     assert_eq!(safety_status, 200, "{safety_body}");
     assert!(safety_body.contains(r#""items":[]"#), "{safety_body}");
 
     // Wallets can resolve the authoritative nonce and authorization descriptor.
     let faucet = hex(&faucet_key().public_key().into_bytes());
-    let (account_status, account_body) = http_request(
-        addr,
-        "GET",
-        &format!("/account/{faucet}"),
-        token,
-        None,
-    );
+    let (account_status, account_body) =
+        http_request(addr, "GET", &format!("/account/{faucet}"), token, None);
     assert_eq!(account_status, 200, "{account_body}");
     assert!(account_body.contains(r#""nonce":"0""#), "{account_body}");
     assert!(
@@ -145,8 +139,7 @@ fn rpc_submission_settles_and_receipts_are_served() {
     assert_eq!(code, 200, "{body}");
     assert!(body.contains(r#""accepted":true"#), "{body}");
     assert!(body.contains(&hex(&txid)), "{body}");
-    let (code, repeated) =
-        http_request(addr, "POST", "/simulate_tx", token, Some(&payload));
+    let (code, repeated) = http_request(addr, "POST", "/simulate_tx", token, Some(&payload));
     assert_eq!(code, 200, "{repeated}");
     assert!(repeated.contains(r#""accepted":true"#), "{repeated}");
     let (code, _) = http_request(

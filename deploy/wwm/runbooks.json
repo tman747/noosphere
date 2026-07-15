@@ -1,0 +1,42 @@
+{
+  "schema": "noos/wwm-runbook-catalog/v1",
+  "production_capable": false,
+  "operations": {
+    "backup": {
+      "steps": ["freeze_backup_coordinates", "snapshot_database", "snapshot_application_state", "verify_artifact_reconstruction_source", "hash_manifest", "replicate_worm_evidence"],
+      "authorization_scope": "WWM_BACKUP_V1"
+    },
+    "restore": {
+      "steps": ["confirm_admission_disabled", "verify_backup_manifest", "restore_database_staging", "replay_finalized_state", "verify_indexer_equality", "verify_artifact_positions", "atomic_promote"],
+      "authorization_scope": "WWM_RESTORE_V1"
+    },
+    "publisher_blackout": {
+      "steps": ["deny_publisher_and_mirrors", "fetch_from_custodians", "reconstruct_exact_bytes", "verify_sha256", "run_offline_prompt", "confirm_ordinary_finality"],
+      "authorization_scope": "WWM_DRILL_V1"
+    },
+    "total_blackout": {
+      "steps": ["disable_ai_and_artifact_routes", "confirm_new_admission_stopped", "confirm_receipt_reads", "confirm_refunds", "confirm_ordinary_finality", "restore_routes"],
+      "authorization_scope": "WWM_DRILL_V1"
+    },
+    "disable": {
+      "steps": ["resolve_finalized_control", "build_emergency_disable", "threshold_authorize", "submit_before_next_checkpoint", "verify_admission_off", "publish_incident"],
+      "authorization_scope": "WWM_EMERGENCY_DISABLE_V1"
+    },
+    "recovery": {
+      "steps": ["verify_direct_prior_tier", "verify_published_successor", "verify_recovery_authorization", "resolve_fresh_prestate", "submit_recovery", "verify_non_replayable", "restart_qualification_clock"],
+      "authorization_scope": "WWM_RECOVERY_V1"
+    },
+    "rotate": {
+      "steps": ["publish_successor", "verify_overlap", "activate_successor", "reject_stale_key", "revoke_old_key", "record_rotation_evidence"],
+      "authorization_scope": "WWM_ROTATION_V1"
+    },
+    "rollback": {
+      "steps": ["disable_new_admission", "route_static_maintenance", "preserve_old_job_reads", "authorize_append_only_successor", "apply_successor_after_publication", "verify_no_model_substitution"],
+      "authorization_scope": "WWM_ROLLBACK_V1"
+    },
+    "drill": {
+      "steps": ["record_prestate", "inject_named_fault", "observe_safety_and_slo", "execute_recovery", "verify_poststate", "append_result"],
+      "authorization_scope": "WWM_DRILL_V1"
+    }
+  }
+}

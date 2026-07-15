@@ -1,0 +1,1047 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mindchain.network/noosphere/protocol/schemas/wwm-web-capacity-v1.schema.json",
+  "title": "WWM Web Capacity v1",
+  "description": "Experimental off-chain capacity contract. It does not extend WWM v2 consensus state and cannot create custody, schedulability, certificate, reward, inference, training, or execution authority.",
+  "oneOf": [
+    { "$ref": "#/$defs/CoordinatorConfig" },
+    { "$ref": "#/$defs/StaticHostManifest" },
+    { "$ref": "#/$defs/StaticInventory" },
+    { "$ref": "#/$defs/HostRegistrationRequest" },
+    { "$ref": "#/$defs/HostRegistrationResponse" },
+    { "$ref": "#/$defs/OfferRequest" },
+    { "$ref": "#/$defs/BrowserSession" },
+    { "$ref": "#/$defs/HeartbeatRequest" },
+    { "$ref": "#/$defs/HeartbeatResponse" },
+    { "$ref": "#/$defs/ShareAssignment" },
+    { "$ref": "#/$defs/ParticipantReport" },
+    { "$ref": "#/$defs/RestoreTask" },
+    { "$ref": "#/$defs/RestoreReceipt" },
+    { "$ref": "#/$defs/SignedRestoredPositionImportIndex" },
+    { "$ref": "#/$defs/RevocationRequest" },
+    { "$ref": "#/$defs/RevocationResponse" },
+    { "$ref": "#/$defs/EvidenceSummary" },
+    { "$ref": "#/$defs/Acknowledgement" },
+    { "$ref": "#/$defs/ErrorResponse" }
+  ],
+  "x-noos-contract": {
+    "contract_version": 1,
+    "contract_identity": "noos/wwm-web-capacity/v1",
+    "status": "EXPERIMENTAL_OFF_CHAIN",
+    "consensus_schema_extended": false,
+    "consensus_action_tags_added": false,
+    "chain_binding_fields": ["chain_id", "genesis_hash", "artifact_id", "manifest_root"],
+    "participant_classes_closed": true,
+    "production_custody": false,
+    "rewards": false,
+    "custodian_capability_membership": false,
+    "availability_certificate_signer": false,
+    "schedulability_contribution": false,
+    "production_custody_reward_eligible": false,
+    "static_graduation": {
+      "automatic": false,
+      "required_complete_position_bytes": 475588608,
+      "required_existing_path": "CustodianCapabilitySetV1",
+      "independent_requirements": ["profile", "bond", "diversity", "probe", "availability", "E-WWM-03"]
+    },
+    "browser_inference": false,
+    "browser_training": false,
+    "browser_mining": false,
+    "browser_arbitrary_code": false,
+    "canonical_json": "RFC8785",
+    "well_known_path": "/.well-known/noos/wwm-web-capacity-v1.json",
+    "json_body_max_bytes": 65536,
+    "assignment_rows_max": 256,
+    "share_bytes": 1047552,
+    "inventory_rows_max": 5448,
+    "static_host_refresh_max_seconds": 60,
+    "static_expiry_removes_future_assignments": true,
+    "cached_public_share_erasure_available": false,
+    "cache_disclosure_required": true
+  },
+  "$defs": {
+    "Hash32": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Signature64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "OpaqueToken256": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{43}$",
+      "description": "Unpadded base64url encoding of exactly 256 random bits. Persist only a one-way hash server-side."
+    },
+    "UnixSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "CanonicalHttpsOrigin": {
+      "type": "string",
+      "format": "uri",
+      "minLength": 9,
+      "maxLength": 253,
+      "pattern": "^https://[^/?#]+$",
+      "description": "Lowercase scheme/host canonical origin with no credentials, path, query, fragment, default port, private/reserved address, or trailing slash."
+    },
+    "HttpsUrl": {
+      "type": "string",
+      "format": "uri",
+      "minLength": 9,
+      "maxLength": 2048,
+      "pattern": "^https://[^#]+$"
+    },
+    "ParticipantClass": {
+      "type": "string",
+      "enum": ["STATIC_HOST_SEEDER", "BROWSER_ADVISORY_CACHE"]
+    },
+    "AdmissionClass": {
+      "type": "string",
+      "enum": ["StatelessReissueable", "ChorusAdvisory"]
+    },
+    "StorageClass": {
+      "type": "string",
+      "enum": ["OPFS", "INDEXEDDB"]
+    },
+    "ExperimentState": {
+      "type": "string",
+      "enum": ["DISABLED", "LOCAL_FIXTURE", "DEVNET", "PUBLIC_TESTNET_PILOT", "CLOSED"]
+    },
+    "ChainBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chain_id", "genesis_hash", "artifact_id", "manifest_root"],
+      "properties": {
+        "chain_id": { "$ref": "#/$defs/Hash32" },
+        "genesis_hash": { "$ref": "#/$defs/Hash32" },
+        "artifact_id": { "$ref": "#/$defs/Hash32" },
+        "manifest_root": { "$ref": "#/$defs/Hash32" }
+      }
+    },
+    "Geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_bytes",
+        "encoded_bytes",
+        "stripes",
+        "positions",
+        "reconstruction_threshold",
+        "schedulable_minimum",
+        "share_bytes",
+        "position_bytes",
+        "coordinate_count"
+      ],
+      "properties": {
+        "source_bytes": { "const": 3803452480 },
+        "encoded_bytes": { "const": 5707063296 },
+        "stripes": { "const": 454 },
+        "positions": { "const": 12 },
+        "reconstruction_threshold": { "const": 8 },
+        "schedulable_minimum": { "const": 9 },
+        "share_bytes": { "const": 1047552 },
+        "position_bytes": { "const": 475588608 },
+        "coordinate_count": { "const": 5448 }
+      }
+    },
+    "Ed25519Signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["suite", "domain", "public_key", "signature"],
+      "properties": {
+        "suite": { "const": "Ed25519" },
+        "domain": {
+          "type": "string",
+          "enum": [
+            "NOOS/SIG/WWM-WEB-HOST-MANIFEST/V1",
+            "NOOS/SIG/WWM-WEB-ASSIGNMENT/V1",
+            "NOOS/SIG/WWM-WEB-RESTORE-TASK/V1",
+            "NOOS/SIG/WWM-WEB-RESTORE-IMPORT-INDEX/V1",
+            "NOOS/SIG/WWM-WEB-EVIDENCE/V1"
+          ]
+        },
+        "public_key": { "$ref": "#/$defs/Hash32" },
+        "signature": { "$ref": "#/$defs/Signature64" }
+      },
+      "description": "Signature over domain UTF-8 bytes followed by RFC 8785 canonical JSON of the enclosing object with the signature member omitted."
+    },
+    "TransportPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cors_allow_origin",
+        "credentials",
+        "redirects",
+        "range_requests",
+        "immutable_cache",
+        "content_encoding"
+      ],
+      "properties": {
+        "cors_allow_origin": { "const": "*" },
+        "credentials": { "const": "omit" },
+        "redirects": { "const": "reject" },
+        "range_requests": { "const": true },
+        "immutable_cache": { "const": true },
+        "content_encoding": { "const": "identity" }
+      }
+    },
+    "InventoryBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "bytes", "sha256", "inventory_root"],
+      "properties": {
+        "url": { "$ref": "#/$defs/HttpsUrl" },
+        "bytes": { "type": "integer", "minimum": 1, "maximum": 8388608 },
+        "sha256": { "$ref": "#/$defs/Hash32" },
+        "inventory_root": { "$ref": "#/$defs/Hash32" }
+      }
+    },
+    "LicenseBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["spdx", "license_url", "license_sha256", "notice_url", "notice_sha256"],
+      "properties": {
+        "spdx": { "const": "Apache-2.0" },
+        "license_url": { "$ref": "#/$defs/HttpsUrl" },
+        "license_sha256": { "$ref": "#/$defs/Hash32" },
+        "notice_url": { "$ref": "#/$defs/HttpsUrl" },
+        "notice_sha256": { "$ref": "#/$defs/Hash32" }
+      }
+    },
+    "InventoryRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stripe",
+        "position",
+        "bytes",
+        "transport_sha256",
+        "protocol_share_digest",
+        "probe_root",
+        "url"
+      ],
+      "properties": {
+        "stripe": { "type": "integer", "minimum": 0, "maximum": 453 },
+        "position": { "type": "integer", "minimum": 0, "maximum": 11 },
+        "bytes": { "const": 1047552 },
+        "transport_sha256": { "$ref": "#/$defs/Hash32" },
+        "protocol_share_digest": { "$ref": "#/$defs/Hash32" },
+        "probe_root": { "$ref": "#/$defs/Hash32" },
+        "url": { "$ref": "#/$defs/HttpsUrl" }
+      },
+      "description": "Rows are strictly sorted by (stripe, position), contain no duplicate coordinate, and their URL origin equals canonical_origin. SHA-256 is transport-only; noos-da verification remains authoritative."
+    },
+    "StaticInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "record_kind",
+        "canonical_origin",
+        "chain_binding",
+        "generated_at",
+        "expires_at",
+        "rows",
+        "inventory_root"
+      ],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "STATIC_INVENTORY" },
+        "canonical_origin": { "$ref": "#/$defs/CanonicalHttpsOrigin" },
+        "chain_binding": { "$ref": "#/$defs/ChainBinding" },
+        "generated_at": { "$ref": "#/$defs/UnixSeconds" },
+        "expires_at": { "$ref": "#/$defs/UnixSeconds" },
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5448,
+          "uniqueItems": true,
+          "x-noos-coordinate-order": "STRICT_ASCENDING_STRIPE_POSITION",
+          "x-noos-duplicate-coordinate-policy": "REJECT",
+          "x-noos-url-origin-policy": "EXACT_CANONICAL_ORIGIN",
+          "items": { "$ref": "#/$defs/InventoryRow" }
+        },
+        "inventory_root": { "$ref": "#/$defs/Hash32" }
+      },
+      "x-noos-immutability": "CONTENT_ADDRESSED_AND_EXPIRES_ONLY",
+      "x-noos-authoritative-verifier": "noos-da",
+      "description": "expires_at is greater than generated_at. inventory_root is BLAKE3-256 under NOOS/WWM-WEB/INVENTORY/V1 over RFC 8785 canonical rows."
+    },
+    "StaticHostManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "record_kind",
+        "participant_class",
+        "admission_class",
+        "canonical_origin",
+        "chain_binding",
+        "host_signing_key",
+        "valid_from",
+        "expires_at",
+        "revocation_url",
+        "inventory",
+        "license",
+        "transport_policy",
+        "production_custody",
+        "rewards",
+        "signature"
+      ],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "STATIC_HOST_MANIFEST" },
+        "participant_class": { "const": "STATIC_HOST_SEEDER" },
+        "admission_class": { "const": "StatelessReissueable" },
+        "canonical_origin": { "$ref": "#/$defs/CanonicalHttpsOrigin" },
+        "chain_binding": { "$ref": "#/$defs/ChainBinding" },
+        "host_signing_key": { "$ref": "#/$defs/Hash32" },
+        "valid_from": { "$ref": "#/$defs/UnixSeconds" },
+        "expires_at": { "$ref": "#/$defs/UnixSeconds" },
+        "revocation_url": { "$ref": "#/$defs/HttpsUrl" },
+        "inventory": { "$ref": "#/$defs/InventoryBinding" },
+        "license": { "$ref": "#/$defs/LicenseBinding" },
+        "transport_policy": { "$ref": "#/$defs/TransportPolicy" },
+        "production_custody": { "const": false },
+        "rewards": { "const": false },
+        "signature": {
+          "allOf": [
+            { "$ref": "#/$defs/Ed25519Signature" },
+            { "properties": { "domain": { "const": "NOOS/SIG/WWM-WEB-HOST-MANIFEST/V1" } } }
+          ]
+        }
+      },
+      "description": "Served without redirect at /.well-known/noos/wwm-web-capacity-v1.json. Signature public_key equals host_signing_key; all host URLs share canonical_origin; valid_from < expires_at. Missing, invalid, unauthorized, or expired manifests stop future assignments only; public Apache-2.0 cache copies may remain and no third-party erasure is promised."
+    },
+    "PrivacyDisclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "normal_telemetry_fields",
+        "forbidden_telemetry_fields",
+        "access_log_ip_prefix_bits_v4",
+        "access_log_ip_prefix_bits_v6",
+        "access_log_retention_seconds",
+        "participant_token_storage",
+        "cross_site_linking",
+        "offline_local_deletion"
+      ],
+      "properties": {
+        "normal_telemetry_fields": {
+          "const": ["aggregate_counters", "coordinate_digests", "coarse_error_codes"]
+        },
+        "forbidden_telemetry_fields": {
+          "const": ["raw_participant_token", "ip_address", "user_agent", "prompt", "browsing_data", "wallet", "cross_site_identity"]
+        },
+        "access_log_ip_prefix_bits_v4": { "const": 24 },
+        "access_log_ip_prefix_bits_v6": { "const": 48 },
+        "access_log_retention_seconds": { "const": 604800 },
+        "participant_token_storage": { "const": "HASHED_ONLY" },
+        "cross_site_linking": { "const": false },
+        "offline_local_deletion": { "const": true }
+      }
+    },
+    "StaticCacheLifecycleDisclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host_refresh_max_seconds",
+        "expiry_effect",
+        "public_share_license",
+        "cached_bytes_may_remain_public",
+        "third_party_cache_erasure_available"
+      ],
+      "properties": {
+        "host_refresh_max_seconds": { "const": 60 },
+        "expiry_effect": { "const": "REMOVES_FUTURE_ASSIGNMENTS_ONLY" },
+        "public_share_license": { "const": "Apache-2.0" },
+        "cached_bytes_may_remain_public": { "const": true },
+        "third_party_cache_erasure_available": { "const": false }
+      }
+    },
+    "CoordinatorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "record_kind",
+        "chain_binding",
+        "geometry",
+        "experiment_state",
+        "coordinator_key",
+        "source_allowlist",
+        "quota_choices_shares",
+        "privacy",
+        "static_cache_lifecycle",
+        "participant_classes",
+        "production_custody",
+        "rewards",
+        "browser_execution"
+      ],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "COORDINATOR_CONFIG" },
+        "chain_binding": { "$ref": "#/$defs/ChainBinding" },
+        "geometry": { "$ref": "#/$defs/Geometry" },
+        "experiment_state": { "$ref": "#/$defs/ExperimentState" },
+        "coordinator_key": { "$ref": "#/$defs/Hash32" },
+        "source_allowlist": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/CanonicalHttpsOrigin" }
+        },
+        "quota_choices_shares": { "const": [16, 64, 256] },
+        "privacy": { "$ref": "#/$defs/PrivacyDisclosure" },
+        "static_cache_lifecycle": { "$ref": "#/$defs/StaticCacheLifecycleDisclosure" },
+        "participant_classes": {
+          "const": ["STATIC_HOST_SEEDER", "BROWSER_ADVISORY_CACHE"]
+        },
+        "production_custody": { "const": false },
+        "rewards": { "const": false },
+        "browser_execution": { "const": "STORAGE_AND_OPT_IN_REPAIR_ONLY" }
+      }
+    },
+    "HostRegistrationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "record_kind", "canonical_origin"],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "HOST_REGISTRATION_REQUEST" },
+        "canonical_origin": { "$ref": "#/$defs/CanonicalHttpsOrigin" }
+      }
+    },
+    "HostRegistrationResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "record_kind",
+        "host_id",
+        "canonical_origin",
+        "participant_class",
+        "admission_class",
+        "inventory_root",
+        "verified_rows",
+        "expires_at",
+        "production_custody",
+        "rewards"
+      ],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "HOST_REGISTRATION_RESPONSE" },
+        "host_id": { "$ref": "#/$defs/Hash32" },
+        "canonical_origin": { "$ref": "#/$defs/CanonicalHttpsOrigin" },
+        "participant_class": { "const": "STATIC_HOST_SEEDER" },
+        "admission_class": { "const": "StatelessReissueable" },
+        "inventory_root": { "$ref": "#/$defs/Hash32" },
+        "verified_rows": { "type": "integer", "minimum": 1, "maximum": 5448 },
+        "expires_at": { "$ref": "#/$defs/UnixSeconds" },
+        "production_custody": { "const": false },
+        "rewards": { "const": false }
+      }
+    },
+    "UploadPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "daily_egress_bytes"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "daily_egress_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 268173312
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "enabled": { "const": false } }, "required": ["enabled"] },
+          "then": { "properties": { "daily_egress_bytes": { "const": 0 } } },
+          "else": { "properties": { "daily_egress_bytes": { "minimum": 1047552 } } }
+        }
+      ]
+    },
+    "OfferRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "record_kind",
+        "canonical_origin",
+        "consent_version",
+        "quota_shares",
+        "effective_bytes",
+        "storage_class",
+        "upload_policy",
+        "page_active"
+      ],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "OFFER_REQUEST" },
+        "canonical_origin": { "$ref": "#/$defs/CanonicalHttpsOrigin" },
+        "consent_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "quota_shares": { "type": "integer", "enum": [16, 64, 256] },
+        "effective_bytes": {
+          "type": "integer",
+          "minimum": 1047552,
+          "maximum": 268173312,
+          "multipleOf": 1047552
+        },
+        "storage_class": { "$ref": "#/$defs/StorageClass" },
+        "upload_policy": { "$ref": "#/$defs/UploadPolicy" },
+        "page_active": { "const": true }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "quota_shares": { "const": 16 } },
+            "required": ["quota_shares"]
+          },
+          "then": {
+            "properties": { "effective_bytes": { "maximum": 16760832 } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "quota_shares": { "const": 64 } },
+            "required": ["quota_shares"]
+          },
+          "then": {
+            "properties": { "effective_bytes": { "maximum": 67043328 } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "quota_shares": { "const": 256 } },
+            "required": ["quota_shares"]
+          },
+          "then": {
+            "properties": { "effective_bytes": { "maximum": 268173312 } }
+          }
+        }
+      ]
+    },
+    "BrowserSession": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "record_kind",
+        "participant_class",
+        "admission_class",
+        "session_token",
+        "participant_id",
+        "canonical_origin",
+        "quota_shares",
+        "effective_bytes",
+        "storage_class",
+        "upload_policy",
+        "issued_at",
+        "expires_at",
+        "production_custody",
+        "rewards"
+      ],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "BROWSER_SESSION" },
+        "participant_class": { "const": "BROWSER_ADVISORY_CACHE" },
+        "admission_class": { "const": "ChorusAdvisory" },
+        "session_token": { "$ref": "#/$defs/OpaqueToken256" },
+        "participant_id": { "$ref": "#/$defs/Hash32" },
+        "canonical_origin": { "$ref": "#/$defs/CanonicalHttpsOrigin" },
+        "quota_shares": { "type": "integer", "enum": [16, 64, 256] },
+        "effective_bytes": {
+          "type": "integer",
+          "minimum": 1047552,
+          "maximum": 268173312,
+          "multipleOf": 1047552
+        },
+        "storage_class": { "$ref": "#/$defs/StorageClass" },
+        "upload_policy": { "$ref": "#/$defs/UploadPolicy" },
+        "issued_at": { "$ref": "#/$defs/UnixSeconds" },
+        "expires_at": { "$ref": "#/$defs/UnixSeconds" },
+        "production_custody": { "const": false },
+        "rewards": { "const": false }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "quota_shares": { "const": 16 } },
+            "required": ["quota_shares"]
+          },
+          "then": {
+            "properties": { "effective_bytes": { "maximum": 16760832 } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "quota_shares": { "const": 64 } },
+            "required": ["quota_shares"]
+          },
+          "then": {
+            "properties": { "effective_bytes": { "maximum": 67043328 } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "quota_shares": { "const": 256 } },
+            "required": ["quota_shares"]
+          },
+          "then": {
+            "properties": { "effective_bytes": { "maximum": 268173312 } }
+          }
+        }
+      ]
+    },
+    "HeartbeatRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "record_kind",
+        "session_token",
+        "canonical_origin",
+        "page_active",
+        "stored_coordinate_digests",
+        "available_bytes"
+      ],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "HEARTBEAT_REQUEST" },
+        "session_token": { "$ref": "#/$defs/OpaqueToken256" },
+        "canonical_origin": { "$ref": "#/$defs/CanonicalHttpsOrigin" },
+        "page_active": { "const": true },
+        "stored_coordinate_digests": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/Hash32" }
+        },
+        "available_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 268173312
+        }
+      }
+    },
+    "AssignmentRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stripe",
+        "position",
+        "bytes",
+        "transport_sha256",
+        "protocol_share_digest",
+        "probe_root",
+        "url",
+        "source_origin"
+      ],
+      "properties": {
+        "stripe": { "type": "integer", "minimum": 0, "maximum": 453 },
+        "position": { "type": "integer", "minimum": 0, "maximum": 11 },
+        "bytes": { "const": 1047552 },
+        "transport_sha256": { "$ref": "#/$defs/Hash32" },
+        "protocol_share_digest": { "$ref": "#/$defs/Hash32" },
+        "probe_root": { "$ref": "#/$defs/Hash32" },
+        "url": { "$ref": "#/$defs/HttpsUrl" },
+        "source_origin": { "$ref": "#/$defs/CanonicalHttpsOrigin" }
+      }
+    },
+    "ShareAssignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "record_kind",
+        "assignment_id",
+        "participant_id",
+        "canonical_origin",
+        "chain_binding",
+        "issued_at",
+        "expires_at",
+        "rows",
+        "signature"
+      ],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "SHARE_ASSIGNMENT" },
+        "assignment_id": { "$ref": "#/$defs/Hash32" },
+        "participant_id": { "$ref": "#/$defs/Hash32" },
+        "canonical_origin": { "$ref": "#/$defs/CanonicalHttpsOrigin" },
+        "chain_binding": { "$ref": "#/$defs/ChainBinding" },
+        "issued_at": { "$ref": "#/$defs/UnixSeconds" },
+        "expires_at": { "$ref": "#/$defs/UnixSeconds" },
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": { "$ref": "#/$defs/AssignmentRow" }
+        },
+        "signature": {
+          "allOf": [
+            { "$ref": "#/$defs/Ed25519Signature" },
+            { "properties": { "domain": { "const": "NOOS/SIG/WWM-WEB-ASSIGNMENT/V1" } } }
+          ]
+        }
+      },
+      "description": "Rows are coordinate-unique, ordered, and bounded by the session quota. Signature public_key equals the pinned coordinator key."
+    },
+    "RestoreTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "record_kind",
+        "task_id",
+        "participant_id",
+        "canonical_origin",
+        "chain_binding",
+        "coordinate",
+        "expected_bytes",
+        "issued_at",
+        "expires_at",
+        "signature"
+      ],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "RESTORE_TASK" },
+        "task_id": { "$ref": "#/$defs/Hash32" },
+        "participant_id": { "$ref": "#/$defs/Hash32" },
+        "canonical_origin": { "$ref": "#/$defs/CanonicalHttpsOrigin" },
+        "chain_binding": { "$ref": "#/$defs/ChainBinding" },
+        "coordinate": { "$ref": "#/$defs/InventoryRow" },
+        "expected_bytes": { "const": 1047552 },
+        "issued_at": { "$ref": "#/$defs/UnixSeconds" },
+        "expires_at": { "$ref": "#/$defs/UnixSeconds" },
+        "signature": {
+          "allOf": [
+            { "$ref": "#/$defs/Ed25519Signature" },
+            { "properties": { "domain": { "const": "NOOS/SIG/WWM-WEB-RESTORE-TASK/V1" } } }
+          ]
+        }
+      }
+    },
+    "HeartbeatResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "record_kind", "server_time", "assignment", "restore_task"],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "HEARTBEAT_RESPONSE" },
+        "server_time": { "$ref": "#/$defs/UnixSeconds" },
+        "assignment": {
+          "oneOf": [
+            { "$ref": "#/$defs/ShareAssignment" },
+            { "type": "null" }
+          ]
+        },
+        "restore_task": {
+          "oneOf": [
+            { "$ref": "#/$defs/RestoreTask" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "assignment": { "$ref": "#/$defs/ShareAssignment" },
+            "restore_task": { "type": "null" }
+          }
+        },
+        {
+          "properties": {
+            "assignment": { "type": "null" },
+            "restore_task": { "$ref": "#/$defs/RestoreTask" }
+          }
+        },
+        {
+          "properties": {
+            "assignment": { "type": "null" },
+            "restore_task": { "type": "null" }
+          }
+        }
+      ]
+    },
+    "ParticipantReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "record_kind",
+        "session_token",
+        "canonical_origin",
+        "page_active",
+        "window_started_at",
+        "window_ended_at",
+        "stored_count",
+        "evicted_count",
+        "error_count",
+        "uploaded_bytes",
+        "coordinate_digests",
+        "error_codes"
+      ],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "PARTICIPANT_REPORT" },
+        "session_token": { "$ref": "#/$defs/OpaqueToken256" },
+        "canonical_origin": { "$ref": "#/$defs/CanonicalHttpsOrigin" },
+        "page_active": { "const": true },
+        "window_started_at": { "$ref": "#/$defs/UnixSeconds" },
+        "window_ended_at": { "$ref": "#/$defs/UnixSeconds" },
+        "stored_count": { "type": "integer", "minimum": 0, "maximum": 256 },
+        "evicted_count": { "type": "integer", "minimum": 0, "maximum": 256 },
+        "error_count": { "type": "integer", "minimum": 0, "maximum": 4096 },
+        "uploaded_bytes": { "type": "integer", "minimum": 0, "maximum": 268173312 },
+        "coordinate_digests": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/Hash32" }
+        },
+        "error_codes": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "QUOTA_CHANGED",
+              "STORAGE_PRESSURE",
+              "SHARE_EVICTED",
+              "DOWNLOAD_ABORTED",
+              "UPLOAD_ABORTED",
+              "WRONG_LENGTH",
+              "WRONG_DIGEST",
+              "WRONG_ORIGIN",
+              "REDIRECT_REJECTED",
+              "ASSIGNMENT_EXPIRED",
+              "SESSION_REVOKED",
+              "STORAGE_UNAVAILABLE",
+              "NETWORK_UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "RestoreReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "record_kind",
+        "task_id",
+        "coordinate_digest",
+        "bytes",
+        "quarantine_id",
+        "canonical_verified",
+        "accepted_at"
+      ],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "RESTORE_RECEIPT" },
+        "task_id": { "$ref": "#/$defs/Hash32" },
+        "coordinate_digest": { "$ref": "#/$defs/Hash32" },
+        "bytes": { "const": 1047552 },
+        "quarantine_id": { "$ref": "#/$defs/Hash32" },
+        "canonical_verified": { "const": true },
+        "accepted_at": { "$ref": "#/$defs/UnixSeconds" }
+      }
+    },
+    "RestoredPositionImportPair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_origin", "task", "receipt"],
+      "properties": {
+        "source_origin": { "$ref": "#/$defs/CanonicalHttpsOrigin" },
+        "task": { "$ref": "#/$defs/RestoreTask" },
+        "receipt": { "$ref": "#/$defs/RestoreReceipt" }
+      },
+      "description": "The task and receipt identities must match. source_origin is coordinator-envelope signed and must equal the exact origin of task.coordinate.url."
+    },
+    "SignedRestoredPositionImportIndex": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "record_kind",
+        "coordinator_public_key",
+        "chain_binding",
+        "target_position",
+        "generated_at",
+        "expires_at",
+        "rows",
+        "signature"
+      ],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "WEB_RESTORED_POSITION_IMPORT_INDEX" },
+        "coordinator_public_key": { "$ref": "#/$defs/Hash32" },
+        "chain_binding": { "$ref": "#/$defs/ChainBinding" },
+        "target_position": { "type": "integer", "minimum": 0, "maximum": 11 },
+        "generated_at": { "$ref": "#/$defs/UnixSeconds" },
+        "expires_at": { "$ref": "#/$defs/UnixSeconds" },
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 454,
+          "items": { "$ref": "#/$defs/RestoredPositionImportPair" }
+        },
+        "signature": {
+          "allOf": [
+            { "$ref": "#/$defs/Ed25519Signature" },
+            { "properties": { "domain": { "const": "NOOS/SIG/WWM-WEB-RESTORE-IMPORT-INDEX/V1" } } }
+          ]
+        }
+      },
+      "description": "Closed, coordinator-signed, local export index. Rows are unique, strictly stripe ordered, all target one position, and must exactly cover the independently loaded canonical manifest. It grants no custody, certificate, schedulability, or reward authority."
+    },
+    "RevocationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "record_kind", "session_token", "canonical_origin", "local_deletion_requested"],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "REVOCATION_REQUEST" },
+        "session_token": { "$ref": "#/$defs/OpaqueToken256" },
+        "canonical_origin": { "$ref": "#/$defs/CanonicalHttpsOrigin" },
+        "local_deletion_requested": { "const": true }
+      }
+    },
+    "RevocationResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "record_kind", "revoked", "assignments_expired", "local_deletion_authority"],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "REVOCATION_RESPONSE" },
+        "revoked": { "const": true },
+        "assignments_expired": { "const": true },
+        "local_deletion_authority": { "const": "CLIENT_ALWAYS_AVAILABLE_OFFLINE" }
+      }
+    },
+    "EvidenceSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "record_kind",
+        "experiment_id",
+        "chain_binding",
+        "window_started_at",
+        "window_ended_at",
+        "static_host_count",
+        "static_provider_count",
+        "static_region_count",
+        "browser_opt_in_count",
+        "verified_coordinate_copies",
+        "restore_attempts",
+        "restore_successes",
+        "corrupt_shares_admitted",
+        "pre_opt_in_activity_count",
+        "quota_overrun_count",
+        "egress_overrun_count",
+        "deletion_attempts",
+        "deletion_successes",
+        "production_custody",
+        "rewards",
+        "controls_enabled",
+        "signature"
+      ],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "EVIDENCE_SUMMARY" },
+        "experiment_id": { "const": "E-WWM-23" },
+        "chain_binding": { "$ref": "#/$defs/ChainBinding" },
+        "window_started_at": { "$ref": "#/$defs/UnixSeconds" },
+        "window_ended_at": { "$ref": "#/$defs/UnixSeconds" },
+        "static_host_count": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "static_provider_count": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "static_region_count": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "browser_opt_in_count": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "verified_coordinate_copies": { "type": "integer", "minimum": 0, "maximum": 100000000 },
+        "restore_attempts": { "type": "integer", "minimum": 0, "maximum": 100000000 },
+        "restore_successes": { "type": "integer", "minimum": 0, "maximum": 100000000 },
+        "corrupt_shares_admitted": { "type": "integer", "minimum": 0, "maximum": 100000000 },
+        "pre_opt_in_activity_count": { "type": "integer", "minimum": 0, "maximum": 100000000 },
+        "quota_overrun_count": { "type": "integer", "minimum": 0, "maximum": 100000000 },
+        "egress_overrun_count": { "type": "integer", "minimum": 0, "maximum": 100000000 },
+        "deletion_attempts": { "type": "integer", "minimum": 0, "maximum": 100000000 },
+        "deletion_successes": { "type": "integer", "minimum": 0, "maximum": 100000000 },
+        "production_custody": { "const": false },
+        "rewards": { "const": false },
+        "controls_enabled": { "const": false },
+        "signature": {
+          "allOf": [
+            { "$ref": "#/$defs/Ed25519Signature" },
+            { "properties": { "domain": { "const": "NOOS/SIG/WWM-WEB-EVIDENCE/V1" } } }
+          ]
+        }
+      }
+    },
+    "Acknowledgement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "record_kind", "accepted", "server_time"],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "ACKNOWLEDGEMENT" },
+        "accepted": { "const": true },
+        "server_time": { "$ref": "#/$defs/UnixSeconds" }
+      }
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "record_kind", "error"],
+      "properties": {
+        "schema": { "const": "noos/wwm-web-capacity/v1" },
+        "record_kind": { "const": "ERROR" },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message"],
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": [
+                "BODY_TOO_LARGE",
+                "INVALID_REQUEST",
+                "ORIGIN_NOT_ALLOWED",
+                "ORIGIN_MISMATCH",
+                "HOST_NOT_ALLOWED",
+                "HOST_FETCH_REJECTED",
+                "HOST_MANIFEST_INVALID",
+                "HOST_INVENTORY_INVALID",
+                "HOST_PROBE_FAILED",
+                "SSRF_DESTINATION_REJECTED",
+                "SESSION_INVALID",
+                "SESSION_EXPIRED",
+                "SESSION_REVOKED",
+                "PAGE_NOT_ACTIVE",
+                "QUOTA_EXCEEDED",
+                "EGRESS_DISABLED",
+                "EGRESS_CAP_EXCEEDED",
+                "ASSIGNMENT_EXPIRED",
+                "RESTORE_TASK_INVALID",
+                "RESTORE_REPLAYED",
+                "RESTORE_WRONG_LENGTH",
+                "RESTORE_WRONG_DIGEST",
+                "RESTORE_CANONICAL_VERIFICATION_FAILED",
+                "RATE_LIMITED",
+                "STORE_UNAVAILABLE",
+                "INTERNAL",
+                "EXPERIMENT_DISABLED"
+              ]
+            },
+            "message": { "type": "string", "minLength": 1, "maxLength": 512 }
+          }
+        }
+      }
+    }
+  }
+}

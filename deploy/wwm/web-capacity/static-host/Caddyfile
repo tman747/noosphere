@@ -1,0 +1,49 @@
+https://{$NOOS_WWM_STATIC_HOST} {
+    root * /srv/noos-wwm-web-capacity
+
+    @manifest path /.well-known/noos/wwm-web-capacity-v1.json
+    handle @manifest {
+        header {
+            Access-Control-Allow-Origin "*"
+            Cache-Control "public, max-age=60, must-revalidate"
+            X-Content-Type-Options "nosniff"
+        }
+        file_server
+    }
+
+    @inventory path /inventory-v1.json
+    handle @inventory {
+        header {
+            Access-Control-Allow-Origin "*"
+            Cache-Control "public, max-age=0, no-cache, must-revalidate"
+            X-Content-Type-Options "nosniff"
+        }
+        file_server
+    }
+
+    @license path /LICENSE.txt /NOTICE.txt
+    handle @license {
+        header {
+            Access-Control-Allow-Origin "*"
+            Cache-Control "public, max-age=31536000, immutable"
+            X-Content-Type-Options "nosniff"
+        }
+        file_server
+    }
+
+    @share path_regexp share ^/shares/[0-9]{6}/[0-9]{2}\.share$
+    handle @share {
+        header {
+            Access-Control-Allow-Origin "*"
+            Accept-Ranges "bytes"
+            Cache-Control "public, max-age=31536000, immutable, no-transform"
+            Content-Type "application/octet-stream"
+            X-Content-Type-Options "nosniff"
+        }
+        file_server
+    }
+
+    handle {
+        respond 404
+    }
+}

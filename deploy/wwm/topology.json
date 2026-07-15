@@ -1,0 +1,59 @@
+{
+  "schema": "noos/wwm-topology/v1",
+  "application_profile": "BONSAI_PUBLIC_TEXT_V1",
+  "supported_environments": ["local", "devnet"],
+  "production_capable": false,
+  "required_services": [
+    "artifact-store",
+    "custodian",
+    "database",
+    "edge",
+    "executor",
+    "gateway",
+    "prometheus"
+  ],
+  "service_networks": {
+    "artifact-store": ["artifact", "monitoring"],
+    "custodian": ["artifact", "control", "monitoring"],
+    "database": ["data"],
+    "edge": ["control", "ingress", "monitoring"],
+    "executor": ["control", "monitoring"],
+    "gateway": ["control", "data", "ingress", "monitoring"],
+    "prometheus": ["monitoring"]
+  },
+  "public_services": ["edge", "gateway"],
+  "internal_networks": ["artifact", "control", "data", "monitoring"],
+  "immutable_image_variables": [
+    "WWM_ARTIFACT_STORE_IMAGE",
+    "WWM_CUSTODIAN_IMAGE",
+    "WWM_EDGE_IMAGE",
+    "WWM_EXECUTOR_IMAGE",
+    "WWM_GATEWAY_IMAGE",
+    "WWM_POSTGRES_IMAGE",
+    "WWM_PROMETHEUS_IMAGE"
+  ],
+  "external_secret_variables": [
+    "WWM_CUSTODIAN_SIGNING_KEY_FILE",
+    "WWM_DATABASE_PASSWORD_FILE",
+    "WWM_EDGE_SIGNING_KEY_FILE",
+    "WWM_EXECUTOR_SIGNING_KEY_FILE",
+    "WWM_GATEWAY_DATABASE_URL_FILE",
+    "WWM_GATEWAY_SIGNING_KEY_FILE"
+  ],
+  "immutable_configs": {
+    "artifact": "bonsai-artifact.json",
+    "runtime": "bonsai-runtime.json"
+  },
+  "production_external_blockers": [
+    "signed nonzero chain_id and genesis_hash",
+    "G0 through G5 exact-revision gate records and threshold authorization",
+    "12 bonded beneficial-owner-deduplicated custodian clusters across at least four regions",
+    "8 independent verifier-capable clusters and 5 independent reconstructor-capable clusters",
+    "5 eligible executor control clusters across five regions, owners, ASNs, and providers with four-survivor capacity",
+    "three gateway regions with two replicas per region",
+    "external KMS/HSM and offline role keys with signed authority epochs",
+    "production Postgres synchronous failover and tested backups",
+    "production DNS, TLS, status, on-call, and telemetry ownership",
+    "all mandatory WWM evidence bundles, public durations, independent review, and zero severity-1 findings"
+  ]
+}

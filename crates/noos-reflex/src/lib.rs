@@ -1025,8 +1025,14 @@ mod tests {
             10
         );
         assert_eq!(lifecycle.bond_balance(h(9)), 90);
-        assert_eq!(lifecycle.compensation_balance(left_events[0].beneficiary), 4);
-        assert_eq!(lifecycle.compensation_balance(right_events[0].beneficiary), 6);
+        assert_eq!(
+            lifecycle.compensation_balance(left_events[0].beneficiary),
+            4
+        );
+        assert_eq!(
+            lifecycle.compensation_balance(right_events[0].beneficiary),
+            6
+        );
         assert_eq!(
             lifecycle.settle_contradiction(&proof, &victims),
             Err(ReflexError::PromiseReplay)
@@ -1057,7 +1063,10 @@ mod tests {
             Err(ReflexError::CompensationMismatch)
         );
         assert_eq!(lifecycle.bond_balance(h(9)), 100);
-        assert_eq!(lifecycle.compensation_balance(left_events[0].beneficiary), 0);
+        assert_eq!(
+            lifecycle.compensation_balance(left_events[0].beneficiary),
+            0
+        );
 
         let duplicate = [
             VictimClaim {
@@ -1082,7 +1091,16 @@ mod tests {
         let shared = event(3, 1, 2);
         let extra = event(4, 1, 3);
         let overlapping = ContradictionProof {
-            left: signed(&key, 1, 0, 100, [0; 32], h(9), std::slice::from_ref(&shared), 1),
+            left: signed(
+                &key,
+                1,
+                0,
+                100,
+                [0; 32],
+                h(9),
+                std::slice::from_ref(&shared),
+                1,
+            ),
             right: signed(
                 &key,
                 1,

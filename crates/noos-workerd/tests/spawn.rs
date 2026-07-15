@@ -78,7 +78,7 @@ fn spawned_worker_emits_exact_receipt_bytes_and_telemetry() {
     let cfg = write_config(&dir);
     let job_id = [0xab_u8; 32];
     let input = format!("JOB {} relay replica 1 40 0\nSHUTDOWN\n", hex(&job_id));
-    let out = spawn_with_stdin(&["--config", cfg.to_str().unwrap()], &input);
+    let out = spawn_with_stdin(&["legacy", "--config", cfg.to_str().unwrap()], &input);
     assert!(out.status.success(), "worker must exit 0 on SHUTDOWN");
 
     // Independent recomputation: replica + not directly reachable must take
@@ -116,7 +116,7 @@ fn emitted_receipt_verifies_and_forgeries_are_rejected() {
         "JOB {} audit 3000 chorus_advisory 0\nSHUTDOWN\n",
         hex(&job_id)
     );
-    let out = spawn_with_stdin(&["--config", cfg.to_str().unwrap()], &input);
+    let out = spawn_with_stdin(&["legacy", "--config", cfg.to_str().unwrap()], &input);
     assert!(out.status.success());
     let text = stdout_text(&out);
     let receipt = text
@@ -166,7 +166,7 @@ fn malformed_lines_count_violations_and_never_kill_the_daemon() {
     let dir = temp_dir("malformed");
     let cfg = write_config(&dir);
     let out = spawn_with_stdin(
-        &["--config", cfg.to_str().unwrap()],
+        &["legacy", "--config", cfg.to_str().unwrap()],
         "BOGUS junk\nSHUTDOWN\n",
     );
     assert!(out.status.success(), "malformed input must not crash");
@@ -195,6 +195,7 @@ fn queue_file_mode_reports_a_real_decreasing_backlog() {
     .unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_noos-workerd"))
         .args([
+            "legacy",
             "--config",
             cfg.to_str().unwrap(),
             "--queue",
@@ -224,7 +225,7 @@ fn queue_file_mode_reports_a_real_decreasing_backlog() {
 fn eof_is_a_graceful_shutdown() {
     let dir = temp_dir("eof");
     let cfg = write_config(&dir);
-    let out = spawn_with_stdin(&["--config", cfg.to_str().unwrap()], "");
+    let out = spawn_with_stdin(&["legacy", "--config", cfg.to_str().unwrap()], "");
     assert!(out.status.success(), "EOF must terminate with exit 0");
     assert!(stdout_text(&out).ends_with("SHUTDOWN jobs=0 violations=0\n"));
 }
@@ -239,15 +240,14 @@ fn help_documents_the_protocol_and_exits_zero() {
     let text = String::from_utf8_lossy(&out.stdout);
     for needle in [
         "noos-workerd",
-        "JOB",
-        "SHUTDOWN",
-        "RECEIPT",
-        "METRIC",
+        "legacy",
+        "serve",
+        "inspect",
+        "prefetch",
+        "drain",
         "--queue",
         "--config",
-        "NOOS/SIG/WORK_RECEIPT/V1",
-        "chain_id(32)",
-        "PROTOCOL",
+        "explicit",
     ] {
         assert!(text.contains(needle), "--help must document `{needle}`");
     }
@@ -269,7 +269,7 @@ fn version_exits_zero_and_unknown_flag_is_a_usage_failure() {
     assert!(!unknown.status.success(), "unknown flags must not boot");
 
     let missing_cfg = Command::new(env!("CARGO_BIN_EXE_noos-workerd"))
-        .args(["--config", "does/not/exist.toml"])
+        .args(["legacy", "--config", "does/not/exist.toml"])
         .output()
         .unwrap();
     assert!(!missing_cfg.status.success(), "missing config must fail");

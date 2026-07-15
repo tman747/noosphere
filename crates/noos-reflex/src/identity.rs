@@ -331,10 +331,16 @@ impl TrainingStepWitness {
             || inference.left != forward.left
             || inference.right != forward.right
             || inference.c32 != forward.c32
-            || (input_gradient.rows, input_gradient.inner, input_gradient.columns)
-                != (forward.rows, forward.columns, forward.inner)
-            || (weight_gradient.rows, weight_gradient.inner, weight_gradient.columns)
-                != (forward.inner, forward.rows, forward.columns)
+            || (
+                input_gradient.rows,
+                input_gradient.inner,
+                input_gradient.columns,
+            ) != (forward.rows, forward.columns, forward.inner)
+            || (
+                weight_gradient.rows,
+                weight_gradient.inner,
+                weight_gradient.columns,
+            ) != (forward.inner, forward.rows, forward.columns)
             || input_gradient.left != weight_gradient.right
             || hash_i8(b"NOOS/E-IDENT-02/GY/V1", &input_gradient.left) != self.gy_root
             || !is_transpose(
@@ -766,22 +772,14 @@ fn leaf_transcript_root(
         &[&[role as u8], &span_id, &gy_root, &artifact_root],
     )
 }
-fn is_transpose(
-    input: &[i8],
-    rows: usize,
-    columns: usize,
-    candidate: &[i8],
-) -> bool {
+fn is_transpose(input: &[i8], rows: usize, columns: usize, candidate: &[i8]) -> bool {
     if input.len() != rows.saturating_mul(columns) || candidate.len() != input.len() {
         return false;
     }
     (0..rows).all(|row| {
-        (0..columns).all(|column| {
-            input[row * columns + column] == candidate[column * rows + row]
-        })
+        (0..columns).all(|column| input[row * columns + column] == candidate[column * rows + row])
     })
 }
-
 
 fn transpose(input: &[i8], rows: usize, columns: usize) -> Result<Vec<i8>, IdentityError> {
     if input.len() != rows.saturating_mul(columns) {
@@ -1033,11 +1031,7 @@ mod tests {
         transplanted.census.forward_macs += 1;
         transplanted.census.training_total_macs += 1;
         transplanted.input_gradient = alternate.input_gradient;
-        assert_eq!(
-            transplanted.verify(),
-            Err(IdentityError::LeafSubstitution)
-        );
-
+        assert_eq!(transplanted.verify(), Err(IdentityError::LeafSubstitution));
     }
 
     #[test]
@@ -1101,15 +1095,7 @@ mod tests {
             inference_macs: 8,
         };
         assert!(PentagonSpanWitness::bind(
-            SpanArtifact::execute(
-                vec![0; 4],
-                vec![1; 4],
-                2,
-                2,
-                2,
-                params(),
-            )
-            .unwrap(),
+            SpanArtifact::execute(vec![0; 4], vec![1; 4], 2, 2, 2, params(),).unwrap(),
             token_state(alternate_training.forward.transcript_root()),
             alternate_training,
             [11; 32],

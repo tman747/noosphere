@@ -1,0 +1,47 @@
+{
+  "schema": "noos/wwm-model-improvement-gate/v1",
+  "environment": "devnet",
+  "production": false,
+  "feature_flags": {
+    "WWM_MINDLINK_REGISTRY_ENABLED": false,
+    "WWM_KNOWLEDGE_SNAPSHOTS_ENABLED": false,
+    "WWM_PUBLIC_RETRIEVAL_ENABLED": false,
+    "WWM_TRAINING_PROMOTION_ENABLED": false
+  },
+  "real_parent": {
+    "name": "Bonsai-27B-F16.gguf",
+    "path": "artifacts/wwm/Bonsai-27B-F16.gguf",
+    "bytes": 53808280640,
+    "sha256": "d4a381a6d07131c34af888607bdbda49fc885c97673a0d22aa3e0f0284bba566",
+    "license": {
+      "spdx": "Apache-2.0",
+      "license_path": "deploy/wwm/licenses/Bonsai-27B/LICENSE.txt",
+      "license_sha256": "69849221bfb90053de2134ef5e6d540287b4b98062326492f1f96f5da685524b",
+      "notice_path": "deploy/wwm/licenses/Bonsai-27B/NOTICE.txt",
+      "notice_sha256": "cef33f95425f9802de78b7b22db0faca84d2216661432a9afcf9620949c21f7e"
+    }
+  },
+  "required_toolchain": {
+    "prism_source_revision": "62061f91088281e65071cc38c5f69ee95c39f14e",
+    "runtime_root": "690d9bbd8d44631fb971e0b0677e10c8d0bb1e08a743bb720eeaab728e30ba27",
+    "build_root": "72b5b1514a6fdf64a275d9ae660cda4db3cb2ce64e37a7ca7e97899729dc3b05",
+    "tokenizer_root": "58f310f0412514cea1a31757c9cc9714666b64fb67127914ab08554c4e0b4d56",
+    "network_allowed": false,
+    "registration_required_before_execution": true,
+    "required_stages": [
+      "one_step_lora_train",
+      "merge_to_f16",
+      "pinned_prism_quantize_to_q1",
+      "pinned_prism_runtime_load_twice",
+      "deterministic_output_reproduction"
+    ]
+  },
+  "promotion": {
+    "canary_ceilings_percent": [1, 5, 25, 50, 100],
+    "minimum_independent_evaluator_clusters": 2,
+    "challenge_timelock_required": true,
+    "critical_failure_action": "IMMEDIATE_PARENT_ROLLBACK",
+    "direct_canonical_training_objects_require_reviewed_wwm_v3": true,
+    "frozen_v2_action_added": false
+  }
+}

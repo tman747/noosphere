@@ -191,6 +191,40 @@
       "minimum_independent_builders": 2,
       "red_team_required": true,
       "required_drills": ["candidate_quarantine", "rollback"]
+    },
+    {
+      "claim_id": "E-WWM-23",
+      "required_artifact_kinds": [
+        "authorized_origin_inventory",
+        "coordinate_coverage_report",
+        "consent_and_deletion_matrix",
+        "browser_churn_probe_log",
+        "restore_admission_results",
+        "canonical_reconstruction_report",
+        "base_chain_impact_report",
+        "bounded_synthetic_load_report",
+        "license_notice_concentration_report",
+        "privacy_accessibility_security_reviews"
+      ],
+      "second_client_vectors_required": true,
+      "minimum_independent_builders": 2,
+      "red_team_required": true,
+      "required_drills": [
+        "storage_pressure",
+        "private_browsing",
+        "site_data_deletion",
+        "seven_day_inactivity",
+        "host_expiry_removal",
+        "provider_outage",
+        "coordinator_outage",
+        "artifact_service_outage",
+        "poison",
+        "replay",
+        "redirect",
+        "ssrf",
+        "quota",
+        "interrupted_write"
+      ]
     }
   ]
 }

@@ -1,0 +1,232 @@
+{
+  "schema": "noos/wwm-hosted-model-cold-reconstruction/v1",
+  "captured_at": "2026-07-15T09:35:19.445Z",
+  "environment": "LOCAL_TESTNET_FIXTURE",
+  "production_claimed": false,
+  "repository_revision": "adf1325428507b4f06f7c9568066985240fc8747",
+  "executor_binary": {
+    "path": "D:/noosphere-targets/integration/release/noos-workerd.exe",
+    "bytes": 8070144,
+    "sha256": "4ea4e5f434e9e6904560150fa4412e26d5f0a43d319a1b94447faa4546a43544"
+  },
+  "finalized_bootstrap_evidence": "evidence/live/wwm-hosted-model-executor-bootstrap/fe98d555695587c2b3e690bb27dbad945b802af811fd1c4ace45ac5189fe9352.json",
+  "canonical_inputs": {
+    "manifest": {
+      "path": "C:/tmp/wwm-bonsai-current-manifest.bin",
+      "bytes": 381824,
+      "sha256": "f45272b7e9151e7ad81c5fe06baabb4f29af25ecbe9a180ab1f53e257f7fcee4",
+      "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7"
+    },
+    "custodian_map": {
+      "path": "C:/tmp/wwm-custodian-map.json",
+      "bytes": 2995,
+      "sha256": "cf5158685903035d59453441a095b368bc7a0e077b9eeb28b5894d12004c26be",
+      "positions": 12,
+      "base_url": "http://127.0.0.1:9761"
+    },
+    "executor_config": {
+      "path": "C:/tmp/wwm-cold-workerd.toml",
+      "bytes": 2658,
+      "sha256": "68e8a2ec5b86ec13f65c624bb9c099ce5f584f958899a3eff6f49226bf00d538"
+    },
+    "proof_bound_custodian_identities": [
+      {
+        "profile_id": "19790a30d47c1a0bf1b72018ff56d549a1b65c84dba8b1acaaad7aea338e008a",
+        "endpoint_root": "035dc7f0552d960c718240d4bf40309da9ed25812bf8c44776ca0aa1fbd6562a",
+        "region_id": "e9374ce45a6003acb540540cc96ffe263b1894e7bf06d6a05ae3d9107f03e7f7",
+        "asn": 65011,
+        "provider_root": "6c518a3423d55dbdec121140ef8b12a06ef67945b4d2cd62b14e41bfe8251b1a",
+        "operator_id": "b9fc1492217f0a530dfd074ed53c8cf759a35ca6ec64a67c4031057d273ab89f"
+      },
+      {
+        "profile_id": "339a008f05959889224a85f8196389fa024834c9d23307732f761303af0f3bc3",
+        "endpoint_root": "52586fa58f037bf0674bcaf2b5df9b15fa95d00506c4b9fd2ef51ae6b828b4fa",
+        "region_id": "cc772b5a62e146760cab857da9f9c902d4f1566dffbe1dee66ff5acbfce9aeda",
+        "asn": 65010,
+        "provider_root": "a050ca8196ea55e97fc6c857568d183a4efc7ac397e893d2414ea77fa02fa7ad",
+        "operator_id": "0390ae5d7432a411be91dac54a2e1c62de13351c61c6361f5bf3434e3fb2936f"
+      },
+      {
+        "profile_id": "364e944f824e2c282a59dc83b8e98638ca49f915063e7aa60425a6d5442bc3f4",
+        "endpoint_root": "6be1d6cfb947e565b85f67dcec657dc56ec7d3f57ff1e12d15d6a9bd301edf57",
+        "region_id": "d804c47a9e39e8c3efc5cc6ce4966aa01ac391cb07d9ce3f4f608b47464da547",
+        "asn": 65000,
+        "provider_root": "2cd716f258e9fdfab14852adb65a03fa6773ddb025a41f4304204fceba763d9a",
+        "operator_id": "cfed7b208f5c6563e1b99a66c7d37b0797afba351ea5e918a59dd7045ab1826a"
+      },
+      {
+        "profile_id": "39e9acb0b265416e86451f2f3c7a2542722047d2e9ddaf8c5a226b8790f3d1a1",
+        "endpoint_root": "8030ecaaf6b57eaad424891283231c1cf9301f03e05404a6c6ecdea0869edc1e",
+        "region_id": "1fe9ab06e96cabe3c71bf4bcaa55d1b1a9a206de1325b7203aab82b1995daf02",
+        "asn": 65009,
+        "provider_root": "e14c59a4783e6474f8b4df74de72df3bcf67be2971aedee62ca3fdc32022882d",
+        "operator_id": "48039b6f627ce60902cc4348f349133b16b88fbe7a565f8adfb7b034681800a2"
+      },
+      {
+        "profile_id": "4730fcbd9219ab94d6d7a762c95d851f1c24db80233316cc64b2631012630e06",
+        "endpoint_root": "d41d6f7b678575377fae320d76c5b6d27753c503da59f4ec5b36099f49a60f05",
+        "region_id": "e9374ce45a6003acb540540cc96ffe263b1894e7bf06d6a05ae3d9107f03e7f7",
+        "asn": 65003,
+        "provider_root": "e14c59a4783e6474f8b4df74de72df3bcf67be2971aedee62ca3fdc32022882d",
+        "operator_id": "e14a38b37d6da5245bc6aa403827c6368170180e67a259840f562720e07615f6"
+      },
+      {
+        "profile_id": "4f9fd90ef0fe5987df4dd91f50946f7ed0d4cf798dc254984ad858451c18f6c4",
+        "endpoint_root": "6c960a581c2994eb04b906c249a4b4a818e29522030ce7c5d2990da99e12ae80",
+        "region_id": "d804c47a9e39e8c3efc5cc6ce4966aa01ac391cb07d9ce3f4f608b47464da547",
+        "asn": 65008,
+        "provider_root": "da3343c411f21801257e92ef68ccd140ec832a15f00961fa0af5e7f556496f55",
+        "operator_id": "6e60135040c743c5b7583fff91f2062d6df242902abc9cb9ac1122f8c82b196a"
+      },
+      {
+        "profile_id": "6a686fb208110b6271f414e1219ee551738b4c8bbdc1cb9ca01d86848936e754",
+        "endpoint_root": "6480b64fd05e24ac828038f33dcfb4351c1925297ba5ceb08b648aca4d16a4f7",
+        "region_id": "e9374ce45a6003acb540540cc96ffe263b1894e7bf06d6a05ae3d9107f03e7f7",
+        "asn": 65007,
+        "provider_root": "97ab40a280c473a72659a345ed3fb0eb4602d687507b3fe4d0d377c3ee9dfb10",
+        "operator_id": "ab5adf934706122c2a51d91977d0d6bec24adcd56b5c9e18402276faf019da31"
+      },
+      {
+        "profile_id": "8d513677a3728787b7f01c78af8a916b618cdfb085d0e8770f809fd19f224538",
+        "endpoint_root": "87ccbd9de1c0aa5711c2595ffe20cbed705b538ac1cf07e61bd04fa7954eb81e",
+        "region_id": "d804c47a9e39e8c3efc5cc6ce4966aa01ac391cb07d9ce3f4f608b47464da547",
+        "asn": 65004,
+        "provider_root": "a050ca8196ea55e97fc6c857568d183a4efc7ac397e893d2414ea77fa02fa7ad",
+        "operator_id": "77b221ac16c79fe55a50151ef220e9bf1da27d244fc7683038b0f98d6064dcdf"
+      },
+      {
+        "profile_id": "bb477ddb818ff16e90c5660f37caecd62c0e03fb747e739d29bd41761c014e0f",
+        "endpoint_root": "04afe1efdd27cf89289f29c781c9b420d6db5cb149713dc62e3bb5c7aa9fb327",
+        "region_id": "cc772b5a62e146760cab857da9f9c902d4f1566dffbe1dee66ff5acbfce9aeda",
+        "asn": 65006,
+        "provider_root": "2cd716f258e9fdfab14852adb65a03fa6773ddb025a41f4304204fceba763d9a",
+        "operator_id": "26bbdf8e70f611f364b901f7d40bcbc210e1d2bea3960f56e41f1538d2bd050e"
+      },
+      {
+        "profile_id": "be765221926b8e51d016b11ca6eac391b66ca3ca85030ee2adb4689b30b370a6",
+        "endpoint_root": "9f72fbfc1f67c7f2a8335d1b8de4f3f704db4e798d236b946fe4fa62bb052e9b",
+        "region_id": "1fe9ab06e96cabe3c71bf4bcaa55d1b1a9a206de1325b7203aab82b1995daf02",
+        "asn": 65001,
+        "provider_root": "97ab40a280c473a72659a345ed3fb0eb4602d687507b3fe4d0d377c3ee9dfb10",
+        "operator_id": "5eebc0971ec94da6113099ff168974eda718c7664657d4769a010900bb22f5a8"
+      },
+      {
+        "profile_id": "cdaabad5bd3456e45072ddebd0410a1290ea2a5c3649a85e6426ecbb66eb9b3c",
+        "endpoint_root": "3b1cb6e398b7a0c4ef732dd0b5e0257b7db73038efbb76656d0d1728323db6ab",
+        "region_id": "1fe9ab06e96cabe3c71bf4bcaa55d1b1a9a206de1325b7203aab82b1995daf02",
+        "asn": 65005,
+        "provider_root": "6c518a3423d55dbdec121140ef8b12a06ef67945b4d2cd62b14e41bfe8251b1a",
+        "operator_id": "13e671b907d40850e1d6feaac431cafa9803209d4a96c37bf020c63252969512"
+      },
+      {
+        "profile_id": "f059f7cd7fbc6717ea35a1e2514a0c6de515bddd79fc0f003336cd142a7f1837",
+        "endpoint_root": "1c9b7e07bffa39ac025d377a3fd36256d5bedb2b530455169f25d3560210b1c9",
+        "region_id": "cc772b5a62e146760cab857da9f9c902d4f1566dffbe1dee66ff5acbfce9aeda",
+        "asn": 65002,
+        "provider_root": "da3343c411f21801257e92ef68ccd140ec832a15f00961fa0af5e7f556496f55",
+        "operator_id": "b6a471b2234dec9da35a01627f998defcc84251ded36cf2af41ad0eaf3a32b7b"
+      }
+    ]
+  },
+  "cold_run": {
+    "command": "D:/noosphere-targets/integration/release/noos-workerd.exe prefetch --config C:/tmp/wwm-cold-workerd.toml",
+    "cache_was_absent": true,
+    "partial_was_absent": true,
+    "elapsed_seconds": 107.46,
+    "outcome": {
+      "schema": "noos.wwm.executor-reconstruction.v1",
+      "artifact_path": "D:/noosphere-artifacts/workerd-cache/Bonsai-27B-Q1_0.gguf",
+      "configured_positions": 12,
+      "installed_from_custodians": true,
+      "source": "FINALIZED_CUSTODIANS",
+      "publisher_or_gateway_fallback": false,
+      "production_claimed": false
+    },
+    "terminal_residency": "Ready"
+  },
+  "transport": {
+    "service": "noos-artifact-service at 127.0.0.1:9761",
+    "share_get_requests_per_cold_reconstruction": 5448,
+    "share_bytes_per_request": 1047552,
+    "encoded_egress_bytes_per_cold_reconstruction": 5707063296,
+    "service_metrics_after_run": {
+      "share_get_responses_total": 10904,
+      "egress_bytes_total": 11421841380,
+      "read_failures": 0,
+      "egress_rejections": 0
+    },
+    "redirects_allowed": false,
+    "publisher_or_gateway_fallback": false
+  },
+  "installed_artifact": {
+    "path": "D:/noosphere-artifacts/workerd-cache/Bonsai-27B-Q1_0.gguf",
+    "bytes": 3803452480,
+    "sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+    "readonly_attribute": true,
+    "partial_exists": false
+  },
+  "decoder_and_install_law": {
+    "end_user_path": "noos_cli::wwm_client::fetch_from_custodians",
+    "sole_decoder": "noos_da::ArtifactDecoderV1",
+    "per_share_commitments_verified": true,
+    "stripe_content_roots_verified": true,
+    "payload_root_verified": true,
+    "final_size_and_sha256_verified": true,
+    "partial_file_fsynced": true,
+    "partial_file_marked_read_only_before_atomic_rename": true,
+    "stale_or_existing_output_not_overwritten": true,
+    "partial_file_after_success": false
+  },
+  "negative_smoke": {
+    "case": "position 0 endpoint_root changed to ff*32",
+    "network_fetch_started": false,
+    "exit_code": 1,
+    "result": "custodian map: position profile or endpoint root does not match finalized proof"
+  },
+  "runtime_readiness_fixes_exercised": [
+    "moved the one-MiB runtime digest buffer from the Windows main stack to the heap",
+    "replaced unsupported llama.cpp --file - with a private prompt file whose content never enters argv or environment and is zeroed and removed on drop",
+    "bounded fixed llama.cpp stdout overhead separately from generated-token bytes"
+  ],
+  "verification_commands": [
+    {
+      "command": "cargo test --release -p noos-workerd",
+      "result": "PASS: 49 tests across 4 suites"
+    },
+    {
+      "command": "cargo test --release -p noos-cli",
+      "result": "PASS: 25 tests across 4 suites"
+    },
+    {
+      "command": "noos-workerd prefetch --config C:/tmp/wwm-cold-workerd-wrong-root.toml",
+      "result": "EXPECTED REJECTION before fetch, exit 1"
+    },
+    {
+      "command": "noos-workerd prefetch --config C:/tmp/wwm-cold-workerd.toml with empty disposable cache",
+      "result": "PASS: FINALIZED_CUSTODIANS -> READY"
+    },
+    {
+      "command": "noos-workerd prefetch --config C:/tmp/wwm-cold-workerd.toml with installed cache",
+      "result": "PASS: exact cold verification -> READY"
+    }
+  ],
+  "checks": {
+    "map_rows_match_finalized_profile_and_endpoint_roots": true,
+    "map_threshold_is_at_least_eight": true,
+    "only_https_or_loopback_http_is_accepted": true,
+    "all_downloaded_shares_use_immutable_artifact_routes": true,
+    "wrong_bytes_are_not_admitted_by_decoder": true,
+    "exact_3803452480_byte_gguf_installed": true,
+    "exact_published_sha256_installed": true,
+    "installed_weights_read_only": true,
+    "no_partial_remains": true,
+    "prism_warmup_reached_ready": true,
+    "publisher_or_gateway_fallback": false,
+    "verdict": "PASS"
+  },
+  "scope_and_non_claims": [
+    "All twelve logical custodian positions route to one loopback artifact service for this local fixture; this is not evidence of physical production diversity.",
+    "Eight positions are sufficient for emergency decoder reconstruction; nine-position live admission behavior is exercised in the later fault-sequence milestone.",
+    "No upstream publisher URL, model hub, public inference gateway, or alternate local model path exists in the reconstruction path."
+  ]
+}

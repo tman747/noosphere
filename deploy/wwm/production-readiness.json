@@ -1,0 +1,25 @@
+{
+  "schema": "noos/wwm-production-readiness/v1",
+  "verdict": "BLOCKED",
+  "deployment_executed": false,
+  "public_traffic_authorized": false,
+  "dns_cutover_authorized": false,
+  "observed_at": null,
+  "blockers": [
+    "exact production chain_id and genesis_hash are owner-blocked",
+    "G0, G1, G2, G3, GENESIS, G4, and G5 have not passed for one exact revision",
+    "no finalized threshold-signed G5 production transition or cutover authorization exists",
+    "no production DNS/domain inventory, DNS authority, or signed static maintenance target is available",
+    "no production TLS, KMS/HSM, deployment, emergency, DNS, and telemetry role keyring is available",
+    "12 independent bonded custodian control clusters and their beneficial-control reviews are unavailable",
+    "8 independent verifier-capable and 5 independent reconstructor-capable clusters are unavailable",
+    "5 eligible executor clusters across five regions/owners/ASNs/providers and four-survivor capacity are unavailable",
+    "three gateway regions with two replicas each and synchronous paid-job state failover are unavailable",
+    "required public evidence durations, independent operators/builders/reviewers, demand, and ceremonies have not occurred",
+    "mandatory BONSAI_PUBLIC_TEXT_V1 WWM evidence bundles are missing for the exact release revision",
+    "production backup/restore, blackout, disable/recovery, rotation, rollback, and DNS drills have not produced real signed evidence",
+    "production SLO observation, on-call ownership, alert routing, status ownership, and zero severity-1 findings are unverified"
+  ],
+  "controls_enabled": false,
+  "promotion_effect": "NONE"
+}

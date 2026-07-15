@@ -32,10 +32,11 @@ use noos_da::{encode_body, BodyDaClaimV1, ShardCandidateV1, BODY_TOTAL_SHARDS};
 use noos_ground::GroundTicketV1;
 use noos_lumen::objects::{
     AccountV1, AssetV1, BoundedList, ComputeJobV1, ComputeWorkerV1, DebtPositionV1,
-    LendingMarketV1, LiquidityPositionV1, OracleFeedV1, OracleReportV1, PoolV1,
-    PrivatePaymentV1, ReceiptV1, StableAssetV1, StableSafetyV1,
+    LendingMarketV1, LiquidityPositionV1, OracleFeedV1, OracleReportV1, PoolV1, PrivatePaymentV1,
+    ReceiptV1, StableAssetV1, StableSafetyV1,
 };
 use noos_lumen::state::LumenRoots;
+use noos_lumen::wwm::{FinalizedModelResolutionV1, ResolutionSelectorV1};
 use noos_p2p::{
     BodyReplyV1, ChainIdentity, InboundItem, Multiaddr, P2pConfig, P2pEvent, P2pHandle, P2pNode,
     MAX_RANGE_HEADERS,
@@ -237,12 +238,7 @@ pub enum ConsensusMsg {
     SimulateTx {
         tx_bytes: Vec<u8>,
         wit_bytes: Vec<u8>,
-        reply: Reply<
-            Result<
-                noos_lumen::state::SimulationOutcome,
-                noos_lumen::state::RejectReason,
-            >,
-        >,
+        reply: Reply<Result<noos_lumen::state::SimulationOutcome, noos_lumen::state::RejectReason>>,
     },
     ImportBlock {
         header: Box<BlockHeaderV1>,
@@ -277,6 +273,21 @@ pub enum ConsensusMsg {
     DevnetWitnessVoteTick {
         witness_index: usize,
         reply: Reply<Result<bool, String>>,
+    },
+    ResolveModel {
+        selector: ResolutionSelectorV1,
+        freshness_bound: u64,
+        reply: Reply<Result<FinalizedModelResolutionV1, String>>,
+    },
+    GetWwmRecord {
+        kind: noos_lumen::wwm::WwmLeafKind,
+        id: Hash32,
+        reply: Reply<
+            Result<
+                (u64, Hash32, noos_lumen::wwm::ResolutionProofV1),
+                String,
+            >,
+        >,
     },
     Status {
         reply: Reply<StatusSnapshot>,
@@ -464,6 +475,22 @@ fn core_loop<P: StorePort>(
                     let _ = gossip.try_send(OutboundGossip::Vote(vote.clone()));
                 }
                 let _ = reply.send(result.map(|vote| vote.is_some()));
+            }
+            ConsensusMsg::ResolveModel {
+                selector,
+                freshness_bound,
+                reply,
+            } => {
+                let _ = reply.send(
+                    core.finalized_model_resolution(selector, freshness_bound)
+                        .map_err(|error| error.to_string()),
+                );
+            }
+            ConsensusMsg::GetWwmRecord { kind, id, reply } => {
+                let _ = reply.send(
+                    core.finalized_wwm_record(kind, id)
+                        .map_err(|error| error.to_string()),
+                );
             }
             ConsensusMsg::Status { reply } => {
                 let _ = reply.send(status_of(core, observer));
@@ -772,7 +799,7 @@ fn spawn_network(
                 let identity = ChainIdentity {
                     chain_id,
                     genesis_hash,
-                    protocol_version: 1,
+                    protocol_version: 2,
                 };
                 let Some(keypair_seed) = settings.keypair_seed else {
                     let _ = startup_tx.send(Err("missing p2p identity seed".into()));

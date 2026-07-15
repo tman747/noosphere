@@ -19,6 +19,10 @@ impl Encoder {
         self.bytes.push(value);
     }
 
+    pub(crate) fn u16(&mut self, value: u16) {
+        self.bytes.extend_from_slice(&value.to_be_bytes());
+    }
+
     pub(crate) fn u32(&mut self, value: u32) {
         self.bytes.extend_from_slice(&value.to_be_bytes());
     }

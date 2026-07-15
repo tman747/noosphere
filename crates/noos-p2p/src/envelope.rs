@@ -1,5 +1,5 @@
-//! Canonical noos-codec message envelopes for the eight `/noos/` protocols
-//! plus the transport handshake (p2p-v1.md §3, §5).
+//! Canonical noos-codec message envelopes for the nine `/noos/` application
+//! protocols plus the transport handshake (p2p-v1.md §3, §5; v2 light sync).
 //!
 //! Every envelope is `version:u16` then tagged fields (noos-codec object
 //! law), always carrying `chain_id` so a cross-chain frame is rejectable on
@@ -14,7 +14,7 @@ use noos_crypto::{hash_domain, DomainId};
 // Protocol table (closed list, identity-v1.md §3)
 // ---------------------------------------------------------------------------
 
-/// The eight application protocols plus the session-gate handshake.
+/// The nine application protocols plus the session-gate handshake.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Protocol {
     /// Transport session gate; runs before all application protocols.
@@ -25,18 +25,20 @@ pub enum Protocol {
     LumenTx,
     SyncRange,
     SyncSnapshot,
+    SyncLightUpdate,
     BlobShard,
     LoomReceipt,
 }
 
-/// The eight application protocols in canonical order (excludes handshake).
-pub const APP_PROTOCOLS: [Protocol; 8] = [
+/// The nine application protocols in canonical order (excludes handshake).
+pub const APP_PROTOCOLS: [Protocol; 9] = [
     Protocol::BraidHeader,
     Protocol::BraidBody,
     Protocol::BraidVote,
     Protocol::LumenTx,
     Protocol::SyncRange,
     Protocol::SyncSnapshot,
+    Protocol::SyncLightUpdate,
     Protocol::BlobShard,
     Protocol::LoomReceipt,
 ];
@@ -60,6 +62,7 @@ impl Protocol {
             Protocol::LumenTx => "/noos/lumen/tx/1",
             Protocol::SyncRange => "/noos/sync/range/1",
             Protocol::SyncSnapshot => "/noos/sync/snapshot/1",
+            Protocol::SyncLightUpdate => "/noos/sync/light-update/2",
             Protocol::BlobShard => "/noos/blob/shard/1",
             Protocol::LoomReceipt => "/noos/loom/receipt/1",
         }
@@ -73,7 +76,8 @@ impl Protocol {
             | Protocol::BraidBody
             | Protocol::BraidVote
             | Protocol::SyncRange
-            | Protocol::SyncSnapshot => Lane::Priority,
+            | Protocol::SyncSnapshot
+            | Protocol::SyncLightUpdate => Lane::Priority,
             Protocol::LumenTx | Protocol::BlobShard | Protocol::LoomReceipt => Lane::Normal,
         }
     }
@@ -88,8 +92,9 @@ impl Protocol {
             Protocol::LumenTx => Some(3),
             Protocol::SyncRange => Some(4),
             Protocol::SyncSnapshot => Some(5),
-            Protocol::BlobShard => Some(6),
-            Protocol::LoomReceipt => Some(7),
+            Protocol::SyncLightUpdate => Some(6),
+            Protocol::BlobShard => Some(7),
+            Protocol::LoomReceipt => Some(8),
         }
     }
 }
@@ -116,6 +121,28 @@ pub const MAX_RECEIPT_BYTES: u32 = 64 * 1024;
 pub const MAX_RANGE_HEADERS: u32 = 128;
 /// Byte budget for the headers list inside one range reply frame.
 pub const RANGE_REPLY_BYTE_BUDGET: usize = 1024 * 1024 - 2048;
+/// Maximum light-update items requested or returned in one page.
+pub const MAX_LIGHT_UPDATE_ITEMS: u32 = 128;
+/// Maximum canonical bytes in one light-update item.
+pub const MAX_LIGHT_UPDATE_ITEM_BYTES: u32 = 262_144;
+/// Maximum canonical bytes in the complete reply frame.
+pub const MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES: usize = 1_048_576;
+/// Maximum compact consensus members in one light snapshot.
+pub const MAX_LIGHT_MEMBERS: u32 = 1_024;
+/// Fixed canonical bytes per compact membership entry.
+pub const LIGHT_MEMBER_ENCODED_BYTES: usize = 112;
+/// Maximum canonical bytes in the compact snapshot.
+pub const MAX_LIGHT_MEMBERSHIP_SNAPSHOT_BYTES: usize = 122_880;
+/// Maximum canonical bytes in handover/rotation evidence.
+pub const MAX_LIGHT_HANDOVER_BYTES: u32 = 32_768;
+/// Maximum compact snapshot plus handover bytes in one item.
+pub const MAX_LIGHT_MEMBERSHIP_WITNESS_BYTES: usize = 155_648;
+/// Header sub-budget inside a light-update item.
+pub const MAX_LIGHT_HEADER_BYTES: u32 = 65_536;
+/// Compact finality-certificate sub-budget inside a light-update item.
+pub const MAX_LIGHT_FINALITY_BYTES: u32 = 32_768;
+/// Ground-ticket and item-wrapper sub-budget.
+pub const MAX_LIGHT_ITEM_AUX_BYTES: u32 = 8_192;
 
 // ---------------------------------------------------------------------------
 // Codec helpers
@@ -537,6 +564,564 @@ impl RangeReplyV1 {
 }
 
 // ---------------------------------------------------------------------------
+// /noos/sync/light-update/2
+// ---------------------------------------------------------------------------
+
+/// Fixed-width BLS public key used by compact membership entries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LightBytes48(pub [u8; 48]);
+
+impl NoosEncode for LightBytes48 {
+    fn encode(&self, w: &mut Writer) {
+        w.put_raw(&self.0);
+    }
+}
+
+impl NoosDecode for LightBytes48 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self, CodecError> {
+        let mut out = [0_u8; 48];
+        for byte in &mut out {
+            *byte = r.get_u8()?;
+        }
+        Ok(Self(out))
+    }
+}
+
+/// Consensus-only membership projection. Its canonical encoding is exactly
+/// 112 bytes and deliberately excludes `MemberV1.failure_domains`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LightMemberV1 {
+    pub validator_id: [u8; 32],
+    pub consensus_bls_key: LightBytes48,
+    pub raw_weight: u128,
+    pub effective_weight: u128,
+}
+
+impl NoosEncode for LightMemberV1 {
+    fn encode(&self, w: &mut Writer) {
+        self.validator_id.encode(w);
+        self.consensus_bls_key.encode(w);
+        self.raw_weight.encode(w);
+        self.effective_weight.encode(w);
+    }
+}
+
+impl NoosDecode for LightMemberV1 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self, CodecError> {
+        Ok(Self {
+            validator_id: <[u8; 32]>::decode(r)?,
+            consensus_bls_key: LightBytes48::decode(r)?,
+            raw_weight: u128::decode(r)?,
+            effective_weight: u128::decode(r)?,
+        })
+    }
+}
+
+/// Semantic failures for a compact membership snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LightMembershipError {
+    TooManyMembers,
+    MemberOrder,
+    WeightOverflow,
+    TotalMismatch,
+    RootMismatch,
+    EncodedBudget,
+}
+
+/// Compact membership snapshot authenticated by the same SMT law as the full
+/// Witness Ring snapshot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LightMembershipSnapshotV1 {
+    epoch: u64,
+    claimed_root: [u8; 32],
+    total_raw_weight: u128,
+    total_effective_weight: u128,
+    members: Vec<LightMemberV1>,
+}
+
+impl LightMembershipSnapshotV1 {
+    /// Constructs a canonical snapshot, deriving all commitments from members.
+    pub fn from_members(
+        epoch: u64,
+        members: Vec<LightMemberV1>,
+    ) -> Result<Self, LightMembershipError> {
+        let (claimed_root, total_raw_weight, total_effective_weight) = Self::derived(&members)?;
+        let snapshot = Self {
+            epoch,
+            claimed_root,
+            total_raw_weight,
+            total_effective_weight,
+            members,
+        };
+        snapshot.verify()?;
+        Ok(snapshot)
+    }
+
+    /// Constructs from carried commitments and verifies every carried value.
+    pub fn checked(
+        epoch: u64,
+        claimed_root: [u8; 32],
+        total_raw_weight: u128,
+        total_effective_weight: u128,
+        members: Vec<LightMemberV1>,
+    ) -> Result<Self, LightMembershipError> {
+        let snapshot = Self {
+            epoch,
+            claimed_root,
+            total_raw_weight,
+            total_effective_weight,
+            members,
+        };
+        snapshot.verify()?;
+        Ok(snapshot)
+    }
+
+    fn derived(members: &[LightMemberV1]) -> Result<([u8; 32], u128, u128), LightMembershipError> {
+        if members.len() > MAX_LIGHT_MEMBERS as usize {
+            return Err(LightMembershipError::TooManyMembers);
+        }
+        if members
+            .windows(2)
+            .any(|pair| pair[0].validator_id >= pair[1].validator_id)
+        {
+            return Err(LightMembershipError::MemberOrder);
+        }
+        let mut total_raw = 0_u128;
+        let mut total_effective = 0_u128;
+        let mut smt = noos_lumen::smt::Smt::new();
+        for member in members {
+            total_raw = total_raw
+                .checked_add(member.raw_weight)
+                .ok_or(LightMembershipError::WeightOverflow)?;
+            total_effective = total_effective
+                .checked_add(member.effective_weight)
+                .ok_or(LightMembershipError::WeightOverflow)?;
+            let mut value = Vec::with_capacity(80);
+            value.extend_from_slice(&member.consensus_bls_key.0);
+            value.extend_from_slice(&member.raw_weight.to_le_bytes());
+            value.extend_from_slice(&member.effective_weight.to_le_bytes());
+            if smt.insert(member.validator_id, value).is_some() {
+                return Err(LightMembershipError::MemberOrder);
+            }
+        }
+        Ok((smt.root(), total_raw, total_effective))
+    }
+
+    /// Recomputes totals and root and checks canonical order and byte budget.
+    pub fn verify(&self) -> Result<(), LightMembershipError> {
+        let (root, raw, effective) = Self::derived(&self.members)?;
+        if raw != self.total_raw_weight || effective != self.total_effective_weight {
+            return Err(LightMembershipError::TotalMismatch);
+        }
+        if root != self.claimed_root {
+            return Err(LightMembershipError::RootMismatch);
+        }
+        if self.encode_canonical().len() > MAX_LIGHT_MEMBERSHIP_SNAPSHOT_BYTES {
+            return Err(LightMembershipError::EncodedBudget);
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    #[must_use]
+    pub fn root(&self) -> [u8; 32] {
+        self.claimed_root
+    }
+
+    #[must_use]
+    pub fn total_raw_weight(&self) -> u128 {
+        self.total_raw_weight
+    }
+
+    #[must_use]
+    pub fn total_effective_weight(&self) -> u128 {
+        self.total_effective_weight
+    }
+
+    #[must_use]
+    pub fn members(&self) -> &[LightMemberV1] {
+        &self.members
+    }
+}
+
+impl NoosEncode for LightMembershipSnapshotV1 {
+    fn encode(&self, w: &mut Writer) {
+        w.put_u16(1);
+        w.put_mandatory_tag(1);
+        self.epoch.encode(w);
+        w.put_mandatory_tag(2);
+        self.claimed_root.encode(w);
+        w.put_mandatory_tag(3);
+        self.total_raw_weight.encode(w);
+        w.put_mandatory_tag(4);
+        self.total_effective_weight.encode(w);
+        w.put_mandatory_tag(5);
+        w.put_list(&self.members, MAX_LIGHT_MEMBERS);
+    }
+}
+
+impl NoosDecode for LightMembershipSnapshotV1 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self, CodecError> {
+        r.expect_version(&[1])?;
+        r.expect_mandatory_tag(1)?;
+        let epoch = u64::decode(r)?;
+        r.expect_mandatory_tag(2)?;
+        let claimed_root = <[u8; 32]>::decode(r)?;
+        r.expect_mandatory_tag(3)?;
+        let total_raw_weight = u128::decode(r)?;
+        r.expect_mandatory_tag(4)?;
+        let total_effective_weight = u128::decode(r)?;
+        r.expect_mandatory_tag(5)?;
+        let members = r.get_list(MAX_LIGHT_MEMBERS)?;
+        Self::checked(
+            epoch,
+            claimed_root,
+            total_raw_weight,
+            total_effective_weight,
+            members,
+        )
+        .map_err(|_| CodecError::UnknownDiscriminant)
+    }
+}
+
+/// Membership transition class. A second consecutive emergency transition is
+/// invalid; `Halt` is terminal and cannot accompany another finalized item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LightMembershipTransitionKind {
+    Normal,
+    EmergencyContinuation,
+    Halt,
+}
+
+impl NoosEncode for LightMembershipTransitionKind {
+    fn encode(&self, w: &mut Writer) {
+        w.put_u8(match self {
+            Self::Normal => 0,
+            Self::EmergencyContinuation => 1,
+            Self::Halt => 2,
+        });
+    }
+}
+
+impl NoosDecode for LightMembershipTransitionKind {
+    fn decode(r: &mut Reader<'_>) -> Result<Self, CodecError> {
+        match r.get_discriminant(3)? {
+            0 => Ok(Self::Normal),
+            1 => Ok(Self::EmergencyContinuation),
+            2 => Ok(Self::Halt),
+            _ => Err(CodecError::UnknownDiscriminant),
+        }
+    }
+}
+
+define_object! {
+    /// Old-set quorum attestation over one compact membership rotation.
+    pub struct LightMembershipHandoverV1 {
+        version: 1;
+        1 => kind: LightMembershipTransitionKind,
+        2 => chain_id: [u8; 32],
+        3 => old_epoch: u64,
+        4 => new_epoch: u64,
+        5 => old_membership_root: [u8; 32],
+        6 => new_membership_root: [u8; 32],
+        7 => finalized_checkpoint_epoch: u64,
+        8 => finalized_checkpoint_hash: [u8; 32],
+        9 => participation_bitmap: Bounded<128>,
+        10 => aggregate_signature: Bounded<96>,
+        11 => raw_weight_sum: u128,
+        12 => effective_weight_sum: u128,
+    }
+}
+
+/// Compact snapshot plus bounded membership handover/rotation evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LightMembershipWitnessV1 {
+    pub snapshot: LightMembershipSnapshotV1,
+    pub handover: Bounded<MAX_LIGHT_HANDOVER_BYTES>,
+}
+
+impl LightMembershipWitnessV1 {
+    pub fn verify(&self) -> Result<(), LightMembershipError> {
+        self.snapshot.verify()?;
+        if self.encode_canonical().len() > MAX_LIGHT_MEMBERSHIP_WITNESS_BYTES {
+            return Err(LightMembershipError::EncodedBudget);
+        }
+        Ok(())
+    }
+}
+
+impl NoosEncode for LightMembershipWitnessV1 {
+    fn encode(&self, w: &mut Writer) {
+        w.put_u16(1);
+        w.put_mandatory_tag(1);
+        self.snapshot.encode(w);
+        w.put_mandatory_tag(2);
+        self.handover.encode(w);
+    }
+}
+
+impl NoosDecode for LightMembershipWitnessV1 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self, CodecError> {
+        r.expect_version(&[1])?;
+        r.expect_mandatory_tag(1)?;
+        let snapshot = LightMembershipSnapshotV1::decode(r)?;
+        r.expect_mandatory_tag(2)?;
+        let handover = Bounded::decode(r)?;
+        let out = Self { snapshot, handover };
+        out.verify().map_err(|_| CodecError::LengthExceedsBound)?;
+        Ok(out)
+    }
+}
+
+/// One finalized light-client history item. Full bodies, bonds, and telemetry
+/// have no field here and therefore cannot enter the witness.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LightUpdateItemV1 {
+    pub height: u64,
+    pub header: Bounded<MAX_LIGHT_HEADER_BYTES>,
+    pub finality: Bounded<MAX_LIGHT_FINALITY_BYTES>,
+    pub membership: LightMembershipWitnessV1,
+    pub ground_ticket: Bounded<MAX_LIGHT_ITEM_AUX_BYTES>,
+}
+
+impl LightUpdateItemV1 {
+    pub fn verify_bounds(&self) -> Result<(), CodecError> {
+        self.membership
+            .verify()
+            .map_err(|_| CodecError::LengthExceedsBound)?;
+        if self.encode_canonical().len() > MAX_LIGHT_UPDATE_ITEM_BYTES as usize {
+            return Err(CodecError::LengthExceedsBound);
+        }
+        Ok(())
+    }
+}
+
+impl NoosEncode for LightUpdateItemV1 {
+    fn encode(&self, w: &mut Writer) {
+        w.put_u16(1);
+        w.put_mandatory_tag(1);
+        self.height.encode(w);
+        w.put_mandatory_tag(2);
+        self.header.encode(w);
+        w.put_mandatory_tag(3);
+        self.finality.encode(w);
+        w.put_mandatory_tag(4);
+        self.membership.encode(w);
+        w.put_mandatory_tag(5);
+        self.ground_ticket.encode(w);
+    }
+}
+
+impl NoosDecode for LightUpdateItemV1 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self, CodecError> {
+        r.expect_version(&[1])?;
+        r.expect_mandatory_tag(1)?;
+        let height = u64::decode(r)?;
+        r.expect_mandatory_tag(2)?;
+        let header = Bounded::decode(r)?;
+        r.expect_mandatory_tag(3)?;
+        let finality = Bounded::decode(r)?;
+        r.expect_mandatory_tag(4)?;
+        let membership = LightMembershipWitnessV1::decode(r)?;
+        r.expect_mandatory_tag(5)?;
+        let ground_ticket = Bounded::decode(r)?;
+        let item = Self {
+            height,
+            header,
+            finality,
+            membership,
+            ground_ticket,
+        };
+        item.verify_bounds()?;
+        Ok(item)
+    }
+}
+
+/// Bounded ascending light-update request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LightUpdateRequestV1 {
+    pub chain_id: [u8; 32],
+    pub genesis_hash: [u8; 32],
+    pub start_height: u64,
+    pub max_items: u32,
+}
+
+impl LightUpdateRequestV1 {
+    pub fn checked(
+        chain_id: [u8; 32],
+        genesis_hash: [u8; 32],
+        start_height: u64,
+        max_items: u32,
+    ) -> Result<Self, CodecError> {
+        if !(1..=MAX_LIGHT_UPDATE_ITEMS).contains(&max_items) {
+            return Err(CodecError::LengthExceedsBound);
+        }
+        Ok(Self {
+            chain_id,
+            genesis_hash,
+            start_height,
+            max_items,
+        })
+    }
+}
+
+impl NoosEncode for LightUpdateRequestV1 {
+    fn encode(&self, w: &mut Writer) {
+        w.put_u16(1);
+        w.put_mandatory_tag(1);
+        self.chain_id.encode(w);
+        w.put_mandatory_tag(2);
+        self.genesis_hash.encode(w);
+        w.put_mandatory_tag(3);
+        self.start_height.encode(w);
+        w.put_mandatory_tag(4);
+        self.max_items.encode(w);
+    }
+}
+
+impl NoosDecode for LightUpdateRequestV1 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self, CodecError> {
+        r.expect_version(&[1])?;
+        r.expect_mandatory_tag(1)?;
+        let chain_id = <[u8; 32]>::decode(r)?;
+        r.expect_mandatory_tag(2)?;
+        let genesis_hash = <[u8; 32]>::decode(r)?;
+        r.expect_mandatory_tag(3)?;
+        let start_height = u64::decode(r)?;
+        r.expect_mandatory_tag(4)?;
+        let max_items = u32::decode(r)?;
+        Self::checked(chain_id, genesis_hash, start_height, max_items)
+    }
+}
+
+/// Reply-shaping failure when even one valid item cannot fit the requested
+/// frame budget. Callers must not return an empty `more=true` page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LightReplyFitError {
+    SingleItemOversize { encoded: usize, budget: usize },
+    NonCanonicalPage,
+}
+
+/// Ascending light-update reply. The byte bound applies to this whole encoded
+/// object, not merely to its item list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LightUpdateReplyV1 {
+    pub chain_id: [u8; 32],
+    pub genesis_hash: [u8; 32],
+    pub requested_start: u64,
+    pub items: BoundedList<LightUpdateItemV1, MAX_LIGHT_UPDATE_ITEMS>,
+    pub next_height: u64,
+    pub more: Flag,
+}
+
+impl LightUpdateReplyV1 {
+    pub fn verify_page(&self) -> Result<(), LightReplyFitError> {
+        if self.items.0.len() > MAX_LIGHT_UPDATE_ITEMS as usize {
+            return Err(LightReplyFitError::NonCanonicalPage);
+        }
+        if self
+            .items
+            .0
+            .windows(2)
+            .any(|pair| pair[0].height >= pair[1].height)
+        {
+            return Err(LightReplyFitError::NonCanonicalPage);
+        }
+        if let Some(first) = self.items.0.first() {
+            if first.height != self.requested_start {
+                return Err(LightReplyFitError::NonCanonicalPage);
+            }
+        }
+        let expected_next = self
+            .items
+            .0
+            .last()
+            .map_or(self.requested_start, |item| item.height.saturating_add(1));
+        if self.next_height != expected_next || (self.more.0 && self.items.0.is_empty()) {
+            return Err(LightReplyFitError::NonCanonicalPage);
+        }
+        Ok(())
+    }
+
+    /// Removes only a suffix until the entire reply fits. The retained prefix
+    /// and `next_height` form the next request. Empty continuation pages are
+    /// forbidden, yielding a typed single-item error instead.
+    pub fn fit_to_budget(&mut self, budget: usize) -> Result<usize, LightReplyFitError> {
+        self.verify_page()?;
+        let mut shed = 0_usize;
+        loop {
+            let encoded = self.encode_canonical().len();
+            if encoded <= budget {
+                return Ok(shed);
+            }
+            if self.items.0.len() <= 1 {
+                return Err(LightReplyFitError::SingleItemOversize { encoded, budget });
+            }
+            self.items.0.pop();
+            shed = shed.saturating_add(1);
+            self.more = Flag(true);
+            self.next_height = self
+                .items
+                .0
+                .last()
+                .map_or(self.requested_start, |item| item.height.saturating_add(1));
+        }
+    }
+}
+
+impl NoosEncode for LightUpdateReplyV1 {
+    fn encode(&self, w: &mut Writer) {
+        w.put_u16(1);
+        w.put_mandatory_tag(1);
+        self.chain_id.encode(w);
+        w.put_mandatory_tag(2);
+        self.genesis_hash.encode(w);
+        w.put_mandatory_tag(3);
+        self.requested_start.encode(w);
+        w.put_mandatory_tag(4);
+        self.items.encode(w);
+        w.put_mandatory_tag(5);
+        self.next_height.encode(w);
+        w.put_mandatory_tag(6);
+        self.more.encode(w);
+    }
+}
+
+impl NoosDecode for LightUpdateReplyV1 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self, CodecError> {
+        r.expect_version(&[1])?;
+        r.expect_mandatory_tag(1)?;
+        let chain_id = <[u8; 32]>::decode(r)?;
+        r.expect_mandatory_tag(2)?;
+        let genesis_hash = <[u8; 32]>::decode(r)?;
+        r.expect_mandatory_tag(3)?;
+        let requested_start = u64::decode(r)?;
+        r.expect_mandatory_tag(4)?;
+        let items = BoundedList::decode(r)?;
+        r.expect_mandatory_tag(5)?;
+        let next_height = u64::decode(r)?;
+        r.expect_mandatory_tag(6)?;
+        let more = Flag::decode(r)?;
+        let reply = Self {
+            chain_id,
+            genesis_hash,
+            requested_start,
+            items,
+            next_height,
+            more,
+        };
+        reply
+            .verify_page()
+            .map_err(|_| CodecError::UnknownDiscriminant)?;
+        Ok(reply)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // /noos/sync/snapshot/1
 // ---------------------------------------------------------------------------
 
@@ -660,6 +1245,45 @@ mod tests {
         [0xAA; 32]
     }
 
+    fn light_member(index: u32) -> LightMemberV1 {
+        let mut validator_id = [0_u8; 32];
+        validator_id[28..].copy_from_slice(&index.to_be_bytes());
+        LightMemberV1 {
+            validator_id,
+            consensus_bls_key: LightBytes48([index as u8; 48]),
+            raw_weight: u128::from(index).saturating_add(1),
+            effective_weight: u128::from(index).saturating_add(1),
+        }
+    }
+
+    fn light_item(height: u64, header_bytes: usize) -> LightUpdateItemV1 {
+        let snapshot = LightMembershipSnapshotV1::from_members(1, vec![light_member(1)]).unwrap();
+        LightUpdateItemV1 {
+            height,
+            header: Bounded(vec![0x11; header_bytes]),
+            finality: Bounded(vec![0x22; 64]),
+            membership: LightMembershipWitnessV1 {
+                snapshot,
+                handover: Bounded(Vec::new()),
+            },
+            ground_ticket: Bounded(vec![0x33; 64]),
+        }
+    }
+
+    fn raw_light_request(max_items: u32) -> Vec<u8> {
+        let mut w = Writer::new();
+        w.put_u16(1);
+        w.put_mandatory_tag(1);
+        w.put_array32(&cid());
+        w.put_mandatory_tag(2);
+        w.put_array32(&[0xBB; 32]);
+        w.put_mandatory_tag(3);
+        w.put_u64(7);
+        w.put_mandatory_tag(4);
+        w.put_u32(max_items);
+        w.into_bytes()
+    }
+
     #[test]
     fn header_msg_round_trip_both_variants() {
         let a = HeaderMsgV1::Announce {
@@ -773,6 +1397,204 @@ mod tests {
     }
 
     #[test]
+    fn light_request_rejects_zero_and_max_plus_one() {
+        assert_eq!(
+            LightUpdateRequestV1::decode_canonical(&raw_light_request(0)).unwrap_err(),
+            CodecError::LengthExceedsBound
+        );
+        for count in [1, MAX_LIGHT_UPDATE_ITEMS] {
+            let request =
+                LightUpdateRequestV1::decode_canonical(&raw_light_request(count)).unwrap();
+            assert_eq!(request.max_items, count);
+        }
+        assert_eq!(
+            LightUpdateRequestV1::decode_canonical(&raw_light_request(MAX_LIGHT_UPDATE_ITEMS + 1))
+                .unwrap_err(),
+            CodecError::LengthExceedsBound
+        );
+    }
+
+    #[test]
+    fn compact_member_is_fixed_112_bytes_and_snapshot_checks_totals_root_order() {
+        assert_eq!(
+            light_member(1).encode_canonical().len(),
+            LIGHT_MEMBER_ENCODED_BYTES
+        );
+        let members: Vec<_> = (0..1_024).map(light_member).collect();
+        let snapshot = LightMembershipSnapshotV1::from_members(9, members.clone()).unwrap();
+        assert_eq!(snapshot.members().len(), 1_024);
+        assert_eq!(
+            snapshot.total_raw_weight(),
+            members.iter().map(|m| m.raw_weight).sum()
+        );
+        assert_eq!(
+            snapshot.total_effective_weight(),
+            members.iter().map(|m| m.effective_weight).sum()
+        );
+        assert!(snapshot.encode_canonical().len() <= MAX_LIGHT_MEMBERSHIP_SNAPSHOT_BYTES);
+        assert_eq!(
+            LightMembershipSnapshotV1::checked(
+                9,
+                snapshot.root(),
+                snapshot.total_raw_weight().saturating_add(1),
+                snapshot.total_effective_weight(),
+                members.clone(),
+            ),
+            Err(LightMembershipError::TotalMismatch)
+        );
+        let mut wrong_root = snapshot.root();
+        wrong_root[0] ^= 1;
+        assert_eq!(
+            LightMembershipSnapshotV1::checked(
+                9,
+                wrong_root,
+                snapshot.total_raw_weight(),
+                snapshot.total_effective_weight(),
+                members.clone(),
+            ),
+            Err(LightMembershipError::RootMismatch)
+        );
+        let mut reversed = members;
+        reversed.swap(0, 1);
+        assert_eq!(
+            LightMembershipSnapshotV1::from_members(9, reversed),
+            Err(LightMembershipError::MemberOrder)
+        );
+    }
+
+    #[test]
+    fn compact_snapshot_rejects_duplicate_and_overflow_weights() {
+        let one = light_member(1);
+        assert_eq!(
+            LightMembershipSnapshotV1::from_members(1, vec![one.clone(), one]),
+            Err(LightMembershipError::MemberOrder)
+        );
+        let mut a = light_member(1);
+        let mut b = light_member(2);
+        a.raw_weight = u128::MAX;
+        b.raw_weight = 1;
+        assert_eq!(
+            LightMembershipSnapshotV1::from_members(1, vec![a, b]),
+            Err(LightMembershipError::WeightOverflow)
+        );
+    }
+
+    #[test]
+    fn light_reply_trims_suffix_and_continues_without_empty_page() {
+        let items = (100..120)
+            .map(|height| light_item(height, 60_000))
+            .collect();
+        let mut reply = LightUpdateReplyV1 {
+            chain_id: cid(),
+            genesis_hash: [0xBB; 32],
+            requested_start: 100,
+            items: BoundedList(items),
+            next_height: 120,
+            more: Flag(false),
+        };
+        assert!(reply.encode_canonical().len() > MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES);
+        let shed = reply
+            .fit_to_budget(MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES)
+            .unwrap();
+        assert!(shed > 0);
+        assert!(reply.encode_canonical().len() <= MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES);
+        assert!(reply.more.0);
+        assert_eq!(
+            reply.next_height,
+            reply.items.0.last().unwrap().height.saturating_add(1)
+        );
+        assert_eq!(reply.items.0.first().unwrap().height, 100);
+        assert_eq!(
+            LightUpdateReplyV1::decode_canonical(&reply.encode_canonical()).unwrap(),
+            reply
+        );
+
+        let mut one = LightUpdateReplyV1 {
+            chain_id: cid(),
+            genesis_hash: [0xBB; 32],
+            requested_start: 7,
+            items: BoundedList(vec![light_item(7, 1_024)]),
+            next_height: 8,
+            more: Flag(false),
+        };
+        assert!(matches!(
+            one.fit_to_budget(64),
+            Err(LightReplyFitError::SingleItemOversize { .. })
+        ));
+        assert_eq!(one.items.0.len(), 1);
+    }
+
+    #[test]
+    fn light_item_exact_nested_maxima_and_malicious_length_reject() {
+        let mut item = light_item(4, MAX_LIGHT_HEADER_BYTES as usize);
+        item.finality = Bounded(vec![0x44; MAX_LIGHT_FINALITY_BYTES as usize]);
+        item.membership.handover = Bounded(vec![0x55; MAX_LIGHT_HANDOVER_BYTES as usize]);
+        item.ground_ticket = Bounded(vec![0x66; MAX_LIGHT_ITEM_AUX_BYTES as usize]);
+        item.verify_bounds().unwrap();
+        assert!(item.encode_canonical().len() <= MAX_LIGHT_UPDATE_ITEM_BYTES as usize);
+        assert_eq!(
+            LightUpdateItemV1::decode_canonical(&item.encode_canonical()).unwrap(),
+            item
+        );
+
+        let mut malicious = Writer::new();
+        malicious.put_u16(1);
+        malicious.put_mandatory_tag(1);
+        malicious.put_u64(4);
+        malicious.put_mandatory_tag(2);
+        malicious.put_u32(MAX_LIGHT_HEADER_BYTES + 1);
+        assert_eq!(
+            LightUpdateItemV1::decode_canonical(malicious.as_bytes()).unwrap_err(),
+            CodecError::LengthExceedsBound
+        );
+    }
+
+    #[test]
+    fn light_reply_rejects_malicious_item_count_before_allocation() {
+        let mut malicious = Writer::new();
+        malicious.put_u16(1);
+        malicious.put_mandatory_tag(1);
+        malicious.put_array32(&cid());
+        malicious.put_mandatory_tag(2);
+        malicious.put_array32(&[0xBB; 32]);
+        malicious.put_mandatory_tag(3);
+        malicious.put_u64(0);
+        malicious.put_mandatory_tag(4);
+        malicious.put_u32(MAX_LIGHT_UPDATE_ITEMS + 1);
+        assert_eq!(
+            LightUpdateReplyV1::decode_canonical(malicious.as_bytes()).unwrap_err(),
+            CodecError::LengthExceedsBound
+        );
+    }
+
+    #[test]
+    fn one_near_max_and_128_small_items_obey_page_laws() {
+        let near_max = light_item(0, MAX_LIGHT_HEADER_BYTES as usize);
+        assert!(near_max.encode_canonical().len() <= MAX_LIGHT_UPDATE_ITEM_BYTES as usize);
+        let one = LightUpdateReplyV1 {
+            chain_id: cid(),
+            genesis_hash: [0xBB; 32],
+            requested_start: 0,
+            items: BoundedList(vec![near_max]),
+            next_height: 1,
+            more: Flag(false),
+        };
+        assert!(one.encode_canonical().len() <= MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES);
+
+        let small = LightUpdateReplyV1 {
+            chain_id: cid(),
+            genesis_hash: [0xBB; 32],
+            requested_start: 10,
+            items: BoundedList((10..138).map(|height| light_item(height, 0)).collect()),
+            next_height: 138,
+            more: Flag(false),
+        };
+        small.verify_page().unwrap();
+        assert_eq!(small.items.0.len(), MAX_LIGHT_UPDATE_ITEMS as usize);
+        assert!(small.encode_canonical().len() <= MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES);
+    }
+
+    #[test]
     fn digest_separates_protocols_and_payloads() {
         let d1 = message_digest(Protocol::LumenTx, b"payload");
         let d2 = message_digest(Protocol::BraidVote, b"payload");
@@ -789,6 +1611,7 @@ mod tests {
         assert_eq!(Protocol::BraidBody.lane(), Lane::Priority);
         assert_eq!(Protocol::SyncRange.lane(), Lane::Priority);
         assert_eq!(Protocol::SyncSnapshot.lane(), Lane::Priority);
+        assert_eq!(Protocol::SyncLightUpdate.lane(), Lane::Priority);
         assert_eq!(Protocol::LumenTx.lane(), Lane::Normal);
         assert_eq!(Protocol::BlobShard.lane(), Lane::Normal);
         assert_eq!(Protocol::LoomReceipt.lane(), Lane::Normal);

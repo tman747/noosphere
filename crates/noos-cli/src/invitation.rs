@@ -59,7 +59,9 @@ pub fn invitation_verify(
     let role = required_str(&invite, "role")?;
     let witness_index = required_u64(&invite, "witness_index")?;
     if role != format!("witness-{witness_index}") || !(1..=3).contains(&witness_index) {
-        return Err(malformed("invitation witness role does not match its index"));
+        return Err(malformed(
+            "invitation witness role does not match its index",
+        ));
     }
     if required_str(&invite, "platform")? == "" {
         return Err(malformed("invitation platform is empty"));

@@ -250,6 +250,150 @@ fn tx_build_encodes_structured_contract_actions_canonically() {
         }
     );
 }
+#[test]
+fn tx_build_encodes_custody_repair_actions_canonically() {
+    let mut spec = minimal_spec();
+    let verifiers = (0x40_u8..0x48).map(h).collect::<Vec<_>>();
+    let signers = verifiers[..5].to_vec();
+    let signatures = signers
+        .iter()
+        .map(|signer_id| json!({"signer_id": signer_id, "signature": "aa"}))
+        .collect::<Vec<_>>();
+    spec["actions"] = json!([
+        {
+            "type": "commit_custody_positions",
+            "commitment_id": h(0x10), "policy_id": h(0x11), "artifact_id": h(0x12),
+            "position": 3, "custodian_profile_id": h(0x13), "custodian_set_id": h(0x14),
+            "custodian_set_epoch": 1, "position_root": h(0x15),
+            "committed_bytes": 475588608_u64, "valid_from": 20, "valid_until": 200,
+            "nonce": 7, "signature": "aa"
+        },
+        {
+            "type": "record_artifact_repair_order",
+            "order_id": h(0x20), "policy_id": h(0x11), "artifact_id": h(0x12),
+            "position": 3, "prior_commitment_id": h(0x10),
+            "replacement_profile_id": h(0x16),
+            "source_commitment_ids": (0x30_u8..0x38).map(h).collect::<Vec<_>>(),
+            "source_positions": [0, 1, 2, 4, 5, 6, 7, 8],
+            "source_positions_root": h(0x21), "expected_position_root": h(0x15),
+            "issued_height": 30, "deadline_height": 100, "authority_epoch": 1,
+            "nonce": 8, "signature": "bb"
+        },
+        {
+            "type": "issue_availability_certificate",
+            "certificate_id": h(0x50), "policy_id": h(0x11), "artifact_id": h(0x12),
+            "custodian_set_id": h(0x14), "custodian_set_root": h(0x51),
+            "custodian_set_epoch": 1, "executor_set_id": h(0x52),
+            "executor_set_root": h(0x53), "executor_set_epoch": 1,
+            "assignment_root": h(0x54), "diversity_root": h(0x55),
+            "challenge_root": h(0x56), "selected_verifiers": verifiers,
+            "signer_ids": signers, "result_root": h(0x57), "availability_state": 0,
+            "issued_height": 31, "valid_until": 200, "signatures": signatures
+        },
+        {
+            "type": "record_artifact_repair_receipt",
+            "repair_id": h(0x60), "order_id": h(0x20), "policy_id": h(0x11),
+            "artifact_id": h(0x12), "position": 3, "prior_commitment_id": h(0x10),
+            "new_commitment_id": h(0x17), "source_positions_root": h(0x21),
+            "new_position_root": h(0x15), "durable_commit_root": h(0x61),
+            "certificate_id": h(0x50), "bytes_read": 3804708864_u64,
+            "bytes_written": 475588608_u64, "evidence_root": h(0x62),
+            "signer_id": h(0x16), "completed_height": 32, "signature": "cc"
+        }
+    ]);
+    let built = noos_cli::tx_build(&spec.to_string()).unwrap();
+    let tx =
+        TransactionV1::decode_canonical(&from_hex(built["tx"].as_str().unwrap()).unwrap()).unwrap();
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[0].as_slice()).unwrap(),
+        ActionV1::CommitCustodyPositions(commitment)
+            if commitment.position == 3 && commitment.committed_bytes == 475_588_608
+    ));
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[1].as_slice()).unwrap(),
+        ActionV1::RecordArtifactRepair(noos_lumen::wwm::ArtifactRepairPayloadV1::Order(order))
+            if order.source_positions.len() == 8
+    ));
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[2].as_slice()).unwrap(),
+        ActionV1::IssueAvailabilityCertificate(certificate)
+            if certificate.selected_verifiers.len() == 8 && certificate.signer_ids.len() == 5
+    ));
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[3].as_slice()).unwrap(),
+        ActionV1::RecordArtifactRepair(noos_lumen::wwm::ArtifactRepairPayloadV1::Receipt(receipt))
+            if receipt.bytes_written == 475_588_608
+    ));
+}
+
+#[test]
+fn wwm_devnet_operator_binds_open_receipt_and_settlement() {
+    let job = json!({
+        "job_id": h(1), "chain_id": h(2), "genesis_hash": h(3), "quote_id": h(4),
+        "registry_epoch": 1, "client_commitment": h(5), "capsule_id": h(6),
+        "execution_profile_id": h(7), "query_policy_id": h(8),
+        "max_input_tokens": 32, "max_output_tokens": 16, "deadline_height": 500,
+        "selected_executor_ids": [h(9)], "availability_certificate_id": h(10),
+        "fund_profile_id": h(11), "reserved_amount": "100", "offchain_envelope_root": h(12)
+    });
+    let receipt = json!({
+        "receipt_id": h(13), "job_id": h(1), "capsule_id": h(6), "artifact_id": h(14),
+        "tokenizer_root": h(15), "template_root": h(16), "runtime_root": h(17),
+        "sbom_root": h(18), "execution_profile_id": h(7), "input_tokens": 4,
+        "output_tokens": 2, "token_history_root": h(19), "output_root": h(20),
+        "signer_ids": [h(21)], "control_cluster_ids": [h(22)],
+        "evidence_tier": "local_verified", "availability_until": 600,
+        "evidence_until": 600, "anchor_height": 450, "anchor_block": h(23),
+        "metered_amount": "30", "paid_amount": "30", "refunded_amount": "10",
+        "terminal_code": "complete", "signatures": []
+    });
+    let settlement = json!({
+        "settlement_id": h(24), "job_id": h(1), "receipt_id": h(13),
+        "fund_profile_id": h(11), "bucket": "job", "prior_settlement_index": 0,
+        "paid_amount": "30", "refunded_amount": "10", "released_amount": "60",
+        "settled_height": 451, "authority_epoch": 1, "signature": "aa"
+    });
+    let flow = json!({"job": job, "receipt": receipt, "settlement": settlement});
+    let built = noos_cli::wwm_devnet_flow(&flow.to_string()).unwrap();
+    assert_eq!(built["job_id"], h(1));
+    assert_eq!(built["receipt_id"], h(13));
+    assert_eq!(built["settlement_id"], h(24));
+    for key in [
+        "open_wwm_job_action",
+        "record_wwm_receipt_action",
+        "settle_wwm_job_action",
+    ] {
+        assert!(!from_hex(built[key].as_str().unwrap()).unwrap().is_empty());
+    }
+    let open_spec = json!({"type": "open_wwm_job"}).as_object().unwrap().clone();
+    let mut open_spec = Value::Object(open_spec);
+    for (key, value) in flow["job"].as_object().unwrap() {
+        open_spec[key] = value.clone();
+    }
+    let encoded_open = noos_cli::wwm_devnet_action(&open_spec.to_string()).unwrap();
+    assert_eq!(encoded_open["kind"], "OpenWwmJob");
+    assert_eq!(encoded_open["id"], h(1));
+    assert!(matches!(
+        ActionV1::decode_canonical(
+            &from_hex(encoded_open["action"].as_str().unwrap()).unwrap()
+        )
+        .unwrap(),
+        ActionV1::OpenWwmJob(_)
+    ));
+
+    for (section, field, wrong) in [
+        ("receipt", "capsule_id", h(90)),
+        ("receipt", "job_id", h(91)),
+        ("settlement", "receipt_id", h(92)),
+    ] {
+        let mut forged = flow.clone();
+        forged[section][field] = json!(wrong);
+        assert!(matches!(
+            noos_cli::wwm_devnet_flow(&forged.to_string()),
+            Err(CliError::Malformed(_))
+        ));
+    }
+}
 
 #[test]
 fn tx_build_encodes_launch_and_swap_actions() {

@@ -1,0 +1,53 @@
+{
+  "schema": "noos/wwm-web-capacity-topology/v1",
+  "profile": "web-capacity",
+  "optional": true,
+  "activation_scope": ["local", "devnet", "public-testnet-pilot"],
+  "production_capable": false,
+  "rewards": false,
+  "service": "web-capacity",
+  "process": "noos-web-capacityd",
+  "listen_container": "0.0.0.0:9770",
+  "default_host_bind": "127.0.0.1:9770",
+  "networks": ["web-capacity-public-egress"],
+  "forbidden_networks": ["artifact", "control", "data", "ingress", "consensus", "validator"],
+  "required_read_only_mounts": [
+    "/run/wwm/web-capacity.json",
+    "/run/wwm/bonsai-artifact-manifest.bin"
+  ],
+  "writable_mounts": [
+    "/var/lib/noos-web-capacity",
+    "/var/lib/noos-web-capacity-quarantine",
+    "/tmp"
+  ],
+  "forbidden_mounts": [
+    "/var/lib/noos-artifacts",
+    "/var/lib/noos-consensus",
+    "/var/lib/noos-model",
+    "/run/secrets/validator_key",
+    "/run/secrets/custodian_signing_key"
+  ],
+  "authority": {
+    "validator_key": false,
+    "consensus_store": false,
+    "model_execution": false,
+    "custody_certificates": false,
+    "production_schedulability": false
+  },
+  "required_environment": [
+    "WWM_WEB_CAPACITY_IMAGE",
+    "WWM_WEB_CAPACITY_SEED",
+    "WWM_WEB_CAPACITY_CONFIG_PATH",
+    "WWM_BONSAI_MANIFEST_PATH"
+  ],
+  "image_policy": "IMMUTABLE_DIGEST_REQUIRED",
+  "browser_credentials": "omit",
+  "resource_caps": {
+    "max_hosts": 1024,
+    "max_active_sessions": 4096,
+    "max_active_assignments": 4096,
+    "max_pending_restore_tasks": 256,
+    "max_quarantine_bytes": 268173312,
+    "max_concurrent_restore_verifications": 8
+  }
+}

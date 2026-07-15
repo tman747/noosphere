@@ -51,11 +51,11 @@ class ReleaseAuthorizationTests(unittest.TestCase):
     def test_external_pinned_keys_verify_and_artifact_hash_mutation_fails(self):
         self.manifest["signatures"] = self.sign(self.manifest)
         errors, blocked = [], []
-        verify_release.verify_signatures(self.manifest, errors, blocked, self.keyring, test_mode=True)
+        verify_release.verify_signatures(self.manifest, errors, blocked, self.keyring, schema_version=1, test_mode=True)
         self.assertEqual((errors, blocked), ([], []))
         mutated = copy.deepcopy(self.manifest); mutated["artifact_hashes"]["release/artifacts/a"] = "5" * 64
         errors = []; blocked = []
-        verify_release.verify_signatures(mutated, errors, blocked, self.keyring, test_mode=True)
+        verify_release.verify_signatures(mutated, errors, blocked, self.keyring, schema_version=1, test_mode=True)
         self.assertTrue(any("invalid" in error for error in errors))
 
     def test_embedded_or_dummy_keys_cannot_nominate_trust(self):
@@ -64,7 +64,7 @@ class ReleaseAuthorizationTests(unittest.TestCase):
             "signature_base64": "AA==",
         }]
         errors, blocked = [], []
-        verify_release.verify_signatures(self.manifest, errors, blocked, None, test_mode=True)
+        verify_release.verify_signatures(self.manifest, errors, blocked, None, schema_version=1, test_mode=True)
         self.assertIn("signed release manifest requires externally supplied pinned role keyring", errors)
 
     def test_repro_assurance_requires_exact_shipped_builder_bytes_and_paths(self):

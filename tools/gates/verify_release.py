@@ -7,13 +7,18 @@ try:
 except ModuleNotFoundError:
  import tomli as tomllib
 from pathlib import Path
+from promotion_records import (
+    PromotionValidationError,
+    registered_domain,
+    validate_protocol_release_manifest_header,
+)
 ROOT=Path(__file__).resolve().parents[2]; HEX=re.compile(r"^[0-9a-f]{64}$")
 def sha(p:Path)->str:return hashlib.sha256(p.read_bytes()).hexdigest()
 def safe(rel:str)->Path:
  p=(ROOT/rel).resolve()
  if ROOT.resolve() not in p.parents and p!=ROOT.resolve():raise ValueError(f"path escapes repository: {rel}")
  return p
-def verify_signatures(manifest:dict,errors:list[str],blocked:list[str],keyring=None,*,test_mode:bool=False):
+def verify_signatures(manifest:dict,errors:list[str],blocked:list[str],keyring=None,*,schema_version:int,test_mode:bool=False):
  sigs=manifest.get("signatures",[]);required=("release-owner","independent-build-reviewer");roles={}
  unsigned=dict(manifest);unsigned["signatures"]=[]
  payload=json.dumps(unsigned,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
@@ -23,7 +28,8 @@ def verify_signatures(manifest:dict,errors:list[str],blocked:list[str],keyring=N
  if keyring is None:
   errors.append("signed release manifest requires externally supplied pinned role keyring")
   return
- message=b"NOOS/RELEASE/MANIFEST/V2\x00"+payload
+ domain_id="D-RELEASE-MANIFEST-SIGNATURE-V2" if schema_version==1 else "D-PROTOCOL-RELEASE-MANIFEST-V2"
+ message=registered_domain(domain_id).encode("ascii")+b"\x00"+payload
  for rec in sigs:
   if not isinstance(rec,dict) or set(rec)!={"role","key_id","signature_ed25519_hex"}:
    errors.append("manifest signature has unknown/embedded-key fields");continue
@@ -72,10 +78,14 @@ def verify_repro_assurance(manifest:dict,report_path:Path,errors:list[str])->Non
 
 
 def main()->int:
- p=argparse.ArgumentParser();p.add_argument("manifest");p.add_argument("--allow-external-blocked",action="store_true");p.add_argument("--keyring");p.add_argument("--final-freeze");p.add_argument("--final-freeze-signatures");p.add_argument("--repro-assurance");a=p.parse_args();mp=safe(a.manifest)
+ p=argparse.ArgumentParser();p.add_argument("manifest");p.add_argument("--schema-version",type=int,choices=(1,2),default=2);p.add_argument("--allow-external-blocked",action="store_true");p.add_argument("--keyring");p.add_argument("--final-freeze");p.add_argument("--final-freeze-signatures");p.add_argument("--repro-assurance");a=p.parse_args();mp=safe(a.manifest)
  try:m=json.loads(mp.read_text("utf-8"))
  except Exception as exc:print(f"manifest parse failed: {exc}",file=sys.stderr);return 1
  errors=[];blocked=[];keyring=None
+ try:
+  validate_protocol_release_manifest_header(m,ROOT,a.schema_version)
+ except PromotionValidationError as exc:
+  errors.append(str(exc))
  supplied=[a.keyring,a.final_freeze,a.final_freeze_signatures]
  if any(supplied) and not all(supplied):errors.append("--keyring, --final-freeze, and --final-freeze-signatures must be supplied together")
  elif all(supplied):
@@ -92,8 +102,8 @@ def main()->int:
    verify_detached_signatures(canonical_json(freeze),read_json(sp),DOMAIN_FINAL_FREEZE,revision,FINAL_ROLES,keyring)
    if freeze.get("trusted_repro_builders_sha256")!=m.get("reproducibility",{}).get("trusted_repro_builders_sha256"):raise ValueError("release does not bind final-freeze reproducibility roster")
   except Exception as exc:errors.append(f"trusted release keyring/final-freeze verification failed: {exc}")
- if m.get("schema_version")!=1 or m.get("manifest_kind")!="noosphere-release-manifest":errors.append("wrong manifest schema/kind")
- for section in ("release","source","identity","toolchain_locks","artifact_hashes","checksums","sbom","provenance","reproducibility","gate_verdicts","unresolved_findings","signatures"):
+ required_sections=("release","source","identity","toolchain_locks","artifact_hashes","checksums","sbom","provenance","reproducibility","gate_verdicts","unresolved_findings","signatures")
+ for section in required_sections:
   if section not in m:errors.append(f"missing section {section}")
  for rel,digest in m.get("artifact_hashes",{}).items():
   try:path=safe(rel)
@@ -157,7 +167,7 @@ def main()->int:
  ident=m.get("identity",{})
  for key in ("chain_id","genesis_hash"):
   if not HEX.fullmatch(str(ident.get(key,""))):blocked.append(f"INVALID_OR_UNFROZEN_{key.upper()}")
- verify_signatures(m,errors,blocked,keyring)
+ verify_signatures(m,errors,blocked,keyring,schema_version=a.schema_version)
  for v in m.get("gate_verdicts",[]):
   if v.get("verdict")!="PASS":blocked.append(f"GATE_{v.get('gate','UNKNOWN')}_{v.get('verdict','MISSING')}")
  if errors:

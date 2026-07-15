@@ -1,11 +1,13 @@
-"""Canonical cryptographic validation for v2 promotion-gate records.
+"""Canonical cryptographic validation for explicitly selected promotion ledgers.
 
-Blocked ledgers may remain unsigned.  A gate can be interpreted as PASSED only
-through this module and only when its closed record, evidence bytes, predecessor
-chain, pinned external role keyring, and every required signature verify.
+V1 remains a historical validation surface. Protocol/API V2 is a clean ledger
+whose first edge binds the exact immutable V1 file bytes. Blocked ledgers may
+remain unsigned; a gate is PASSED only after its closed record, evidence,
+predecessor chain, externally pinned role keys, and every signature verify.
 """
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import re
@@ -13,14 +15,19 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from cryptography.exceptions import InvalidSignature
+from validate_registry import schema_validate
 
 ORDER = ["G0", "G1", "G2", "G3", "GENESIS", "G4", "G5"]
 HASH = re.compile(r"^[0-9a-f]{64}$")
 REVISION = re.compile(r"^[0-9a-f]{40}$")
 PLACEHOLDER = re.compile(r"(?:OWNER_BLOCKED|PENDING|REPLACE_ME|EXAMPLE|fixture\s*:\s*true)", re.IGNORECASE)
-DOMAIN = "NOOS/PROMOTION/GATE/V2"
+V1_LEDGER_DOMAIN_ID = "D-PROMOTION-LEDGER-V2"
+V1_PREDECESSOR_PATH = "protocol/release/promotion-blockers.json"
+V1_PREDECESSOR_SHA256 = "2509d617934e2c69eea64c6af228ae1b43aa2953269589c9da8b0099f0faf759"
+V1_RELEASE_SCHEMA_PATH = "protocol/release/manifest-schema-v1.json"
+V1_RELEASE_SCHEMA_SHA256 = "10d9f1e939fa304508f483db4023bd3d412458136c4b628c48831e2052fcb6c5"
 REQUIRED_ROLES = ("release-owner", "independent-build-reviewer", "operations-owner", "security-reviewer")
-REQUIRED_REQUIREMENTS = {
+REQUIRED_REQUIREMENTS_V1 = {
     "G0": ["G0.REGISTRY_SCHEMA", "G0.OWNER_CONSTANTS"],
     "G1": ["G1.DETERMINISTIC_LAB"],
     "G2": ["G2.INDEPENDENT_DEVNET"],
@@ -28,6 +35,10 @@ REQUIRED_REQUIREMENTS = {
     "GENESIS": ["GENESIS.QUIET_WEEK", "GENESIS.BITCOIN_ANCHOR", "GENESIS.DKG", "GENESIS.MAINNET_ECONOMICS", "GENESIS.REPRO_DEMO"],
     "G4": ["G4.CANARY_DURATION", "G4.EXIT_AND_FAULT_DRILLS", "G4.HARDWARE_BUILDERS"],
     "G5": ["G5.EXACT_LOWER_GATES", "G5.CLAIM_COMPLETENESS", "G5.EXTERNAL_REVIEWS", "G5.LIVE_DIVERSITY", "G5.SIGNATURES"],
+}
+REQUIRED_REQUIREMENTS_V2 = {
+    **REQUIRED_REQUIREMENTS_V1,
+    "G0": ["G0.PROTOCOL_V2_SCHEMA", "G0.V1_PREDECESSOR", "G0.OWNER_CONSTANTS", "G0.INDEPENDENT_REVIEW"],
 }
 RECORD_KEYS = {
     "schema_version", "kind", "gate_id", "exact_revision", "chain_id", "genesis_hash",
@@ -51,8 +62,251 @@ def digest(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def ledger_root(record_hashes: Sequence[str]) -> str:
-    return digest(b"NOOS/PROMOTION/LEDGER/V2\x00" + canonical_json(list(record_hashes)))
+def registered_domain(domain_id: str, *, root: Path | None = None) -> str:
+    """Resolve one generated-domain source entry; callers never copy contexts."""
+    registry = (root or Path(__file__).resolve().parents[2]) / "protocol/spec/crypto-domains-v1.csv"
+    with registry.open(newline="", encoding="utf-8") as stream:
+        rows = csv.DictReader(line for line in stream if not line.startswith("#"))
+        matches = [row["context_string"] for row in rows if row.get("domain_id") == domain_id]
+    if len(matches) != 1:
+        raise PromotionValidationError(f"domain registry selection is not unique: {domain_id}")
+    return matches[0]
+
+
+def ledger_root(record_hashes: Sequence[str], *, schema_version: int = 1) -> str:
+    if schema_version == 1:
+        domain = registered_domain(V1_LEDGER_DOMAIN_ID).encode("ascii")
+    elif schema_version == 2:
+        domain = registered_domain("D-PROMOTION-PROTOCOL-V2-LEDGER").encode("ascii")
+    else:
+        raise PromotionValidationError(f"unsupported promotion schema version: {schema_version}")
+    return digest(domain + b"\x00" + canonical_json(list(record_hashes)))
+
+
+def validate_schema_dispatch(ledger: Mapping[str, Any], root: Path, schema_version: int) -> None:
+    """Reject inference and mixed schema/protocol/API identities."""
+    if schema_version == 1:
+        expected = {
+            "$schema": "promotion-blockers-schema-v1.json",
+            "schema_version": 1,
+        }
+        for key, value in expected.items():
+            if key in ledger and ledger.get(key) != value:
+                raise PromotionValidationError(f"V1 promotion ledger mismatch at {key}")
+        binding = ledger.get("protocol_binding", {})
+        for key in ("protocol_version", "api_version"):
+            if key in binding and binding.get(key) != "v1":
+                raise PromotionValidationError(f"V1 promotion ledger has mixed {key}")
+        if "predecessor" in ledger:
+            raise PromotionValidationError("V1 promotion ledger cannot carry a V2 predecessor")
+        return
+    if schema_version != 2:
+        raise PromotionValidationError(f"unsupported promotion schema version: {schema_version}")
+    if ledger.get("$schema") != "promotion-blockers-schema-v2.json" or ledger.get("schema_version") != 2:
+        raise PromotionValidationError("V2 promotion ledger/schema binding mismatch")
+    binding = ledger.get("protocol_binding", {})
+    expected_binding = {
+        "protocol_identity": "noos-protocol-identity-v2",
+        "protocol_version": "v2",
+        "api_version": "v2",
+        "peer_identity": "v2-only",
+    }
+    for key, value in expected_binding.items():
+        if binding.get(key) != value:
+            raise PromotionValidationError(f"V2 promotion ledger has mixed identity at {key}")
+    predecessor = ledger.get("predecessor")
+    expected_predecessor = {
+        "kind": "noosphere-promotion-ledger-predecessor-v1",
+        "ledger_path": V1_PREDECESSOR_PATH,
+        "schema_version": 1,
+        "protocol_version": "v1",
+        "api_version": "v1",
+        "release_version": "0.0.0-preproduction",
+        "root_algorithm": "SHA-256-EXACT-FILE-BYTES",
+        "predecessor_root": V1_PREDECESSOR_SHA256,
+        "relation": "DIRECT_IMMUTABLE_PREDECESSOR",
+    }
+    if predecessor != expected_predecessor:
+        raise PromotionValidationError("V2 promotion ledger predecessor is missing, wrong, or cyclic")
+    predecessor_path = _safe(root, V1_PREDECESSOR_PATH)
+    if not predecessor_path.is_file() or digest(predecessor_path.read_bytes()) != V1_PREDECESSOR_SHA256:
+        raise PromotionValidationError("immutable V1 predecessor bytes/root mismatch")
+    try:
+        predecessor_doc = json.loads(predecessor_path.read_text("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise PromotionValidationError(f"immutable V1 predecessor cannot be decoded: {exc}") from exc
+    if (
+        predecessor_doc.get("$schema") != "promotion-blockers-schema-v1.json"
+        or predecessor_doc.get("schema_version") != 1
+        or predecessor_doc.get("protocol_binding", {}).get("protocol_version") != "v1"
+        or predecessor_doc.get("protocol_binding", {}).get("api_version") != "v1"
+    ):
+        raise PromotionValidationError("immutable predecessor is not the closed V1 identity")
+    contracts = ledger.get("contracts", {})
+    if contracts.get("v1_decode_policy") != "REJECT_V1_WWM_BYTES":
+        raise PromotionValidationError("V2 promotion ledger permits mixed WWM bytes")
+    if contracts.get("action_registry") != {
+        "container": "ActionV1", "first_discriminant": 40,
+        "last_discriminant": 59, "variant_count": 60,
+    }:
+        raise PromotionValidationError("V2 action discriminant/count contract mismatch")
+    if contracts.get("transaction_bounds") != {
+        "action_call_max_bytes": 65536, "tx_plus_witness_max_bytes": 65532,
+        "tx_push_max_bytes": 65536, "tx_push_length_prefix_bytes": 4,
+    }:
+        raise PromotionValidationError("V2 transaction bound contract mismatch")
+    if contracts.get("light_update") != {
+        "protocol": "/noos/sync/light-update/2", "max_items": 128,
+        "max_item_bytes": 262144, "request_min_items": 1,
+    }:
+        raise PromotionValidationError("V2 light-update contract mismatch")
+    if contracts.get("resolver") != {
+        "target": "/model-resolution/<selector>", "max_bytes": 262144,
+        "max_proofs": 17, "normal_leaf_count": 17,
+        "authorized_target": "/authorized-config/<config_id>", "authorized_max_bytes": 393216,
+    }:
+        raise PromotionValidationError("V2 resolver contract mismatch")
+    expected_tags = {
+        "action_41": ["InstallProfile", "TransitionCapability"],
+        "action_50": ["InstallProfile", "TransitionCapability"],
+        "action_52": ["StageFundProfile", "LockFundMutation", "ActivateFundProfile", "CloseFundProfile"],
+        "action_58": ["TransitionServingAlias"],
+        "action_59": ["Activate", "EmergencyDisable", "AuthorizeOperationalConfig", "ApplyOperationalConfig", "Recover"],
+    }
+    if contracts.get("payload_tags") != expected_tags:
+        raise PromotionValidationError("V2 payload tag contract mismatch")
+    auth_binding = ledger.get("authorization_binding", {})
+    if auth_binding.get("gate_record_domain_id") != "D-PROMOTION-GATE-V2":
+        raise PromotionValidationError("V2 gate-record domain selection mismatch")
+    release_manifest = ledger.get("release_manifest", {})
+    if (
+        release_manifest.get("schema") != "protocol-release-manifest-v2.schema.json"
+        or release_manifest.get("path") != "protocol/release/protocol-release-manifest-v2.json"
+    ):
+        raise PromotionValidationError("V2 release-manifest schema/path binding mismatch")
+    manifest_status = release_manifest.get("status")
+    manifest_hash = release_manifest.get("sha256")
+    if not (
+        (manifest_status == "OWNER_BLOCKED" and manifest_hash == "OWNER_BLOCKED")
+        or (manifest_status == "BOUND" and isinstance(manifest_hash, str) and HASH.fullmatch(manifest_hash))
+    ):
+        raise PromotionValidationError("V2 release-manifest blocker/hash binding mismatch")
+    schema_path = root / "protocol/release/promotion-blockers-schema-v2.json"
+    try:
+        schema = json.loads(schema_path.read_text("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise PromotionValidationError(f"V2 promotion schema cannot be loaded: {exc}") from exc
+    schema_errors = schema_validate(ledger, schema)
+    if schema_errors:
+        raise PromotionValidationError(f"V2 promotion schema violation: {schema_errors[0]}")
+
+
+def validate_protocol_release_manifest_header(manifest: Mapping[str, Any], root: Path, schema_version: int) -> None:
+    """Validate version identity and immutable predecessor before artifact work."""
+    if schema_version == 1:
+        if manifest.get("schema_version") != 1 or manifest.get("manifest_kind") != "noosphere-release-manifest":
+            raise PromotionValidationError("wrong V1 release manifest schema/kind")
+        release = manifest.get("release")
+        if isinstance(release, Mapping) and (
+            release.get("protocol_version") != "v1" or release.get("api_version") != "v1"
+        ):
+            raise PromotionValidationError("V1 release manifest has mixed protocol/API identity")
+        if "predecessor_binding" in manifest:
+            raise PromotionValidationError("V1 release manifest cannot carry a V2 predecessor")
+        return
+    if schema_version != 2:
+        raise PromotionValidationError(f"unsupported release schema version: {schema_version}")
+    if (
+        manifest.get("$schema") != "protocol-release-manifest-v2.schema.json"
+        or manifest.get("schema_version") != 2
+        or manifest.get("manifest_kind") != "noosphere-protocol-release-manifest-v2"
+    ):
+        raise PromotionValidationError("wrong V2 release manifest schema/kind")
+    release = manifest.get("release", {})
+    expected_release = {
+        "protocol_identity": "noos-protocol-identity-v2",
+        "protocol_version": "v2",
+        "api_version": "v2",
+        "peer_identity": "v2-only",
+    }
+    for key, value in expected_release.items():
+        if release.get(key) != value:
+            raise PromotionValidationError(f"V2 release manifest has mixed identity at {key}")
+    identity = manifest.get("identity", {})
+    if identity.get("protocol_identity") != "noos-protocol-identity-v2":
+        raise PromotionValidationError("V2 release chain identity is mixed")
+    expected_predecessor = {
+        "promotion_ledger": {
+            "path": V1_PREDECESSOR_PATH, "schema_version": 1,
+            "protocol_version": "v1", "api_version": "v1",
+            "root_algorithm": "SHA-256-EXACT-FILE-BYTES", "root": V1_PREDECESSOR_SHA256,
+        },
+        "release_schema": {
+            "path": V1_RELEASE_SCHEMA_PATH, "schema_version": 1,
+            "root_algorithm": "SHA-256-EXACT-FILE-BYTES", "root": V1_RELEASE_SCHEMA_SHA256,
+        },
+        "relation": "CLEAN_V2_CUTOVER_FROM_IMMUTABLE_V1",
+    }
+    if manifest.get("predecessor_binding") != expected_predecessor:
+        raise PromotionValidationError("V2 release predecessor is missing, wrong, or cyclic")
+    for relative, expected in (
+        (V1_PREDECESSOR_PATH, V1_PREDECESSOR_SHA256),
+        (V1_RELEASE_SCHEMA_PATH, V1_RELEASE_SCHEMA_SHA256),
+    ):
+        path = _safe(root, relative)
+        if not path.is_file() or digest(path.read_bytes()) != expected:
+            raise PromotionValidationError(f"immutable V1 release predecessor bytes/root mismatch: {relative}")
+    if manifest.get("activation_boundary") != {
+        "controls_enabled": False, "promotion_effect": "NONE",
+        "dns_cutover": "PROHIBITED", "model_execution": "OFF_CHAIN_ONLY",
+    }:
+        raise PromotionValidationError("V2 release manifest fabricates activation or promotion")
+    contracts = manifest.get("contracts", {})
+    if contracts.get("action_variant_count") != 60 or contracts.get("action_discriminants") != list(range(40, 60)):
+        raise PromotionValidationError("V2 release action registry mismatch")
+    if contracts.get("payload_tags") != {
+        "41": ["InstallProfile", "TransitionCapability"],
+        "50": ["InstallProfile", "TransitionCapability"],
+        "52": ["StageFundProfile", "LockFundMutation", "ActivateFundProfile", "CloseFundProfile"],
+        "58": ["TransitionServingAlias"],
+        "59": ["Activate", "EmergencyDisable", "AuthorizeOperationalConfig", "ApplyOperationalConfig", "Recover"],
+    }:
+        raise PromotionValidationError("V2 release payload tag registry mismatch")
+    if contracts.get("resolver") != {
+        "normal_max_bytes": 262144, "normal_max_proofs": 17,
+        "authorized_max_bytes": 393216,
+    }:
+        raise PromotionValidationError("V2 release resolver bounds mismatch")
+    if contracts.get("light_update") != {
+        "protocol": "/noos/sync/light-update/2", "min_items": 1,
+        "max_items": 128, "max_item_bytes": 262144,
+    }:
+        raise PromotionValidationError("V2 release light-update bounds mismatch")
+    if contracts.get("transaction_bounds") != {
+        "action_call_max_bytes": 65536, "tx_plus_witness_max_bytes": 65532,
+        "tx_push_prefix_bytes": 4, "tx_push_max_bytes": 65536,
+    }:
+        raise PromotionValidationError("V2 release transaction bounds mismatch")
+    if contracts.get("v1_wwm_decode") != "REJECT":
+        raise PromotionValidationError("V2 release permits mixed V1 WWM bytes")
+    verdicts = manifest.get("gate_verdicts")
+    if not isinstance(verdicts, list) or [row.get("gate") for row in verdicts if isinstance(row, Mapping)] != ORDER:
+        raise PromotionValidationError("V2 release gate order mismatch")
+    if any(row.get("verdict") != "BLOCKED" or row.get("ledger_record_hash") != "OWNER_BLOCKED" for row in verdicts):
+        raise PromotionValidationError("V2 release manifest fabricates a gate PASS")
+    if manifest.get("signatures") not in ([], None):
+        if not isinstance(manifest.get("signatures"), list):
+            raise PromotionValidationError("V2 release signatures are malformed")
+    schema_path = root / "protocol/release/protocol-release-manifest-v2.schema.json"
+    try:
+        schema = json.loads(schema_path.read_text("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise PromotionValidationError(f"V2 release schema cannot be loaded: {exc}") from exc
+    schema_errors = schema_validate(manifest, schema)
+    if schema_errors:
+        raise PromotionValidationError(f"V2 release schema violation: {schema_errors[0]}")
+
+
 
 
 def _safe(root: Path, rel: Any) -> Path:
@@ -121,10 +375,14 @@ def _validate_evidence(root: Path, descriptor: Mapping[str, Any], gate_id: str, 
 
 def validate_promotion_ledger(
     ledger: Mapping[str, Any], root: Path, keyring: Mapping[str, Any] | None = None,
-    *, trusted_role_keyring_sha256: str | None = None, expected_revision: str | None = None,
-    expected_chain_id: str | None = None, expected_genesis_hash: str | None = None,
-    require_all_passed: bool = False, test_mode: bool = False,
+    *, schema_version: int, trusted_role_keyring_sha256: str | None = None,
+    expected_revision: str | None = None, expected_chain_id: str | None = None,
+    expected_genesis_hash: str | None = None, require_all_passed: bool = False,
+    test_mode: bool = False,
 ) -> dict[str, Any]:
+    validate_schema_dispatch(ledger, root, schema_version)
+    required_requirements = REQUIRED_REQUIREMENTS_V1 if schema_version == 1 else REQUIRED_REQUIREMENTS_V2
+    gate_domain = registered_domain("D-PROMOTION-GATE-V2")
     binding = ledger.get("protocol_binding", {})
     revision = binding.get("revision")
     chain_id = binding.get("chain_id")
@@ -139,14 +397,28 @@ def validate_promotion_ledger(
     if not isinstance(gates, list) or [g.get("gate") for g in gates if isinstance(g, dict)] != ORDER:
         raise PromotionValidationError("promotion gate order mismatch")
     auth_binding = ledger.get("authorization_binding", {})
+    if schema_version == 1:
+        if auth_binding.get("gate_record_domain") not in (None, gate_domain):
+            raise PromotionValidationError("V1 promotion gate-record domain mismatch")
+    elif auth_binding.get("gate_record_domain_id") != "D-PROMOTION-GATE-V2":
+        raise PromotionValidationError("V2 promotion gate-record domain mismatch")
     passed_hashes: list[str] = []
     all_passed = True
     for index, gate in enumerate(gates):
+        if not isinstance(gate, Mapping):
+            raise PromotionValidationError(f"{ORDER[index]}: promotion gate row malformed")
         state = gate.get("state")
+        if state not in {"BLOCKED", "PASSED", "KILLED"}:
+            raise PromotionValidationError(f"{ORDER[index]}: unknown promotion gate state")
+        requirement_ids = [r.get("requirement_id") for r in gate.get("requirements", []) if isinstance(r, Mapping)]
+        if requirement_ids != required_requirements[ORDER[index]]:
+            raise PromotionValidationError(f"{ORDER[index]}: exact ordered requirement ID set mismatch")
         if state != "PASSED":
             all_passed = False
             if gate.get("signatures"):
                 raise PromotionValidationError(f"{ORDER[index]}: non-PASSED gate cannot carry signatures")
+            if gate.get("authorization_record") is not None:
+                raise PromotionValidationError(f"{ORDER[index]}: non-PASSED gate cannot carry an authorization record")
             continue
         if not REVISION.fullmatch(str(revision or "")) or not HASH.fullmatch(str(chain_id or "")) or not HASH.fullmatch(str(genesis_hash or "")):
             raise PromotionValidationError("PASSED gate requires frozen revision/chain/genesis identity")
@@ -159,11 +431,8 @@ def validate_promotion_ledger(
             raise PromotionValidationError(f"{ORDER[index]}: closed authorization record missing/fields mismatch")
         if not test_mode and PLACEHOLDER.search(json.dumps(record, sort_keys=True)):
             raise PromotionValidationError(f"{ORDER[index]}: authorization record contains placeholder/fixture fields")
-        requirement_ids = [r.get("requirement_id") for r in gate.get("requirements", []) if isinstance(r, dict)]
-        if requirement_ids != REQUIRED_REQUIREMENTS[ORDER[index]]:
-            raise PromotionValidationError(f"{ORDER[index]}: exact ordered requirement ID set mismatch")
         expected_predecessor = passed_hashes[-1] if passed_hashes else "0" * 64
-        expected_prior_root = ledger_root(passed_hashes)
+        expected_prior_root = ledger_root(passed_hashes, schema_version=schema_version)
         expected_key_ids = [getattr(keyring.get(role), "key_id", None) for role in REQUIRED_ROLES]
         expected_values = {
             "schema_version": 2, "kind": "noosphere-promotion-gate-record-v2",
@@ -206,7 +475,7 @@ def validate_promotion_ledger(
             if role in by_role or role not in REQUIRED_ROLES:
                 raise PromotionValidationError("promotion signature duplicate/unknown role")
             by_role[role] = signature
-        message = DOMAIN.encode("ascii") + b"\x00" + raw
+        message = gate_domain.encode("ascii") + b"\x00" + raw
         for role_name in REQUIRED_ROLES:
             role = keyring.get(role_name)
             signature = by_role.get(role_name)
@@ -217,7 +486,7 @@ def validate_promotion_ledger(
             except (ValueError, TypeError, InvalidSignature) as exc:
                 raise PromotionValidationError(f"promotion signature invalid: {role_name}") from exc
         passed_hashes.append(record_hash)
-    computed_root = ledger_root(passed_hashes)
+    computed_root = ledger_root(passed_hashes, schema_version=schema_version)
     if all_passed:
         if auth_binding.get("ledger_root") != computed_root:
             raise PromotionValidationError("complete promotion ledger root mismatch")
@@ -225,4 +494,7 @@ def validate_promotion_ledger(
         raise PromotionValidationError("incomplete promotion ledger cannot claim a ledger root")
     if require_all_passed and not all_passed:
         raise PromotionValidationError("cutover prohibited: every G0..G5 gate must cryptographically validate as PASSED")
-    return {"all_passed": all_passed, "ledger_root": computed_root, "record_hashes": passed_hashes}
+    return {
+        "schema_version": schema_version, "all_passed": all_passed,
+        "ledger_root": computed_root, "record_hashes": passed_hashes,
+    }

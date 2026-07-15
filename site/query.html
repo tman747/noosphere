@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f3f0e7">
-  <meta name="description" content="Pin a World Wide Mind model and knowledge snapshot, request a bounded public quote, and inspect the exact inference receipt.">
-  <meta property="og:title" content="MindChain Query — Inspect every assurance boundary">
-  <meta property="og:description" content="A no-wallet public query surface with pinned state, bounded quotes, explicit SOFT, ANCHORED, and ASSURED labels, sources, and receipts.">
+  <meta name="description" content="Verify the active MindChain model, request a bounded paid or sponsored remote job, and retain its signed receipt.">
+  <meta property="og:title" content="MindChain Query — Verify the active capsule">
+  <meta property="og:description" content="A proof-carrying browser-remote client for Bonsai Q1. The browser never downloads the 3.8 GB model.">
   <meta property="og:type" content="website">
-  <title>MindChain Query — Inspect every assurance boundary</title>
+  <title>MindChain Query — Verify the active capsule</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="query-page">
@@ -33,36 +33,126 @@
   <main id="query-main" class="shell query-shell">
     <section class="query-intro reveal" aria-labelledby="query-title">
       <div class="query-heading">
-        <p class="eyebrow">Public query / experimental</p>
-        <h1 id="query-title">Ask the model.<br>Keep the receipt.</h1>
-        <p class="lede">This client pins one finalized model, policy, and knowledge snapshot before it requests a price. The label beside an answer reports execution finality—not truth.</p>
+        <p class="eyebrow">Browser-remote / protocol v2</p>
+        <h1 id="query-title">Ask remotely.<br>Verify the receipt.</h1>
+        <p class="lede">This browser verifies finalized model resolution before quoting. It never downloads or runs the 3.8&nbsp;GB model, and an execution receipt never certifies that an answer is true.</p>
       </div>
 
       <aside class="query-trust-rail" aria-labelledby="trust-title">
         <div class="trust-rail-head">
-          <p class="panel-label" id="trust-title">Pinned state</p>
+          <p class="panel-label" id="trust-title">Proof-carrying state</p>
           <span id="network-state" class="state-flag state-pending">Checking</span>
         </div>
         <dl class="pin-list">
           <div>
             <dt>Chain / genesis</dt>
-            <dd id="pin-chain">Not pinned</dd>
+            <dd id="pin-chain">Not verified</dd>
           </div>
           <div>
-            <dt>Model capsule</dt>
-            <dd id="pin-model">Not pinned</dd>
+            <dt>Active capsule</dt>
+            <dd id="pin-model">Not verified</dd>
           </div>
           <div>
-            <dt>Knowledge snapshot</dt>
-            <dd id="pin-snapshot">Not pinned</dd>
+            <dt>Active control</dt>
+            <dd id="pin-control">Not verified</dd>
           </div>
           <div>
-            <dt>Independent reads</dt>
-            <dd id="pin-readers">0 / 3</dd>
+            <dt>Candidate</dt>
+            <dd id="pin-candidate">None published</dd>
+          </div>
+          <div>
+            <dt>Resolution proof</dt>
+            <dd id="pin-proof">Not verified</dd>
           </div>
         </dl>
-        <p id="pin-disclosure" class="trust-disclosure">No request leaves this page until the gateway declares its chain, model, and execution boundary.</p>
+        <p id="pin-disclosure" class="trust-disclosure">No prompt leaves this page until the installed light client verifies the active finalized resolution. Gateway claims are not proof.</p>
       </aside>
+    </section>
+
+    <section id="hosted-proof-panel" class="hosted-proof reveal" aria-labelledby="hosted-proof-title" aria-busy="true">
+      <header class="hosted-proof-head">
+        <div>
+          <p class="eyebrow">Independent network proof</p>
+          <h2 id="hosted-proof-title">Hosted by MindChain</h2>
+          <p>Finalized identity and custody on-chain. Model bytes and Prism execution stay off-chain, served by the certified custodian set.</p>
+        </div>
+        <span id="hosted-panel-state" class="state-flag state-pending">Checking 17 leaves</span>
+      </header>
+
+      <div class="hosted-proof-ledger">
+        <section class="hosted-identity" aria-labelledby="hosted-identity-title">
+          <div class="hosted-section-head">
+            <p class="panel-label">Finalized identity</p>
+            <span>01</span>
+          </div>
+          <h3 id="hosted-identity-title">Exact bytes.<br>Exact chain.</h3>
+          <div class="hosted-byte-pair" aria-label="Source and encoded artifact geometry">
+            <div>
+              <strong id="hosted-source-bytes">—</strong>
+              <span>GB source GGUF</span>
+            </div>
+            <div>
+              <strong id="hosted-encoded-bytes">—</strong>
+              <span>GB encoded shares</span>
+            </div>
+          </div>
+          <dl class="hosted-facts">
+            <div><dt>Chain / genesis</dt><dd id="hosted-chain-genesis">Not verified</dd></div>
+            <div><dt>Finalized checkpoint</dt><dd id="hosted-finalized">Not verified</dd></div>
+            <div><dt>Capsule</dt><dd id="hosted-capsule">Not verified</dd></div>
+            <div><dt>Artifact</dt><dd id="hosted-artifact">Not verified</dd></div>
+            <div><dt>Manifest</dt><dd id="hosted-manifest">Not verified</dd></div>
+            <div><dt>RS geometry</dt><dd id="hosted-geometry">Not verified</dd></div>
+          </dl>
+        </section>
+
+        <section class="hosted-custody" aria-labelledby="hosted-custody-title">
+          <div class="hosted-section-head">
+            <p class="panel-label">Certified custody map</p>
+            <span>02</span>
+          </div>
+          <div class="hosted-custody-title">
+            <h3 id="hosted-custody-title">Twelve independent positions</h3>
+            <strong id="hosted-schedulability">— / 12</strong>
+          </div>
+          <p class="hosted-section-copy">Nine live positions admit a new job; any eight can reconstruct. Rows come from the verified finalized certificate, not gateway labels.</p>
+          <ol id="hosted-custodian-map" class="custodian-map" aria-label="Finalized custodian positions">
+            <li class="custodian-pending">Awaiting verified custodian map</li>
+          </ol>
+        </section>
+
+        <section class="hosted-runtime" aria-labelledby="hosted-runtime-title">
+          <div class="hosted-section-head">
+            <p class="panel-label">Cold reconstruction</p>
+            <span>03</span>
+          </div>
+          <div class="hosted-runtime-title">
+            <h3 id="hosted-runtime-title">Custodians → decoder → Prism</h3>
+            <strong id="hosted-reconstruction-state">Waiting</strong>
+          </div>
+          <progress id="hosted-reconstruction-progress" max="3803452480" value="0">0%</progress>
+          <p id="hosted-reconstruction-copy" class="hosted-section-copy">No unverified progress is shown.</p>
+          <dl class="hosted-facts">
+            <div><dt>Prism runtime root</dt><dd id="hosted-runtime-root">Not verified</dd></div>
+            <div><dt>Availability certificate</dt><dd id="hosted-certificate">Not verified</dd></div>
+            <div><dt>Certificate horizon</dt><dd id="hosted-certificate-horizon">Not verified</dd></div>
+            <div><dt>Publisher / gateway fallback</dt><dd id="hosted-fallback">Not verified</dd></div>
+          </dl>
+        </section>
+      </div>
+
+      <footer class="hosted-proof-trail" aria-labelledby="hosted-trail-title">
+        <div>
+          <p class="panel-label">Proof trail</p>
+          <h3 id="hosted-trail-title">Job → receipt → settlement</h3>
+        </div>
+        <dl>
+          <div><dt>Job</dt><dd id="hosted-job-link">No job submitted</dd></div>
+          <div><dt>Receipt</dt><dd id="hosted-receipt-link">Awaiting terminal receipt</dd></div>
+          <div><dt>Settlement</dt><dd id="hosted-settlement-link">Awaiting chain settlement</dd></div>
+        </dl>
+      </footer>
+      <p id="hosted-proof-disclosure" class="hosted-proof-disclosure">Verification pending. The panel remains unproved and query admission stays closed until an independent light client accepts the finalized graph and reconstruction evidence.</p>
     </section>
 
     <section class="query-workspace reveal" aria-label="World Wide Mind query">
@@ -87,31 +177,29 @@
 
         <div class="query-controls">
           <fieldset>
-            <legend>Compute privacy</legend>
-            <label class="mode-choice selected">
-              <input type="radio" name="compute-mode" value="public" checked>
-              <span><strong>Open execution</strong><small>Gateway state must disclose who sees the prompt.</small></span>
-            </label>
-            <label class="mode-choice unavailable" aria-disabled="true">
-              <input type="radio" name="compute-mode" value="p1" disabled>
-              <span><strong>Attested private</strong><small>Unavailable until P1 evidence passes.</small></span>
-            </label>
+            <legend>Execution boundary</legend>
+            <div class="mode-choice selected">
+              <span><strong>Remote open execution</strong><small>Only the finalized active capsule can dispatch. Selected executors can see the prompt.</small></span>
+            </div>
+            <div class="mode-choice unavailable" aria-disabled="true">
+              <span><strong>Browser-local execution</strong><small>Not in this release. This page will not download the model.</small></span>
+            </div>
           </fieldset>
 
           <fieldset>
-            <legend>Required finality</legend>
-            <label class="finality-choice">
-              <input type="radio" name="finality" value="SOFT" checked>
-              <span><strong>SOFT</strong><small>Execution criteria come from the pinned gateway state.</small></span>
+            <legend>Payment</legend>
+            <label class="finality-choice selected">
+              <input type="radio" name="payment-mode" value="SPONSORED" checked>
+              <span><strong>Sponsored</strong><small>Uses a bounded sponsor grant. No wallet secret enters this page.</small></span>
             </label>
             <label class="finality-choice">
-              <input type="radio" name="finality" value="ANCHORED">
-              <span><strong>ANCHORED</strong><small>Chunk commitment included on chain.</small></span>
+              <input type="radio" name="payment-mode" value="PAID">
+              <span><strong>Paid escrow</strong><small>Provide a public escrow authorization signed by the native wallet.</small></span>
             </label>
-            <label class="finality-choice">
-              <input type="radio" name="finality" value="ASSURED">
-              <span><strong>ASSURED</strong><small>Anchored and evidence available after challenge.</small></span>
+            <label id="escrow-label" for="escrow-authorization" hidden>Escrow authorization JSON
+              <textarea id="escrow-authorization" rows="4" spellcheck="false" autocomplete="off" aria-describedby="escrow-help"></textarea>
             </label>
+            <p id="escrow-help" class="helper" hidden>The authorization may contain a transaction and signature, but never a wallet seed or private key.</p>
           </fieldset>
         </div>
 
@@ -127,84 +215,177 @@
           </div>
           <div>
             <span>Payment</span>
-            <strong id="payment-label">Sponsor requested</strong>
+            <strong id="payment-label">Sponsored</strong>
           </div>
           <div>
-            <span>Ceiling</span>
+            <span>Maximum fee</span>
             <strong id="quote-ceiling">Quote required</strong>
           </div>
         </div>
 
         <button id="query-submit" class="button button-primary query-submit" type="submit" disabled>
-          <span>Pin state to continue</span>
+          <span>Verify active state to continue</span>
           <span aria-hidden="true">→</span>
         </button>
       </form>
 
-      <section id="answer-panel" class="answer-panel" aria-labelledby="answer-title" aria-live="polite">
+      <section id="answer-panel" class="answer-panel" aria-labelledby="answer-title">
+        <p id="query-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">Waiting for verified state.</p>
         <div id="answer-empty" class="answer-empty">
           <span class="answer-index" aria-hidden="true">01</span>
           <div>
-            <p class="panel-label">Answer stream</p>
+            <p class="panel-label">Remote answer stream</p>
             <h2 id="answer-title">Nothing has been sent.</h2>
-            <p>The gateway's disclosed execution status appears here. Anchoring and assurance update separately; no label certifies that the answer is true.</p>
+            <p>Tokens begin as <strong>PROVISIONAL_SIGNED</strong> and upgrade only when the signed primary stream matches a selected backup. No evidence label certifies factual truth.</p>
           </div>
         </div>
 
-        <div id="answer-loading" class="answer-loading" hidden aria-label="Waiting for disclosed execution path">
+        <div id="answer-loading" class="answer-loading" hidden aria-label="Waiting for signed executor events">
           <div class="skeleton skeleton-label"></div>
           <div class="skeleton skeleton-line wide"></div>
           <div class="skeleton skeleton-line"></div>
           <div class="skeleton skeleton-line short"></div>
-          <p>Waiting for the disclosed execution path.</p>
+          <p>Waiting for canonical signed stream events.</p>
         </div>
 
         <article id="answer-result" class="answer-result" hidden>
           <header class="answer-result-head">
             <div>
-              <p class="panel-label">Bounded answer</p>
-              <h2>Execution response</h2>
+              <p class="panel-label">Bounded remote answer</p>
+              <h2>Verified executor stream</h2>
             </div>
-            <span id="answer-finality" class="finality-badge finality-soft">SOFT</span>
+            <span id="answer-finality" class="finality-badge finality-soft">PROVISIONAL_SIGNED</span>
           </header>
           <p id="answer-copy" class="answer-copy"></p>
-          <p id="answer-warning" class="answer-warning">Execution status is not truth. Inspect the disclosed evidence boundary.</p>
-          <button id="receipt-toggle" class="control-button" type="button" aria-expanded="false" aria-controls="receipt-drawer">Inspect sources and receipt</button>
+          <p id="answer-warning" class="answer-warning">Execution evidence is not truth, safety, privacy, or proof of the model's answer.</p>
+          <div class="answer-actions">
+            <button id="cancel-job" class="control-button" type="button" disabled>Cancel job</button>
+            <button id="receipt-toggle" class="control-button" type="button" aria-expanded="false" aria-controls="receipt-drawer" disabled>Inspect evidence and receipt</button>
+          </div>
         </article>
 
         <aside id="receipt-drawer" class="receipt-drawer" hidden aria-labelledby="receipt-title">
           <div class="receipt-heading">
             <div>
-              <p class="panel-label">Source and receipt drawer</p>
+              <p class="panel-label">Evidence and receipt drawer</p>
               <h3 id="receipt-title">Pinned execution record</h3>
             </div>
             <button id="receipt-close" class="drawer-close" type="button">Close</button>
           </div>
           <dl id="receipt-facts" class="receipt-facts"></dl>
-          <ol id="source-list" class="source-list"></ol>
-          <pre id="receipt-json" aria-label="Canonical receipt JSON"></pre>
+          <pre id="receipt-json" tabindex="0" aria-label="Verified canonical receipt JSON"></pre>
         </aside>
       </section>
     </section>
 
+    <section id="capacity-panel" class="capacity-panel reveal" aria-labelledby="capacity-title" data-state="dormant">
+      <header class="capacity-head">
+        <div>
+          <p class="eyebrow">Experimental · off-chain · unrewarded</p>
+          <h2 id="capacity-title">Lend idle storage.<br>Keep every exit.</h2>
+          <p>A voluntary advisory cache for public Bonsai share copies. It joins no availability certificate, counts toward no schedulability, earns nothing, and never runs model code. Nothing below touches your disk or network before you opt in.</p>
+        </div>
+        <span id="capacity-state" class="state-flag state-pending">Dormant</span>
+      </header>
+
+      <div class="capacity-body">
+        <div class="capacity-terms">
+          <p class="panel-label">What opting in means</p>
+          <dl class="capacity-facts">
+            <div><dt>Participant class</dt><dd>BROWSER_ADVISORY_CACHE</dd></div>
+            <div><dt>Admission class</dt><dd>ChorusAdvisory · advisory only</dd></div>
+            <div><dt>Production custody</dt><dd>NONE · never certified</dd></div>
+            <div><dt>Rewards</dt><dd>NONE</dd></div>
+            <div><dt>Browser execution</dt><dd>Storage + opt-in repair only</dd></div>
+          </dl>
+          <ul class="capacity-guarantees">
+            <li>A dedicated worker only downloads coordinator-signed shares, checks exact length and SHA-256, and stores opaque bytes. No inference, training, mining, or downloaded code ever runs here.</li>
+            <li>Polling and repair happen only while this page is open and visible. Closing the tab stops everything.</li>
+            <li>Repair uploads are off by default. Enabling them requires a daily cap you choose; pause aborts transfers instantly.</li>
+            <li>Delete removes only the app-owned <code>noos-wwm-cache-v1</code> namespace and the session token — it works offline, always.</li>
+          </ul>
+          <p class="capacity-cache-note">Shares are public Apache-2.0 model bytes. Deletion clears this browser only; bytes you already served to others may remain in third-party caches, and no erasure there is promised. Copies stay best-effort and evictable unless you separately choose “Keep copies”.</p>
+        </div>
+
+        <form id="capacity-form" class="capacity-consent" novalidate>
+          <fieldset id="capacity-quota">
+            <legend>Local quota — never more than 10% of free origin storage</legend>
+            <label class="finality-choice selected">
+              <input type="radio" name="capacity-quota" value="16" checked>
+              <span><strong>16 shares</strong><small>16,760,832 bytes · about 16.8 MB</small></span>
+            </label>
+            <label class="finality-choice">
+              <input type="radio" name="capacity-quota" value="64">
+              <span><strong>64 shares</strong><small>67,043,328 bytes · about 67.0 MB</small></span>
+            </label>
+            <label class="finality-choice">
+              <input type="radio" name="capacity-quota" value="256">
+              <span><strong>256 shares</strong><small>268,173,312 bytes · about 268.2 MB</small></span>
+            </label>
+          </fieldset>
+
+          <fieldset id="capacity-repair-fieldset">
+            <legend>Repair egress — off by default</legend>
+            <label class="capacity-repair-toggle" for="capacity-repair">
+              <input type="checkbox" id="capacity-repair">
+              <span><strong>Allow capped restore uploads</strong><small>At most one 1,047,552-byte share per task, only while this page is open, never past your daily cap.</small></span>
+            </label>
+            <label class="capacity-cap-label" for="capacity-egress-cap">Daily egress cap
+              <select id="capacity-egress-cap" disabled>
+                <option value="16760832">16 shares · 16.8 MB / day</option>
+                <option value="67043328" selected>64 shares · 67.0 MB / day</option>
+                <option value="134086656">128 shares · 134.1 MB / day</option>
+              </select>
+            </label>
+          </fieldset>
+
+          <div class="capacity-strip" aria-label="Estimated versus actual local bytes">
+            <div><span>Estimated free</span><strong id="capacity-estimated">Not measured</strong></div>
+            <div><span>Lend up to</span><strong id="capacity-effective">Not measured</strong></div>
+            <div><span>Actually stored</span><strong id="capacity-actual">0 bytes</strong></div>
+            <div><span>Storage</span><strong id="capacity-class">Not opened</strong></div>
+          </div>
+
+          <button id="capacity-opt-in" class="button button-primary capacity-opt-in" type="submit">
+            <span>Opt in — lend up to 16 shares</span>
+            <span aria-hidden="true">→</span>
+          </button>
+
+          <p id="capacity-error" class="inline-error" role="alert" hidden></p>
+
+          <div id="capacity-controls" class="capacity-controls" hidden>
+            <button id="capacity-keep" class="control-button" type="button">Keep copies (request persistence)</button>
+            <button id="capacity-pause" class="control-button" type="button">Pause</button>
+            <button id="capacity-delete" class="control-button capacity-delete" type="button">Delete my copies</button>
+          </div>
+          <p id="capacity-persistence" class="capacity-persistence" hidden>Copies are best effort until you choose “Keep copies”.</p>
+          <p id="capacity-note" class="capacity-disclosure" role="status" aria-live="polite">Dormant. This page has made no storage estimate, download, hash, heartbeat, or upload for web capacity.</p>
+          <div id="capacity-dormant-controls" class="capacity-dormant-controls">
+            <button id="capacity-purge" class="control-button" type="button">Delete copies left by an earlier visit</button>
+            <p>Removes only the app-owned <code>noos-wwm-cache-v1</code> namespace and its session token, offline if needed. Bytes already served publicly may remain in third-party caches.</p>
+          </div>
+        </form>
+      </div>
+    </section>
+
     <section class="query-boundaries reveal" aria-labelledby="boundaries-title">
-      <p class="eyebrow">Read the boundary first</p>
-      <h2 id="boundaries-title">Three labels. Three different claims.</h2>
+      <p class="eyebrow">Keep the axes separate</p>
+      <h2 id="boundaries-title">Execution, chain anchor, and settlement are different claims.</h2>
       <div class="boundary-ledger">
         <article>
-          <span>SOFT</span>
-          <h3>Matching execution</h3>
-          <p>Two selected executors signed the same bounded token-state claim. It can still be disputed or fail to anchor.</p>
+          <span>PROVISIONAL_SIGNED</span>
+          <h3>Primary executor claim</h3>
+          <p>The designated primary signed this ordered token history. It has not matched a backup yet.</p>
         </article>
         <article>
-          <span>ANCHORED</span>
-          <h3>Canonical commitment</h3>
-          <p>The claim is included in finalized chain state. Evidence availability and challenge outcome are still separate.</p>
+          <span>MATCHED_QUORUM</span>
+          <h3>Observed token match</h3>
+          <p>The primary and one selected backup signed the same ordered token IDs and history root. This is not a truth or determinism claim.</p>
         </article>
         <article>
-          <span>ASSURED</span>
-          <h3>Available challenge surface</h3>
-          <p>Every required chunk is anchored, evidence is available, and the challenge window has resolved. This still does not prove factual truth.</p>
+          <span>SETTLED / REFUNDED</span>
+          <h3>Separate money state</h3>
+          <p>The terminal receipt proves its own anchor and payment outcome. Local inference has no chain-settlement claim.</p>
         </article>
       </div>
     </section>
@@ -212,11 +393,11 @@
 
   <footer class="site-footer">
     <div class="shell footer-grid">
-      <p>MindChain query surface · experimental controls remain disabled until evidence gates pass.</p>
+      <p>MindChain browser-remote client · no browser model download · no silent fallback.</p>
       <p><a href="connect.html">Connection status</a> · <a href="../docs/v1/assurance-disclosures.md">Assurance disclosures</a> · <a href="../docs/world-wide-mind-architecture-and-rd-plan.md">Architecture</a></p>
     </div>
   </footer>
 
-  <script src="query.js" defer></script>
+  <script type="module" src="query.js"></script>
 </body>
 </html>

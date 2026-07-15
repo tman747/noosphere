@@ -1,0 +1,129 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "MindChain WWM Public API", "version": "2.0.0", "description": "Proof-carrying remote access to the finalized active WWM capsule."},
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "x-noos-contract": {
+    "api_identity": "v2",
+    "media_type": "application/vnd.noos.wwm.v2+json",
+    "browser_execution": "REMOTE_ONLY",
+    "browser_artifact_download": false,
+    "proofs_verified_flag_is_authority": false,
+    "candidate_law": "AUTHORIZED_NOT_ACTIVE is inspectable and never dispatchable",
+    "prompt_commitment_domain": "NOOS/WWM/PROMPT-COMMITMENT/V2",
+    "prompt_bytes_max": 48000,
+    "output_tokens_max": 512,
+    "sse_replay": "Monotonic event ids and Last-Event-ID replay the durable spool without rerunning inference",
+    "no_silent_fallback": true
+  },
+  "security": [{"bearerAuth": []}, {"cookieAuth": [], "csrfHeader": []}],
+  "paths": {
+    "/api/wwm/v2/state": {"get": {"operationId": "getWwmStateV2", "responses": {"200": {"description": "Active resolution with inactive candidates", "content": {"application/vnd.noos.wwm.v2+json": {"schema": {"$ref": "#/components/schemas/StateResponse"}}}}, "503": {"$ref": "#/components/responses/Error"}}}},
+    "/api/wwm/v2/capsules/{capsule_id}": {"get": {"operationId": "getWwmCapsuleV2", "parameters": [{"$ref": "#/components/parameters/CapsuleId"}], "responses": {"200": {"description": "Capsule and resolution", "content": {"application/vnd.noos.wwm.v2+json": {"schema": {"$ref": "#/components/schemas/CapsuleResponse"}}}}, "404": {"$ref": "#/components/responses/Error"}}}},
+    "/api/wwm/v2/quotes": {"post": {"operationId": "createWwmQuoteV2", "description": "Quotes only the active capsule and exact active pin.", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/QuoteRequest"}}}}, "responses": {"200": {"description": "Signed quote", "content": {"application/vnd.noos.wwm.v2+json": {"schema": {"$ref": "#/components/schemas/QuoteResponse"}}}}, "409": {"$ref": "#/components/responses/Error"}}}},
+    "/api/wwm/v2/jobs": {"post": {"operationId": "createWwmJobV2", "description": "Consumes one quote. Repeated Idempotency-Key returns the same job without rerunning inference.", "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JobRequest"}}}}, "responses": {"200": {"description": "Idempotent job view", "content": {"application/vnd.noos.wwm.v2+json": {"schema": {"$ref": "#/components/schemas/JobView"}}}}, "201": {"description": "Created job", "content": {"application/vnd.noos.wwm.v2+json": {"schema": {"$ref": "#/components/schemas/JobView"}}}}}}},
+    "/api/wwm/v2/jobs/{job_id}/stream": {"get": {"operationId": "streamWwmJobV2", "description": "Canonical durable SSE replay; reconnect never dispatches another execution.", "parameters": [{"$ref": "#/components/parameters/JobId"}, {"$ref": "#/components/parameters/LastEventId"}], "responses": {"200": {"description": "SSE records whose id and event fields equal data.id and data.type", "content": {"text/event-stream": {"schema": {"type": "string", "x-sse-data-schema": {"$ref": "#/components/schemas/StreamEvent"}}}}}, "410": {"$ref": "#/components/responses/Error"}}}},
+    "/api/wwm/v2/jobs/{job_id}/cancel": {"post": {"operationId": "cancelWwmJobV2", "parameters": [{"$ref": "#/components/parameters/JobId"}], "responses": {"200": {"description": "Cancel state", "content": {"application/vnd.noos.wwm.v2+json": {"schema": {"$ref": "#/components/schemas/CancelResponse"}}}}, "404": {"$ref": "#/components/responses/Error"}}}},
+    "/api/wwm/v2/jobs/{job_id}/receipt": {"get": {"operationId": "getWwmReceiptV2", "parameters": [{"$ref": "#/components/parameters/JobId"}], "responses": {"200": {"description": "Signed terminal receipt; settlement remains a separate axis", "content": {"application/vnd.noos.wwm.v2+json": {"schema": {"$ref": "#/components/schemas/Receipt"}}}}, "404": {"$ref": "#/components/responses/Error"}}}}
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {"type": "http", "scheme": "bearer"},
+      "cookieAuth": {"type": "apiKey", "in": "cookie", "name": "wwm_session"},
+      "csrfHeader": {"type": "apiKey", "in": "header", "name": "X-CSRF-Token"}
+    },
+    "parameters": {
+      "CapsuleId": {"name": "capsule_id", "in": "path", "required": true, "schema": {"$ref": "#/components/schemas/Hash32"}},
+      "JobId": {"name": "job_id", "in": "path", "required": true, "schema": {"$ref": "#/components/schemas/Hash32"}},
+      "IdempotencyKey": {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 256}},
+      "LastEventId": {"name": "Last-Event-ID", "in": "header", "required": false, "schema": {"type": "string", "pattern": "^(0|[1-9][0-9]{0,19})$"}}
+    },
+    "schemas": {
+      "Hash32": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+      "PaymentMode": {"enum": ["SPONSORED", "PAID"]},
+      "JobStatus": {"enum": ["QUEUED", "RUNNING", "CANCEL_REQUESTED", "COMPLETED", "CANCELLED", "FAILED", "NO_QUORUM"]},
+      "EvidenceState": {"enum": ["NONE", "PROVISIONAL_SIGNED", "MATCHED_QUORUM"]},
+      "SettlementState": {"enum": ["PENDING_CHAIN", "FINALIZED_PAID", "FINALIZED_REFUNDED"]},
+      "CapsuleResolution": {
+        "type": "object", "additionalProperties": false,
+        "required": ["capsule_id", "model_name", "artifact_sha256", "artifact_length", "execution_profile_id", "query_profile_id", "activation_state"],
+        "properties": {
+          "capsule_id": {"$ref": "#/components/schemas/Hash32"}, "model_name": {"type": "string", "minLength": 1, "maxLength": 256},
+          "artifact_sha256": {"$ref": "#/components/schemas/Hash32"}, "artifact_length": {"type": "integer", "minimum": 1, "maximum": 3803452480},
+          "execution_profile_id": {"$ref": "#/components/schemas/Hash32"}, "query_profile_id": {"$ref": "#/components/schemas/Hash32"},
+          "activation_state": {"enum": ["ACTIVE", "AUTHORIZED_NOT_ACTIVE"]}
+        },
+        "x-bonsai-active-identity": {"model_name": "Bonsai-27B-Q1_0.gguf", "artifact_length": 3803452480, "artifact_sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0"}
+      },
+      "ExecutorRegistration": {
+        "type": "object", "additionalProperties": false,
+        "required": ["executor_id", "control_cluster_id", "region", "https_origin", "protocol_version", "registry_epoch", "active"],
+        "properties": {"executor_id": {"type": "string"}, "control_cluster_id": {"type": "string"}, "region": {"type": "string"}, "https_origin": {"type": "string", "format": "uri"}, "protocol_version": {"const": 2}, "registry_epoch": {"type": "integer", "minimum": 1}, "active": {"type": "boolean"}}
+      },
+      "StateObjectProof": {
+        "type": "object", "additionalProperties": false,
+        "required": ["object_kind", "object_id", "canonical_value_hex", "smt_siblings"],
+        "properties": {
+          "object_kind": {"type": "string", "minLength": 1, "maxLength": 64},
+          "object_id": {"$ref": "#/components/schemas/Hash32"},
+          "canonical_value_hex": {"type": "string", "pattern": "^(?:[0-9a-f]{2})+$", "maxLength": 524288},
+          "smt_siblings": {"type": "array", "minItems": 1, "maxItems": 256, "items": {"$ref": "#/components/schemas/Hash32"}}
+        }
+      },
+      "FinalizedResolution": {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "chain_id", "genesis_hash", "finalized_height", "finalized_hash", "objects_root", "pin_id", "proofs_verified", "canonical_resolution_body_hex", "finality_evidence_hex", "state_object_proofs", "active", "candidates", "executors", "fee_schedule_id", "fund_profile_id", "service_directory_id", "registry_vector_id"],
+        "properties": {
+          "schema": {"const": "noos/finalized-model-resolution/v1"}, "chain_id": {"$ref": "#/components/schemas/Hash32"}, "genesis_hash": {"$ref": "#/components/schemas/Hash32"},
+          "finalized_height": {"type": "integer", "minimum": 1}, "finalized_hash": {"$ref": "#/components/schemas/Hash32"}, "objects_root": {"$ref": "#/components/schemas/Hash32"}, "pin_id": {"$ref": "#/components/schemas/Hash32"},
+          "proofs_verified": {"type": "boolean", "description": "Informational endpoint result only. Browser/native clients independently verify the supplied canonical resolution material from an approved anchor."},
+          "canonical_resolution_body_hex": {"type": "string", "pattern": "^(?:[0-9a-f]{2})+$", "maxLength": 524288},
+          "finality_evidence_hex": {"type": "string", "pattern": "^(?:[0-9a-f]{2})+$", "maxLength": 524288},
+          "state_object_proofs": {"type": "array", "minItems": 1, "maxItems": 17, "items": {"$ref": "#/components/schemas/StateObjectProof"}, "contains": {"properties": {"object_kind": {"const": "MODEL_CAPSULE"}}},
+          "active": {"allOf": [{"$ref": "#/components/schemas/CapsuleResolution"}, {"properties": {"activation_state": {"const": "ACTIVE"}}}]},
+          "candidates": {"type": "array", "maxItems": 32, "items": {"allOf": [{"$ref": "#/components/schemas/CapsuleResolution"}, {"properties": {"activation_state": {"const": "AUTHORIZED_NOT_ACTIVE"}}}]}},
+          "executors": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"$ref": "#/components/schemas/ExecutorRegistration"}},
+          "fee_schedule_id": {"$ref": "#/components/schemas/Hash32"}, "fund_profile_id": {"$ref": "#/components/schemas/Hash32"}, "service_directory_id": {"$ref": "#/components/schemas/Hash32"}, "registry_vector_id": {"$ref": "#/components/schemas/Hash32"}
+        },
+        "x-required-verification-material": "Clients verify canonical resolution bytes, finality evidence, and every state-object proof from an approved trust anchor; proofs_verified is non-authoritative."
+      },
+      "StateResponse": {"type": "object", "additionalProperties": false, "required": ["schema", "enabled", "resolution", "signing_key_id", "execution"], "properties": {"schema": {"const": "noos/wwm-gateway/v2"}, "enabled": {"type": "boolean"}, "resolution": {"$ref": "#/components/schemas/FinalizedResolution"}, "signing_key_id": {"type": "string"}, "execution": {"const": "REGISTERED_EXECUTOR_EDGE_ONLY"}}},
+      "CapsuleResponse": {"type": "object", "additionalProperties": false, "required": ["schema", "capsule", "resolution", "dispatchable"], "properties": {"schema": {"const": "noos/wwm-capsule-resolution/v2"}, "capsule": {"$ref": "#/components/schemas/CapsuleResolution"}, "resolution": {"$ref": "#/components/schemas/FinalizedResolution"}, "dispatchable": {"type": "boolean"}}, "x-dispatch-law": "true only for resolution.active"},
+      "PaymentAuthorization": {"type": "object", "additionalProperties": false, "required": ["mode", "authorization"], "properties": {"mode": {"$ref": "#/components/schemas/PaymentMode"}, "authorization": {"type": "string", "maxLength": 131064, "description": "Empty only for SPONSORED, which the authenticated payment verifier resolves to a bounded tenant grant. PAID requires a public native-wallet escrow authorization and never seed/private material."}}, "allOf": [{"if": {"properties": {"mode": {"const": "PAID"}}}, "then": {"properties": {"authorization": {"minLength": 1}}}}]},
+      "QuoteRequest": {
+        "type": "object", "additionalProperties": false,
+        "required": ["request_id", "pin_id", "capsule_id", "prompt_commitment", "execution_profile_id", "query_profile_id", "input_tokens", "maximum_output_tokens", "client_nonce", "payment"],
+        "properties": {
+          "request_id": {"type": "string", "minLength": 1, "maxLength": 128}, "pin_id": {"$ref": "#/components/schemas/Hash32"}, "capsule_id": {"$ref": "#/components/schemas/Hash32"}, "prompt_commitment": {"$ref": "#/components/schemas/Hash32"},
+          "execution_profile_id": {"$ref": "#/components/schemas/Hash32"}, "query_profile_id": {"$ref": "#/components/schemas/Hash32"}, "input_tokens": {"type": "integer", "minimum": 1, "maximum": 4095},
+          "maximum_output_tokens": {"type": "integer", "minimum": 1, "maximum": 512}, "client_nonce": {"type": "string", "minLength": 1, "maxLength": 256}, "payment": {"$ref": "#/components/schemas/PaymentAuthorization"}
+        },
+        "x-context-law": "input_tokens + maximum_output_tokens <= active execution profile maximum (first release <=4096)"
+      },
+      "QuoteResponse": {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "quote_id", "request_id", "pin_id", "capsule_id", "execution_profile_id", "query_profile_id", "prompt_commitment", "input_tokens", "maximum_output_tokens", "payment_mode", "payment_reference", "expires_at_height", "maximum_fee_micro_noos", "signature"],
+        "properties": {
+          "schema": {"const": "noos/wwm-quote/v2"}, "quote_id": {"$ref": "#/components/schemas/Hash32"}, "request_id": {"type": "string"}, "pin_id": {"$ref": "#/components/schemas/Hash32"}, "capsule_id": {"$ref": "#/components/schemas/Hash32"},
+          "execution_profile_id": {"$ref": "#/components/schemas/Hash32"}, "query_profile_id": {"$ref": "#/components/schemas/Hash32"}, "prompt_commitment": {"$ref": "#/components/schemas/Hash32"}, "input_tokens": {"type": "integer"}, "maximum_output_tokens": {"type": "integer", "maximum": 512},
+          "payment_mode": {"$ref": "#/components/schemas/PaymentMode"}, "payment_reference": {"type": "string"}, "expires_at_height": {"type": "integer", "minimum": 1}, "maximum_fee_micro_noos": {"type": "integer", "minimum": 0}, "signature": {"type": "string", "minLength": 1}
+        }
+      },
+      "JobRequest": {"type": "object", "additionalProperties": false, "required": ["quote_id", "prompt", "prompt_commitment", "prompt_salt"], "properties": {"quote_id": {"$ref": "#/components/schemas/Hash32"}, "prompt": {"type": "string", "minLength": 1, "maxLength": 12000, "x-max-utf8-bytes": 48000}, "prompt_commitment": {"$ref": "#/components/schemas/Hash32"}, "prompt_salt": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}},
+      "JobView": {"type": "object", "additionalProperties": false, "required": ["schema", "job_id", "status", "replayed"], "properties": {"schema": {"const": "noos/wwm-job/v2"}, "job_id": {"$ref": "#/components/schemas/Hash32"}, "status": {"$ref": "#/components/schemas/JobStatus"}, "replayed": {"type": "boolean"}}},
+      "CancelResponse": {"type": "object", "additionalProperties": false, "required": ["schema", "job_id", "status"], "properties": {"schema": {"const": "noos/wwm-cancel/v2"}, "job_id": {"$ref": "#/components/schemas/Hash32"}, "status": {"$ref": "#/components/schemas/JobStatus"}}},
+      "StreamEvent": {"type": "object", "additionalProperties": false, "required": ["id", "type", "data"], "properties": {"id": {"type": "integer", "minimum": 1}, "type": {"enum": ["output.delta", "evidence.updated", "receipt.completed", "settlement.finalized"]}, "data": {"type": "object"}}, "x-output-data-required": ["job_id", "capsule_id", "evidence_state", "executor_signature"], "description": "Client rejects output events without independently verifiable job/capsule/evidence/signature binding."},
+      "Receipt": {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "receipt_id", "job_id", "tenant_id", "capsule_id", "execution_profile_id", "prompt_commitment", "output_commitment", "output_tokens", "terminal_status", "evidence_state", "chain_anchor", "settlement_state", "payment_mode", "payment_reference", "executor_id", "signature"],
+        "properties": {
+          "schema": {"const": "noos/wwm-receipt/v2"}, "receipt_id": {"$ref": "#/components/schemas/Hash32"}, "job_id": {"$ref": "#/components/schemas/Hash32"}, "tenant_id": {"type": "string"}, "capsule_id": {"$ref": "#/components/schemas/Hash32"},
+          "execution_profile_id": {"$ref": "#/components/schemas/Hash32"}, "prompt_commitment": {"$ref": "#/components/schemas/Hash32"}, "output_commitment": {"$ref": "#/components/schemas/Hash32"}, "output_tokens": {"type": "integer", "minimum": 0, "maximum": 512},
+          "terminal_status": {"$ref": "#/components/schemas/JobStatus"}, "evidence_state": {"$ref": "#/components/schemas/EvidenceState"}, "chain_anchor": {"oneOf": [{"type": "null"}, {"$ref": "#/components/schemas/Hash32"}]}, "settlement_state": {"$ref": "#/components/schemas/SettlementState"},
+          "payment_mode": {"$ref": "#/components/schemas/PaymentMode"}, "payment_reference": {"type": "string"}, "executor_id": {"oneOf": [{"type": "null"}, {"type": "string"}]}, "signature": {"type": "string", "minLength": 1}
+        }
+      },
+      "Error": {"type": "object", "required": ["error"], "properties": {"error": {"type": "object", "required": ["code", "message"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "request_id": {"type": "string"}}}}}
+    },
+    "responses": {"Error": {"description": "Bounded v2 error", "content": {"application/vnd.noos.wwm.v2+json": {"schema": {"$ref": "#/components/schemas/Error"}}}}}
+  }
+}

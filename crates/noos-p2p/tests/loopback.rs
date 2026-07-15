@@ -1,7 +1,7 @@
 //! Loopback integration matrix (plan §7.4 acceptance): two in-process nodes
 //! over 127.0.0.1 QUIC exercising the identity handshake in both directions,
-//! all eight protocols, the oversize-frame law, rate-limit trips, duplicate
-//! suppression, priority ordering under load, and closed-list negotiation.
+//! all nine application protocols, the oversize-frame law, rate-limit trips,
+//! duplicate suppression, priority ordering under load, and closed-list negotiation.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -10,9 +10,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use noos_p2p::{
-    write_raw_declared, BodyReplyV1, ChainIdentity, HeaderReplyV1, InboundItem, P2pConfig,
-    P2pEvent, P2pHandle, P2pNode, PeerId, ProtocolStore, PushReplyV1, RejectCode, SendError,
-    ShardReplyV1, SnapshotReplyV1, Violation,
+    write_raw_declared, BodyReplyV1, Bounded, ChainIdentity, HeaderReplyV1, InboundItem,
+    LightBytes48, LightMemberV1, LightMembershipSnapshotV1, LightMembershipWitnessV1,
+    LightUpdateItemV1, P2pConfig, P2pEvent, P2pHandle, P2pNode, PeerId, ProtocolStore, PushReplyV1,
+    RejectCode, SendError, ShardReplyV1, SnapshotReplyV1, Violation,
 };
 use tokio::sync::mpsc;
 use tokio::time::timeout;
@@ -23,7 +24,7 @@ fn chain_a() -> ChainIdentity {
     ChainIdentity {
         chain_id: [0xA1; 32],
         genesis_hash: [0xA2; 32],
-        protocol_version: 1,
+        protocol_version: 2,
     }
 }
 
@@ -31,7 +32,7 @@ fn chain_wrong() -> ChainIdentity {
     ChainIdentity {
         chain_id: [0xB1; 32],
         genesis_hash: [0xB2; 32],
-        protocol_version: 1,
+        protocol_version: 2,
     }
 }
 
@@ -40,6 +41,7 @@ struct MemStore {
     headers: HashMap<[u8; 32], Vec<u8>>,
     bodies: HashMap<[u8; 32], Vec<u8>>,
     range: Vec<Vec<u8>>,
+    light_updates: Vec<LightUpdateItemV1>,
     chunks: HashMap<([u8; 32], u32), (u32, Vec<u8>)>,
     shards: HashMap<([u8; 32], u32), Vec<u8>>,
 }
@@ -61,11 +63,42 @@ impl ProtocolStore for MemStore {
             .min(self.range.len());
         (self.range[start..end].to_vec(), end < self.range.len())
     }
+    fn light_updates(&self, start_height: u64, max_items: u32) -> (Vec<LightUpdateItemV1>, bool) {
+        let mut available = self
+            .light_updates
+            .iter()
+            .filter(|item| item.height >= start_height);
+        let items: Vec<_> = available
+            .by_ref()
+            .take(max_items as usize)
+            .cloned()
+            .collect();
+        (items, available.next().is_some())
+    }
     fn snapshot_chunk(&self, snapshot_root: &[u8; 32], chunk_index: u32) -> Option<(u32, Vec<u8>)> {
         self.chunks.get(&(*snapshot_root, chunk_index)).cloned()
     }
     fn shard(&self, content_root: &[u8; 32], shard_index: u32) -> Option<Vec<u8>> {
         self.shards.get(&(*content_root, shard_index)).cloned()
+    }
+}
+
+fn light_item(height: u64) -> LightUpdateItemV1 {
+    let member = LightMemberV1 {
+        validator_id: [0x11; 32],
+        consensus_bls_key: LightBytes48([0x22; 48]),
+        raw_weight: 10,
+        effective_weight: 10,
+    };
+    LightUpdateItemV1 {
+        height,
+        header: Bounded(vec![height as u8; 64]),
+        finality: Bounded(vec![0x33; 64]),
+        membership: LightMembershipWitnessV1 {
+            snapshot: LightMembershipSnapshotV1::from_members(1, vec![member]).unwrap(),
+            handover: Bounded(Vec::new()),
+        },
+        ground_ticket: Bounded(vec![0x44; 32]),
     }
 }
 
@@ -139,7 +172,7 @@ async fn handshake_accepts_matching_chain_and_binds_attestation() {
     assert_eq!(peer, b.local_peer_id());
     assert_eq!(attestation.chain_id, chain_a().chain_id);
     assert_eq!(attestation.genesis_hash, chain_a().genesis_hash);
-    assert_eq!(attestation.protocol_version, 1);
+    assert_eq!(attestation.protocol_version, 2);
 
     let ev = wait_for(&mut b_rx, "b PeerReady", |e| {
         matches!(e, P2pEvent::PeerReady { .. })
@@ -210,11 +243,11 @@ async fn handshake_rejects_wrong_chain_when_we_dial_wrong_node() {
 }
 
 // ---------------------------------------------------------------------------
-// Eight-protocol round trip
+// Nine-protocol round trip
 // ---------------------------------------------------------------------------
 
 #[tokio::test(flavor = "multi_thread")]
-async fn all_eight_protocols_round_trip_one_canonical_message() {
+async fn all_nine_protocols_round_trip_one_canonical_message() {
     let header_hash = [0x11; 32];
 
     let mut store = MemStore::default();
@@ -223,6 +256,7 @@ async fn all_eight_protocols_round_trip_one_canonical_message() {
     store.headers.insert(header_hash, header.clone());
     store.bodies.insert([0x22; 32], body.clone());
     store.range = vec![b"h0".to_vec(), b"h1".to_vec(), b"h2".to_vec()];
+    store.light_updates = (0..3).map(light_item).collect();
     store
         .chunks
         .insert(([0x33; 32], 1), (4, b"snapshot-chunk-1".to_vec()));
@@ -368,7 +402,19 @@ async fn all_eight_protocols_round_trip_one_canonical_message() {
         other => panic!("expected chunk, got {other:?}"),
     }
 
-    // 7. /noos/blob/shard/1 — shard request/transfer.
+    // 7. /noos/sync/light-update/2 — compact finalized history page.
+    let reply = timeout(WAIT, a.request_light_updates(bp, 0, 2))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(reply.requested_start, 0);
+    assert_eq!(reply.items.0.len(), 2);
+    assert_eq!(reply.items.0[0].height, 0);
+    assert_eq!(reply.items.0[1].height, 1);
+    assert_eq!(reply.next_height, 2);
+    assert!(reply.more.0);
+
+    // 8. /noos/blob/shard/1 — shard request/transfer.
     let reply = timeout(WAIT, a.request_shard(bp, [0x44; 32], 7))
         .await
         .unwrap()
@@ -383,7 +429,7 @@ async fn all_eight_protocols_round_trip_one_canonical_message() {
         .unwrap();
     assert_eq!(reply, ShardReplyV1::NotFound);
 
-    // 8. /noos/loom/receipt/1 — lane disabled at genesis: explicit
+    // 9. /noos/loom/receipt/1 — lane disabled at genesis: explicit
     //    feature_disabled, and the receipt is NOT dispatched.
     let reply = timeout(WAIT, a.push_loom_receipt(bp, b"loom-receipt".to_vec()))
         .await

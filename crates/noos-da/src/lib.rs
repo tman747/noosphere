@@ -36,6 +36,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod artifact;
 mod body;
 pub mod custody;
 mod descriptor;
@@ -45,10 +46,25 @@ mod merkle;
 pub mod vector_gen;
 
 #[cfg(test)]
+mod artifact_tests;
+#[cfg(test)]
+mod custody_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod vector_tests;
 
+pub use artifact::{
+    artifact_global_share_index, probe_branch, share_commitment, verify_probe, ArtifactDecoderV1,
+    ArtifactEncodeCheckpointV1, ArtifactEncoderV1, ArtifactError, ArtifactManifestV1,
+    ArtifactShareCommitmentV1, ArtifactShareSink, ArtifactShareSource, ArtifactStripeV1,
+    ARTIFACT_CODEC_WORKING_SET_BYTES, ARTIFACT_DATA_POSITIONS, ARTIFACT_MANIFEST_FIXED_BYTES,
+    ARTIFACT_MANIFEST_GLOBAL_INDEX, ARTIFACT_MANIFEST_STRIPE_BYTES, ARTIFACT_MAX_SOURCE_BYTES,
+    ARTIFACT_MAX_STRIPES, ARTIFACT_PARITY_POSITIONS, ARTIFACT_POSITIONS, ARTIFACT_PROBE_DEPTH,
+    ARTIFACT_PROBE_LEAF_BYTES, ARTIFACT_PROBE_LEAVES, ARTIFACT_PROFILE_ID, ARTIFACT_SHARE_BYTES,
+    ARTIFACT_STRIPE_BYTES, BONSAI_FINAL_ACTUAL_BYTES, BONSAI_FINAL_PADDING_BYTES,
+    BONSAI_POSITION_BYTES, BONSAI_SOURCE_BYTES, BONSAI_STRIPES,
+};
 pub use body::{
     commit_shards, content_root, encode_body, encode_padded_region, reconstruct_and_verify,
     verify_body_shard, verify_shard_sample, AvailabilityLedger, BodyDaClaimV1, EncodedBodyV1,

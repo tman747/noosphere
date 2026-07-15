@@ -1,0 +1,116 @@
+{
+  "schema": "noos/wwm-hosted-model-share-ingest/v1",
+  "captured_at": "2026-07-15T07:44:47.905Z",
+  "environment": "LOCAL_TESTNET_FIXTURE",
+  "production_claimed": false,
+  "repository_revision": "adf1325428507b4f06f7c9568066985240fc8747",
+  "service_binary": {
+    "path": "D:/noosphere-targets/integration/release/noos-artifact-service.exe",
+    "bytes": 4391936,
+    "sha256": "44b365bd71deea3dfe9814f26edc3235e88d775a6533cc8e45a7f15650e8552e",
+    "release_build": true
+  },
+  "storage_isolation": {
+    "artifact_root": "D:/noosphere-artifacts/custodian-store",
+    "consensus_root": "C:/tmp/wwm-consensus-placeholder",
+    "paths_overlap": false,
+    "quota_bytes": 8589934592,
+    "segment_size_bytes": 67108864,
+    "max_concurrency": 1,
+    "configured_io_bytes_per_second": 67108864
+  },
+  "commands": {
+    "ingest": "D:/noosphere-targets/integration/release/noos-artifact-service.exe ingest --source D:/noosphere-artifacts/bonsai/Bonsai-27B-Q1_0.gguf --store-root D:/noosphere-artifacts/custodian-store --consensus-root C:/tmp/wwm-consensus-placeholder --quota-bytes 8589934592 --report C:/tmp/wwm-bonsai-ingest-idempotent.json",
+    "independent_verify": "D:/noosphere-targets/integration/release/noos-artifact-service.exe verify --store-root D:/noosphere-artifacts/custodian-store --consensus-root C:/tmp/wwm-consensus-placeholder --quota-bytes 8589934592 --report C:/tmp/wwm-bonsai-store-verify.json"
+  },
+  "resume_and_fail_closed_observation": {
+    "completed_stripes_before_successful_resume": 454,
+    "published_before_successful_resume": false,
+    "first_publish_rejected": true,
+    "rejection": "Frozen manifest root rejected an incorrect codec retention value (actual 3e03e3c8fa4dd2b28e1c54ff6fd87a953a23f24fa504f0b9963ded82a9eca716; expected 80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7). The availability-policy evidence horizon is not the codec descriptor retention field.",
+    "frozen_codec_retention_epochs": 1,
+    "idempotent_revalidation_started_published": true,
+    "idempotent_revalidation_completed_stripes": 0
+  },
+  "ingest_and_full_share_verification": {
+    "schema": "noos.wwm.artifact-ingest.v1",
+    "source": "D:/noosphere-artifacts/bonsai/Bonsai-27B-Q1_0.gguf",
+    "initial_completed_stripes": 0,
+    "initial_published": true,
+    "verification": {
+      "schema": "noos.wwm.artifact-store-verification.v1",
+      "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+      "source_bytes": 3803452480,
+      "published_sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+      "protocol_payload_root": "d9fd68fd5b262b0b3672f71c633956c93228e6e3f331ed92ef40e2647de475f7",
+      "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+      "stripe_count": 454,
+      "position_count": 12,
+      "position_roots": [
+        "876dca42ebbba4d77cd3d75a07f1048c6c4d678cf5b7a70a261e54243d885723",
+        "0dae9a09efc7995a52f82a3b317ca348e6af468876a9b51d860c48271d3ccade",
+        "cb8028d59b9d563384913436c87089810fe4fb07396f7e7e14491fe84d08eb92",
+        "c551b7b08d4753f2d34c61807a519a0130fb42af3e3ce8c9022906d32e88bc0a",
+        "f161223dd88f2499a6a302a9a73bd225035cc881ae3dbbaf5c6ea1d31b79403b",
+        "16a00fd5b0dd339c656bbb7eaa460f4264eb336ef8c5494aa1b6dde01a49af5c",
+        "3b9a0ce52f270edf449a79720f0c039ef7643bac8cb5b4e8f36be8025a56e46a",
+        "984d8e5466178dab6a2d16241f5b981c23c781279c2e205986fb32059243ca64",
+        "d82cf859624e65eb7ed37bdfed4e72a61dd572097bc8e29d20dfc704782cd1e5",
+        "2f0f66ceb088d2659fd7038571c0c62ed3439df389366afc462f49fe237d90ef",
+        "cb120382623eb4f397640337280f3d4ce85593059434e72220e4deb09e8e979b",
+        "640f3654c30df9d26df3ed2e2066d460a067db481cbf4d6ee4fba48457888b59"
+      ],
+      "verified_share_count": 5448,
+      "encoded_share_bytes": 5707063296,
+      "store_used_bytes": 5708023250,
+      "store_quota_bytes": 8589934592,
+      "published": true
+    }
+  },
+  "independent_full_share_verification": {
+    "schema": "noos.wwm.artifact-store-verification.v1",
+    "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+    "source_bytes": 3803452480,
+    "published_sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+    "protocol_payload_root": "d9fd68fd5b262b0b3672f71c633956c93228e6e3f331ed92ef40e2647de475f7",
+    "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+    "stripe_count": 454,
+    "position_count": 12,
+    "position_roots": [
+      "876dca42ebbba4d77cd3d75a07f1048c6c4d678cf5b7a70a261e54243d885723",
+      "0dae9a09efc7995a52f82a3b317ca348e6af468876a9b51d860c48271d3ccade",
+      "cb8028d59b9d563384913436c87089810fe4fb07396f7e7e14491fe84d08eb92",
+      "c551b7b08d4753f2d34c61807a519a0130fb42af3e3ce8c9022906d32e88bc0a",
+      "f161223dd88f2499a6a302a9a73bd225035cc881ae3dbbaf5c6ea1d31b79403b",
+      "16a00fd5b0dd339c656bbb7eaa460f4264eb336ef8c5494aa1b6dde01a49af5c",
+      "3b9a0ce52f270edf449a79720f0c039ef7643bac8cb5b4e8f36be8025a56e46a",
+      "984d8e5466178dab6a2d16241f5b981c23c781279c2e205986fb32059243ca64",
+      "d82cf859624e65eb7ed37bdfed4e72a61dd572097bc8e29d20dfc704782cd1e5",
+      "2f0f66ceb088d2659fd7038571c0c62ed3439df389366afc462f49fe237d90ef",
+      "cb120382623eb4f397640337280f3d4ce85593059434e72220e4deb09e8e979b",
+      "640f3654c30df9d26df3ed2e2066d460a067db481cbf4d6ee4fba48457888b59"
+    ],
+    "verified_share_count": 5448,
+    "encoded_share_bytes": 5707063296,
+    "store_used_bytes": 5708023250,
+    "store_quota_bytes": 8589934592,
+    "published": true
+  },
+  "checks": {
+    "all_454_stripes_present": true,
+    "all_12_positions_present": true,
+    "all_5448_share_commitments_match_manifest": true,
+    "all_12_position_roots_validate": true,
+    "manifest_root_matches_chain_fixture": true,
+    "payload_root_and_sha256_match_publisher_source": true,
+    "published_index_visible": true,
+    "reopen_quota_accounting_matches": true,
+    "verdict": "PASS"
+  },
+  "scope_and_non_claims": [
+    "This is one isolated local artifact store containing all twelve positions; it is not a production custodian deployment.",
+    "No custody certificate, geographic/provider diversity, rewards, public availability, or production durability is claimed.",
+    "No base-chain validator path depends on this artifact root or on model availability.",
+    "Transport, chain-derived executor bootstrap, cold reconstruction, and inference are verified in later separately gated steps."
+  ]
+}

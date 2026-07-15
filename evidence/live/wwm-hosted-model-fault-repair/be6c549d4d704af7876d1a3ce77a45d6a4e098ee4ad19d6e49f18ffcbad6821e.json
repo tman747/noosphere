@@ -1,0 +1,313 @@
+{
+  "artifact": {
+    "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+    "encoded_bytes": 5707063296,
+    "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+    "name": "Bonsai-27B-Q1_0.gguf",
+    "positions": 12,
+    "reconstruction_threshold": 8,
+    "schedulable_minimum": 9,
+    "sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+    "source_bytes": 3803452480
+  },
+  "chain_continuity": {
+    "all_transfer_receipt_statuses": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "application_receipt_status": 0,
+    "final_finalized_height": 19200,
+    "finality_advanced_blocks": 8704,
+    "finalized": {
+      "epoch": 75,
+      "hash": "db2ed4f2ac4031e0ac2534458fd28c6bbdc0fbf5d399979bed82b012cfd8742d"
+    },
+    "initial_finalized_height": 10496,
+    "justified": {
+      "epoch": 76,
+      "hash": "dc74985bf845759896f7e12f6262221b0794bd0c012c99492691ab6d7fdba2d6"
+    },
+    "unsafe_head": {
+      "hash": "dc74985bf845759896f7e12f6262221b0794bd0c012c99492691ab6d7fdba2d6",
+      "height": 19456
+    }
+  },
+  "claims": {
+    "admission_and_inference_resumed": true,
+    "canonical_any_eight_repair_completed": true,
+    "fresh_certificate_finalized": true,
+    "model_availability_isolated_from_base_chain": true,
+    "new_job_admission_failed_closed_at_eight": true,
+    "ordinary_chain_finality_continued": true,
+    "production_availability_claimed": false
+  },
+  "environment": {
+    "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+    "external_model_egress": false,
+    "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+    "kind": "isolated_devnet",
+    "node_rpc": "loopback",
+    "production_claimed": false
+  },
+  "fault_sequence": [
+    {
+      "admission_status": 200,
+      "live_count": 12,
+      "live_positions": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "offline_positions": [],
+      "ordinary_transaction": {
+        "receipt": {
+          "fee_charged": "544",
+          "status": 0,
+          "txid": "1e1476154a1b00046a3849bee925b8d2e6e3a48153ccddf604aec9853a3e18d4"
+        },
+        "state": {
+          "settled_height": 12495,
+          "status_code": 0
+        }
+      },
+      "phase": "12_live",
+      "schedulable": true
+    },
+    {
+      "admission_status": 200,
+      "live_count": 9,
+      "live_positions": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "offline_positions": [
+        0,
+        1,
+        2
+      ],
+      "ordinary_transaction": {
+        "receipt": {
+          "fee_charged": "544",
+          "status": 0,
+          "txid": "b60012ddd4e0621d8a5254fd51760d475358d47f01b49180b1f6d6709ee76323"
+        },
+        "state": {
+          "settled_height": 12572,
+          "status_code": 0
+        }
+      },
+      "phase": "9_live",
+      "schedulable": true
+    },
+    {
+      "canonical_repair": {
+        "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+        "bytes_read": 3804708864,
+        "bytes_written": 475588608,
+        "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+        "position_root": "c551b7b08d4753f2d34c61807a519a0130fb42af3e3ce8c9022906d32e88bc0a",
+        "published": true,
+        "repaired_position": 3,
+        "repaired_shares": 454,
+        "replacement_store_used_bytes": 476368756,
+        "schema": "noos.wwm.artifact-position-repair.v1",
+        "source_positions": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "capacity_quote": {
+        "body": {
+          "error": "availability_not_schedulable",
+          "live_count": 8,
+          "live_positions": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "offline_positions": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "reconstruction_threshold": 8,
+          "schedulable_minimum": 9
+        },
+        "status": 503
+      },
+      "emergency_reconstruction_possible": true,
+      "job_admission": {
+        "error": "availability_not_schedulable",
+        "status": 503
+      },
+      "live_count": 8,
+      "live_positions": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "offline_positions": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "ordinary_transaction": {
+        "receipt": {
+          "fee_charged": "544",
+          "status": 0,
+          "txid": "46f87aba535904c00712477c2cb337f23ecf7211664663677ab1746905f4b9a2"
+        },
+        "state": {
+          "settled_height": 12681,
+          "status_code": 0
+        }
+      },
+      "phase": "8_live",
+      "schedulable": false
+    },
+    {
+      "admission_status": 200,
+      "inference": {
+        "duration_seconds": 8.326,
+        "job_id": "8baa168a2b8a71afde87da813a594f81ca4d1f829fbcf1a4498fda7e9d7b327c",
+        "output_root": "bddbf7ac5d6f7c49157af6238da4eef78366b371e82d79fcb30caf35fb5cd961",
+        "terminal_code": "completed",
+        "token_chunks": 22
+      },
+      "live_count": 9,
+      "live_positions": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "offline_positions": [
+        0,
+        1,
+        2
+      ],
+      "ordinary_transaction": {
+        "receipt": {
+          "fee_charged": "544",
+          "status": 0,
+          "txid": "ed611d2dbb0ec0aee90d84c517406f5f034054d8d12847319ca4979c0c26cfe7"
+        },
+        "state": {
+          "settled_height": 18689,
+          "status_code": 0
+        }
+      },
+      "phase": "repaired_9_live",
+      "position_root": "c551b7b08d4753f2d34c61807a519a0130fb42af3e3ce8c9022906d32e88bc0a",
+      "profile_assignment": {
+        "position_0": "39e9acb0b265416e86451f2f3c7a2542722047d2e9ddaf8c5a226b8790f3d1a1",
+        "position_3": "19790a30d47c1a0bf1b72018ff56d549a1b65c84dba8b1acaaad7aea338e008a"
+      },
+      "replacement_bytes_exact": true,
+      "replacement_store": "D:/noosphere-artifacts/repaired-position-3",
+      "schedulable": true
+    }
+  ],
+  "finalized_repair": {
+    "assignment_root": "a774a06a7f3710b65062c856e576cd40671d960db62d893093755aa70b979399",
+    "certificate_valid_until": 117544,
+    "finalized_resolution_hash": "db2ed4f2ac4031e0ac2534458fd28c6bbdc0fbf5d399979bed82b012cfd8742d",
+    "finalized_resolution_height": 19200,
+    "fresh_certificate_id": "15299f81fd3607bbd33faf04f4b2fc1059e420eedad2e2dea4347191ff7b56e0",
+    "new_commitment_id": "086f9c827a1f13fcea8a4200df86c9c04b15eb0ef89d98f7d7ce9631bde431ae",
+    "objects_root": "2aeef8cea1cd9ef94eb18836e72477f996f78fb210781364c8ade6770f4d5b04",
+    "old_profile_id": "39e9acb0b265416e86451f2f3c7a2542722047d2e9ddaf8c5a226b8790f3d1a1",
+    "prior_position": 3,
+    "proof_body_blake3": "9afb00c5f89d85d80cf8b7226ec2576d7092371a1e25daa9f05f32101e736db9",
+    "publisher_or_gateway_fallback": false,
+    "repair_order_id": "ad80d3d93b81a0cc3fa1c436d7fdc86d09265e94536e03a607f9ffadabff525e",
+    "repair_receipt_id": "0ad3b27de5a97fa85267cef2490d7d1c4d32aa5c9dd1ff94373aae63b3a384b8",
+    "repair_transaction_id": "a7bb70dbeb9ad29fb12ded9fbc5445ffd4262b2ea0c3f2225701733f2686ab20",
+    "repair_transaction_receipt": {
+      "receipt": {
+        "fee_charged": "5360",
+        "status": 0,
+        "txid": "a7bb70dbeb9ad29fb12ded9fbc5445ffd4262b2ea0c3f2225701733f2686ab20"
+      },
+      "state": {
+        "settled_height": 17546,
+        "status_code": 0
+      }
+    },
+    "replacement_profile_id": "19790a30d47c1a0bf1b72018ff56d549a1b65c84dba8b1acaaad7aea338e008a",
+    "replacement_profile_prior_position": 0
+  },
+  "generated_at": "2026-07-15T11:25:18.073396+00:00",
+  "ordinary_application_transaction": {
+    "created_asset": {
+      "action_index": 0,
+      "asset_id": "b3af89065b2390b116318ad541b900b28b23e434f55d975967d38baf0fd12fd9",
+      "decimals": 0,
+      "name": "Repair Continuity",
+      "symbol": "RPR2",
+      "total_supply": "1000"
+    },
+    "receipt": {
+      "receipt": {
+        "fee_charged": "456",
+        "status": 0,
+        "txid": "53cce35f8d1407aae9e11cdbf1b431280a78493e24276294764b48d43bb2adbd"
+      },
+      "state": {
+        "settled_height": 18976,
+        "status_code": 0
+      }
+    },
+    "txid": "53cce35f8d1407aae9e11cdbf1b431280a78493e24276294764b48d43bb2adbd"
+  },
+  "schema": "noos.wwm.hosted-model-fault-repair-evidence.v1",
+  "signature": {
+    "domain": "NOOS/EVIDENCE/WWM-HOSTED-FAULT/V1",
+    "public_key": "17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce",
+    "signature": "7c45bff4c29429eb513d9293eac91ed15fb0a2e34fdfe25e91c4929c1e17118eecfd3ca8d69e8d3577cf303f198490f9278d9c77bb2ca0cc1b2cd14946cfd90c",
+    "signed_payload_sha256": "7a992e93ceebff7e7d7eeaad2742efc6f6ea1396f496d623637656376e88ada7",
+    "suite": "Ed25519"
+  }
+}

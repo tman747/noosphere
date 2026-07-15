@@ -1,7 +1,7 @@
 [package]
 name = "noos-p2p"
 version = "0.1.0"
-description = "NOOSPHERE transport: libp2p QUIC with chain-identity binding (D-SIG-PEER handshake), the eight closed /noos/ v1 protocols as bounded framed substreams, 1 MiB frame law, priority/normal outbound lanes (consensus-over-AI scheduling), per-peer rate limits, content-digest duplicate caches, violation scoring with progressive cooldowns, deterministic-jitter reconnect backoff, and targeted repair requests (plan section 7.4). No sync algorithms, mempool policy, or RPC."
+description = "NOOSPHERE transport: libp2p QUIC with chain-identity binding, nine bounded /noos/ application protocols including protocol-v2 finalized light updates, 1 MiB frame law, consensus-priority scheduling, per-peer limits, duplicate caches, violation cooldowns, reconnect backoff, and targeted repair."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -10,6 +10,7 @@ repository.workspace = true
 [dependencies]
 noos-codec = { path = "../noos-codec" }
 noos-crypto = { path = "../noos-crypto" }
+noos-lumen = { path = "../noos-lumen" }
 # Pinned exactly (plan section 7.4): libp2p QUIC is the normative wire stack.
 # Changing either pin is a protocol-operations decision, not a dependency bump.
 libp2p = { version = "=0.56.0", default-features = false, features = ["tokio", "quic", "ed25519"] }

@@ -1,9 +1,636 @@
 use crate::canonical::{strictly_sorted, Encoder};
-use crate::{domain_hash, domains, Artifact, ArtifactKind, Hash32, SpeciesError};
+use crate::{domain_hash, ArtifactKind, Hash32, SpeciesError};
+use noos_crypto::{verify_domain, DomainId, Keypair, PublicKey, Signature};
 use std::collections::BTreeSet;
 
-const SHARD_DOMAIN: &str = "NOOS/ARTIFACT/SHARD/V1";
-const DERIVATION_DOMAIN: &str = "NOOS/ARTIFACT/DERIVATION/V1";
+pub const ARTIFACT_SHARE_VERSION: u16 = 2;
+pub const ARTIFACT_STRIPE_VERSION: u16 = 2;
+pub const ARTIFACT_MANIFEST_VERSION: u16 = 2;
+pub const ARTIFACT_DESCRIPTOR_VERSION: u16 = 2;
+pub const WEIGHT_MANIFEST_VERSION: u16 = 2;
+pub const WEIGHT_INSPECTION_VERSION: u16 = 2;
+pub const BONSAI_SOURCE_BYTES: u64 = 3_803_452_480;
+pub const BONSAI_STRIPE_COUNT: usize = 454;
+pub const PADDED_STRIPE_BYTES: u32 = 8_380_416;
+pub const SHARE_BYTES: u32 = 1_047_552;
+pub const DATA_POSITIONS: u8 = 8;
+pub const PARITY_POSITIONS: u8 = 4;
+pub const POSITION_COUNT: usize = 12;
+pub const PROBE_LEAF_COUNT: u8 = 32;
+pub const PROBE_LEAF_BYTES: u32 = 32_736;
+pub const FINAL_SOURCE_BYTES: u32 = 7_124_032;
+pub const FINAL_PADDING_BYTES: u32 = 1_256_384;
+
+const SHARE_DOMAIN: &str = "NOOS/WWM/ARTIFACT/SHARE/V2";
+const STRIPE_DOMAIN: &str = "NOOS/WWM/ARTIFACT/STRIPE/V2";
+const MANIFEST_DOMAIN: &str = "NOOS/WWM/ARTIFACT/MANIFEST/V2";
+const DESCRIPTOR_DOMAIN: &str = "NOOS/WWM/ARTIFACT/DESCRIPTOR/V2";
+const WEIGHT_DOMAIN: &str = "NOOS/WWM/WEIGHT/MANIFEST/V2";
+const INSPECTION_DOMAIN: &str = "NOOS/WWM/WEIGHT/INSPECTION/V2";
+const DERIVATION_DOMAIN: &str = "NOOS/WWM/ARTIFACT/DERIVATION/V2";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PublisherSignatureV2 {
+    pub publisher_index: u8,
+    pub signature: [u8; 64],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactShareV2 {
+    pub version: u16,
+    pub erasure_profile_id: Hash32,
+    pub stripe_index: u32,
+    pub position_index: u8,
+    pub encoded_byte_length: u32,
+    pub full_share_digest: Hash32,
+    pub probe_root: Hash32,
+    pub probe_leaf_count: u8,
+    pub probe_leaf_bytes: u32,
+    pub share_id: Hash32,
+}
+
+impl ArtifactShareV2 {
+    pub fn canonical_body(&self) -> Result<Vec<u8>, SpeciesError> {
+        if self.version != ARTIFACT_SHARE_VERSION
+            || self.erasure_profile_id == [0; 32]
+            || usize::from(self.position_index) >= POSITION_COUNT
+            || self.encoded_byte_length != SHARE_BYTES
+            || self.full_share_digest == [0; 32]
+            || self.probe_root == [0; 32]
+            || self.probe_leaf_count != PROBE_LEAF_COUNT
+            || self.probe_leaf_bytes != PROBE_LEAF_BYTES
+        {
+            return Err(SpeciesError::InvalidArtifactSchema);
+        }
+        let mut encoder = Encoder::new(SHARE_DOMAIN);
+        encoder.u16(self.version);
+        encoder.hash(&self.erasure_profile_id);
+        encoder.u32(self.stripe_index);
+        encoder.u8(self.position_index);
+        encoder.u32(self.encoded_byte_length);
+        encoder.hash(&self.full_share_digest);
+        encoder.hash(&self.probe_root);
+        encoder.u8(self.probe_leaf_count);
+        encoder.u32(self.probe_leaf_bytes);
+        Ok(encoder.finish())
+    }
+
+    pub fn derived_id(&self) -> Result<Hash32, SpeciesError> {
+        Ok(domain_hash(SHARE_DOMAIN, &[&self.canonical_body()?]))
+    }
+
+    pub fn finalize_id(&mut self) -> Result<Hash32, SpeciesError> {
+        self.share_id = self.derived_id()?;
+        Ok(self.share_id)
+    }
+
+    pub fn validate(&self) -> Result<(), SpeciesError> {
+        if self.share_id == [0; 32] || self.derived_id()? != self.share_id {
+            return Err(SpeciesError::ArtifactDigestMismatch);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactStripeV2 {
+    pub version: u16,
+    pub erasure_profile_id: Hash32,
+    pub stripe_index: u32,
+    pub source_offset: u64,
+    pub padded_source_bytes: u32,
+    pub actual_source_bytes: u32,
+    pub zero_padding_bytes: u32,
+    pub padded_content_root: Hash32,
+    pub blob_descriptor_id: Hash32,
+    pub ordered_share_ids: Vec<Hash32>,
+    pub stripe_id: Hash32,
+}
+
+impl ArtifactStripeV2 {
+    pub fn canonical_body(&self) -> Result<Vec<u8>, SpeciesError> {
+        let expected_offset = u64::from(self.stripe_index)
+            .checked_mul(u64::from(PADDED_STRIPE_BYTES))
+            .ok_or(SpeciesError::ArtifactTooLarge)?;
+        if self.version != ARTIFACT_STRIPE_VERSION
+            || self.erasure_profile_id == [0; 32]
+            || self.source_offset != expected_offset
+            || self.padded_source_bytes != PADDED_STRIPE_BYTES
+            || self.actual_source_bytes == 0
+            || self.actual_source_bytes > PADDED_STRIPE_BYTES
+            || self
+                .actual_source_bytes
+                .checked_add(self.zero_padding_bytes)
+                != Some(PADDED_STRIPE_BYTES)
+            || self.padded_content_root == [0; 32]
+            || self.blob_descriptor_id == [0; 32]
+            || self.ordered_share_ids.len() != POSITION_COUNT
+            || self.ordered_share_ids.iter().any(|id| *id == [0; 32])
+            || self
+                .ordered_share_ids
+                .iter()
+                .copied()
+                .collect::<BTreeSet<_>>()
+                .len()
+                != POSITION_COUNT
+        {
+            return Err(SpeciesError::InvalidArtifactSchema);
+        }
+        let mut encoder = Encoder::new(STRIPE_DOMAIN);
+        encoder.u16(self.version);
+        encoder.hash(&self.erasure_profile_id);
+        encoder.u32(self.stripe_index);
+        encoder.u64(self.source_offset);
+        encoder.u32(self.padded_source_bytes);
+        encoder.u32(self.actual_source_bytes);
+        encoder.u32(self.zero_padding_bytes);
+        encoder.hash(&self.padded_content_root);
+        encoder.hash(&self.blob_descriptor_id);
+        encoder.hashes(&self.ordered_share_ids);
+        Ok(encoder.finish())
+    }
+
+    pub fn derived_id(&self) -> Result<Hash32, SpeciesError> {
+        Ok(domain_hash(STRIPE_DOMAIN, &[&self.canonical_body()?]))
+    }
+
+    pub fn finalize_id(&mut self) -> Result<Hash32, SpeciesError> {
+        self.stripe_id = self.derived_id()?;
+        Ok(self.stripe_id)
+    }
+
+    pub fn validate(&self) -> Result<(), SpeciesError> {
+        if self.stripe_id == [0; 32] || self.derived_id()? != self.stripe_id {
+            return Err(SpeciesError::ArtifactDigestMismatch);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactManifestV2 {
+    pub version: u16,
+    pub erasure_profile_id: Hash32,
+    pub source_byte_length: u64,
+    pub source_sha256: Hash32,
+    pub payload_root: Hash32,
+    pub stripe_ids: Vec<Hash32>,
+    pub position_roots: Vec<Hash32>,
+    pub final_actual_source_bytes: u32,
+    pub final_zero_padding_bytes: u32,
+    pub manifest_id: Hash32,
+}
+
+impl ArtifactManifestV2 {
+    pub fn canonical_body(&self) -> Result<Vec<u8>, SpeciesError> {
+        if self.version != ARTIFACT_MANIFEST_VERSION
+            || self.erasure_profile_id == [0; 32]
+            || self.source_byte_length != BONSAI_SOURCE_BYTES
+            || self.source_sha256 == [0; 32]
+            || self.payload_root == [0; 32]
+            || self.stripe_ids.len() != BONSAI_STRIPE_COUNT
+            || self.stripe_ids.iter().any(|id| *id == [0; 32])
+            || self
+                .stripe_ids
+                .iter()
+                .copied()
+                .collect::<BTreeSet<_>>()
+                .len()
+                != BONSAI_STRIPE_COUNT
+            || self.position_roots.len() != POSITION_COUNT
+            || self.position_roots.iter().any(|root| *root == [0; 32])
+            || self.final_actual_source_bytes != FINAL_SOURCE_BYTES
+            || self.final_zero_padding_bytes != FINAL_PADDING_BYTES
+        {
+            return Err(SpeciesError::InvalidArtifactSchema);
+        }
+        let mut encoder = Encoder::new(MANIFEST_DOMAIN);
+        encoder.u16(self.version);
+        encoder.hash(&self.erasure_profile_id);
+        encoder.u64(self.source_byte_length);
+        encoder.hash(&self.source_sha256);
+        encoder.hash(&self.payload_root);
+        encoder.hashes(&self.stripe_ids);
+        encoder.hashes(&self.position_roots);
+        encoder.u32(self.final_actual_source_bytes);
+        encoder.u32(self.final_zero_padding_bytes);
+        Ok(encoder.finish())
+    }
+
+    pub fn derived_id(&self) -> Result<Hash32, SpeciesError> {
+        Ok(domain_hash(MANIFEST_DOMAIN, &[&self.canonical_body()?]))
+    }
+
+    pub fn finalize_id(&mut self) -> Result<Hash32, SpeciesError> {
+        self.manifest_id = self.derived_id()?;
+        Ok(self.manifest_id)
+    }
+
+    pub fn validate(&self) -> Result<(), SpeciesError> {
+        if self.manifest_id == [0; 32] || self.derived_id()? != self.manifest_id {
+            return Err(SpeciesError::ArtifactDigestMismatch);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactDescriptorV2 {
+    pub version: u16,
+    pub kind: ArtifactKind,
+    pub media_type: String,
+    pub byte_length: u64,
+    pub payload_root: Hash32,
+    pub source_sha256: Hash32,
+    pub manifest_id: Hash32,
+    pub erasure_profile_id: Hash32,
+    pub stripe_count: u32,
+    pub license_root: Hash32,
+    pub rights_root: Hash32,
+    pub provenance_root: Hash32,
+    pub publisher_keys: Vec<Hash32>,
+    pub publisher_threshold: u8,
+    pub published_height: u64,
+    pub annotations_root: Hash32,
+    pub descriptor_id: Hash32,
+    pub signatures: Vec<PublisherSignatureV2>,
+}
+
+impl ArtifactDescriptorV2 {
+    pub fn canonical_body(&self) -> Result<Vec<u8>, SpeciesError> {
+        if self.version != ARTIFACT_DESCRIPTOR_VERSION
+            || self.media_type.is_empty()
+            || self.media_type.len() > 255
+            || self.byte_length != BONSAI_SOURCE_BYTES
+            || self.payload_root == [0; 32]
+            || self.source_sha256 == [0; 32]
+            || self.manifest_id == [0; 32]
+            || self.erasure_profile_id == [0; 32]
+            || usize::try_from(self.stripe_count).ok() != Some(BONSAI_STRIPE_COUNT)
+            || self.license_root == [0; 32]
+            || self.rights_root == [0; 32]
+            || self.provenance_root == [0; 32]
+            || self.annotations_root == [0; 32]
+            || self.publisher_keys.is_empty()
+            || self.publisher_keys.len() > 16
+            || !strictly_sorted(&self.publisher_keys)
+            || self.publisher_threshold == 0
+            || usize::from(self.publisher_threshold) > self.publisher_keys.len()
+        {
+            return Err(SpeciesError::InvalidArtifactSchema);
+        }
+        let mut encoder = Encoder::new(DESCRIPTOR_DOMAIN);
+        encoder.u16(self.version);
+        encoder.u8(kind_tag(self.kind));
+        encoder.string(&self.media_type);
+        encoder.u64(self.byte_length);
+        encoder.hash(&self.payload_root);
+        encoder.hash(&self.source_sha256);
+        encoder.hash(&self.manifest_id);
+        encoder.hash(&self.erasure_profile_id);
+        encoder.u32(self.stripe_count);
+        encoder.hash(&self.license_root);
+        encoder.hash(&self.rights_root);
+        encoder.hash(&self.provenance_root);
+        encoder.hashes(&self.publisher_keys);
+        encoder.u8(self.publisher_threshold);
+        encoder.u64(self.published_height);
+        encoder.hash(&self.annotations_root);
+        Ok(encoder.finish())
+    }
+
+    pub fn derived_id(&self) -> Result<Hash32, SpeciesError> {
+        Ok(domain_hash(DESCRIPTOR_DOMAIN, &[&self.canonical_body()?]))
+    }
+
+    pub fn finalize_id(&mut self) -> Result<Hash32, SpeciesError> {
+        if !self.signatures.is_empty() {
+            return Err(SpeciesError::InvalidArtifactSignature);
+        }
+        self.descriptor_id = self.derived_id()?;
+        Ok(self.descriptor_id)
+    }
+
+    pub fn add_signature(&mut self, keypair: &Keypair) -> Result<(), SpeciesError> {
+        if self.descriptor_id == [0; 32] || self.derived_id()? != self.descriptor_id {
+            return Err(SpeciesError::ArtifactDigestMismatch);
+        }
+        let index = signer_index(&self.publisher_keys, keypair)?;
+        if self
+            .signatures
+            .iter()
+            .any(|entry| entry.publisher_index == index)
+        {
+            return Err(SpeciesError::InvalidArtifactSignature);
+        }
+        let body = self.canonical_body()?;
+        let signature = keypair
+            .sign_domain(
+                DomainId::SigWwm,
+                &[DESCRIPTOR_DOMAIN.as_bytes(), &self.descriptor_id, &body],
+            )
+            .map_err(|_| SpeciesError::InvalidArtifactSignature)?;
+        self.signatures.push(PublisherSignatureV2 {
+            publisher_index: index,
+            signature: signature.into_bytes(),
+        });
+        self.signatures.sort_by_key(|entry| entry.publisher_index);
+        Ok(())
+    }
+
+    pub fn validate(&self) -> Result<(), SpeciesError> {
+        if self.descriptor_id == [0; 32] || self.derived_id()? != self.descriptor_id {
+            return Err(SpeciesError::ArtifactDigestMismatch);
+        }
+        verify_threshold_signatures(
+            DESCRIPTOR_DOMAIN,
+            self.descriptor_id,
+            &self.canonical_body()?,
+            &self.publisher_keys,
+            self.publisher_threshold,
+            &self.signatures,
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WeightManifestV2 {
+    pub version: u16,
+    pub artifact_id: Hash32,
+    pub gguf_version: u32,
+    pub architecture: String,
+    pub file_type: u32,
+    pub alignment: u32,
+    pub metadata_count: u64,
+    pub tensor_count: u64,
+    pub q1_tensor_count: u64,
+    pub f32_tensor_count: u64,
+    pub data_offset: u64,
+    pub metadata_root: Hash32,
+    pub tensor_table_root: Hash32,
+    pub tensor_bounds_root: Hash32,
+    pub dtype_root: Hash32,
+    pub quantization_root: Hash32,
+    pub tokenizer_root: Hash32,
+    pub special_token_root: Hash32,
+    pub chat_template_root: Hash32,
+    pub runtime_compatibility_root: Hash32,
+    pub weight_manifest_id: Hash32,
+}
+
+impl WeightManifestV2 {
+    pub fn canonical_body(&self) -> Result<Vec<u8>, SpeciesError> {
+        if self.version != WEIGHT_MANIFEST_VERSION
+            || self.artifact_id == [0; 32]
+            || self.gguf_version != 3
+            || self.architecture != "qwen35"
+            || self.file_type != 40
+            || self.alignment != 32
+            || self.metadata_count == 0
+            || self.tensor_count == 0
+            || self.q1_tensor_count == 0
+            || self.q1_tensor_count.checked_add(self.f32_tensor_count) != Some(self.tensor_count)
+            || self.data_offset == 0
+            || [
+                self.metadata_root,
+                self.tensor_table_root,
+                self.tensor_bounds_root,
+                self.dtype_root,
+                self.quantization_root,
+                self.tokenizer_root,
+                self.special_token_root,
+                self.chat_template_root,
+                self.runtime_compatibility_root,
+            ]
+            .contains(&[0; 32])
+        {
+            return Err(SpeciesError::InvalidWeightManifest);
+        }
+        let mut encoder = Encoder::new(WEIGHT_DOMAIN);
+        encoder.u16(self.version);
+        encoder.hash(&self.artifact_id);
+        encoder.u32(self.gguf_version);
+        encoder.string(&self.architecture);
+        encoder.u32(self.file_type);
+        encoder.u32(self.alignment);
+        encoder.u64(self.metadata_count);
+        encoder.u64(self.tensor_count);
+        encoder.u64(self.q1_tensor_count);
+        encoder.u64(self.f32_tensor_count);
+        encoder.u64(self.data_offset);
+        encoder.hash(&self.metadata_root);
+        encoder.hash(&self.tensor_table_root);
+        encoder.hash(&self.tensor_bounds_root);
+        encoder.hash(&self.dtype_root);
+        encoder.hash(&self.quantization_root);
+        encoder.hash(&self.tokenizer_root);
+        encoder.hash(&self.special_token_root);
+        encoder.hash(&self.chat_template_root);
+        encoder.hash(&self.runtime_compatibility_root);
+        Ok(encoder.finish())
+    }
+
+    pub fn derived_id(&self) -> Result<Hash32, SpeciesError> {
+        Ok(domain_hash(WEIGHT_DOMAIN, &[&self.canonical_body()?]))
+    }
+
+    pub fn finalize_id(&mut self) -> Result<Hash32, SpeciesError> {
+        self.weight_manifest_id = self.derived_id()?;
+        Ok(self.weight_manifest_id)
+    }
+
+    pub fn validate(&self) -> Result<(), SpeciesError> {
+        if self.weight_manifest_id == [0; 32] || self.derived_id()? != self.weight_manifest_id {
+            return Err(SpeciesError::InvalidWeightManifest);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WeightInspectionReceiptV2 {
+    pub version: u16,
+    pub artifact_id: Hash32,
+    pub weight_manifest_id: Hash32,
+    pub runtime_build_id: Hash32,
+    pub observed_byte_length: u64,
+    pub observed_sha256: Hash32,
+    pub observed_metadata_root: Hash32,
+    pub observed_tensor_table_root: Hash32,
+    pub inspector_public_key: Hash32,
+    pub inspected_at_unix_seconds: u64,
+    pub receipt_id: Hash32,
+    pub signature: [u8; 64],
+}
+
+impl WeightInspectionReceiptV2 {
+    pub fn canonical_body(&self) -> Result<Vec<u8>, SpeciesError> {
+        if self.version != WEIGHT_INSPECTION_VERSION
+            || self.observed_byte_length != BONSAI_SOURCE_BYTES
+            || [
+                self.artifact_id,
+                self.weight_manifest_id,
+                self.runtime_build_id,
+                self.observed_sha256,
+                self.observed_metadata_root,
+                self.observed_tensor_table_root,
+                self.inspector_public_key,
+            ]
+            .contains(&[0; 32])
+            || self.inspected_at_unix_seconds == 0
+        {
+            return Err(SpeciesError::InvalidInspectionReceipt);
+        }
+        let mut encoder = Encoder::new(INSPECTION_DOMAIN);
+        encoder.u16(self.version);
+        encoder.hash(&self.artifact_id);
+        encoder.hash(&self.weight_manifest_id);
+        encoder.hash(&self.runtime_build_id);
+        encoder.u64(self.observed_byte_length);
+        encoder.hash(&self.observed_sha256);
+        encoder.hash(&self.observed_metadata_root);
+        encoder.hash(&self.observed_tensor_table_root);
+        encoder.hash(&self.inspector_public_key);
+        encoder.u64(self.inspected_at_unix_seconds);
+        Ok(encoder.finish())
+    }
+
+    pub fn derived_id(&self) -> Result<Hash32, SpeciesError> {
+        Ok(domain_hash(INSPECTION_DOMAIN, &[&self.canonical_body()?]))
+    }
+
+    pub fn sign(&mut self, keypair: &Keypair) -> Result<Hash32, SpeciesError> {
+        if keypair.public_key().into_bytes() != self.inspector_public_key
+            || self.signature != [0; 64]
+        {
+            return Err(SpeciesError::InvalidInspectionSignature);
+        }
+        self.receipt_id = self.derived_id()?;
+        let body = self.canonical_body()?;
+        self.signature = keypair
+            .sign_domain(
+                DomainId::SigWwm,
+                &[INSPECTION_DOMAIN.as_bytes(), &self.receipt_id, &body],
+            )
+            .map_err(|_| SpeciesError::InvalidInspectionSignature)?
+            .into_bytes();
+        Ok(self.receipt_id)
+    }
+
+    pub fn validate(&self) -> Result<(), SpeciesError> {
+        if self.receipt_id == [0; 32]
+            || self.derived_id()? != self.receipt_id
+            || self.signature == [0; 64]
+        {
+            return Err(SpeciesError::InvalidInspectionReceipt);
+        }
+        verify_domain(
+            DomainId::SigWwm,
+            &PublicKey::from_bytes(self.inspector_public_key),
+            &[
+                INSPECTION_DOMAIN.as_bytes(),
+                &self.receipt_id,
+                &self.canonical_body()?,
+            ],
+            &Signature::from_bytes(self.signature),
+        )
+        .map_err(|_| SpeciesError::InvalidInspectionSignature)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactDerivationV2 {
+    pub version: u16,
+    pub parents: Vec<Hash32>,
+    pub output: Hash32,
+    pub transform_root: Hash32,
+    pub recipe_root: Hash32,
+    pub provenance_root: Hash32,
+    pub derivation_id: Hash32,
+}
+
+impl ArtifactDerivationV2 {
+    pub fn canonical_body(&self) -> Result<Vec<u8>, SpeciesError> {
+        if self.version != 2
+            || self.parents.is_empty()
+            || self.parents.len() > 32
+            || !strictly_sorted(&self.parents)
+            || self.parents.contains(&self.output)
+            || [
+                self.output,
+                self.transform_root,
+                self.recipe_root,
+                self.provenance_root,
+            ]
+            .contains(&[0; 32])
+        {
+            return Err(SpeciesError::InvalidDerivation);
+        }
+        let mut encoder = Encoder::new(DERIVATION_DOMAIN);
+        encoder.u16(self.version);
+        encoder.hashes(&self.parents);
+        encoder.hash(&self.output);
+        encoder.hash(&self.transform_root);
+        encoder.hash(&self.recipe_root);
+        encoder.hash(&self.provenance_root);
+        Ok(encoder.finish())
+    }
+
+    pub fn derived_id(&self) -> Result<Hash32, SpeciesError> {
+        Ok(domain_hash(DERIVATION_DOMAIN, &[&self.canonical_body()?]))
+    }
+
+    pub fn finalize_id(&mut self) -> Result<Hash32, SpeciesError> {
+        self.derivation_id = self.derived_id()?;
+        Ok(self.derivation_id)
+    }
+
+    pub fn validate(&self) -> Result<(), SpeciesError> {
+        if self.derivation_id == [0; 32] || self.derived_id()? != self.derivation_id {
+            return Err(SpeciesError::InvalidDerivation);
+        }
+        Ok(())
+    }
+}
+
+fn signer_index(keys: &[Hash32], keypair: &Keypair) -> Result<u8, SpeciesError> {
+    let key = keypair.public_key().into_bytes();
+    let index = keys
+        .binary_search(&key)
+        .map_err(|_| SpeciesError::InvalidArtifactSignature)?;
+    u8::try_from(index).map_err(|_| SpeciesError::InvalidArtifactSignature)
+}
+
+fn verify_threshold_signatures(
+    domain: &str,
+    object_id: Hash32,
+    body: &[u8],
+    keys: &[Hash32],
+    threshold: u8,
+    signatures: &[PublisherSignatureV2],
+) -> Result<(), SpeciesError> {
+    if signatures.len() < usize::from(threshold)
+        || signatures.len() > keys.len()
+        || !signatures
+            .windows(2)
+            .all(|pair| pair[0].publisher_index < pair[1].publisher_index)
+    {
+        return Err(SpeciesError::InvalidArtifactSignature);
+    }
+    for entry in signatures {
+        let key = keys
+            .get(usize::from(entry.publisher_index))
+            .ok_or(SpeciesError::InvalidArtifactSignature)?;
+        verify_domain(
+            DomainId::SigWwm,
+            &PublicKey::from_bytes(*key),
+            &[domain.as_bytes(), &object_id, body],
+            &Signature::from_bytes(entry.signature),
+        )
+        .map_err(|_| SpeciesError::InvalidArtifactSignature)?;
+    }
+    Ok(())
+}
 
 fn kind_tag(kind: ArtifactKind) -> u8 {
     match kind {
@@ -23,478 +650,188 @@ fn kind_tag(kind: ArtifactKind) -> u8 {
     }
 }
 
-impl Artifact {
-    fn identity_bytes(&self, payload: &[u8]) -> Vec<u8> {
-        let mut value = Encoder::new(domains::ARTIFACT);
-        value.u8(kind_tag(self.kind));
-        value.string(&self.media_type);
-        value.u64(self.byte_length);
-        value.hash(&self.chunking_profile);
-        value.hash(&self.availability_root);
-        value.hash(&self.encoding);
-        value.optional_hash(self.numeric_profile.as_ref());
-        value.optional_hash(self.encryption_profile.as_ref());
-        value.hash(&self.rights_root);
-        value.hash(&self.creator);
-        value.u64(self.created_at);
-        value.hash(&self.annotations_root);
-        value.bytes(payload);
-        value.finish()
-    }
-
-    #[must_use]
-    pub fn derived_id(&self, payload: &[u8]) -> Hash32 {
-        *blake3::hash(&self.identity_bytes(payload)).as_bytes()
-    }
-
-    pub fn validate_schema(&self) -> Result<(), SpeciesError> {
-        if self.media_type.is_empty()
-            || self.media_type.len() > 255
-            || self.chunking_profile == [0; 32]
-            || self.availability_root == [0; 32]
-            || self.encoding == [0; 32]
-            || self.rights_root == [0; 32]
-            || self.creator == [0; 32]
-        {
-            return Err(SpeciesError::InvalidArtifactSchema);
-        }
-        Ok(())
-    }
-
-    pub fn verify_payload(&self, payload: &[u8]) -> Result<(), SpeciesError> {
-        self.validate_schema()?;
-        if u64::try_from(payload.len()).map_err(|_| SpeciesError::ArtifactTooLarge)?
-            != self.byte_length
-        {
-            return Err(SpeciesError::ArtifactLengthMismatch);
-        }
-        if self.derived_id(payload) != self.artifact_id {
-            return Err(SpeciesError::ArtifactDigestMismatch);
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DerivationEdge {
-    pub edge_id: Hash32,
-    pub parents: Vec<Hash32>,
-    pub output: Hash32,
-    pub transform: Hash32,
-    pub recipe: Hash32,
-    pub provenance_root: Hash32,
-    pub created_at: u64,
-}
-
-impl DerivationEdge {
-    fn identity_bytes(&self) -> Vec<u8> {
-        let mut value = Encoder::new(DERIVATION_DOMAIN);
-        value.hashes(&self.parents);
-        value.hash(&self.output);
-        value.hash(&self.transform);
-        value.hash(&self.recipe);
-        value.hash(&self.provenance_root);
-        value.u64(self.created_at);
-        value.finish()
-    }
-
-    #[must_use]
-    pub fn derived_id(&self) -> Hash32 {
-        *blake3::hash(&self.identity_bytes()).as_bytes()
-    }
-
-    pub fn validate(&self) -> Result<(), SpeciesError> {
-        if self.parents.is_empty()
-            || !strictly_sorted(&self.parents)
-            || self.parents.contains(&self.output)
-            || self.transform == [0; 32]
-            || self.recipe == [0; 32]
-            || self.provenance_root == [0; 32]
-        {
-            return Err(SpeciesError::InvalidDerivation);
-        }
-        if self.derived_id() != self.edge_id {
-            return Err(SpeciesError::ArtifactDigestMismatch);
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ErasureProfile {
-    pub data_shards: u16,
-    pub parity_shards: u16,
-    pub shard_length: u32,
-    pub original_length: u64,
-}
-
-impl ErasureProfile {
-    pub fn validate(&self) -> Result<(), SpeciesError> {
-        if self.data_shards == 0
-            || self.parity_shards != 1
-            || self.shard_length == 0
-            || self.data_shards > 255
-        {
-            return Err(SpeciesError::UnsupportedErasureProfile);
-        }
-        let capacity = u64::from(self.data_shards)
-            .checked_mul(u64::from(self.shard_length))
-            .ok_or(SpeciesError::ArtifactTooLarge)?;
-        if self.original_length == 0 || self.original_length > capacity {
-            return Err(SpeciesError::UnsupportedErasureProfile);
-        }
-        Ok(())
-    }
-
-    #[must_use]
-    pub const fn declared_loss_bound(self) -> u16 {
-        self.parity_shards
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ArtifactShard {
-    pub index: u16,
-    pub bytes: Vec<u8>,
-    pub digest: Hash32,
-}
-
-fn shard_digest(artifact_id: &Hash32, index: u16, bytes: &[u8]) -> Hash32 {
-    domain_hash(SHARD_DOMAIN, &[artifact_id, &index.to_be_bytes(), bytes])
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EncodedArtifact {
-    pub artifact_id: Hash32,
-    pub profile: ErasureProfile,
-    pub shards: Vec<ArtifactShard>,
-}
-
-impl EncodedArtifact {
-    pub fn encode(
-        artifact: &Artifact,
-        payload: &[u8],
-        data_shards: u16,
-    ) -> Result<Self, SpeciesError> {
-        artifact.verify_payload(payload)?;
-        if data_shards == 0 || payload.is_empty() {
-            return Err(SpeciesError::UnsupportedErasureProfile);
-        }
-        let length = u64::try_from(payload.len()).map_err(|_| SpeciesError::ArtifactTooLarge)?;
-        let rounding = u64::from(data_shards)
-            .checked_sub(1)
-            .ok_or(SpeciesError::ArtifactTooLarge)?;
-        let shard_length_u64 = length
-            .checked_add(rounding)
-            .ok_or(SpeciesError::ArtifactTooLarge)?
-            .checked_div(u64::from(data_shards))
-            .ok_or(SpeciesError::ArtifactTooLarge)?;
-        let shard_length =
-            u32::try_from(shard_length_u64).map_err(|_| SpeciesError::ArtifactTooLarge)?;
-        let profile = ErasureProfile {
-            data_shards,
-            parity_shards: 1,
-            shard_length,
-            original_length: length,
-        };
-        profile.validate()?;
-        let width = usize::try_from(shard_length).map_err(|_| SpeciesError::ArtifactTooLarge)?;
-        let mut data = Vec::with_capacity(usize::from(data_shards));
-        for index in 0..data_shards {
-            let start = usize::from(index)
-                .checked_mul(width)
-                .ok_or(SpeciesError::ArtifactTooLarge)?;
-            let end = start.saturating_add(width).min(payload.len());
-            let mut bytes = vec![0; width];
-            if start < payload.len() {
-                let copied = end
-                    .checked_sub(start)
-                    .ok_or(SpeciesError::ArtifactTooLarge)?;
-                bytes[..copied].copy_from_slice(&payload[start..end]);
-            }
-            data.push(bytes);
-        }
-        let mut parity = vec![0_u8; width];
-        for shard in &data {
-            for (out, byte) in parity.iter_mut().zip(shard) {
-                *out ^= byte;
-            }
-        }
-        data.push(parity);
-        let shards = data
-            .into_iter()
-            .enumerate()
-            .map(|(index, bytes)| {
-                let index = u16::try_from(index).unwrap_or(u16::MAX);
-                ArtifactShard {
-                    index,
-                    digest: shard_digest(&artifact.artifact_id, index, &bytes),
-                    bytes,
-                }
-            })
-            .collect();
-        Ok(Self {
-            artifact_id: artifact.artifact_id,
-            profile,
-            shards,
-        })
-    }
-
-    pub fn reconstruct(
-        &self,
-        artifact: &Artifact,
-        offered: &[ArtifactShard],
-    ) -> Result<Vec<u8>, SpeciesError> {
-        self.profile.validate()?;
-        if artifact.artifact_id != self.artifact_id {
-            return Err(SpeciesError::ArtifactDigestMismatch);
-        }
-        let total = self
-            .profile
-            .data_shards
-            .checked_add(self.profile.parity_shards)
-            .ok_or(SpeciesError::ArtifactTooLarge)?;
-        let width = usize::try_from(self.profile.shard_length)
-            .map_err(|_| SpeciesError::ArtifactTooLarge)?;
-        let mut seen = BTreeSet::new();
-        let mut slots = vec![None; usize::from(total)];
-        for shard in offered {
-            if shard.index >= total || !seen.insert(shard.index) || shard.bytes.len() != width {
-                return Err(SpeciesError::InvalidShard);
-            }
-            let expected_digest = self
-                .shards
-                .iter()
-                .find(|expected| expected.index == shard.index)
-                .map(|expected| expected.digest)
-                .ok_or(SpeciesError::InvalidShard)?;
-            if shard_digest(&self.artifact_id, shard.index, &shard.bytes) != shard.digest
-                || shard.digest != expected_digest
-            {
-                return Err(SpeciesError::PoisonedShard);
-            }
-            slots[usize::from(shard.index)] = Some(shard.bytes.clone());
-        }
-        let missing = slots.iter().filter(|value| value.is_none()).count();
-        if missing > usize::from(self.profile.declared_loss_bound()) {
-            return Err(SpeciesError::LossBoundExceeded);
-        }
-        let parity_index = usize::from(self.profile.data_shards);
-        let missing_data = (0..parity_index)
-            .filter(|index| slots[*index].is_none())
-            .collect::<Vec<_>>();
-        if let Some(missing_index) = missing_data.first().copied() {
-            let mut recovered = slots
-                .get(parity_index)
-                .and_then(Clone::clone)
-                .ok_or(SpeciesError::LossBoundExceeded)?;
-            for (index, shard) in slots.iter().enumerate().take(parity_index) {
-                if index != missing_index {
-                    let shard = shard.as_ref().ok_or(SpeciesError::LossBoundExceeded)?;
-                    for (out, byte) in recovered.iter_mut().zip(shard) {
-                        *out ^= byte;
-                    }
-                }
-            }
-            slots[missing_index] = Some(recovered);
-        }
-        let mut payload = Vec::new();
-        for shard in slots.iter().take(parity_index) {
-            payload.extend_from_slice(shard.as_ref().ok_or(SpeciesError::LossBoundExceeded)?);
-        }
-        let original_length = usize::try_from(self.profile.original_length)
-            .map_err(|_| SpeciesError::ArtifactTooLarge)?;
-        payload.truncate(original_length);
-        artifact.verify_payload(&payload)?;
-        Ok(payload)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ServingTraffic {
-    InteractiveToken,
-    Batch,
-    Replica,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ShardLocation {
-    pub index: u16,
-    pub site: Hash32,
-    pub region: Hash32,
-}
-
-pub fn topology_local_indices(
-    profile: ErasureProfile,
-    locations: &[ShardLocation],
-    request_site: Hash32,
-    request_region: Hash32,
-    traffic: ServingTraffic,
-) -> Result<Vec<u16>, SpeciesError> {
-    profile.validate()?;
-    let total = profile
-        .data_shards
-        .checked_add(profile.parity_shards)
-        .ok_or(SpeciesError::ArtifactTooLarge)?;
-    let mut locations = locations.to_vec();
-    locations.sort_by_key(|location| {
-        let locality = if location.site == request_site {
-            0
-        } else if location.region == request_region {
-            1
-        } else {
-            2
-        };
-        (locality, location.index, location.site)
-    });
-    let mut seen = BTreeSet::new();
-    let mut selected = Vec::new();
-    for location in locations {
-        if location.index >= total || !seen.insert(location.index) {
-            continue;
-        }
-        if traffic == ServingTraffic::InteractiveToken && location.site != request_site {
-            continue;
-        }
-        selected.push(location.index);
-        if selected.len() == usize::from(profile.data_shards) {
-            return Ok(selected);
-        }
-    }
-    if traffic == ServingTraffic::InteractiveToken {
-        Err(SpeciesError::WanPerTokenForbidden)
-    } else {
-        Err(SpeciesError::LossBoundExceeded)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used)]
     use super::*;
 
     fn h(value: u8) -> Hash32 {
         [value; 32]
     }
 
-    fn artifact(payload: &[u8]) -> Artifact {
-        let mut artifact = Artifact {
-            artifact_id: [0; 32],
-            kind: ArtifactKind::Adapter,
-            media_type: "application/noos-adapter".into(),
-            byte_length: u64::try_from(payload.len()).unwrap(),
-            chunking_profile: h(1),
-            availability_root: h(2),
-            encoding: h(3),
-            numeric_profile: Some(h(4)),
-            encryption_profile: None,
-            rights_root: h(5),
-            creator: h(6),
-            created_at: 7,
+    fn descriptor() -> (ArtifactDescriptorV2, Keypair, Keypair) {
+        let first = Keypair::from_seed([1; 32]);
+        let second = Keypair::from_seed([2; 32]);
+        let mut keys = vec![
+            first.public_key().into_bytes(),
+            second.public_key().into_bytes(),
+        ];
+        keys.sort();
+        let mut value = ArtifactDescriptorV2 {
+            version: ARTIFACT_DESCRIPTOR_VERSION,
+            kind: ArtifactKind::WeightShard,
+            media_type: "application/vnd.gguf".into(),
+            byte_length: BONSAI_SOURCE_BYTES,
+            payload_root: h(1),
+            source_sha256: h(2),
+            manifest_id: h(3),
+            erasure_profile_id: h(4),
+            stripe_count: BONSAI_STRIPE_COUNT as u32,
+            license_root: h(5),
+            rights_root: h(6),
+            provenance_root: h(7),
+            publisher_keys: keys,
+            publisher_threshold: 2,
+            published_height: 9,
             annotations_root: h(8),
+            descriptor_id: [0; 32],
+            signatures: Vec::new(),
         };
-        artifact.artifact_id = artifact.derived_id(payload);
-        artifact
+        value.finalize_id().unwrap();
+        (value, first, second)
     }
 
     #[test]
-    fn claim_artifact_reconstructs_at_declared_loss_and_rejects_poison() {
-        let payload = b"deterministic adapter payload with uneven shard boundary";
-        let artifact = artifact(payload);
-        let encoded = EncodedArtifact::encode(&artifact, payload, 4).unwrap();
-        assert_eq!(encoded.profile.declared_loss_bound(), 1);
-        for missing in 0..encoded.shards.len() {
-            let offered = encoded
-                .shards
-                .iter()
-                .enumerate()
-                .filter(|(index, _)| *index != missing)
-                .map(|(_, shard)| shard.clone())
-                .collect::<Vec<_>>();
-            assert_eq!(encoded.reconstruct(&artifact, &offered).unwrap(), payload);
-        }
-        let mut poisoned = encoded.shards.clone();
-        poisoned[0].bytes[0] ^= 1;
-        poisoned[0].digest = shard_digest(&artifact.artifact_id, 0, &poisoned[0].bytes);
+    fn descriptor_id_and_threshold_signatures_cover_whole_input() {
+        let (mut value, first, second) = descriptor();
+        value.add_signature(&first).unwrap();
+        value.add_signature(&second).unwrap();
+        value.validate().unwrap();
+        let mut changed = value.clone();
+        changed.rights_root[0] ^= 1;
         assert_eq!(
-            encoded.reconstruct(&artifact, &poisoned),
-            Err(SpeciesError::PoisonedShard)
-        );
-        let mut spliced = artifact.clone();
-        spliced.media_type = "application/different-schema".into();
-        assert_eq!(
-            encoded.reconstruct(&spliced, &encoded.shards),
+            changed.validate(),
             Err(SpeciesError::ArtifactDigestMismatch)
         );
-    }
-
-    #[test]
-    fn claim_artifact_locality_escape_is_fail_closed() {
-        let profile = ErasureProfile {
-            data_shards: 2,
-            parity_shards: 1,
-            shard_length: 8,
-            original_length: 16,
-        };
-        let local_site = h(1);
-        let local_region = h(2);
-        let locations = vec![
-            ShardLocation {
-                index: 0,
-                site: local_site,
-                region: local_region,
-            },
-            ShardLocation {
-                index: 1,
-                site: h(3),
-                region: local_region,
-            },
-            ShardLocation {
-                index: 2,
-                site: h(4),
-                region: h(5),
-            },
-        ];
+        let mut forged = value;
+        forged.signatures[0].signature[0] ^= 1;
         assert_eq!(
-            topology_local_indices(
-                profile,
-                &locations,
-                local_site,
-                local_region,
-                ServingTraffic::InteractiveToken,
-            ),
-            Err(SpeciesError::WanPerTokenForbidden)
-        );
-        assert_eq!(
-            topology_local_indices(
-                profile,
-                &locations,
-                local_site,
-                local_region,
-                ServingTraffic::Batch,
-            )
-            .unwrap(),
-            vec![0, 1]
+            forged.validate(),
+            Err(SpeciesError::InvalidArtifactSignature)
         );
     }
 
     #[test]
-    fn claim_artifact_derivation_tamper_and_splice_reject() {
-        let mut edge = DerivationEdge {
-            edge_id: [0; 32],
-            parents: vec![h(1), h(2)],
-            output: h(3),
-            transform: h(4),
-            recipe: h(5),
-            provenance_root: h(6),
-            created_at: 7,
+    fn manifest_is_identity_only_and_rejects_duplicates() {
+        let mut value = ArtifactManifestV2 {
+            version: ARTIFACT_MANIFEST_VERSION,
+            erasure_profile_id: h(1),
+            source_byte_length: BONSAI_SOURCE_BYTES,
+            source_sha256: h(2),
+            payload_root: h(3),
+            stripe_ids: (0..BONSAI_STRIPE_COUNT)
+                .map(|index| domain_hash("stripe", &[&index.to_be_bytes()]))
+                .collect(),
+            position_roots: (0..POSITION_COUNT)
+                .map(|index| domain_hash("position", &[&index.to_be_bytes()]))
+                .collect(),
+            final_actual_source_bytes: FINAL_SOURCE_BYTES,
+            final_zero_padding_bytes: FINAL_PADDING_BYTES,
+            manifest_id: [0; 32],
         };
-        edge.edge_id = edge.derived_id();
-        assert_eq!(edge.validate(), Ok(()));
-        edge.parents.swap(0, 1);
-        assert_eq!(edge.validate(), Err(SpeciesError::InvalidDerivation));
-        edge.parents.sort();
-        edge.provenance_root = h(9);
-        assert_eq!(edge.validate(), Err(SpeciesError::ArtifactDigestMismatch));
+        value.finalize_id().unwrap();
+        value.validate().unwrap();
+        assert!(value.canonical_body().unwrap().len() < 65_536);
+        let mut duplicate = value;
+        duplicate.stripe_ids[1] = duplicate.stripe_ids[0];
+        assert_eq!(
+            duplicate.validate(),
+            Err(SpeciesError::InvalidArtifactSchema)
+        );
+    }
+
+    #[test]
+    fn share_stripe_and_weight_ids_form_forward_only_dag() {
+        let mut share = ArtifactShareV2 {
+            version: ARTIFACT_SHARE_VERSION,
+            erasure_profile_id: h(1),
+            stripe_index: 0,
+            position_index: 0,
+            encoded_byte_length: SHARE_BYTES,
+            full_share_digest: h(2),
+            probe_root: h(3),
+            probe_leaf_count: PROBE_LEAF_COUNT,
+            probe_leaf_bytes: PROBE_LEAF_BYTES,
+            share_id: [0; 32],
+        };
+        share.finalize_id().unwrap();
+        share.validate().unwrap();
+
+        let ordered_share_ids = (0_u8..POSITION_COUNT as u8)
+            .map(|position| domain_hash("test-share", &[&[position]]))
+            .collect::<Vec<_>>();
+        let mut stripe = ArtifactStripeV2 {
+            version: ARTIFACT_STRIPE_VERSION,
+            erasure_profile_id: h(1),
+            stripe_index: 0,
+            source_offset: 0,
+            padded_source_bytes: PADDED_STRIPE_BYTES,
+            actual_source_bytes: PADDED_STRIPE_BYTES,
+            zero_padding_bytes: 0,
+            padded_content_root: h(4),
+            blob_descriptor_id: h(5),
+            ordered_share_ids,
+            stripe_id: [0; 32],
+        };
+        stripe.finalize_id().unwrap();
+        stripe.validate().unwrap();
+        let stripe_id = stripe.stripe_id;
+        stripe.ordered_share_ids[0] = share.share_id;
+        assert_ne!(stripe.derived_id().unwrap(), stripe_id);
+
+        let mut weight = WeightManifestV2 {
+            version: WEIGHT_MANIFEST_VERSION,
+            artifact_id: h(10),
+            gguf_version: 3,
+            architecture: "qwen35".into(),
+            file_type: 40,
+            alignment: 32,
+            metadata_count: 37,
+            tensor_count: 851,
+            q1_tensor_count: 498,
+            f32_tensor_count: 353,
+            data_offset: 10_992_704,
+            metadata_root: h(11),
+            tensor_table_root: h(12),
+            tensor_bounds_root: h(13),
+            dtype_root: h(14),
+            quantization_root: h(15),
+            tokenizer_root: h(16),
+            special_token_root: h(17),
+            chat_template_root: h(18),
+            runtime_compatibility_root: h(19),
+            weight_manifest_id: [0; 32],
+        };
+        weight.finalize_id().unwrap();
+        weight.validate().unwrap();
+        let weight_id = weight.weight_manifest_id;
+        weight.runtime_compatibility_root[0] ^= 1;
+        assert_ne!(weight.derived_id().unwrap(), weight_id);
+        assert_eq!(weight.validate(), Err(SpeciesError::InvalidWeightManifest));
+    }
+
+    #[test]
+    fn inspection_signature_is_bound_to_every_observation() {
+        let key = Keypair::from_seed([4; 32]);
+        let mut receipt = WeightInspectionReceiptV2 {
+            version: WEIGHT_INSPECTION_VERSION,
+            artifact_id: h(1),
+            weight_manifest_id: h(2),
+            runtime_build_id: h(3),
+            observed_byte_length: BONSAI_SOURCE_BYTES,
+            observed_sha256: h(4),
+            observed_metadata_root: h(5),
+            observed_tensor_table_root: h(6),
+            inspector_public_key: key.public_key().into_bytes(),
+            inspected_at_unix_seconds: 7,
+            receipt_id: [0; 32],
+            signature: [0; 64],
+        };
+        receipt.sign(&key).unwrap();
+        receipt.validate().unwrap();
+        receipt.observed_metadata_root[0] ^= 1;
+        assert_eq!(
+            receipt.validate(),
+            Err(SpeciesError::InvalidInspectionReceipt)
+        );
     }
 }

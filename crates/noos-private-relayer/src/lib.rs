@@ -88,11 +88,7 @@ impl RelayIntent {
             .map_err(|_| RelayError::InvalidSignature)
     }
 
-    pub fn validate_policy(
-        &self,
-        policy: &RelayPolicy,
-        now_unix: u64,
-    ) -> Result<(), RelayError> {
+    pub fn validate_policy(&self, policy: &RelayPolicy, now_unix: u64) -> Result<(), RelayError> {
         validate_intent(policy, now_unix, self)
     }
 }

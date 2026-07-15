@@ -63,13 +63,30 @@ def run_claim(
     registry_path: Path,
     experiments_path: Path,
     revision: str,
+    disposition: str,
 ) -> tuple[dict[str, Any], int]:
     claim_id = claim["claim_id"]
+    if disposition == "DISABLED_NOT_CLAIMED":
+        return (
+            {
+                "claim": claim_id,
+                "verdict": "DISABLED_NOT_CLAIMED",
+                "applicability_profile": evidence.BONSAI_PROFILE,
+                "disposition": disposition,
+                "controls_enabled": False,
+                "promotion_effect": "NONE",
+            },
+            0,
+        )
+    if disposition != "MANDATORY":
+        raise evidence.EvidenceError(f"{claim_id}: invalid applicability disposition")
     bundle_dir = evidence_root / claim_id.lower()
     if not (bundle_dir / "bundle.json").is_file() or not (bundle_dir / "result.json").is_file():
         return (
             {
                 "claim": claim_id,
+                "applicability_profile": evidence.BONSAI_PROFILE,
+                "disposition": disposition,
                 "verdict": "BLOCKED",
                 "reason": "sealed_evidence_bundle_missing",
                 "pass_threshold_sha256": evidence.threshold_digest(claim),
@@ -92,6 +109,8 @@ def run_claim(
         return (
             {
                 "claim": claim_id,
+                "applicability_profile": evidence.BONSAI_PROFILE,
+                "disposition": disposition,
                 "verdict": "INVALID_EVIDENCE",
                 "error": str(error),
                 "rollback": claim["rollback"],
@@ -105,6 +124,8 @@ def run_claim(
         return (
             {
                 "claim": claim_id,
+                "applicability_profile": evidence.BONSAI_PROFILE,
+                "disposition": disposition,
                 "verdict": "INVALID_EVIDENCE",
                 "error": "bundle_claim_identity_mismatch",
                 "controls_enabled": False,
@@ -123,6 +144,8 @@ def run_claim(
         "rollback": claim["rollback"],
         "controls_enabled": False,
         "promotion_effect": "NONE_REQUIRES_SEPARATE_SIGNED_DECISION",
+        "applicability_profile": evidence.BONSAI_PROFILE,
+        "disposition": disposition,
     }
     if result["verdict"] == "PASS":
         return payload, 0
@@ -137,12 +160,14 @@ def main() -> int:
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY)
     parser.add_argument("--experiments", type=Path, default=DEFAULT_EXPERIMENTS)
+    parser.add_argument("--applicability", default=evidence.BONSAI_PROFILE)
     parser.add_argument("--evidence-root", type=Path, default=EVIDENCE_ROOT)
     parser.add_argument("--validate-only", action="store_true")
     args = parser.parse_args()
 
     try:
         registry, experiments = load_registry(args.registry, args.experiments)
+        profile = evidence.applicability_profile(registry, args.applicability)
     except (OSError, ValueError, json.JSONDecodeError, evidence.EvidenceError) as error:
         emit({"verdict": "INVALID_REGISTRY", "error": str(error)})
         return 1
@@ -156,6 +181,8 @@ def main() -> int:
                 "controls_enabled": registry["controls_enabled"],
                 "registry_sha256": hashlib.sha256(canonical_json(registry)).hexdigest(),
                 "experiments_sha256": hashlib.sha256(canonical_json(experiments)).hexdigest(),
+                "applicability_profile": profile["profile_id"],
+                "claim_dispositions": profile["claim_dispositions"],
             }
         )
         return 0
@@ -186,6 +213,7 @@ def main() -> int:
             args.registry,
             args.experiments,
             revision,
+            profile["claim_dispositions"][claim["claim_id"]],
         )
         results.append(result)
         codes.append(code)

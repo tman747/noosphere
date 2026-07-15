@@ -36,6 +36,14 @@ use crate::objects::{
     ResourceVector, StableAssetV1, StableSafetyV1, TransactionV1, TransactionWitnessesV1,
 };
 use crate::smt::Smt;
+use crate::wwm::{
+    genesis_fund_ledger, wwm_fixed_key, wwm_profile_key, CapabilityMutationV1, CapabilitySetV1,
+    CapabilityStatus, CustodianCapabilityMutationV2, CustodianCapabilitySetV1, FundBucketTag,
+    FundLedgerStatus, FundMutationLockRefV1, FundMutationLockStatus, FundMutationLockV1,
+    FundProfileV1, ModelCapsuleV2, RegisterFundProfilePayloadV1, RegistryEpochVectorV1,
+    ResolutionProofV1, TestnetModelRegistrationV1, TransitionWwmControlPayloadV1, WwmControlMode,
+    WwmControlStateV1, WwmFundLedgerV1, WwmJobV1, WwmLeafKind, WwmReceiptV1,
+};
 use crate::Hash32;
 
 /// NOOS asset id: the zero hash (frozen, lumen-v1.md §3.2).
@@ -380,6 +388,8 @@ pub enum GenesisError {
     DuplicateAccount,
     DuplicateBalance,
     InvalidIssuance,
+    InvalidWwmAnchor,
+    WwmAnchorAlreadyInstalled,
     Overflow,
 }
 
@@ -459,6 +469,232 @@ impl LumenLedger {
             receipts_root: self.receipts.root(),
             params_root: self.params.root(),
         }
+    }
+    /// Return the exact objects-SMT value and its finalized-root proof envelope.
+    #[must_use]
+    pub fn finalized_object_proof(&self, state_key: Hash32) -> ResolutionProofV1 {
+        let value = match self.objects.get(&state_key) {
+            None => crate::wwm::ResolutionValueV1::Absent,
+            Some(bytes) => crate::objects::BoundedBytes::new(bytes.to_vec()).map_or(
+                crate::wwm::ResolutionValueV1::Absent,
+                crate::wwm::ResolutionValueV1::Present,
+            ),
+        };
+        ResolutionProofV1 {
+            state_key,
+            value,
+            proof: self.objects.prove(&state_key),
+            objects_root: self.objects.root(),
+        }
+    }
+
+    /// Genesis-only WWM bootstrap hook. It installs one immutable signed fund
+    /// profile, a Current zero-money ledger retaining all five policy rows,
+    /// the registry anchor at epoch zero, and a Disabled control singleton.
+    /// Validation completes before any write.
+    pub fn install_wwm_genesis_anchor(
+        &mut self,
+        profile: &FundProfileV1,
+        control: &WwmControlStateV1,
+    ) -> Result<(), GenesisError> {
+        if !profile.validate()
+            || control.mode != WwmControlMode::Disabled
+            || control.active_config_id.0.is_some()
+            || control.latest_authorized_config_id.0.is_some()
+            || control.resolution_config_id.0.is_some()
+            || !control.separation_valid()
+        {
+            return Err(GenesisError::InvalidWwmAnchor);
+        }
+        let ledger = genesis_fund_ledger(profile).ok_or(GenesisError::InvalidWwmAnchor)?;
+        let profile_key = wwm_profile_key(WwmLeafKind::FundProfile, &profile.profile_id);
+        let ledger_key = wwm_profile_key(WwmLeafKind::FundLedger, &profile.profile_id);
+        let registry_key = wwm_fixed_key(WwmLeafKind::RegistryEpochVector);
+        let control_key = wwm_fixed_key(WwmLeafKind::Control);
+        if [profile_key, ledger_key, registry_key, control_key]
+            .iter()
+            .any(|key| self.objects.contains(key))
+        {
+            return Err(GenesisError::WwmAnchorAlreadyInstalled);
+        }
+        let mut registry = RegistryEpochVectorV1 {
+            vector_id: [0; 32],
+            executor_set_id: [0; 32],
+            executor_epoch: 0,
+            custodian_set_id: [0; 32],
+            custodian_epoch: 0,
+            fee_policy_id: [0; 32],
+            fee_epoch: 0,
+            fund_profile_id: profile.profile_id,
+            fund_epoch: 0,
+            service_directory_id: [0; 32],
+            service_epoch: 0,
+        };
+        registry.vector_id = crate::domain_hash(
+            "NOOS/WWM/REGISTRY-EPOCH-VECTOR/V1",
+            &[&registry.encode_canonical()],
+        );
+        self.objects.insert(profile_key, profile.encode_canonical());
+        self.objects.insert(ledger_key, ledger.encode_canonical());
+        self.objects
+            .insert(registry_key, registry.encode_canonical());
+        self.objects.insert(control_key, control.encode_canonical());
+        Ok(())
+    }
+
+    /// Replaces the disabled WWM genesis anchor with one complete Testnet
+    /// registration. The caller must explicitly attest that the enclosing
+    /// genesis is a test network; all graph validation and collision checks
+    /// complete before the first write.
+    pub fn install_wwm_testnet_registration(
+        &mut self,
+        registration: &TestnetModelRegistrationV1,
+        is_test_network: bool,
+    ) -> Result<(), GenesisError> {
+        if !is_test_network {
+            return Err(GenesisError::InvalidWwmAnchor);
+        }
+        let control_key = wwm_fixed_key(WwmLeafKind::Control);
+        let registry_key = wwm_fixed_key(WwmLeafKind::RegistryEpochVector);
+        let current_control = self
+            .objects
+            .get(&control_key)
+            .and_then(|bytes| WwmControlStateV1::decode_canonical(bytes).ok())
+            .ok_or(GenesisError::InvalidWwmAnchor)?;
+        let current_registry = self
+            .objects
+            .get(&registry_key)
+            .and_then(|bytes| RegistryEpochVectorV1::decode_canonical(bytes).ok())
+            .ok_or(GenesisError::InvalidWwmAnchor)?;
+        if current_control.mode != WwmControlMode::Disabled
+            || current_control.active_config_id.0.is_some()
+            || current_control.latest_authorized_config_id.0.is_some()
+            || current_control.resolution_config_id.0.is_some()
+            || current_registry.executor_set_id != [0; 32]
+            || current_registry.custodian_set_id != [0; 32]
+            || current_registry.fee_policy_id != [0; 32]
+            || current_registry.service_directory_id != [0; 32]
+        {
+            return Err(GenesisError::InvalidWwmAnchor);
+        }
+        let fund_profile = self
+            .objects
+            .get(&wwm_profile_key(
+                WwmLeafKind::FundProfile,
+                &current_registry.fund_profile_id,
+            ))
+            .and_then(|bytes| FundProfileV1::decode_canonical(bytes).ok())
+            .ok_or(GenesisError::InvalidWwmAnchor)?;
+        let fund_ledger = self
+            .objects
+            .get(&wwm_profile_key(
+                WwmLeafKind::FundLedger,
+                &current_registry.fund_profile_id,
+            ))
+            .and_then(|bytes| WwmFundLedgerV1::decode_canonical(bytes).ok())
+            .ok_or(GenesisError::InvalidWwmAnchor)?;
+        if !registration.validate(&fund_profile, &fund_ledger) {
+            return Err(GenesisError::InvalidWwmAnchor);
+        }
+
+        let mut writes = BTreeMap::<Hash32, Vec<u8>>::new();
+        let mut add = |key: Hash32, value: Vec<u8>| -> Result<(), GenesisError> {
+            if writes.insert(key, value).is_some() {
+                return Err(GenesisError::InvalidWwmAnchor);
+            }
+            Ok(())
+        };
+        add(
+            wwm_fixed_key(WwmLeafKind::ServingAlias),
+            registration.alias.encode_canonical(),
+        )?;
+        add(control_key, registration.control.encode_canonical())?;
+        add(
+            wwm_profile_key(
+                WwmLeafKind::AuthorizedConfig,
+                &registration.config.config_id,
+            ),
+            registration.config.encode_canonical(),
+        )?;
+        add(
+            wwm_profile_key(WwmLeafKind::Capsule, &registration.capsule.capsule_id),
+            registration.capsule.encode_canonical(),
+        )?;
+        add(
+            wwm_profile_key(WwmLeafKind::Artifact, &registration.artifact.artifact_id),
+            registration.artifact.encode_canonical(),
+        )?;
+        add(
+            wwm_profile_key(
+                WwmLeafKind::AvailabilityPolicy,
+                &registration.availability_policy.policy_id,
+            ),
+            registration.availability_policy.encode_canonical(),
+        )?;
+        add(
+            wwm_fixed_key(WwmLeafKind::CurrentCertificatePointer),
+            registration
+                .availability_certificate
+                .certificate_id
+                .to_vec(),
+        )?;
+        add(
+            wwm_profile_key(
+                WwmLeafKind::Certificate,
+                &registration.availability_certificate.certificate_id,
+            ),
+            registration.availability_certificate.encode_canonical(),
+        )?;
+        add(registry_key, registration.registry.encode_canonical())?;
+        add(
+            wwm_profile_key(
+                WwmLeafKind::ExecutorCapabilitySet,
+                &registration.executor_set.set_id,
+            ),
+            registration.executor_set.encode_canonical(),
+        )?;
+        add(
+            wwm_profile_key(
+                WwmLeafKind::CustodianCapabilitySet,
+                &registration.custodian_set.set_id,
+            ),
+            registration.custodian_set.encode_canonical(),
+        )?;
+        add(
+            wwm_profile_key(
+                WwmLeafKind::ExecutionProfile,
+                &registration.execution_profile.profile_id,
+            ),
+            registration.execution_profile.encode_canonical(),
+        )?;
+        add(
+            wwm_profile_key(
+                WwmLeafKind::QueryPolicy,
+                &registration.query_policy.policy_id,
+            ),
+            registration.query_policy.encode_canonical(),
+        )?;
+        add(
+            wwm_profile_key(WwmLeafKind::FeePolicy, &registration.fee_policy.policy_id),
+            registration.fee_policy.encode_canonical(),
+        )?;
+        add(
+            wwm_profile_key(
+                WwmLeafKind::ServiceDirectory,
+                &registration.service_directory.directory_id,
+            ),
+            registration.service_directory.encode_canonical(),
+        )?;
+
+        if writes.iter().any(|(key, _)| {
+            *key != control_key && *key != registry_key && self.objects.contains(key)
+        }) {
+            return Err(GenesisError::WwmAnchorAlreadyInstalled);
+        }
+        for (key, value) in writes {
+            self.objects.insert(key, value);
+        }
+        Ok(())
     }
 
     #[must_use]
@@ -634,6 +870,34 @@ impl LumenLedger {
     #[cfg(test)]
     pub(crate) fn remove_stable_safety_for_test(&mut self, market: &Hash32) {
         self.objects.remove(&derive_stable_safety_id(market));
+    }
+
+    #[cfg(test)]
+    pub(crate) fn install_wwm_flow_fixture_for_test(
+        &mut self,
+        control: &WwmControlStateV1,
+        capsule: &ModelCapsuleV2,
+        execution_profile_id: Hash32,
+        query_policy_id: Hash32,
+        certificate_id: Hash32,
+        fund_profile_id: Hash32,
+    ) {
+        self.objects.insert(
+            wwm_fixed_key(WwmLeafKind::Control),
+            control.encode_canonical(),
+        );
+        self.objects.insert(
+            wwm_profile_key(WwmLeafKind::Capsule, &capsule.capsule_id),
+            capsule.encode_canonical(),
+        );
+        for (kind, id) in [
+            (WwmLeafKind::ExecutionProfile, execution_profile_id),
+            (WwmLeafKind::QueryPolicy, query_policy_id),
+            (WwmLeafKind::Certificate, certificate_id),
+            (WwmLeafKind::FundProfile, fund_profile_id),
+        ] {
+            self.objects.insert(wwm_profile_key(kind, &id), vec![1]);
+        }
     }
 
     #[must_use]
@@ -1591,6 +1855,33 @@ impl LumenLedger {
                     if !signed(requester) =>
                 {
                     return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::TransitionWwmControl(
+                    TransitionWwmControlPayloadV1::EmergencyDisable(_),
+                ) if !emergency_ok() => return Err(RejectReason::GovernanceDenied),
+                ActionV1::RegisterArtifactDescriptor(_)
+                | ActionV1::RegisterCustodianProfile(_)
+                | ActionV1::RegisterAvailabilityPolicy(_)
+                | ActionV1::CommitCustodyPositions(_)
+                | ActionV1::RecordCustodyChallenge(_)
+                | ActionV1::RecordCustodyProbe(_)
+                | ActionV1::IssueAvailabilityCertificate(_)
+                | ActionV1::RecordArtifactRepair(_)
+                | ActionV1::RegisterModelCapsuleV2(_)
+                | ActionV1::RegisterExecutionProfile(_)
+                | ActionV1::RegisterExecutorProfile(_)
+                | ActionV1::RegisterFeePolicy(_)
+                | ActionV1::RegisterFundProfile(_)
+                | ActionV1::RegisterQueryPolicy(_)
+                | ActionV1::RegisterServiceDirectory(_)
+                | ActionV1::OpenWwmJob(_)
+                | ActionV1::RecordWwmReceipt(_)
+                | ActionV1::SettleWwmJob(_)
+                | ActionV1::TransitionServingAlias(_)
+                | ActionV1::TransitionWwmControl(_)
+                    if !gov_ok() =>
+                {
+                    return Err(RejectReason::GovernanceDenied);
                 }
                 _ => {}
             }
@@ -3502,6 +3793,393 @@ impl LumenLedger {
                     ov.write_count()?;
                     ov.write_count()?;
                 }
+                ActionV1::RegisterArtifactDescriptor(v) => {
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::Artifact, &v.artifact_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::RegisterCustodianProfile(v) => {
+                    apply_custodian_mutation(&mut ov, self, v)?;
+                }
+                ActionV1::RegisterAvailabilityPolicy(v) => {
+                    require_wwm(&ov, self, WwmLeafKind::Artifact, &v.artifact_id)?;
+                    if v.position_count != 12
+                        || v.reconstruction_threshold != 8
+                        || v.schedulable_minimum != 9
+                        || v.samples_per_challenge == 0
+                        || v.verifier_sample_size != 8
+                        || v.verifier_threshold != 5
+                        || v.reconstructor_sample_size != 5
+                        || v.reconstructor_threshold != 3
+                        || v.policy_start_height >= v.policy_end_height
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::AvailabilityPolicy, &v.policy_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::CommitCustodyPositions(v) => {
+                    require_wwm(&ov, self, WwmLeafKind::Artifact, &v.artifact_id)?;
+                    require_wwm(&ov, self, WwmLeafKind::AvailabilityPolicy, &v.policy_id)?;
+                    let registry = current_registry(&ov, self)?;
+                    if v.position >= 12
+                        || v.custodian_set_id != registry.custodian_set_id
+                        || v.custodian_set_epoch != registry.custodian_epoch
+                        || v.valid_from >= v.valid_until
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::CustodyCommitment, &v.commitment_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::RecordCustodyChallenge(v) => {
+                    require_wwm(&ov, self, WwmLeafKind::CustodyCommitment, &v.commitment_id)?;
+                    require_wwm(&ov, self, WwmLeafKind::AvailabilityPolicy, &v.policy_id)?;
+                    if v.probe_indices.is_empty()
+                        || v.issued_height >= v.response_deadline_height
+                        || v.finalized_beacon_height > v.issued_height
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::CustodyChallenge, &v.challenge_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::RecordCustodyProbe(v) => {
+                    require_wwm(&ov, self, WwmLeafKind::CustodyChallenge, &v.challenge_id)?;
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::CustodyProbe, &v.probe_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::IssueAvailabilityCertificate(v) => {
+                    require_wwm(&ov, self, WwmLeafKind::AvailabilityPolicy, &v.policy_id)?;
+                    if v.availability_state > 2 {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    if v.selected_verifiers.len() != 8
+                        || v.signer_ids.len() != 5
+                        || !strict_hashes(v.selected_verifiers.as_slice())
+                        || !strict_hashes(v.signer_ids.as_slice())
+                        || v.valid_until <= v.issued_height
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::Certificate, &v.certificate_id),
+                        v.encode_canonical(),
+                    )?;
+                    ov.objects.insert(
+                        wwm_fixed_key(WwmLeafKind::CurrentCertificatePointer),
+                        Some(v.certificate_id.to_vec()),
+                    );
+                    ov.write_count()?;
+                }
+                ActionV1::RecordArtifactRepair(v) => match v {
+                    crate::wwm::ArtifactRepairPayloadV1::Order(order) => {
+                        require_wwm(&ov, self, WwmLeafKind::AvailabilityPolicy, &order.policy_id)?;
+                        if order.position >= 12
+                            || order.issued_height >= order.deadline_height
+                            || order.source_commitment_ids.len() != 8
+                            || order.source_positions.len() != 8
+                            || !strict_hashes(order.source_commitment_ids.as_slice())
+                            || !order
+                                .source_positions
+                                .as_slice()
+                                .windows(2)
+                                .all(|w| w[0] < w[1])
+                            || order.expected_position_root == [0; 32]
+                        {
+                            return Err(FailCode::PostconditionFailed);
+                        }
+                        wwm_insert_unique(
+                            &mut ov,
+                            self,
+                            wwm_profile_key(WwmLeafKind::ArtifactRepair, &order.order_id),
+                            order.encode_canonical(),
+                        )?;
+                    }
+                    crate::wwm::ArtifactRepairPayloadV1::Receipt(receipt) => {
+                        require_wwm(&ov, self, WwmLeafKind::ArtifactRepair, &receipt.order_id)?;
+                        require_wwm(
+                            &ov,
+                            self,
+                            WwmLeafKind::CustodyCommitment,
+                            &receipt.prior_commitment_id,
+                        )?;
+                        require_wwm(
+                            &ov,
+                            self,
+                            WwmLeafKind::CustodyCommitment,
+                            &receipt.new_commitment_id,
+                        )?;
+                        if receipt.bytes_read == 0
+                            || receipt.bytes_written == 0
+                            || receipt.evidence_root == [0; 32]
+                            || receipt.signer_id == [0; 32]
+                        {
+                            return Err(FailCode::PostconditionFailed);
+                        }
+                        require_wwm(&ov, self, WwmLeafKind::Certificate, &receipt.certificate_id)?;
+                        wwm_insert_unique(
+                            &mut ov,
+                            self,
+                            wwm_profile_key(WwmLeafKind::ArtifactRepair, &receipt.repair_id),
+                            receipt.encode_canonical(),
+                        )?;
+                    }
+                },
+                ActionV1::RegisterModelCapsuleV2(v) => {
+                    require_wwm(&ov, self, WwmLeafKind::Artifact, &v.artifact_id)?;
+                    require_wwm(
+                        &ov,
+                        self,
+                        WwmLeafKind::AvailabilityPolicy,
+                        &v.availability_policy_id,
+                    )?;
+                    if v.payload_root == [0; 32]
+                        || v.manifest_root == [0; 32]
+                        || v.runtime_root == [0; 32]
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::Capsule, &v.capsule_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::RegisterExecutionProfile(v) => {
+                    require_wwm(&ov, self, WwmLeafKind::Capsule, &v.capsule_id)?;
+                    if v.attachments_allowed != 0
+                        || v.max_output_tokens == 0
+                        || v.max_context_tokens == 0
+                        || v.max_output_tokens > v.max_context_tokens
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::ExecutionProfile, &v.profile_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::RegisterExecutorProfile(v) => {
+                    apply_capability_mutation(
+                        &mut ov,
+                        self,
+                        WwmLeafKind::ExecutorCapabilitySet,
+                        v,
+                    )?;
+                }
+                ActionV1::RegisterFeePolicy(v) => {
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::FeePolicy, &v.policy_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::RegisterFundProfile(v) => {
+                    apply_fund_profile_mutation(&mut ov, self, ctx.height, v)?;
+                }
+                ActionV1::RegisterQueryPolicy(v) => {
+                    require_wwm(&ov, self, WwmLeafKind::Capsule, &v.capsule_id)?;
+                    if v.attachments_allowed != 0
+                        || v.max_total_tokens == 0
+                        || v.max_input_tokens
+                            .checked_add(v.max_output_tokens)
+                            .is_none_or(|n| n > v.max_total_tokens)
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::QueryPolicy, &v.policy_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::RegisterServiceDirectory(v) => {
+                    if v.not_before_height >= v.not_after_height || v.endpoint_records.is_empty() {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::ServiceDirectory, &v.directory_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::OpenWwmJob(v) => {
+                    let control = current_control(&ov, self)?;
+                    if !matches!(
+                        control.mode,
+                        WwmControlMode::Testnet
+                            | WwmControlMode::Canary
+                            | WwmControlMode::Production
+                    ) || control.active_config_id != control.resolution_config_id
+                        || control.active_capsule_id.0 != Some(v.capsule_id)
+                        || control.capsule_id != v.capsule_id
+                        || control.execution_profile_id != v.execution_profile_id
+                        || control.query_policy_id != v.query_policy_id
+                        || v.chain_id != ctx.chain_id
+                        || v.offchain_envelope_root == [0; 32]
+                        || v.selected_executor_ids.is_empty()
+                        || v.max_input_tokens == 0
+                        || v.max_output_tokens == 0
+                        || v.deadline_height <= ctx.height
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    require_wwm(
+                        &ov,
+                        self,
+                        WwmLeafKind::ExecutionProfile,
+                        &v.execution_profile_id,
+                    )?;
+                    require_wwm(&ov, self, WwmLeafKind::QueryPolicy, &v.query_policy_id)?;
+                    require_wwm(
+                        &ov,
+                        self,
+                        WwmLeafKind::Certificate,
+                        &v.availability_certificate_id,
+                    )?;
+                    require_wwm(&ov, self, WwmLeafKind::FundProfile, &v.fund_profile_id)?;
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::Job, &v.job_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::RecordWwmReceipt(v) => {
+                    let job_bytes = overlay_object(
+                        &ov,
+                        self,
+                        &wwm_profile_key(WwmLeafKind::Job, &v.job_id),
+                    )
+                    .ok_or(FailCode::PostconditionFailed)?;
+                    let job = WwmJobV1::decode_canonical(&job_bytes)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let capsule_bytes = overlay_object(
+                        &ov,
+                        self,
+                        &wwm_profile_key(WwmLeafKind::Capsule, &job.capsule_id),
+                    )
+                    .ok_or(FailCode::PostconditionFailed)?;
+                    let capsule = ModelCapsuleV2::decode_canonical(&capsule_bytes)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if v.job_id != job.job_id
+                        || v.capsule_id != job.capsule_id
+                        || v.artifact_id != capsule.artifact_id
+                        || v.tokenizer_root != capsule.tokenizer_root
+                        || v.template_root != capsule.template_root
+                        || v.runtime_root != capsule.runtime_root
+                        || v.sbom_root != capsule.sbom_root
+                        || v.execution_profile_id != job.execution_profile_id
+                        || v.input_tokens > job.max_input_tokens
+                        || v.output_tokens > job.max_output_tokens
+                        || v.output_root == [0; 32]
+                        || v.token_history_root == [0; 32]
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::Receipt, &v.receipt_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::SettleWwmJob(v) => {
+                    let job_bytes = overlay_object(
+                        &ov,
+                        self,
+                        &wwm_profile_key(WwmLeafKind::Job, &v.job_id),
+                    )
+                    .ok_or(FailCode::PostconditionFailed)?;
+                    let job = WwmJobV1::decode_canonical(&job_bytes)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let receipt_bytes = overlay_object(
+                        &ov,
+                        self,
+                        &wwm_profile_key(WwmLeafKind::Receipt, &v.receipt_id),
+                    )
+                    .ok_or(FailCode::PostconditionFailed)?;
+                    let receipt = WwmReceiptV1::decode_canonical(&receipt_bytes)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let terminal_total = v
+                        .paid_amount
+                        .checked_add(v.refunded_amount)
+                        .and_then(|value| value.checked_add(v.released_amount))
+                        .ok_or(FailCode::Overflow)?;
+                    if receipt.job_id != job.job_id
+                        || v.job_id != job.job_id
+                        || v.receipt_id != receipt.receipt_id
+                        || v.fund_profile_id != job.fund_profile_id
+                        || v.bucket != FundBucketTag::Job
+                        || v.paid_amount != receipt.paid_amount
+                        || v.refunded_amount != receipt.refunded_amount
+                        || terminal_total != job.reserved_amount
+                        || v.settled_height < receipt.anchor_height
+                        || v.settled_height > ctx.height
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        wwm_profile_key(WwmLeafKind::Settlement, &v.settlement_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::TransitionServingAlias(v) => {
+                    let control = current_control(&ov, self)?;
+                    if !matches!(
+                        control.mode,
+                        WwmControlMode::Disabled | WwmControlMode::Testnet
+                    ) || control.mode != v.expected_control_state
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    require_wwm(&ov, self, WwmLeafKind::Capsule, &v.new_capsule_id)?;
+                    let key = wwm_fixed_key(WwmLeafKind::ServingAlias);
+                    let prior = overlay_object(&ov, self, &key)
+                        .map(|raw| crate::wwm::ServingAliasTransitionV1::decode_canonical(&raw))
+                        .transpose()
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if prior.as_ref().map(|p| p.transition_id) != v.prior_transition_id.0
+                        || prior.as_ref().map(|p| p.new_capsule_id) != v.prior_capsule_id.0
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    ov.objects.insert(key, Some(v.encode_canonical()));
+                    ov.write_count()?;
+                }
+                ActionV1::TransitionWwmControl(v) => {
+                    apply_control_transition(&mut ov, self, ctx.height, v)?;
+                }
             }
         }
 
@@ -3617,6 +4295,683 @@ fn failure_receipt(
 // ---------------------------------------------------------------------------
 // Overlay read-through helpers (free functions to keep borrows narrow)
 // ---------------------------------------------------------------------------
+
+fn strict_hashes(values: &[Hash32]) -> bool {
+    values.windows(2).all(|pair| pair[0] < pair[1])
+}
+
+fn wwm_insert_unique(
+    ov: &mut Overlay,
+    base: &LumenLedger,
+    key: Hash32,
+    value: Vec<u8>,
+) -> Result<(), FailCode> {
+    if overlay_object(ov, base, &key).is_some() {
+        return Err(FailCode::PostconditionFailed);
+    }
+    ov.objects.insert(key, Some(value));
+    ov.write_count()
+}
+
+fn require_wwm(
+    ov: &Overlay,
+    base: &LumenLedger,
+    kind: WwmLeafKind,
+    id: &Hash32,
+) -> Result<Vec<u8>, FailCode> {
+    overlay_object(ov, base, &wwm_profile_key(kind, id)).ok_or(FailCode::PostconditionFailed)
+}
+
+fn current_registry(ov: &Overlay, base: &LumenLedger) -> Result<RegistryEpochVectorV1, FailCode> {
+    let key = wwm_fixed_key(WwmLeafKind::RegistryEpochVector);
+    match overlay_object(ov, base, &key) {
+        Some(raw) => {
+            RegistryEpochVectorV1::decode_canonical(&raw).map_err(|_| FailCode::PostconditionFailed)
+        }
+        None => Ok(RegistryEpochVectorV1 {
+            vector_id: [0; 32],
+            executor_set_id: [0; 32],
+            executor_epoch: 0,
+            custodian_set_id: [0; 32],
+            custodian_epoch: 0,
+            fee_policy_id: [0; 32],
+            fee_epoch: 0,
+            fund_profile_id: [0; 32],
+            fund_epoch: 0,
+            service_directory_id: [0; 32],
+            service_epoch: 0,
+        }),
+    }
+}
+
+fn write_registry(ov: &mut Overlay, mut value: RegistryEpochVectorV1) -> Result<(), FailCode> {
+    value.vector_id = [0; 32];
+    value.vector_id = crate::domain_hash(
+        "NOOS/WWM/REGISTRY-EPOCH-VECTOR/V1",
+        &[&value.encode_canonical()],
+    );
+    ov.objects.insert(
+        wwm_fixed_key(WwmLeafKind::RegistryEpochVector),
+        Some(value.encode_canonical()),
+    );
+    ov.write_count()
+}
+
+fn apply_capability_mutation(
+    ov: &mut Overlay,
+    base: &LumenLedger,
+    kind: WwmLeafKind,
+    mutation: &CapabilityMutationV1,
+) -> Result<(), FailCode> {
+    let fixed_key = wwm_fixed_key(kind);
+    let current = overlay_object(ov, base, &fixed_key)
+        .map(|raw| CapabilitySetV1::decode_canonical(&raw))
+        .transpose()
+        .map_err(|_| FailCode::PostconditionFailed)?;
+    let prior_id = current.as_ref().map_or([0; 32], |set| set.set_id);
+    let prior_epoch = current.as_ref().map_or(0, |set| set.epoch);
+    let mut entries = current
+        .as_ref()
+        .map_or_else(Vec::new, |set| set.entries.as_slice().to_vec());
+    let declared_prior = match mutation {
+        CapabilityMutationV1::InstallProfile(install) => {
+            if install.profile.status != CapabilityStatus::Active
+                || entries
+                    .iter()
+                    .any(|p| p.profile_id == install.profile.profile_id)
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            entries.push(install.profile.clone());
+            install.prior_set_id
+        }
+        CapabilityMutationV1::TransitionCapability(transition) => {
+            let profile = entries
+                .iter_mut()
+                .find(|profile| profile.profile_id == transition.profile_id)
+                .ok_or(FailCode::PostconditionFailed)?;
+            let legal = matches!(
+                (transition.prior_status, transition.new_status),
+                (CapabilityStatus::Active, CapabilityStatus::Suspended)
+                    | (CapabilityStatus::Active, CapabilityStatus::Retired)
+                    | (CapabilityStatus::Suspended, CapabilityStatus::Active)
+                    | (CapabilityStatus::Suspended, CapabilityStatus::Retired)
+            );
+            if !legal || profile.status != transition.prior_status {
+                return Err(FailCode::PostconditionFailed);
+            }
+            profile.status = transition.new_status;
+            transition.prior_set_id
+        }
+    };
+    if declared_prior != prior_id {
+        return Err(FailCode::PostconditionFailed);
+    }
+    entries.sort_by_key(|profile| profile.profile_id);
+    let entries = crate::objects::BoundedList::new(entries).ok_or(FailCode::PostconditionFailed)?;
+    let epoch = prior_epoch.checked_add(1).ok_or(FailCode::Overflow)?;
+    let set_id = crate::domain_hash(
+        "NOOS/WWM/CAPABILITY-SET/V1",
+        &[&prior_id, &epoch.to_le_bytes(), &entries.encode_canonical()],
+    );
+    let set = CapabilitySetV1 {
+        set_id,
+        prior_set_id: prior_id,
+        epoch,
+        entries,
+    };
+    if !set.validate() {
+        return Err(FailCode::PostconditionFailed);
+    }
+    ov.objects.insert(fixed_key, Some(set.encode_canonical()));
+    ov.objects
+        .insert(wwm_profile_key(kind, &set_id), Some(set.encode_canonical()));
+    ov.write_count()?;
+    ov.write_count()?;
+    let mut registry = current_registry(ov, base)?;
+    match kind {
+        WwmLeafKind::ExecutorCapabilitySet => {
+            registry.executor_set_id = set_id;
+            registry.executor_epoch = epoch;
+        }
+        _ => return Err(FailCode::PostconditionFailed),
+    }
+    write_registry(ov, registry)
+}
+fn apply_custodian_mutation(
+    ov: &mut Overlay,
+    base: &LumenLedger,
+    mutation: &CustodianCapabilityMutationV2,
+) -> Result<(), FailCode> {
+    let kind = WwmLeafKind::CustodianCapabilitySet;
+    let fixed_key = wwm_fixed_key(kind);
+    let current = overlay_object(ov, base, &fixed_key)
+        .map(|raw| CustodianCapabilitySetV1::decode_canonical(&raw))
+        .transpose()
+        .map_err(|_| FailCode::PostconditionFailed)?;
+    let prior_id = current.as_ref().map_or([0; 32], |set| set.set_id);
+    let prior_epoch = current.as_ref().map_or(0, |set| set.epoch);
+    let mut entries = current
+        .as_ref()
+        .map_or_else(Vec::new, |set| set.entries.as_slice().to_vec());
+    let declared_prior = match mutation {
+        CustodianCapabilityMutationV2::InstallProfile(install) => {
+            if install.profile.status != CapabilityStatus::Active
+                || entries
+                    .iter()
+                    .any(|p| p.profile_id == install.profile.profile_id)
+                || install.profile.capacity_bytes
+                    < install
+                        .profile
+                        .staging_bytes
+                        .saturating_add(install.profile.headroom_bytes)
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            entries.push(install.profile.clone());
+            install.prior_set_id
+        }
+        CustodianCapabilityMutationV2::TransitionCapability(transition) => {
+            let profile = entries
+                .iter_mut()
+                .find(|p| p.profile_id == transition.profile_id)
+                .ok_or(FailCode::PostconditionFailed)?;
+            let legal = matches!(
+                (transition.prior_status, transition.new_status),
+                (CapabilityStatus::Active, CapabilityStatus::Suspended)
+                    | (CapabilityStatus::Active, CapabilityStatus::Retired)
+                    | (CapabilityStatus::Suspended, CapabilityStatus::Active)
+                    | (CapabilityStatus::Suspended, CapabilityStatus::Retired)
+            );
+            if !legal || profile.status != transition.prior_status {
+                return Err(FailCode::PostconditionFailed);
+            }
+            profile.status = transition.new_status;
+            transition.prior_set_id
+        }
+    };
+    if declared_prior != prior_id {
+        return Err(FailCode::PostconditionFailed);
+    }
+    entries.sort_by_key(|profile| profile.profile_id);
+    let entries = crate::objects::BoundedList::new(entries).ok_or(FailCode::PostconditionFailed)?;
+    let epoch = prior_epoch.checked_add(1).ok_or(FailCode::Overflow)?;
+    let set_id = crate::domain_hash(
+        "NOOS/WWM/CUSTODIAN-CAPABILITY-SET/V1",
+        &[&prior_id, &epoch.to_le_bytes(), &entries.encode_canonical()],
+    );
+    let set = CustodianCapabilitySetV1 {
+        set_id,
+        prior_set_id: prior_id,
+        epoch,
+        entries,
+    };
+    if !set.validate() {
+        return Err(FailCode::PostconditionFailed);
+    }
+    ov.objects.insert(fixed_key, Some(set.encode_canonical()));
+    ov.objects
+        .insert(wwm_profile_key(kind, &set_id), Some(set.encode_canonical()));
+    ov.write_count()?;
+    ov.write_count()?;
+    let mut registry = current_registry(ov, base)?;
+    registry.custodian_set_id = set_id;
+    registry.custodian_epoch = epoch;
+    write_registry(ov, registry)
+}
+
+fn ledger_root(ledger: &WwmFundLedgerV1) -> Hash32 {
+    crate::domain_hash(
+        "NOOS/WWM/FUND-LEDGER-ROOT/V1",
+        &[&ledger.encode_canonical()],
+    )
+}
+
+fn read_ledger(
+    ov: &Overlay,
+    base: &LumenLedger,
+    profile_id: &Hash32,
+) -> Result<WwmFundLedgerV1, FailCode> {
+    let raw = require_wwm(ov, base, WwmLeafKind::FundLedger, profile_id)?;
+    WwmFundLedgerV1::decode_canonical(&raw).map_err(|_| FailCode::PostconditionFailed)
+}
+
+fn write_ledger(ov: &mut Overlay, ledger: &WwmFundLedgerV1) -> Result<(), FailCode> {
+    if !ledger.validate() {
+        return Err(FailCode::PostconditionFailed);
+    }
+    ov.objects.insert(
+        wwm_profile_key(WwmLeafKind::FundLedger, &ledger.profile_id),
+        Some(ledger.encode_canonical()),
+    );
+    ov.write_count()
+}
+
+fn apply_fund_profile_mutation(
+    ov: &mut Overlay,
+    base: &LumenLedger,
+    height: u64,
+    mutation: &RegisterFundProfilePayloadV1,
+) -> Result<(), FailCode> {
+    match mutation {
+        RegisterFundProfilePayloadV1::StageFundProfile(stage) => {
+            let registry = current_registry(ov, base)?;
+            if !stage.profile.validate() || stage.prior_current_id != registry.fund_profile_id {
+                return Err(FailCode::PostconditionFailed);
+            }
+            let profile_key = wwm_profile_key(WwmLeafKind::FundProfile, &stage.profile.profile_id);
+            let ledger_key = wwm_profile_key(WwmLeafKind::FundLedger, &stage.profile.profile_id);
+            if overlay_object(ov, base, &profile_key).is_some()
+                || overlay_object(ov, base, &ledger_key).is_some()
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            let mut ledger =
+                genesis_fund_ledger(&stage.profile).ok_or(FailCode::PostconditionFailed)?;
+            ledger.status = FundLedgerStatus::Staged;
+            ov.objects
+                .insert(profile_key, Some(stage.profile.encode_canonical()));
+            ov.objects
+                .insert(ledger_key, Some(ledger.encode_canonical()));
+            ov.write_count()?;
+            ov.write_count()
+        }
+        RegisterFundProfilePayloadV1::LockFundMutation(lock) => {
+            if lock.source_profile_id == lock.other_profile_id
+                || lock.execute_before_height <= height
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            let registry = current_registry(ov, base)?;
+            let mut source = read_ledger(ov, base, &lock.source_profile_id)?;
+            let mut other = read_ledger(ov, base, &lock.other_profile_id)?;
+            if source.lock_ref.0.is_some()
+                || other.lock_ref.0.is_some()
+                || source.topup_permit_epoch != lock.prior_source_permit_epoch
+                || other.topup_permit_epoch != lock.prior_other_permit_epoch
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            let legal = match lock.operation {
+                crate::wwm::FundMutationOperation::Activate => {
+                    source.profile_id == registry.fund_profile_id
+                        && source.status == FundLedgerStatus::Current
+                        && other.status == FundLedgerStatus::Staged
+                }
+                crate::wwm::FundMutationOperation::Close => {
+                    other.profile_id == registry.fund_profile_id
+                        && other.status == FundLedgerStatus::Current
+                        && matches!(
+                            source.status,
+                            FundLedgerStatus::Staged | FundLedgerStatus::Superseded
+                        )
+                }
+            };
+            if !legal {
+                return Err(FailCode::PostconditionFailed);
+            }
+            source.topup_permit_epoch = source
+                .topup_permit_epoch
+                .checked_add(1)
+                .ok_or(FailCode::Overflow)?;
+            other.topup_permit_epoch = other
+                .topup_permit_epoch
+                .checked_add(1)
+                .ok_or(FailCode::Overflow)?;
+            let lock_id = crate::domain_hash(
+                "NOOS/WWM/FUND-MUTATION-LOCK/V1",
+                &[&mutation.encode_canonical()],
+            );
+            source.lock_ref = crate::objects::OptionalObject(Some(FundMutationLockRefV1 {
+                lock_id,
+                operation: lock.operation,
+                peer_profile_id: other.profile_id,
+                execute_before_height: lock.execute_before_height,
+            }));
+            other.lock_ref = crate::objects::OptionalObject(Some(FundMutationLockRefV1 {
+                lock_id,
+                operation: lock.operation,
+                peer_profile_id: source.profile_id,
+                execute_before_height: lock.execute_before_height,
+            }));
+            let source_root = ledger_root(&source);
+            let other_root = ledger_root(&other);
+            let record = FundMutationLockV1 {
+                lock_id,
+                operation: lock.operation,
+                profile_id_0: source.profile_id.min(other.profile_id),
+                profile_id_1: source.profile_id.max(other.profile_id),
+                post_ref_root_0: if source.profile_id < other.profile_id {
+                    source_root
+                } else {
+                    other_root
+                },
+                post_ref_root_1: if source.profile_id < other.profile_id {
+                    other_root
+                } else {
+                    source_root
+                },
+                permit_epoch_0: if source.profile_id < other.profile_id {
+                    source.topup_permit_epoch
+                } else {
+                    other.topup_permit_epoch
+                },
+                permit_epoch_1: if source.profile_id < other.profile_id {
+                    other.topup_permit_epoch
+                } else {
+                    source.topup_permit_epoch
+                },
+                authority_epoch: lock.authority.authority_epoch,
+                execute_before_height: lock.execute_before_height,
+                status: FundMutationLockStatus::Pending,
+                signature: lock.authority.signature.clone(),
+            };
+            write_ledger(ov, &source)?;
+            write_ledger(ov, &other)?;
+            wwm_insert_unique(
+                ov,
+                base,
+                wwm_profile_key(WwmLeafKind::FundMutationLock, &lock_id),
+                record.encode_canonical(),
+            )
+        }
+        RegisterFundProfilePayloadV1::ActivateFundProfile(activate) => {
+            let mut registry = current_registry(ov, base)?;
+            if activate.prior_current_id != registry.fund_profile_id {
+                return Err(FailCode::PostconditionFailed);
+            }
+            let mut current = read_ledger(ov, base, &activate.prior_current_id)?;
+            let mut candidate = read_ledger(ov, base, &activate.profile_id)?;
+            let lock_key = wwm_profile_key(WwmLeafKind::FundMutationLock, &activate.lock_id);
+            let raw = overlay_object(ov, base, &lock_key).ok_or(FailCode::PostconditionFailed)?;
+            let mut lock = FundMutationLockV1::decode_canonical(&raw)
+                .map_err(|_| FailCode::PostconditionFailed)?;
+            if lock.status != FundMutationLockStatus::Pending
+                || lock.operation != crate::wwm::FundMutationOperation::Activate
+                || height > lock.execute_before_height
+                || ledger_root(&current) != activate.locked_current_ledger_root
+                || ledger_root(&candidate) != activate.locked_candidate_ledger_root
+                || current.status != FundLedgerStatus::Current
+                || candidate.status != FundLedgerStatus::Staged
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            current.status = FundLedgerStatus::Superseded;
+            candidate.status = FundLedgerStatus::Current;
+            current.lock_ref = crate::objects::OptionalObject(None);
+            candidate.lock_ref = crate::objects::OptionalObject(None);
+            lock.status = FundMutationLockStatus::Completed;
+            write_ledger(ov, &current)?;
+            write_ledger(ov, &candidate)?;
+            ov.objects.insert(lock_key, Some(lock.encode_canonical()));
+            ov.write_count()?;
+            registry.fund_profile_id = candidate.profile_id;
+            registry.fund_epoch = registry
+                .fund_epoch
+                .checked_add(1)
+                .ok_or(FailCode::Overflow)?;
+            write_registry(ov, registry)
+        }
+        RegisterFundProfilePayloadV1::CloseFundProfile(close) => {
+            let registry = current_registry(ov, base)?;
+            if close.current_profile_id != registry.fund_profile_id {
+                return Err(FailCode::PostconditionFailed);
+            }
+            let mut source = read_ledger(ov, base, &close.profile_id)?;
+            let mut current = read_ledger(ov, base, &close.current_profile_id)?;
+            let lock_key = wwm_profile_key(WwmLeafKind::FundMutationLock, &close.lock_id);
+            let raw = overlay_object(ov, base, &lock_key).ok_or(FailCode::PostconditionFailed)?;
+            let mut lock = FundMutationLockV1::decode_canonical(&raw)
+                .map_err(|_| FailCode::PostconditionFailed)?;
+            if lock.status != FundMutationLockStatus::Pending
+                || lock.operation != crate::wwm::FundMutationOperation::Close
+                || height > lock.execute_before_height
+                || ledger_root(&source) != close.locked_source_ledger_root
+                || ledger_root(&current) != close.locked_current_ledger_root
+                || source
+                    .rows
+                    .iter()
+                    .any(|row| row.reserved != 0 || row.live_liability != 0)
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            for (source_row, current_row) in
+                source.rows.as_slice().iter().zip(current.rows.as_slice())
+            {
+                if source_row.bucket != current_row.bucket {
+                    return Err(FailCode::PostconditionFailed);
+                }
+            }
+            let mut source_rows = source.rows.as_slice().to_vec();
+            let mut current_rows = current.rows.as_slice().to_vec();
+            for (source_row, current_row) in source_rows.iter_mut().zip(current_rows.iter_mut()) {
+                current_row.migrated_in = current_row
+                    .migrated_in
+                    .checked_add(source_row.free)
+                    .ok_or(FailCode::Overflow)?;
+                current_row.free = current_row
+                    .free
+                    .checked_add(source_row.free)
+                    .ok_or(FailCode::Overflow)?;
+                source_row.migrated_out = source_row
+                    .migrated_out
+                    .checked_add(source_row.free)
+                    .ok_or(FailCode::Overflow)?;
+                source_row.free = 0;
+            }
+            source.rows = crate::objects::BoundedList::new(source_rows)
+                .ok_or(FailCode::PostconditionFailed)?;
+            current.rows = crate::objects::BoundedList::new(current_rows)
+                .ok_or(FailCode::PostconditionFailed)?;
+            source.status = FundLedgerStatus::Closed;
+            source.lock_ref = crate::objects::OptionalObject(None);
+            current.lock_ref = crate::objects::OptionalObject(None);
+            lock.status = FundMutationLockStatus::Completed;
+            write_ledger(ov, &source)?;
+            write_ledger(ov, &current)?;
+            ov.objects.insert(lock_key, Some(lock.encode_canonical()));
+            ov.write_count()
+        }
+    }
+}
+
+fn current_control(ov: &Overlay, base: &LumenLedger) -> Result<WwmControlStateV1, FailCode> {
+    let raw = overlay_object(ov, base, &wwm_fixed_key(WwmLeafKind::Control))
+        .ok_or(FailCode::PostconditionFailed)?;
+    let control =
+        WwmControlStateV1::decode_canonical(&raw).map_err(|_| FailCode::PostconditionFailed)?;
+    if control.separation_valid() {
+        Ok(control)
+    } else {
+        Err(FailCode::PostconditionFailed)
+    }
+}
+
+fn write_control(ov: &mut Overlay, control: &WwmControlStateV1) -> Result<(), FailCode> {
+    if !control.separation_valid() {
+        return Err(FailCode::PostconditionFailed);
+    }
+    ov.objects.insert(
+        wwm_fixed_key(WwmLeafKind::Control),
+        Some(control.encode_canonical()),
+    );
+    ov.write_count()
+}
+
+fn apply_control_transition(
+    ov: &mut Overlay,
+    base: &LumenLedger,
+    height: u64,
+    payload: &TransitionWwmControlPayloadV1,
+) -> Result<(), FailCode> {
+    let mut control = current_control(ov, base)?;
+    match payload {
+        TransitionWwmControlPayloadV1::Activate { transition, config } => {
+            let legal = matches!(
+                (control.mode, transition.target),
+                (WwmControlMode::Disabled, WwmControlMode::Testnet)
+                    | (WwmControlMode::Disabled, WwmControlMode::Canary)
+                    | (WwmControlMode::Canary, WwmControlMode::Production)
+            );
+            if !legal
+                || transition.source != control.mode
+                || transition.config_id != config.config_id
+                || transition.expected_active_config_id != control.active_config_id
+                || transition.activation_height != height
+                || config.activation_height != height
+                || config.tier != transition.target
+                || !config.validate()
+                || config.capsule_id != control.capsule_id
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            let alias_raw = overlay_object(ov, base, &wwm_fixed_key(WwmLeafKind::ServingAlias))
+                .ok_or(FailCode::PostconditionFailed)?;
+            let alias = crate::wwm::ServingAliasTransitionV1::decode_canonical(&alias_raw)
+                .map_err(|_| FailCode::PostconditionFailed)?;
+            if alias.new_capsule_id != config.capsule_id {
+                return Err(FailCode::PostconditionFailed);
+            }
+            wwm_insert_unique(
+                ov,
+                base,
+                wwm_profile_key(WwmLeafKind::AuthorizedConfig, &config.config_id),
+                config.encode_canonical(),
+            )?;
+            control.direct_prior_live_mode = control.mode;
+            control.direct_prior_config_id = control.active_config_id;
+            control.mode = transition.target;
+            control.active_capsule_id = crate::objects::OptionalHash32(Some(config.capsule_id));
+            control.last_transition_id =
+                crate::objects::OptionalHash32(Some(transition.transition_id));
+            control.last_transition_height = height;
+            control.active_config_id = crate::objects::OptionalHash32(Some(config.config_id));
+            control.latest_authorized_config_id =
+                crate::objects::OptionalHash32(Some(config.config_id));
+            control.resolution_config_id = crate::objects::OptionalHash32(Some(config.config_id));
+            write_control(ov, &control)
+        }
+        TransitionWwmControlPayloadV1::EmergencyDisable(disable) => {
+            if !matches!(
+                control.mode,
+                WwmControlMode::Testnet | WwmControlMode::Canary | WwmControlMode::Production
+            ) || control.mode != disable.expected_state
+                || control.active_config_id != disable.expected_config
+                || disable.incident_root == [0; 32]
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            control.direct_prior_live_mode = control.mode;
+            control.direct_prior_config_id = control.active_config_id;
+            control.mode = WwmControlMode::EmergencyDisabled;
+            control.last_transition_height = height;
+            write_control(ov, &control)
+        }
+        TransitionWwmControlPayloadV1::AuthorizeOperationalConfig(reconfiguration) => {
+            if !matches!(
+                control.mode,
+                WwmControlMode::Canary
+                    | WwmControlMode::Production
+                    | WwmControlMode::EmergencyDisabled
+            ) || reconfiguration.prior_active_config_id
+                != control
+                    .active_config_id
+                    .0
+                    .ok_or(FailCode::PostconditionFailed)?
+                || reconfiguration.candidate_config.parent_config_id.0 != control.active_config_id.0
+                || reconfiguration.candidate_config.capsule_id != control.capsule_id
+                || reconfiguration.candidate_config.tier
+                    != if control.mode == WwmControlMode::EmergencyDisabled {
+                        control.direct_prior_live_mode
+                    } else {
+                        control.mode
+                    }
+                || !reconfiguration.candidate_config.validate()
+                || reconfiguration.encode_canonical().len()
+                    > crate::wwm::MAX_OPERATIONAL_RECONFIG_BYTES
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            wwm_insert_unique(
+                ov,
+                base,
+                wwm_profile_key(
+                    WwmLeafKind::OperationalAuthorization,
+                    &reconfiguration.authorization_id,
+                ),
+                reconfiguration.encode_canonical(),
+            )?;
+            wwm_insert_unique(
+                ov,
+                base,
+                wwm_profile_key(
+                    WwmLeafKind::AuthorizedConfig,
+                    &reconfiguration.candidate_config.config_id,
+                ),
+                reconfiguration.candidate_config.encode_canonical(),
+            )?;
+            control.latest_authorized_config_id =
+                crate::objects::OptionalHash32(Some(reconfiguration.candidate_config.config_id));
+            write_control(ov, &control)
+        }
+        TransitionWwmControlPayloadV1::ApplyOperationalConfig(apply) => {
+            if !matches!(
+                control.mode,
+                WwmControlMode::Canary | WwmControlMode::Production
+            ) || control.active_config_id.0 != Some(apply.expected_active_config_id)
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            let raw = require_wwm(
+                ov,
+                base,
+                WwmLeafKind::OperationalAuthorization,
+                &apply.authorization_id,
+            )?;
+            let reconfiguration = crate::wwm::OperationalReconfigurationV1::decode_canonical(&raw)
+                .map_err(|_| FailCode::PostconditionFailed)?;
+            if control.latest_authorized_config_id.0
+                != Some(reconfiguration.candidate_config.config_id)
+                || reconfiguration.not_before_height > height
+                || reconfiguration.expiry_height < height
+                || reconfiguration.candidate_config.tier != control.mode
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            control.direct_prior_config_id = control.active_config_id;
+            control.active_config_id =
+                crate::objects::OptionalHash32(Some(reconfiguration.candidate_config.config_id));
+            control.resolution_config_id = control.active_config_id;
+            control.last_transition_height = height;
+            write_control(ov, &control)
+        }
+        TransitionWwmControlPayloadV1::Recover(recovery) => {
+            if control.mode != WwmControlMode::EmergencyDisabled
+                || recovery.target_tier != control.direct_prior_live_mode
+                || control.latest_authorized_config_id.0 != Some(recovery.selected_config_id)
+                || recovery.not_before_height > height
+                || recovery.expiry_height < height
+                || recovery.activation_height != height
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+            require_wwm(
+                ov,
+                base,
+                WwmLeafKind::AuthorizedConfig,
+                &recovery.selected_config_id,
+            )?;
+            control.mode = recovery.target_tier;
+            control.active_config_id =
+                crate::objects::OptionalHash32(Some(recovery.selected_config_id));
+            control.resolution_config_id = control.active_config_id;
+            control.last_transition_id =
+                crate::objects::OptionalHash32(Some(recovery.authorization_id));
+            control.last_transition_height = height;
+            write_control(ov, &control)
+        }
+    }
+}
 
 fn overlay_object(ov: &Overlay, base: &LumenLedger, id: &Hash32) -> Option<Vec<u8>> {
     match ov.objects.get(id) {

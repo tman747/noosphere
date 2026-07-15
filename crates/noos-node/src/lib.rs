@@ -50,7 +50,9 @@
 
 #![forbid(unsafe_code)]
 
+pub mod artifact_store_port;
 pub mod auth;
+mod bonsai_fixture;
 pub mod consensus;
 pub mod devnet_fixture;
 pub mod genesis;
@@ -58,6 +60,7 @@ pub mod mempool;
 pub mod metrics;
 pub mod network;
 pub mod pool;
+pub mod resolver;
 pub mod roots;
 pub mod rpc;
 pub mod store_port;
@@ -103,6 +106,8 @@ pub enum NodeError {
     Store(noos_store::StoreError),
     /// Fatal store startup condition.
     StoreFatal(noos_store::FatalError),
+    /// Proof-carrying WWM model resolution failure.
+    Resolution(crate::resolver::ResolutionError),
     /// Claimed header roots do not match the recomputed transition
     /// (ch01 §9.3): names the first mismatching field.
     RootMismatch { field: &'static str },
@@ -143,6 +148,7 @@ impl fmt::Display for NodeError {
             NodeError::Witness(e) => write!(f, "witness: {e:?}"),
             NodeError::Store(e) => write!(f, "store: {e}"),
             NodeError::StoreFatal(e) => write!(f, "store fatal: {e}"),
+            NodeError::Resolution(e) => write!(f, "model resolution: {e:?}"),
             NodeError::RootMismatch { field } => {
                 write!(f, "claimed header root mismatch: {field}")
             }

@@ -160,13 +160,16 @@ async fn status_json(indexer: &Indexer) -> serde_json::Value {
     use axum::http::Request;
     use tower::ServiceExt;
     let response = noos_indexer::router(indexer.clone())
-        .oneshot(Request::builder().uri("/api/status").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/api/status")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap()
 }
-
-
 
 #[tokio::test]
 async fn first_block_anchors_distinct_genesis_header_hash() {
@@ -181,13 +184,18 @@ async fn first_block_anchors_distinct_genesis_header_hash() {
     let report = indexer.sync_from_node(&id, &mut source, 16).await.unwrap();
     assert_eq!(report.ingested, 2);
     assert_eq!(report.next_height, 3);
-    assert_eq!(stored_block_hash(&indexer, 1).await, Some(block_hash(0xaa, 1)));
+    assert_eq!(
+        stored_block_hash(&indexer, 1).await,
+        Some(block_hash(0xaa, 1))
+    );
 
     drop(indexer);
     let restored = Indexer::open(dir.path(), id.clone(), id).unwrap();
-    assert_eq!(stored_block_hash(&restored, 2).await, Some(block_hash(0xaa, 2)));
+    assert_eq!(
+        stored_block_hash(&restored, 2).await,
+        Some(block_hash(0xaa, 2))
+    );
 }
-
 
 #[tokio::test]
 async fn explicit_node_finality_heads_are_indexed_and_persisted() {
@@ -214,7 +222,6 @@ async fn explicit_node_finality_heads_are_indexed_and_persisted() {
     assert_eq!(status["justified"]["height"], "512");
     assert_eq!(status["finalized"]["height"], "256");
 }
-
 
 #[tokio::test]
 async fn fork_replaces_prior_head_rows_exactly() {
@@ -355,7 +362,9 @@ async fn corrupt_latest_generation_falls_back_without_skipping_rows() {
         .filter(|path| {
             path.file_name()
                 .and_then(|name| name.to_str())
-                .is_some_and(|name| name.starts_with("index-generation-v2-") && name.ends_with(".json"))
+                .is_some_and(|name| {
+                    name.starts_with("index-generation-v2-") && name.ends_with(".json")
+                })
         })
         .collect();
     generations.sort();

@@ -281,6 +281,63 @@ submitBtn.addEventListener("click", () => {
   })();
 });
 
+// --- WWM paid authorization --------------------------------------------
+const wwmAuthorizeBtn = el("wwm-authorize-btn", HTMLButtonElement);
+const wwmAuthorizeOut = el("wwm-authorize-out", HTMLOutputElement);
+wwmAuthorizeBtn.disabled = true;
+
+function numericInput(id: string): number {
+  const value = Number(el(id, HTMLInputElement).value);
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error("invalid_integer");
+  return value;
+}
+
+function textInput(id: string): string {
+  const value = el(id, HTMLInputElement).value.trim();
+  if (!value) throw new Error("missing_wwm_authorization_field");
+  return value;
+}
+
+wwmAuthorizeBtn.addEventListener("click", () => {
+  void (async () => {
+    if (!invoke || !activeProfile) return;
+    wwmAuthorizeBtn.disabled = true;
+    wwmAuthorizeBtn.setAttribute("aria-busy", "true");
+    showPending(wwmAuthorizeOut, "Checking finalized chain identity before native signing…");
+    try {
+      const req = {
+        wallet_id: walletId(),
+        profile_id: activeProfile.id,
+        request_id: textInput("wwm-request-id"),
+        pin_id: textInput("wwm-pin-id"),
+        capsule_id: textInput("wwm-capsule-id"),
+        execution_profile_id: textInput("wwm-execution-profile-id"),
+        query_profile_id: textInput("wwm-query-profile-id"),
+        prompt_commitment: textInput("wwm-prompt-commitment"),
+        maximum_fee_micro_noos: numericInput("wwm-max-fee"),
+        expires_at_height: numericInput("wwm-expiry-height"),
+        payer_nonce: numericInput("wwm-payer-nonce"),
+        account: numericInput("wwm-account"),
+        index: numericInput("wwm-index"),
+      };
+      const authorization = await invoke("prepare_wwm_paid_authorization_cmd", { req });
+      if (!authorization || typeof authorization !== "object"
+        || !("schema" in authorization) || authorization.schema !== "noos/wallet-wwm-paid-authorization/v1"
+        || !("mode" in authorization) || authorization.mode !== "PAID"
+        || !("authorization" in authorization) || typeof authorization.authorization !== "string"
+        || !("secret_exported_to_ui" in authorization) || authorization.secret_exported_to_ui !== false) {
+        throw new Error("malformed_wwm_authorization");
+      }
+      show(wwmAuthorizeOut, true, JSON.stringify(authorization, null, 2));
+    } catch (e) {
+      show(wwmAuthorizeOut, false, errorCode(e));
+    } finally {
+      wwmAuthorizeBtn.disabled = false;
+      wwmAuthorizeBtn.removeAttribute("aria-busy");
+    }
+  })();
+});
+
 // --- Update manifest ----------------------------------------------------
 const manifestBtn = el("manifest-btn", HTMLButtonElement);
 const manifestOut = el("manifest-out", HTMLOutputElement);
@@ -331,11 +388,13 @@ void (async () => {
     renderProfile();
     refreshStatusBtn.disabled = false;
     submitBtn.disabled = false;
+    wwmAuthorizeBtn.disabled = false;
     manifestBtn.disabled = false;
   } catch (e) {
     show(profileOut, false, errorCode(e));
     refreshStatusBtn.disabled = true;
     submitBtn.disabled = true;
+    wwmAuthorizeBtn.disabled = true;
     manifestBtn.disabled = true;
   }
 })();

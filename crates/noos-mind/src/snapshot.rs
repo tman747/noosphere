@@ -334,6 +334,11 @@ impl SnapshotCatalog {
         Ok(())
     }
 
+    #[must_use]
+    pub fn get(&self, snapshot_id: &Hash32) -> Option<&KnowledgeSnapshot> {
+        self.snapshots.get(snapshot_id)
+    }
+
     pub fn activate(&mut self, snapshot_id: Hash32, height: u64) -> Result<(), SnapshotError> {
         let snapshot = self
             .snapshots
@@ -459,6 +464,15 @@ pub struct DeterministicLexicalIndex {
 }
 
 impl DeterministicLexicalIndex {
+    pub fn derive_root(
+        eligible_mindlink_ids: &[Hash32],
+        graph: &KnowledgeGraph,
+        profile: &RetrievalProfile,
+    ) -> Result<Hash32, SnapshotError> {
+        let (_, index_root) = Self::derive_documents(eligible_mindlink_ids, graph, profile)?;
+        Ok(index_root)
+    }
+
     pub fn build(
         snapshot: &KnowledgeSnapshot,
         graph: &KnowledgeGraph,
@@ -470,10 +484,43 @@ impl DeterministicLexicalIndex {
         {
             return Err(SnapshotError::InvalidIndex);
         }
+        let (documents, index_root) =
+            Self::derive_documents(&snapshot.eligible_mindlink_ids, graph, &profile)?;
+        if index_root != snapshot.index_roots.lexical_root {
+            return Err(SnapshotError::InvalidIndex);
+        }
+        Ok(Self {
+            snapshot_id: snapshot.snapshot_id,
+            profile,
+            index_root,
+            documents,
+        })
+    }
+
+    fn derive_documents(
+        eligible_mindlink_ids: &[Hash32],
+        graph: &KnowledgeGraph,
+        profile: &RetrievalProfile,
+    ) -> Result<(BTreeMap<Hash32, IndexedDocument>, Hash32), SnapshotError> {
+        if profile.class != RetrievalProfileClass::DeterministicPublic
+            || eligible_mindlink_ids.is_empty()
+            || eligible_mindlink_ids.len() > MAX_SNAPSHOT_MINDLINKS
+            || !strictly_sorted(eligible_mindlink_ids)
+            || eligible_mindlink_ids.contains(&[0; 32])
+        {
+            return Err(SnapshotError::InvalidIndex);
+        }
         let mut documents = BTreeMap::new();
         let mut root_body = Vec::new();
-        for id in &snapshot.eligible_mindlink_ids {
+        for id in eligible_mindlink_ids {
             let link = graph.mindlink(id).ok_or(SnapshotError::InvalidIndex)?;
+            let state = graph.state(id).ok_or(SnapshotError::InvalidIndex)?;
+            if state.lifecycle != Lifecycle::SnapshotAccepted
+                || link.rights.retrieval_permission != Permission::Allow
+                || link.rights.visibility == Visibility::RevokedFutureUse
+            {
+                return Err(SnapshotError::RightsViolation);
+            }
             let (original_text, summary) = match &link.content {
                 ContentPayload::Public {
                     original_text,
@@ -521,15 +568,7 @@ impl DeterministicLexicalIndex {
             DomainId::WwmKnowledgeSnapshot,
             &[b"LEXICAL-INDEX/V1", &profile.profile_id, &root_body],
         )?;
-        if index_root != snapshot.index_roots.lexical_root {
-            return Err(SnapshotError::InvalidIndex);
-        }
-        Ok(Self {
-            snapshot_id: snapshot.snapshot_id,
-            profile,
-            index_root,
-            documents,
-        })
+        Ok((documents, index_root))
     }
 
     /// Search is defined only for the public deterministic profile. A private

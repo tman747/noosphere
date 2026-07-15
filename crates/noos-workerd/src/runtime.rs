@@ -3,15 +3,17 @@
 //! The run loop takes no wall clock and no OS randomness: identical input
 //! plus identical config produce identical output bytes. All state that a
 //! receipt binds is explicit in the receipt body.
+pub mod llama_cpp;
+pub mod process;
 
 use crate::config::Config;
 use crate::hex::{decode_hex32, encode_hex};
+use crate::telemetry;
 use noos_crypto::{DomainId, Keypair, PublicKey, Signature};
 use noos_hearth::{
     admit_custody, route, CustodyRole, HearthError, JobShape, NetworkConditions, Route,
 };
 use noos_nel::{freivalds_verify_u64, FreivaldsProfile};
-use noos_workerd::telemetry;
 use std::io::{self, Write};
 
 /// chain_id(32) || job_id(32) || class(1) || outcome(1) || result(1) || seq_le(8)

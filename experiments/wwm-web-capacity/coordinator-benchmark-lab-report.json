@@ -1,0 +1,108 @@
+{
+  "schema": "noos/wwm-web-capacity-benchmark-report/v1",
+  "experiment_id": "E-WWM-23",
+  "distribution_scope": "SYNTHETIC_FIXTURE",
+  "event_count": 1000000,
+  "seed": 23063,
+  "events": {
+    "offers": {
+      "attempted": 450000,
+      "accepted": 419807,
+      "rejected": 30193
+    },
+    "active_page_heartbeats": {
+      "attempted": 500000,
+      "accepted": 500000,
+      "rejected": 0
+    },
+    "bounded_reports": {
+      "attempted": 1000,
+      "accepted": 1000,
+      "rejected": 0
+    },
+    "revokes": {
+      "attempted": 10000,
+      "accepted": 10000,
+      "rejected": 0
+    },
+    "expiries": {
+      "attempted": 100,
+      "accepted": 100,
+      "rejected": 0
+    },
+    "replacements": {
+      "attempted": 38900,
+      "accepted": 38900,
+      "rejected": 0
+    }
+  },
+  "restart_checkpoints": [
+    250000,
+    500000,
+    750000
+  ],
+  "snapshot_interval_events": 4096,
+  "final_state": {
+    "hosts": 0,
+    "active_hosts": 0,
+    "sessions": 4560,
+    "active_sessions": 4096,
+    "assignments": 0,
+    "active_assignments": 0,
+    "assignment_rows": 0,
+    "reports": 10,
+    "pending_restore_tasks": 0,
+    "verifying_restore_tasks": 0,
+    "restores": 0,
+    "quarantine_bytes": 0,
+    "access_log_rows": 0,
+    "rate_limit_rows": 0,
+    "total_rows": 4570
+  },
+  "observed_peak_state": {
+    "hosts": 0,
+    "active_hosts": 0,
+    "sessions": 4584,
+    "active_sessions": 4096,
+    "assignments": 0,
+    "active_assignments": 0,
+    "assignment_rows": 0,
+    "reports": 10,
+    "pending_restore_tasks": 0,
+    "verifying_restore_tasks": 0,
+    "restores": 0,
+    "quarantine_bytes": 0,
+    "access_log_rows": 0,
+    "rate_limit_rows": 0,
+    "total_rows": 4594
+  },
+  "sqlite_bytes": 1658880,
+  "observed_peak_sqlite_bytes": 7183640,
+  "observed_peak_queue": 0,
+  "deterministic_checksum_blake3": "19db7177897b5b3b309bb1e62c71461e3a00f23b3d6045a790fcd77dc739b684",
+  "wall_clock_duration_ms": 799528,
+  "raw_session_tokens_persisted": false,
+  "raw_ip_or_user_agent_in_report": false,
+  "caps": {
+    "max_hosts": 1024,
+    "max_active_sessions": 4096,
+    "max_active_assignments": 4096,
+    "max_pending_restore_tasks": 256,
+    "max_quarantine_bytes": 268173312,
+    "max_concurrent_restore_verifications": 8
+  },
+  "assertions": {
+    "max_total_rows": 8192,
+    "max_sqlite_bytes": 67108864,
+    "max_peak_queue": 0
+  },
+  "claims": {
+    "coordinator_benchmark_only": true,
+    "real_volunteers_observed": false,
+    "real_availability_measured": false,
+    "reconstruction_proved": false,
+    "production_claim": false,
+    "promotion_authorized": false,
+    "e_wwm_23_real_pilot_pass": false
+  }
+}

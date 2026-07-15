@@ -1,189 +1,257 @@
-//! noos-workerd — deterministic NOOSPHERE worker daemon.
-//!
-//! # Wire protocol (line oriented)
-//!
-//! Input arrives on stdin (default) or from `--queue <file>`; one command
-//! per line, blank lines ignored:
-//!
-//! ```text
-//! JOB <job_id:64hex> relay <shape> <hops:u8> <rtt_ms:u32> <direct:0|1>
-//! JOB <job_id:64hex> seed  <shape> <hops:u8> <rtt_ms:u32> <direct:0|1>
-//! JOB <job_id:64hex> audit <availability_bps:u16> <role> <gate:0|1>
-//! SHUTDOWN
-//! ```
-//!
-//! Shapes: `interactive replica wan_batch stateless reissueable
-//! stateful_custody chorus_advisory`. Roles: `stateful_production
-//! stateless_reissueable chorus_advisory`.
-//!
-//! `relay`/`seed` call the real hearth routing state machine
-//! (`noos_hearth::route`; `seed` sets `is_seeding`); `audit` calls the real
-//! hearth custody admission law (`noos_hearth::admit_custody`) and then a
-//! wired NEL Freivalds verifier self-audit
-//! (`noos_nel::freivalds_verify_u64`).
-//!
-//! Output is written to stdout, one record per line:
-//!
-//! ```text
-//! READY pubkey=<64hex>
-//! RECEIPT body=<150hex> sig=<128hex>
-//! ERR malformed <reason>
-//! METRIC <telemetry-v1 family>{<bounded label>} <value>
-//! SHUTDOWN jobs=<n> violations=<m>
-//! ```
-//!
-//! Receipt body layout (75 bytes):
-//! `chain_id(32) || job_id(32) || class(1) || outcome(1) || result(1) ||
-//! seq_le(8)`, signed with Ed25519 under the registered
-//! `D-SIG-WORK-RECEIPT` domain (`NOOS/SIG/WORK_RECEIPT/V1`). Class bytes:
-//! relay=1 seed=2 audit=3. Outcome bytes: 0=accepted, 1=hearth rejection,
-//! 2=verifier failure. Result bytes: route codes lan_interactive=1
-//! wan_replica=2 wan_batch=3 relay_fallback=4 many_source_seeding=5, a
-//! stable hearth error code on outcome 1, or 1 for a clean audit.
-//!
-//! Every METRIC family/label pair is a row of the frozen
-//! `protocol/telemetry/telemetry-v1.yaml` contract; sequence numbers start
-//! at 1 and `SHUTDOWN`/EOF both terminate gracefully with exit code 0.
-//!
-//! # Determinism
-//!
-//! The daemon takes no wall clock and draws no OS randomness: identical
-//! config plus identical input produce identical output bytes. The signing
-//! seed comes only from the config file.
+//! `noos-workerd` legacy jobs and private Bonsai protocol-v2 executor.
 
-mod config;
-mod hex;
-mod runtime;
-
+use noos_workerd::config::{self, ExecutorConfig};
+use noos_workerd::executor::api::{router, ApiState};
+use noos_workerd::executor::bootstrap::load_and_verify_executor_bootstrap;
+use noos_workerd::executor::reconstruction::reconstruct_if_absent;
+use noos_workerd::executor::residency::{verify_cold_load, Residency, ResidencyState};
+use noos_workerd::executor::scheduler::Cancellation;
+use noos_workerd::executor::security::SidecarEndpoint;
+use noos_workerd::runtime;
+use noos_workerd::runtime::llama_cpp::LlamaCppAdapter;
+use noos_workerd::runtime::process::run_child;
 use std::io::BufRead as _;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use tokio::sync::mpsc;
 
-const DEFAULT_CONFIG: &str = "deploy/workerd.toml";
+const HELP: &str = "\
+noos-workerd — private Bonsai executor
 
-const HELP: &str = concat!(
-    "noos-workerd — deterministic NOOSPHERE worker daemon\n",
-    "\n",
-    "USAGE:\n",
-    "  noos-workerd [--config <path>] [--queue <path>]\n",
-    "  noos-workerd --help | --version\n",
-    "\n",
-    "OPTIONS:\n",
-    "  --config <path>  TOML config (default deploy/workerd.toml)\n",
-    "  --queue <path>   read the job queue from a file instead of stdin\n",
-    "  --help, -h       print this protocol description and exit\n",
-    "  --version        print the version and exit\n",
-    "\n",
-    "CONFIG (TOML):\n",
-    "  [worker]\n",
-    "  seed_hex     = \"<64hex>\"  Ed25519 receipt signing seed\n",
-    "  chain_id_hex = \"<64hex>\"  chain the receipts bind to\n",
-    "\n",
-    "INPUT PROTOCOL (one command per line; blank lines ignored):\n",
-    "  JOB <job_id:64hex> relay <shape> <hops> <rtt_ms> <direct:0|1>\n",
-    "  JOB <job_id:64hex> seed  <shape> <hops> <rtt_ms> <direct:0|1>\n",
-    "  JOB <job_id:64hex> audit <availability_bps> <role> <gate:0|1>\n",
-    "  SHUTDOWN\n",
-    "  shapes: interactive replica wan_batch stateless reissueable\n",
-    "          stateful_custody chorus_advisory\n",
-    "  roles:  stateful_production stateless_reissueable chorus_advisory\n",
-    "\n",
-    "OUTPUT PROTOCOL (stdout, line oriented):\n",
-    "  READY pubkey=<64hex>\n",
-    "  RECEIPT body=<150hex> sig=<128hex>\n",
-    "    body = chain_id(32) || job_id(32) || class(1) || outcome(1) ||\n",
-    "           result(1) || seq_le(8)\n",
-    "    sig  = Ed25519 under NOOS/SIG/WORK_RECEIPT/V1 (D-SIG-WORK-RECEIPT)\n",
-    "    class: relay=1 seed=2 audit=3\n",
-    "    outcome: 0=accepted 1=hearth_rejected 2=verifier_failed\n",
-    "    result: route lan_interactive=1 wan_replica=2 wan_batch=3\n",
-    "            relay_fallback=4 many_source_seeding=5; hearth error code\n",
-    "            on outcome 1; audit ok=1\n",
-    "  ERR malformed <reason>\n",
-    "  METRIC <telemetry-v1 family>{<bounded label>} <value>\n",
-    "  SHUTDOWN jobs=<n> violations=<m>\n",
-    "\n",
-    "DETERMINISM: no wall clock, no OS randomness; identical config and\n",
-    "input produce identical output bytes. EOF is a graceful SHUTDOWN.\n",
-);
+USAGE:
+  noos-workerd legacy --config <path> [--queue <path>]
+  noos-workerd serve|inspect|prefetch|drain --config <path>
+  noos-workerd --help | --version
+
+Legacy Hearth/NEL line jobs are available only through the explicit `legacy`
+mode. Protocol-v2 configuration is strict and has no production defaults.
+";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Mode {
+    Legacy,
+    Serve,
+    Inspect,
+    Prefetch,
+    Drain,
+}
+
+struct Args {
+    mode: Mode,
+    config: PathBuf,
+    queue: Option<PathBuf>,
+}
 
 fn usage_error(message: &str) -> ExitCode {
     eprintln!("noos-workerd: {message}");
-    eprintln!("run `noos-workerd --help` for the protocol description");
+    eprintln!("run `noos-workerd --help` for usage");
     ExitCode::from(2)
 }
 
-fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    let mut config_path = DEFAULT_CONFIG.to_owned();
-    let mut queue_path: Option<String> = None;
-    let mut index = 0_usize;
-    while let Some(arg) = args.get(index) {
-        match arg.as_str() {
-            "--help" | "-h" => {
-                print!("{HELP}");
-                return ExitCode::SUCCESS;
-            }
-            "--version" => {
-                println!("noos-workerd {}", env!("CARGO_PKG_VERSION"));
-                return ExitCode::SUCCESS;
-            }
-            "--config" => {
-                index = index.saturating_add(1);
-                let Some(value) = args.get(index) else {
-                    return usage_error("--config requires a path");
-                };
-                config_path.clone_from(value);
-            }
-            "--queue" => {
-                index = index.saturating_add(1);
-                let Some(value) = args.get(index) else {
-                    return usage_error("--queue requires a path");
-                };
-                queue_path = Some(value.clone());
-            }
-            other => return usage_error(&format!("unknown flag `{other}`")),
-        }
+fn parse_args(args: &[String]) -> Result<Args, String> {
+    let mode = match args.first().map(String::as_str) {
+        Some("legacy") => Mode::Legacy,
+        Some("serve") => Mode::Serve,
+        Some("inspect") => Mode::Inspect,
+        Some("prefetch") => Mode::Prefetch,
+        Some("drain") => Mode::Drain,
+        Some(other) => return Err(format!("unknown mode `{other}`")),
+        None => return Err("an explicit mode is required".into()),
+    };
+    let mut config = None;
+    let mut queue = None;
+    let mut index = 1_usize;
+    while let Some(flag) = args.get(index) {
         index = index.saturating_add(1);
+        let value = args
+            .get(index)
+            .ok_or_else(|| format!("{flag} requires a value"))?;
+        index = index.saturating_add(1);
+        match flag.as_str() {
+            "--config" if config.is_none() => config = Some(PathBuf::from(value)),
+            "--queue" if mode == Mode::Legacy && queue.is_none() => {
+                queue = Some(PathBuf::from(value));
+            }
+            "--queue" => return Err("--queue is legacy-only".into()),
+            other => return Err(format!("unknown or duplicate option `{other}`")),
+        }
     }
+    Ok(Args {
+        mode,
+        config: config.ok_or_else(|| "--config is required".to_owned())?,
+        queue,
+    })
+}
 
-    let config_text = match std::fs::read_to_string(&config_path) {
-        Ok(text) => text,
-        Err(err) => {
-            eprintln!("noos-workerd: cannot read config {config_path}: {err}");
-            return ExitCode::FAILURE;
-        }
-    };
-    let cfg = match config::parse(&config_text) {
-        Ok(cfg) => cfg,
-        Err(err) => {
-            eprintln!("noos-workerd: {config_path}: {err}");
-            return ExitCode::FAILURE;
-        }
-    };
+fn load_v2(path: &Path) -> Result<ExecutorConfig, String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    ExecutorConfig::parse(&text).map_err(|error| format!("{}: {error}", path.display()))
+}
 
+fn run_legacy(path: &Path, queue_path: Option<&Path>) -> Result<(), String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let config = config::parse(&text).map_err(|error| format!("{}: {error}", path.display()))?;
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
-    let result = match queue_path {
-        Some(path) => match std::fs::read_to_string(&path) {
-            Ok(text) => {
-                let lines: Vec<String> = text.lines().map(str::to_owned).collect();
-                let pending = runtime::count_job_lines(&lines);
-                runtime::run(&cfg, lines.into_iter().map(Ok), Some(pending), &mut out)
-            }
-            Err(err) => {
-                eprintln!("noos-workerd: cannot read queue {path}: {err}");
-                return ExitCode::FAILURE;
-            }
-        },
+    match queue_path {
+        Some(path) => {
+            let text = std::fs::read_to_string(path)
+                .map_err(|error| format!("cannot read queue {}: {error}", path.display()))?;
+            let lines: Vec<String> = text.lines().map(str::to_owned).collect();
+            let pending = runtime::count_job_lines(&lines);
+            runtime::run(&config, lines.into_iter().map(Ok), Some(pending), &mut out)
+                .map_err(|error| error.to_string())
+        }
         None => {
             let stdin = std::io::stdin();
-            runtime::run(&cfg, stdin.lock().lines(), None, &mut out)
+            runtime::run(&config, stdin.lock().lines(), None, &mut out)
+                .map_err(|error| error.to_string())
         }
+    }
+}
+
+async fn prepare(config: &ExecutorConfig) -> Result<Residency, String> {
+    std::fs::create_dir_all(&config.worker.scratch_dir)
+        .map_err(|error| format!("cannot create runtime scratch: {error}"))?;
+    let bootstrap =
+        load_and_verify_executor_bootstrap(config).map_err(|error| error.to_string())?;
+    let mut residency = Residency::default();
+    let reconstruction = reconstruct_if_absent(config, &bootstrap, &mut residency)
+        .map_err(|error| error.to_string())?;
+    eprintln!(
+        "{}",
+        serde_json::to_string(&reconstruction).map_err(|error| error.to_string())?
+    );
+    verify_cold_load(config, &mut residency, &bootstrap).map_err(|error| error.to_string())?;
+    residency
+        .transition(ResidencyState::Warming)
+        .map_err(|error| error.to_string())?;
+    let adapter = LlamaCppAdapter::new(
+        config.scheduler.max_context_tokens,
+        config.scheduler.max_output_tokens,
+    );
+    let spec = adapter
+        .child_spec(config, &[1], 1)
+        .map_err(|error| error.to_string())?;
+    let (sender, mut receiver) = mpsc::channel(16);
+    let drain = tokio::spawn(async move { while receiver.recv().await.is_some() {} });
+    let result = run_child(
+        &spec,
+        b"Reply with exactly: OK",
+        Cancellation::new(),
+        sender,
+    )
+    .await;
+    let _ = drain.await;
+    result.map_err(|error| error.to_string())?;
+    residency
+        .transition(ResidencyState::Ready)
+        .map_err(|error| error.to_string())?;
+    Ok(residency)
+}
+
+async fn serve(config: ExecutorConfig) -> Result<(), String> {
+    let residency = prepare(&config).await?;
+    let endpoint =
+        SidecarEndpoint::parse(&config.worker.listen).map_err(|error| error.to_string())?;
+    let drain_file = config.worker.drain_file.clone();
+    let state = ApiState::new(config, residency)?;
+    let shutdown_state = state.clone();
+    let shutdown = async move {
+        loop {
+            if drain_file.exists() {
+                shutdown_state.scheduler.drain();
+                if let Ok(mut residency) = shutdown_state.residency.write() {
+                    let _ = residency.transition(ResidencyState::Draining);
+                }
+                while shutdown_state.scheduler.admitted() != 0 {
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                }
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+    };
+    match endpoint {
+        SidecarEndpoint::Tcp(address) => {
+            let listener = tokio::net::TcpListener::bind(address)
+                .await
+                .map_err(|error| format!("cannot bind private sidecar: {error}"))?;
+            axum::serve(listener, router(state))
+                .with_graceful_shutdown(shutdown)
+                .await
+                .map_err(|error| error.to_string())
+        }
+        #[cfg(unix)]
+        SidecarEndpoint::Unix(path) => {
+            if path.exists() {
+                std::fs::remove_file(&path)
+                    .map_err(|error| format!("cannot replace unix socket: {error}"))?;
+            }
+            let listener = tokio::net::UnixListener::bind(path)
+                .map_err(|error| format!("cannot bind unix sidecar: {error}"))?;
+            axum::serve(listener, router(state))
+                .with_graceful_shutdown(shutdown)
+                .await
+                .map_err(|error| error.to_string())
+        }
+    }
+}
+
+fn inspect(config: &ExecutorConfig) -> Result<(), String> {
+    let bootstrap =
+        load_and_verify_executor_bootstrap(config).map_err(|error| error.to_string())?;
+    let output =
+        serde_json::to_string_pretty(bootstrap.summary()).map_err(|error| error.to_string())?;
+    println!("{output}");
+    Ok(())
+}
+
+fn request_drain(config: &ExecutorConfig) -> Result<(), String> {
+    if let Some(parent) = config.worker.drain_file.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|error| format!("cannot create drain directory: {error}"))?;
+    }
+    std::fs::write(&config.worker.drain_file, b"DRAINING\n")
+        .map_err(|error| format!("cannot write drain request: {error}"))
+}
+
+#[tokio::main]
+async fn main() -> ExitCode {
+    let raw: Vec<String> = std::env::args().skip(1).collect();
+    if raw.as_slice() == ["--help"] || raw.as_slice() == ["-h"] {
+        print!("{HELP}");
+        return ExitCode::SUCCESS;
+    }
+    if raw.as_slice() == ["--version"] {
+        println!("noos-workerd {}", env!("CARGO_PKG_VERSION"));
+        return ExitCode::SUCCESS;
+    }
+    let args = match parse_args(&raw) {
+        Ok(args) => args,
+        Err(error) => return usage_error(&error),
+    };
+    let result = match args.mode {
+        Mode::Legacy => run_legacy(&args.config, args.queue.as_deref()),
+        Mode::Serve | Mode::Inspect | Mode::Prefetch | Mode::Drain => match load_v2(&args.config) {
+            Err(error) => Err(error),
+            Ok(config) => match args.mode {
+                Mode::Serve => serve(config).await,
+                Mode::Inspect => inspect(&config),
+                Mode::Prefetch => prepare(&config)
+                    .await
+                    .map(|state| println!("READY residency={:?}", state.state())),
+                Mode::Drain => request_drain(&config),
+                Mode::Legacy => unreachable!(),
+            },
+        },
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
-        Err(err) => {
-            eprintln!("noos-workerd: {err}");
+        Err(error) => {
+            eprintln!("noos-workerd: {error}");
             ExitCode::FAILURE
         }
     }

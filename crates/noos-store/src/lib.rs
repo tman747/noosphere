@@ -53,6 +53,7 @@
 use std::fmt;
 use std::path::PathBuf;
 
+mod artifact_store;
 mod blob;
 mod engine;
 mod manifest;
@@ -61,12 +62,18 @@ mod vfs;
 mod wal;
 
 #[cfg(test)]
+mod artifact_store_tests;
+#[cfg(test)]
 mod crash_tests;
 #[cfg(test)]
 mod test_util;
 #[cfg(test)]
 mod tests;
 
+pub use artifact_store::{
+    ArtifactFailpoint, ArtifactIngestSpec, ArtifactKey, ArtifactResumeState, ArtifactStore,
+    ArtifactStoreConfig, ArtifactStoreError,
+};
 pub use blob::BlobLoc;
 pub use engine::Cf;
 pub use manifest::{CurrentPointerV1, FileEntryV1, ManifestV1, SegmentMarkV1};

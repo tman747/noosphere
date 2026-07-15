@@ -27,8 +27,12 @@ use noos_ground::{
 };
 use noos_lumen::fees::{FeeParamsV1, FeeStateV1};
 use noos_lumen::issuance::{EmissionSharesV1, IssuanceParamsV1};
-use noos_lumen::objects::{AccountV1, BoundedBytes, BoundedList};
+use noos_lumen::objects::{AccountV1, BoundedBytes, BoundedList, OptionalHash32};
 use noos_lumen::state::{GenesisConfig, LumenLedger, NOOS_ASSET};
+use noos_lumen::wwm::{
+    CoveragePolicyRowV1, FundBucketTag, FundProfileV1, SignatureEntryV1, WwmControlMode,
+    WwmControlStateV1,
+};
 
 use crate::roots::{
     body_cert_root, body_receipt_root, body_ticket_root, body_tx_root, body_witness_root,
@@ -441,6 +445,9 @@ pub struct GenesisSpec {
     /// is installed as an unspendable zero-balance genesis account, binding
     /// the complete registry to `genesis_hash`.
     pub contract_codes: BTreeMap<Hash32, Vec<u8>>,
+    /// Install the exact Bonsai-27B registration graph at genesis. This is
+    /// refused by the ledger unless `params.is_test_network` is true.
+    pub wwm_bonsai_fixture: bool,
 }
 
 /// A fully derived genesis: identity, ledger, and the genesis block.
@@ -455,6 +462,61 @@ pub struct BuiltGenesis {
     pub body_bytes: Vec<u8>,
 }
 
+fn devnet_wwm_anchor() -> (FundProfileV1, WwmControlStateV1) {
+    let buckets = [
+        FundBucketTag::Job,
+        FundBucketTag::CustodyRetention,
+        FundBucketTag::Repair,
+        FundBucketTag::ChallengeReferee,
+        FundBucketTag::Sponsor,
+    ];
+    let rows = buckets
+        .into_iter()
+        .map(|bucket| CoveragePolicyRowV1 {
+            bucket,
+            baseline_liability_at_origin: 1,
+            liability_rate_per_height: 1,
+            coverage_origin_height: 0,
+            coverage_end_height: u64::MAX,
+            minimum_coverage_heights: 1,
+            per_reservation_cap: 1,
+            exposure_cap: 1,
+        })
+        .collect();
+    let mut profile = FundProfileV1 {
+        profile_id: [0; 32],
+        settlement_asset: NOOS_ASSET,
+        authority_root: GOV_AUTHORITY_ACCOUNT,
+        recovery_root: EMERGENCY_AUTHORITY_ACCOUNT,
+        route_root: [0; 32],
+        coverage_policy_rows: BoundedList::new(rows).unwrap_or_default(),
+        authority_epoch: 0,
+        signatures: BoundedList::<SignatureEntryV1, 32>::default(),
+    };
+    profile.profile_id =
+        noos_lumen::domain_hash("NOOS/WWM/FUND-PROFILE/V1", &[&profile.encode_canonical()]);
+    let control = WwmControlStateV1 {
+        mode: WwmControlMode::Disabled,
+        active_capsule_id: OptionalHash32(None),
+        last_transition_id: OptionalHash32(None),
+        last_transition_height: 0,
+        direct_prior_live_mode: WwmControlMode::Disabled,
+        direct_prior_config_id: OptionalHash32(None),
+        active_config_id: OptionalHash32(None),
+        latest_authorized_config_id: OptionalHash32(None),
+        resolution_config_id: OptionalHash32(None),
+        release_root: [0; 32],
+        promotion_ledger_root: [0; 32],
+        capsule_id: [0; 32],
+        artifact_id: [0; 32],
+        availability_policy_id: [0; 32],
+        execution_profile_id: [0; 32],
+        query_policy_id: [0; 32],
+        runway_root: [0; 32],
+    };
+    (profile, control)
+}
+
 impl GenesisSpec {
     /// Devnet spec over the frozen parameters file with a fixed time origin.
     pub fn devnet(params: DevnetParams, genesis_time_ms: u64) -> Self {
@@ -465,6 +527,7 @@ impl GenesisSpec {
             extra_accounts: Vec::new(),
             gov_authority: GOV_AUTHORITY_ACCOUNT,
             contract_codes: BTreeMap::new(),
+            wwm_bonsai_fixture: false,
         }
     }
 
@@ -713,6 +776,20 @@ impl GenesisSpec {
                 emergency_authority: EMERGENCY_AUTHORITY_ACCOUNT,
             })
             .map_err(|error| NodeError::Config(format!("invalid genesis ledger: {error:?}")))?;
+        let (fund_profile, wwm_control) = devnet_wwm_anchor();
+        ledger
+            .install_wwm_genesis_anchor(&fund_profile, &wwm_control)
+            .map_err(|error| NodeError::Config(format!("invalid WWM genesis anchor: {error:?}")))?;
+        if self.wwm_bonsai_fixture {
+            let registration = crate::bonsai_fixture::registration(fund_profile.profile_id)?;
+            ledger
+                .install_wwm_testnet_registration(&registration, self.params.is_test_network)
+                .map_err(|error| {
+                    NodeError::Config(format!(
+                        "invalid Bonsai testnet genesis registration: {error:?}"
+                    ))
+                })?;
+        }
         Ok(ledger)
     }
 
@@ -986,6 +1063,73 @@ mod production_proposal_refusal_tests {
     }
 
     #[test]
+    fn explicit_bonsai_fixture_installs_a_complete_verified_testnet_graph() {
+        let params = DevnetParams::parse(DEVNET).unwrap();
+        let mut spec = GenesisSpec::devnet(params, 1_760_000_000_000);
+        spec.wwm_bonsai_fixture = true;
+        let built = spec.build().unwrap();
+        let checkpoint = noos_braid::CheckpointRef {
+            epoch: 0,
+            checkpoint_hash: *built.header.block_hash().unwrap().as_bytes(),
+        };
+        let terminal = crate::resolver::FinalizedResolutionTerminalV1 {
+            header: built.header.clone(),
+            checkpoint,
+            finality: noos_braid::FinalityCertificateV1 {
+                source: checkpoint,
+                target: checkpoint,
+                participation_bitmap: noos_lumen::objects::BoundedBytes::default(),
+                aggregate_signature: noos_braid::Bytes96([0; 96]),
+                raw_weight_sum: 0,
+                effective_weight_sum: 0,
+                membership_root: [0; 32],
+            },
+        };
+        let selector = noos_lumen::wwm::ResolutionSelectorV1 {
+            kind: noos_lumen::wwm::ResolutionSelectorKind::Alias,
+            value: noos_lumen::objects::BoundedBytes::new(b"bonsai-q1".to_vec()).unwrap(),
+        };
+        let response = crate::resolver::build_finalized_model_resolution(
+            &built.ledger,
+            built.chain_id,
+            built.genesis_hash,
+            selector.clone(),
+            0,
+            terminal,
+        )
+        .unwrap();
+        let verified = crate::resolver::verify_finalized_model_resolution(
+            &response,
+            built.chain_id,
+            built.genesis_hash,
+            &selector,
+            crate::resolver::TrustedFinalizedCheckpointV1 {
+                checkpoint,
+                height: 0,
+            },
+            0,
+        )
+        .unwrap();
+        assert_eq!(response.proofs.len(), 17);
+        assert_eq!(
+            verified.control.mode,
+            noos_lumen::wwm::WwmControlMode::Testnet
+        );
+        assert_eq!(verified.executor_set.unwrap().entries.len(), 8);
+        assert_eq!(verified.custodian_set.unwrap().entries.len(), 12);
+        let artifact = verified.artifact.unwrap();
+        assert_eq!(artifact.source_bytes, 3_803_452_480);
+        assert_eq!(
+            crate::rpc::hex(&artifact.published_sha256),
+            "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0"
+        );
+        assert_eq!(
+            crate::rpc::hex(&artifact.manifest_root),
+            "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7"
+        );
+    }
+
+    #[test]
     fn devnet_identity_vector_is_stable_after_state_binding() {
         let spec = GenesisSpec::devnet(DevnetParams::parse(DEVNET).unwrap(), 1_760_000_000_000);
         let built = spec.build().unwrap();
@@ -995,7 +1139,7 @@ mod production_proposal_refusal_tests {
         );
         assert_eq!(
             super::hex32_for_test(built.genesis_hash),
-            "989340dfa04e2285d9e038dc45c87d56bb3d65ad96dac3d3411d1cf34a9c3214"
+            "e4cf96ba6a65167f2def93429b23c91c1d4716a6a2ba9f15d598b9bea04f3b4c"
         );
     }
 }

@@ -384,11 +384,7 @@ fn recovery_moves_escrow_only_on_fully_bound_registered_adjudication() {
     forged.signature = attacker.sign(&forged.message()).to_bytes();
     let mut protected = active_recovery(&receipt);
     assert_eq!(
-        protected.apply_adjudication(
-            &forged,
-            &attacker.verifying_key(),
-            &mut BTreeSet::new()
-        ),
+        protected.apply_adjudication(&forged, &attacker.verifying_key(), &mut BTreeSet::new()),
         Err(BesiError::TrustPolicy)
     );
     assert_eq!(protected.state, PrivateJobState::Active);

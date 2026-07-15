@@ -2419,7 +2419,8 @@ def verify_cutover_authorization(
     authorization: Mapping[str, Any], signatures: Mapping[str, Any], keyring: Mapping[str, RoleKey],
     promotion_ledger: Mapping[str, Any], release_manifest: Mapping[str, Any], final_freeze: Mapping[str, Any],
     prepared_cutover: Mapping[str, Any],
-    *, trusted_role_keyring_sha256: str, raw_component_hashes: Mapping[str, str] | None = None,
+    *, trusted_role_keyring_sha256: str, promotion_schema_version: int,
+    release_schema_version: int, raw_component_hashes: Mapping[str, str] | None = None,
     promotion_root: Path = ROOT, test_mode: bool = False,
 ) -> None:
     require_non_fixture(authorization, "cutover authorization", test_mode=test_mode)
@@ -2437,13 +2438,21 @@ def verify_cutover_authorization(
     if str(gates_path) not in sys.path:
         sys.path.insert(0, str(gates_path))
     try:
-        from promotion_records import PromotionValidationError, validate_promotion_ledger
+        from promotion_records import (
+            PromotionValidationError,
+            validate_promotion_ledger,
+            validate_protocol_release_manifest_header,
+        )
         promotion_summary = validate_promotion_ledger(
             promotion_ledger, promotion_root, keyring,
+            schema_version=promotion_schema_version,
             trusted_role_keyring_sha256=trusted_role_keyring_sha256,
             expected_revision=revision, expected_chain_id=authorization["chain_id"],
             expected_genesis_hash=authorization["genesis_hash"], require_all_passed=True,
             test_mode=test_mode,
+        )
+        validate_protocol_release_manifest_header(
+            release_manifest, promotion_root, release_schema_version,
         )
     except (ImportError, PromotionValidationError) as exc:
         raise AuthorizationError(str(exc)) from exc
@@ -2885,6 +2894,8 @@ def command_verify_cutover(args: argparse.Namespace) -> None:
         read_json(Path(args.promotion_ledger)), read_json(Path(args.release_manifest)),
         final_freeze, read_json(Path(args.prepared_cutover)),
         trusted_role_keyring_sha256=file_sha256(Path(args.keyring)),
+        promotion_schema_version=args.promotion_schema_version,
+        release_schema_version=args.release_schema_version,
         raw_component_hashes={key: file_sha256(path) for key, path in component_paths.items()},
     )
     print("CUTOVER_AUTHORIZATION_VALID cryptographic_roles_verified=true human_independence_not_established=true")
@@ -2913,6 +2924,8 @@ def command_sign_cutover(args: argparse.Namespace) -> None:
         read_json(Path(args.promotion_ledger)), read_json(Path(args.release_manifest)),
         final_freeze, read_json(Path(args.prepared_cutover)),
         trusted_role_keyring_sha256=file_sha256(Path(args.keyring)),
+        promotion_schema_version=args.promotion_schema_version,
+        release_schema_version=args.release_schema_version,
         raw_component_hashes={key: file_sha256(path) for key, path in component_paths.items()},
     )
     write_new_json(Path(args.out), signatures)
@@ -3007,12 +3020,16 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("sign-cutover"); p.set_defaults(func=command_sign_cutover)
     p.add_argument("--authorization", required=True); p.add_argument("--keyring", required=True)
     p.add_argument("--promotion-ledger", required=True); p.add_argument("--release-manifest", required=True)
+    p.add_argument("--promotion-schema-version", type=int, choices=(1, 2), required=True)
+    p.add_argument("--release-schema-version", type=int, choices=(1, 2), required=True)
     p.add_argument("--final-freeze", required=True); p.add_argument("--final-freeze-signatures", required=True)
     p.add_argument("--prepared-cutover", required=True); p.add_argument("--out", required=True); role_keys(p)
     p = sub.add_parser("verify-cutover"); p.set_defaults(func=command_verify_cutover)
     p.add_argument("--authorization", required=True); p.add_argument("--signatures", required=True)
     p.add_argument("--keyring", required=True); p.add_argument("--promotion-ledger", required=True)
     p.add_argument("--release-manifest", required=True); p.add_argument("--final-freeze", required=True)
+    p.add_argument("--promotion-schema-version", type=int, choices=(1, 2), required=True)
+    p.add_argument("--release-schema-version", type=int, choices=(1, 2), required=True)
     p.add_argument("--final-freeze-signatures", required=True)
     p.add_argument("--prepared-cutover", required=True)
     return parser

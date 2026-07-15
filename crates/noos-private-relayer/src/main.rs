@@ -127,9 +127,7 @@ fn reserve_intent(
     now_unix: u64,
 ) -> Result<(), RelayError> {
     let created = i64::try_from(now_unix).map_err(|_| RelayError::Overflow)?;
-    let connection = database
-        .lock()
-        .map_err(|_| RelayError::UpstreamRejected)?;
+    let connection = database.lock().map_err(|_| RelayError::UpstreamRejected)?;
     match connection.execute(
         "INSERT INTO relay_attempts
          (signer, nonce, payment_id, destination, status, created_unix, updated_unix)
@@ -157,11 +155,8 @@ fn complete_intent(
     now_unix: u64,
 ) -> Result<(), RelayError> {
     let updated = i64::try_from(now_unix).map_err(|_| RelayError::Overflow)?;
-    let receipt_json =
-        serde_json::to_string(receipt).map_err(|_| RelayError::UpstreamRejected)?;
-    let connection = database
-        .lock()
-        .map_err(|_| RelayError::UpstreamRejected)?;
+    let receipt_json = serde_json::to_string(receipt).map_err(|_| RelayError::UpstreamRejected)?;
+    let connection = database.lock().map_err(|_| RelayError::UpstreamRejected)?;
     let changed = connection
         .execute(
             "UPDATE relay_attempts
@@ -189,9 +184,7 @@ fn resolve_failed_intent(
     error: RelayError,
     now_unix: u64,
 ) -> Result<(), RelayError> {
-    let connection = database
-        .lock()
-        .map_err(|_| RelayError::UpstreamRejected)?;
+    let connection = database.lock().map_err(|_| RelayError::UpstreamRejected)?;
     if error == RelayError::UpstreamRejected {
         let updated = i64::try_from(now_unix).map_err(|_| RelayError::Overflow)?;
         connection
@@ -473,13 +466,7 @@ mod tests {
         let relay_intent = intent();
         let database = Mutex::new(open_database(&path).unwrap());
         reserve_intent(&database, &relay_intent, 150).unwrap();
-        resolve_failed_intent(
-            &database,
-            &relay_intent,
-            RelayError::UpstreamRejected,
-            151,
-        )
-        .unwrap();
+        resolve_failed_intent(&database, &relay_intent, RelayError::UpstreamRejected, 151).unwrap();
         assert_eq!(
             reserve_intent(&database, &relay_intent, 152),
             Err(RelayError::Replay)

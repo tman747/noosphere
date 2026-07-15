@@ -77,7 +77,9 @@ fn reserve(database: &Connection, position_id: &str, debt: u128) -> Result<bool,
         params![position_id, debt.to_string()],
     ) {
         Ok(_) => Ok(true),
-        Err(error) if error.sqlite_error_code() == Some(ErrorCode::ConstraintViolation) => Ok(false),
+        Err(error) if error.sqlite_error_code() == Some(ErrorCode::ConstraintViolation) => {
+            Ok(false)
+        }
         Err(_) => Err(OperatorError::Upstream),
     }
 }
@@ -125,7 +127,10 @@ fn run_once(config: &Config) -> Result<serde_json::Value, OperatorError> {
             "market_id": candidate.market_id,
             "owner": candidate.owner,
         });
-        match config.signer.submit_action(action, status.unsafe_head.height) {
+        match config
+            .signer
+            .submit_action(action, status.unsafe_head.height)
+        {
             Ok(txid) => {
                 update_attempt(
                     &config.database,

@@ -1,0 +1,24 @@
+services:
+  artifact-store:
+    environment:
+      WWM_DEPLOYMENT: local
+      WWM_PRODUCTION_CAPABLE: "false"
+      WWM_BOOTSTRAP_SOURCE: /run/wwm/ingest/Bonsai-27B-Q1_0.gguf
+    volumes:
+      - ${WWM_BONSAI_SOURCE_PATH:?verified Bonsai Q1 artifact path required}:/run/wwm/ingest/Bonsai-27B-Q1_0.gguf:ro
+  custodian:
+    environment:
+      WWM_DEPLOYMENT: local
+      WWM_PRODUCTION_CAPABLE: "false"
+  executor:
+    environment:
+      WWM_DEPLOYMENT: local
+      WWM_PRODUCTION_CAPABLE: "false"
+  edge:
+    environment:
+      WWM_DEPLOYMENT: local
+      WWM_PRODUCTION_CAPABLE: "false"
+  gateway:
+    environment:
+      WWM_DEPLOYMENT: local
+      WWM_PRODUCTION_CAPABLE: "false"

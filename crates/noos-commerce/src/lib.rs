@@ -1,6 +1,13 @@
-//! Commerce negotiation/evaluation overlay mapped onto the one Work Loom escrow lifecycle.
+//! Legacy non-WWM Commerce negotiation/evaluation plus the authoritative WWM adapter.
+//!
+//! [`Commerce`] preserves the unrelated Work Loom lifecycle. [`WwmCommerceBook`]
+//! never projects a metadata budget: it carries canonical Lumen job, receipt,
+//! settlement, and the exact pinned Work Loom obligation.
 #![forbid(unsafe_code)]
-use noos_work_loom::JobState as WorkJobState;
+use noos_lumen::wwm::{
+    FundBucketTag, WwmEvidenceTier, WwmJobV1, WwmReceiptV1, WwmSettlementV1, WwmTerminalCode,
+};
+use noos_work_loom::{wwm::PinnedObligation, JobState as WorkJobState};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub type Hash32 = [u8; 32];
@@ -540,6 +547,224 @@ impl Commerce {
         if job.quality_requirement == QualityRequirement::Q0NoQualityAssurance {
             return Err(CommerceError::QualityAssuranceMisrepresentation);
         }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WwmCommerceError {
+    DuplicateJob,
+    UnknownJob,
+    InvalidJobReference,
+    ReceiptAlreadyRecorded,
+    InvalidReceiptReference,
+    SettlementAlreadyRecorded,
+    InvalidSettlementReference,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoritativeWwmRecord {
+    pub job: WwmJobV1,
+    pub obligation: PinnedObligation,
+    pub receipt: Option<WwmReceiptV1>,
+    pub settlement: Option<WwmSettlementV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WwmCommerceProofView {
+    pub job_id: Hash32,
+    pub fund_profile_id: Hash32,
+    pub bucket: FundBucketTag,
+    pub obligation_id: Hash32,
+    pub opening_index: u64,
+    pub reserved_amount: u128,
+    pub receipt_id: Option<Hash32>,
+    pub settlement_id: Option<Hash32>,
+    pub terminal_code: Option<WwmTerminalCode>,
+    pub paid_amount: u128,
+    pub refunded_amount: u128,
+    pub released_amount: u128,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct WwmCommerceBook {
+    records: BTreeMap<Hash32, AuthoritativeWwmRecord>,
+}
+
+impl WwmCommerceBook {
+    pub fn open(
+        &mut self,
+        job: WwmJobV1,
+        obligation: PinnedObligation,
+    ) -> Result<(), WwmCommerceError> {
+        if self.records.contains_key(&job.job_id) {
+            return Err(WwmCommerceError::DuplicateJob);
+        }
+        if job.job_id == [0; 32]
+            || job.quote_id == [0; 32]
+            || job.fund_profile_id == [0; 32]
+            || job.client_commitment == [0; 32]
+            || job.offchain_envelope_root == [0; 32]
+            || job.deadline_height == 0
+            || job.selected_executor_ids.is_empty()
+            || job.reserved_amount == 0
+            || obligation.obligation_id != job.job_id
+            || obligation.profile_id != job.fund_profile_id
+            || obligation.amount != job.reserved_amount
+            || !matches!(
+                obligation.bucket,
+                FundBucketTag::Job | FundBucketTag::Sponsor
+            )
+        {
+            return Err(WwmCommerceError::InvalidJobReference);
+        }
+        self.records.insert(
+            job.job_id,
+            AuthoritativeWwmRecord {
+                job,
+                obligation,
+                receipt: None,
+                settlement: None,
+            },
+        );
+        Ok(())
+    }
+
+    pub fn record_receipt(&mut self, receipt: WwmReceiptV1) -> Result<(), WwmCommerceError> {
+        let record = self
+            .records
+            .get_mut(&receipt.job_id)
+            .ok_or(WwmCommerceError::UnknownJob)?;
+        if record.receipt.is_some() {
+            return Err(WwmCommerceError::ReceiptAlreadyRecorded);
+        }
+        let accounted = receipt
+            .paid_amount
+            .checked_add(receipt.refunded_amount)
+            .ok_or(WwmCommerceError::InvalidReceiptReference)?;
+        let terminal_matches_tier = match receipt.terminal_code {
+            WwmTerminalCode::Complete => matches!(
+                receipt.evidence_tier,
+                WwmEvidenceTier::SignedSingle | WwmEvidenceTier::MatchedQuorum
+            ),
+            WwmTerminalCode::NoQuorum => {
+                receipt.evidence_tier == WwmEvidenceTier::NoQuorum && receipt.paid_amount == 0
+            }
+            WwmTerminalCode::Cancelled | WwmTerminalCode::Deadline => receipt.paid_amount == 0,
+            WwmTerminalCode::Rejected => true,
+        };
+        if receipt.receipt_id == [0; 32]
+            || receipt.capsule_id != record.job.capsule_id
+            || receipt.execution_profile_id != record.job.execution_profile_id
+            || receipt.anchor_height == 0
+            || receipt.anchor_block == [0; 32]
+            || receipt.signatures.is_empty()
+            || receipt.paid_amount > receipt.metered_amount
+            || accounted > record.job.reserved_amount
+            || !terminal_matches_tier
+        {
+            return Err(WwmCommerceError::InvalidReceiptReference);
+        }
+        record.receipt = Some(receipt);
+        Ok(())
+    }
+
+    pub fn record_settlement(
+        &mut self,
+        settlement: WwmSettlementV1,
+    ) -> Result<(), WwmCommerceError> {
+        let record = self
+            .records
+            .get_mut(&settlement.job_id)
+            .ok_or(WwmCommerceError::UnknownJob)?;
+        if record.settlement.is_some() {
+            return Err(WwmCommerceError::SettlementAlreadyRecorded);
+        }
+        let receipt = record
+            .receipt
+            .as_ref()
+            .ok_or(WwmCommerceError::InvalidSettlementReference)?;
+        let conserved = settlement
+            .paid_amount
+            .checked_add(settlement.refunded_amount)
+            .and_then(|value| value.checked_add(settlement.released_amount))
+            .ok_or(WwmCommerceError::InvalidSettlementReference)?;
+        if settlement.settlement_id == [0; 32]
+            || settlement.receipt_id != receipt.receipt_id
+            || settlement.fund_profile_id != record.obligation.profile_id
+            || settlement.bucket != record.obligation.bucket
+            || settlement.prior_settlement_index != record.obligation.opening_index
+            || settlement.paid_amount != receipt.paid_amount
+            || settlement.refunded_amount != receipt.refunded_amount
+            || conserved != record.obligation.amount
+            || settlement.signature.as_slice().is_empty()
+        {
+            return Err(WwmCommerceError::InvalidSettlementReference);
+        }
+        record.settlement = Some(settlement);
+        Ok(())
+    }
+
+    pub fn proof_view(&self, job_id: Hash32) -> Result<WwmCommerceProofView, WwmCommerceError> {
+        let record = self
+            .records
+            .get(&job_id)
+            .ok_or(WwmCommerceError::UnknownJob)?;
+        Ok(WwmCommerceProofView {
+            job_id,
+            fund_profile_id: record.obligation.profile_id,
+            bucket: record.obligation.bucket,
+            obligation_id: record.obligation.obligation_id,
+            opening_index: record.obligation.opening_index,
+            reserved_amount: record.obligation.amount,
+            receipt_id: record.receipt.as_ref().map(|receipt| receipt.receipt_id),
+            settlement_id: record
+                .settlement
+                .as_ref()
+                .map(|settlement| settlement.settlement_id),
+            terminal_code: record.receipt.as_ref().map(|receipt| receipt.terminal_code),
+            paid_amount: record
+                .settlement
+                .as_ref()
+                .map(|settlement| settlement.paid_amount)
+                .unwrap_or(0),
+            refunded_amount: record
+                .settlement
+                .as_ref()
+                .map(|settlement| settlement.refunded_amount)
+                .unwrap_or(0),
+            released_amount: record
+                .settlement
+                .as_ref()
+                .map(|settlement| settlement.released_amount)
+                .unwrap_or(0),
+        })
+    }
+
+    #[must_use]
+    pub fn snapshot(&self) -> BTreeMap<Hash32, AuthoritativeWwmRecord> {
+        self.records.clone()
+    }
+
+    pub fn restore_snapshot(
+        &mut self,
+        records: BTreeMap<Hash32, AuthoritativeWwmRecord>,
+    ) -> Result<(), WwmCommerceError> {
+        if records.iter().any(|(job_id, record)| {
+            *job_id != record.job.job_id
+                || record.obligation.obligation_id != *job_id
+                || record.obligation.profile_id != record.job.fund_profile_id
+                || record.obligation.amount != record.job.reserved_amount
+                || record.settlement.as_ref().is_some_and(|settlement| {
+                    record
+                        .receipt
+                        .as_ref()
+                        .is_none_or(|receipt| settlement.receipt_id != receipt.receipt_id)
+                })
+        }) {
+            return Err(WwmCommerceError::InvalidJobReference);
+        }
+        self.records = records;
         Ok(())
     }
 }
@@ -1319,5 +1544,105 @@ mod tests {
             graph.add_evaluation(wash),
             Err(AttributionError::SelfDealing)
         );
+    }
+    #[test]
+    fn authoritative_wwm_adapter_carries_canonical_refs_and_reorgs_without_budget_projection() {
+        use noos_lumen::{
+            objects::{BoundedBytes, BoundedList},
+            wwm::SignatureEntryV1,
+        };
+        let job = WwmJobV1 {
+            job_id: h(200),
+            chain_id: h(201),
+            genesis_hash: h(202),
+            quote_id: h(203),
+            registry_epoch: 7,
+            client_commitment: h(204),
+            capsule_id: h(205),
+            execution_profile_id: h(206),
+            query_policy_id: h(207),
+            max_input_tokens: 100,
+            max_output_tokens: 20,
+            deadline_height: 500,
+            selected_executor_ids: BoundedList::new(vec![h(208)]).unwrap(),
+            availability_certificate_id: h(209),
+            fund_profile_id: h(210),
+            reserved_amount: 100,
+            offchain_envelope_root: h(211),
+        };
+        let obligation = PinnedObligation {
+            obligation_id: job.job_id,
+            profile_id: job.fund_profile_id,
+            bucket: FundBucketTag::Job,
+            amount: job.reserved_amount,
+            opening_index: 7,
+            opened_height: 100,
+        };
+        let mut book = WwmCommerceBook::default();
+        book.open(job.clone(), obligation).unwrap();
+        let opened_snapshot = book.snapshot();
+        let receipt = WwmReceiptV1 {
+            receipt_id: h(212),
+            job_id: job.job_id,
+            capsule_id: job.capsule_id,
+            artifact_id: h(213),
+            tokenizer_root: h(214),
+            template_root: h(215),
+            runtime_root: h(216),
+            sbom_root: h(217),
+            execution_profile_id: job.execution_profile_id,
+            input_tokens: 10,
+            output_tokens: 5,
+            token_history_root: h(218),
+            output_root: h(219),
+            signer_ids: BoundedList::new(vec![h(208)]).unwrap(),
+            control_cluster_ids: BoundedList::new(vec![h(220)]).unwrap(),
+            evidence_tier: WwmEvidenceTier::SignedSingle,
+            availability_until: 1_000,
+            evidence_until: 1_000,
+            anchor_height: 400,
+            anchor_block: h(221),
+            metered_amount: 60,
+            paid_amount: 60,
+            refunded_amount: 40,
+            terminal_code: WwmTerminalCode::Complete,
+            signatures: BoundedList::new(vec![SignatureEntryV1 {
+                signer_id: h(208),
+                signature: BoundedBytes::new(vec![1; 64]).unwrap(),
+            }])
+            .unwrap(),
+        };
+        book.record_receipt(receipt.clone()).unwrap();
+        let settlement = WwmSettlementV1 {
+            settlement_id: h(222),
+            job_id: job.job_id,
+            receipt_id: receipt.receipt_id,
+            fund_profile_id: job.fund_profile_id,
+            bucket: FundBucketTag::Job,
+            prior_settlement_index: obligation.opening_index,
+            paid_amount: 60,
+            refunded_amount: 40,
+            released_amount: 0,
+            settled_height: 401,
+            authority_epoch: 1,
+            signature: BoundedBytes::new(vec![2; 64]).unwrap(),
+        };
+        book.record_settlement(settlement.clone()).unwrap();
+        let view = book.proof_view(job.job_id).unwrap();
+        assert_eq!(view.receipt_id, Some(receipt.receipt_id));
+        assert_eq!(view.settlement_id, Some(settlement.settlement_id));
+        assert_eq!(
+            view.paid_amount + view.refunded_amount,
+            view.reserved_amount
+        );
+        assert_eq!(
+            book.record_settlement(settlement),
+            Err(WwmCommerceError::SettlementAlreadyRecorded)
+        );
+
+        book.restore_snapshot(opened_snapshot).unwrap();
+        let rewound = book.proof_view(job.job_id).unwrap();
+        assert_eq!(rewound.receipt_id, None);
+        assert_eq!(rewound.settlement_id, None);
     }
 }

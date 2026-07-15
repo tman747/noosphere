@@ -29,8 +29,55 @@ DEFAULT_SCHEMA = ROOT / "protocol" / "release" / "wwm-evidence-bundle.schema.jso
 SIGNATURE_DOMAIN = b"NOOS/SIG/WWM/V1\0D-WWM-EVIDENCE-BUNDLE\0"
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
-CLAIM_ID = re.compile(r"^E-WWM-(0[1-9]|1[0-9]|2[0-2])$")
+CLAIM_ID = re.compile(r"^E-WWM-(0[1-9]|1[0-9]|2[0-3])$")
+EXPECTED_CLAIM_IDS = tuple(f"E-WWM-{index:02d}" for index in range(1, 24))
 VALID_VERDICTS = {"PASS", "PARTIAL", "KILLED"}
+BONSAI_PROFILE = "BONSAI_PUBLIC_TEXT_V1"
+BONSAI_MANDATORY_CLAIMS = {
+    "E-WWM-02",
+    "E-WWM-03",
+    "E-WWM-04",
+    "E-WWM-10",
+    "E-WWM-13",
+    "E-WWM-14",
+    "E-WWM-15",
+    "E-WWM-16",
+    "E-WWM-18",
+    "E-WWM-20",
+}
+E23_REQUIRED_ARTIFACT_KINDS = {
+    "authorized_origin_inventory",
+    "coordinate_coverage_report",
+    "consent_and_deletion_matrix",
+    "browser_churn_probe_log",
+    "restore_admission_results",
+    "canonical_reconstruction_report",
+    "base_chain_impact_report",
+    "bounded_synthetic_load_report",
+    "license_notice_concentration_report",
+    "privacy_accessibility_security_reviews",
+}
+E23_REQUIRED_DRILLS = {
+    "storage_pressure",
+    "private_browsing",
+    "site_data_deletion",
+    "seven_day_inactivity",
+    "host_expiry_removal",
+    "provider_outage",
+    "coordinator_outage",
+    "artifact_service_outage",
+    "poison",
+    "replay",
+    "redirect",
+    "ssrf",
+    "quota",
+    "interrupted_write",
+}
+E23_LAB_REPORT_SCHEMA = "noos/e-wwm-23-evidence/v1"
+E23_LAB_STATUS = "LAB_PASS_REAL_PILOT_PENDING"
+E23_LAB_SCOPE = "DETERMINISTIC_LAB_SIMULATION"
+E23_LOCAL_CACHE_ONLY = "PERSONAL_LOCAL_CACHE_ONLY"
+VALID_DISPOSITIONS = {"MANDATORY", "DISABLED_NOT_CLAIMED"}
 ATTESTATION_ROLES = {
     "experiment_operator",
     "independent_reproducer",
@@ -39,6 +86,8 @@ ATTESTATION_ROLES = {
 RESULT_KEYS = {
     "schema_version",
     "claim_id",
+    "applicability_profile",
+    "claim_disposition",
     "source_revision",
     "environment_root",
     "raw_artifact_roots",
@@ -51,6 +100,8 @@ RESULT_KEYS = {
 BUNDLE_KEYS = {
     "schema_version",
     "claim_id",
+    "applicability_profile",
+    "claim_disposition",
     "source_revision",
     "preregistration_sha256",
     "environment",
@@ -150,10 +201,13 @@ def load_contracts(
     if registry.get("schema_version") != "1.0.0" or registry.get("controls_enabled") is not False:
         raise EvidenceError("invalid or enabled WWM claim registry")
     claims = registry.get("claims")
-    if not isinstance(claims, list) or [row.get("claim_id") for row in claims] != [
-        f"E-WWM-{index:02d}" for index in range(1, 23)
-    ]:
-        raise EvidenceError("claim registry must contain sorted E-WWM-01 through E-WWM-22")
+    if (
+        not isinstance(claims, list)
+        or any(not isinstance(row, dict) for row in claims)
+        or tuple(row.get("claim_id") for row in claims) != EXPECTED_CLAIM_IDS
+        or any(row.get("enabled") is not False for row in claims)
+    ):
+        raise EvidenceError("claim registry must contain sorted, disabled E-WWM-01 through E-WWM-23")
     if experiments.get("schema_version") != 1 or experiments.get("controls_enabled") is not False:
         raise EvidenceError("invalid or enabled WWM experiment registry")
     common = experiments.get("common_policy")
@@ -171,7 +225,38 @@ def load_contracts(
         raise EvidenceError("experiment registry must require two reproductions")
     if common.get("maximum_unresolved_severity_1_findings") != 0:
         raise EvidenceError("severity-1 findings must block release")
+    if common.get("controls_remain_disabled_after_pass") is not True:
+        raise EvidenceError("WWM controls must remain disabled after every experiment pass")
     policy_map: dict[str, dict[str, Any]] = {}
+    profiles = registry.get("applicability_profiles")
+    if not isinstance(profiles, list) or len(profiles) != 1:
+        raise EvidenceError("claim registry must contain the Bonsai applicability profile")
+    profile = profiles[0]
+    if (
+        not isinstance(profile, dict)
+        or set(profile) != {"profile_id", "description", "claim_dispositions"}
+        or profile.get("profile_id") != BONSAI_PROFILE
+        or not isinstance(profile.get("description"), str)
+        or not profile["description"]
+    ):
+        raise EvidenceError("Bonsai applicability profile is malformed")
+    dispositions = profile.get("claim_dispositions")
+    expected_claims = set(EXPECTED_CLAIM_IDS)
+    if (
+        not isinstance(dispositions, dict)
+        or set(dispositions) != expected_claims
+        or any(value not in VALID_DISPOSITIONS for value in dispositions.values())
+    ):
+        raise EvidenceError("Bonsai applicability must dispose exactly all 23 claims")
+    mandatory = {
+        claim_id
+        for claim_id, disposition in dispositions.items()
+        if disposition == "MANDATORY"
+    }
+    if mandatory != BONSAI_MANDATORY_CLAIMS:
+        raise EvidenceError("Bonsai mandatory claim set differs from the frozen profile")
+    if dispositions["E-WWM-23"] != "DISABLED_NOT_CLAIMED":
+        raise EvidenceError("E-WWM-23 must remain non-production and disabled in the Bonsai profile")
     for policy in policies:
         if not isinstance(policy, dict):
             raise EvidenceError("claim policy must be an object")
@@ -197,12 +282,31 @@ def load_contracts(
         ):
             raise EvidenceError(f"{claim_id}: malformed experiment policy")
         policy_map[claim_id] = policy
-    if sorted(policy_map) != [f"E-WWM-{index:02d}" for index in range(1, 23)]:
-        raise EvidenceError("experiment registry must cover every WWM claim")
+    if tuple(sorted(policy_map)) != EXPECTED_CLAIM_IDS:
+        raise EvidenceError("experiment registry must cover every WWM claim through E-WWM-23")
+    e23_policy = policy_map["E-WWM-23"]
+    if (
+        set(e23_policy["required_artifact_kinds"]) != E23_REQUIRED_ARTIFACT_KINDS
+        or set(e23_policy["required_drills"]) != E23_REQUIRED_DRILLS
+        or e23_policy["second_client_vectors_required"] is not True
+        or e23_policy["minimum_independent_builders"] != 2
+        or e23_policy["red_team_required"] is not True
+    ):
+        raise EvidenceError("E-WWM-23 policy is incomplete or promotion safeguards are weakened")
     schema = load_json(DEFAULT_SCHEMA)
     if schema.get("title") != "World Wide Mind immutable evidence bundle":
         raise EvidenceError("WWM evidence bundle schema is missing or wrong")
     return registry, experiments, policy_map
+
+
+def applicability_profile(
+    registry: dict[str, Any],
+    profile_id: str = BONSAI_PROFILE,
+) -> dict[str, Any]:
+    for profile in registry["applicability_profiles"]:
+        if profile["profile_id"] == profile_id:
+            return profile
+    raise EvidenceError(f"unknown applicability profile: {profile_id}")
 
 
 def claim_by_id(registry: dict[str, Any], claim_id: str) -> dict[str, Any]:
@@ -226,6 +330,8 @@ def preregistration_record(
     return {
         "schema_version": 1,
         "claim_id": claim_id,
+        "applicability_profile": BONSAI_PROFILE,
+        "claim_disposition": applicability_profile(registry)["claim_dispositions"][claim_id],
         "protected_property": claim["protected_property"],
         "adversary": claim["adversary"],
         "dependencies": claim["dependencies"],
@@ -297,6 +403,8 @@ def prepare_bundle(
     registry, experiments, policy_map = load_contracts(registry_path, experiments_path)
     claim = claim_by_id(registry, claim_id)
     policy = policy_map[claim_id]
+    profile = applicability_profile(registry)
+    disposition = profile["claim_dispositions"][claim_id]
     if not HEX40.fullmatch(revision):
         raise EvidenceError("revision must be canonical 40-hex")
     if output.exists():
@@ -354,6 +462,8 @@ def prepare_bundle(
     result = {
         "schema_version": 1,
         "claim_id": claim_id,
+        "applicability_profile": BONSAI_PROFILE,
+        "claim_disposition": disposition,
         "source_revision": revision,
         "environment_root": f"sha256:{environment_descriptor['sha256']}",
         "raw_artifact_roots": [f"sha256:{row['sha256']}" for row in artifacts],
@@ -369,6 +479,8 @@ def prepare_bundle(
     bundle = {
         "schema_version": 1,
         "claim_id": claim_id,
+        "applicability_profile": BONSAI_PROFILE,
+        "claim_disposition": disposition,
         "source_revision": revision,
         "preregistration_sha256": preregistration_sha256,
         "environment": environment_descriptor,
@@ -484,6 +596,7 @@ def validate_descriptor(bundle_dir: Path, descriptor: Any) -> None:
         or not isinstance(descriptor["bytes"], int)
         or descriptor["bytes"] <= 0
     ):
+
         raise EvidenceError("artifact descriptor value is invalid")
     path = (bundle_dir / relative).resolve()
     try:
@@ -498,6 +611,57 @@ def require_hash(value: Any, field: str) -> str:
     if not isinstance(value, str) or not HEX64.fullmatch(value):
         raise EvidenceError(f"{field} must be a lowercase SHA-256 digest")
     return value
+
+
+def validate_e23_local_reports(
+    bundle_dir: Path,
+    bundle: dict[str, Any],
+    result: dict[str, Any],
+) -> bool:
+    """Recognize hash-only E-WWM-23 lab reports without treating them as pilot evidence."""
+    found = False
+    for descriptor in bundle["artifacts"]:
+        path = bundle_dir / descriptor["path"]
+        try:
+            report = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            continue
+        if not isinstance(report, dict) or report.get("schema") != E23_LAB_REPORT_SCHEMA:
+            continue
+        found = True
+        evidence_sha256 = report.get("evidence_sha256")
+        unsigned = dict(report)
+        unsigned.pop("evidence_sha256", None)
+        real_duration = next(
+            (
+                check
+                for check in report.get("gates", [])
+                if isinstance(check, dict) and check.get("id") == "real-duration"
+            ),
+            None,
+        )
+        if (
+            report.get("experiment_id") != "E-WWM-23"
+            or report.get("status") != E23_LAB_STATUS
+            or report.get("evidence_scope") != E23_LAB_SCOPE
+            or report.get("production_claim") is not False
+            or report.get("promotion_authorized") is not False
+            or report.get("browser_disposition") != E23_LOCAL_CACHE_ONLY
+            or not isinstance(evidence_sha256, str)
+            or evidence_sha256 != sha256_bytes(canonical_json(unsigned) + b"\n")
+            or not isinstance(real_duration, dict)
+            or real_duration.get("passed") is not False
+            or real_duration.get("evidence_class") != "REAL_PUBLIC_PILOT_REQUIRED"
+        ):
+            raise EvidenceError("E-WWM-23 deterministic lab report is malformed or overclaims promotion")
+    if not found:
+        return False
+    promotion = bundle["promotion_record"]
+    if result["verdict"] == "PASS" or (
+        promotion is not None and promotion.get("decision") != "HOLD"
+    ):
+        raise EvidenceError("E-WWM-23 deterministic lab evidence cannot satisfy real-pilot promotion")
+    return True
 
 
 def validate_evidence_records(
@@ -661,6 +825,13 @@ def verify_bundle_directory(
         raise EvidenceError("bundle claim ID is invalid")
     claim = claim_by_id(registry, claim_id)
     policy = policy_map[claim_id]
+    profile = applicability_profile(registry)
+    expected_disposition = profile["claim_dispositions"][claim_id]
+    if (
+        bundle.get("applicability_profile") != BONSAI_PROFILE
+        or bundle.get("claim_disposition") != expected_disposition
+    ):
+        raise EvidenceError("bundle applicability profile or disposition is stale")
     if bundle.get("schema_version") != 1 or not HEX40.fullmatch(str(bundle.get("source_revision"))):
         raise EvidenceError("bundle schema version or source revision is invalid")
     if expected_revision is not None and bundle["source_revision"] != expected_revision:
@@ -703,6 +874,8 @@ def verify_bundle_directory(
     if (
         result["schema_version"] != 1
         or result["claim_id"] != claim_id
+        or result["applicability_profile"] != BONSAI_PROFILE
+        or result["claim_disposition"] != expected_disposition
         or result["source_revision"] != bundle["source_revision"]
         or result["environment_root"] != f"sha256:{bundle['environment']['sha256']}"
         or result["raw_artifact_roots"] != raw_roots
@@ -714,6 +887,8 @@ def verify_bundle_directory(
         or result["preregistration_sha256"] != expected_preregistration
     ):
         raise EvidenceError("result identity, threshold, roots, or measured values are invalid")
+    if claim_id == "E-WWM-23":
+        validate_e23_local_reports(bundle_dir, bundle, result)
     artifact_kinds = {descriptor["kind"] for descriptor in bundle["artifacts"]}
     if not set(policy["required_artifact_kinds"]).issubset(artifact_kinds):
         raise EvidenceError("bundle lacks claim-specific raw artifact kinds")

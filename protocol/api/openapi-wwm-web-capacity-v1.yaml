@@ -1,0 +1,543 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MindChain Experimental Web Capacity API",
+    "version": "1.0.0-experimental",
+    "description": "Off-chain static-host and explicit browser-cache coordination. This API is not WWM v2 consensus, production custody, schedulability, availability certification, rewards, inference, training, mining, or arbitrary browser execution."
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "servers": [
+    { "url": "https://capacity.devnet.mindchain.invalid", "description": "Illustrative owner-controlled devnet origin only" }
+  ],
+  "security": [],
+  "x-noos-contract": {
+    "api_identity": "wwm-web-capacity-v1",
+    "schema_identity": "noos/wwm-web-capacity/v1",
+    "media_type": "application/vnd.noos.wwm-web-capacity.v1+json",
+    "status": "EXPERIMENTAL_OFF_CHAIN",
+    "consensus_schema_extended": false,
+    "consensus_action_tags_added": false,
+    "chain_binding_fields": ["chain_id", "genesis_hash", "artifact_id", "manifest_root"],
+    "participant_classes": ["STATIC_HOST_SEEDER", "BROWSER_ADVISORY_CACHE"],
+    "production_custody": false,
+    "rewards": false,
+    "custodian_capability_membership": false,
+    "availability_certificate_signer": false,
+    "schedulability_contribution": false,
+    "production_custody_reward_eligible": false,
+    "static_graduation_automatic": false,
+    "browser_execution": "STORAGE_AND_OPT_IN_REPAIR_ONLY",
+    "mutation_credentials_mode": "omit",
+    "mutation_cors": "EXPLICIT_REGISTERED_ORIGIN_ONLY",
+    "public_share_cors": "WILDCARD_WITHOUT_CREDENTIALS",
+    "json_body_max_bytes": 65536,
+    "assignment_rows_max": 256,
+    "restore_body_exact_bytes": 1047552,
+    "redirects": "REJECT",
+    "session_token_bits": 256,
+    "session_token_storage": "HASHED_ONLY",
+    "normal_telemetry_raw_ip": false,
+    "normal_telemetry_user_agent": false,
+    "access_log_retention_seconds_max": 604800,
+    "static_host_refresh_max_seconds": 60,
+    "static_expiry_removes_future_assignments": true,
+    "cached_public_share_erasure_available": false
+  },
+  "paths": {
+    "/api/wwm-web-capacity/v1/config": {
+      "get": {
+        "operationId": "getWebCapacityConfigV1",
+        "description": "Returns the exact experimental chain/model binding, geometry, coordinator key, source allowlist, quota choices, privacy and static-cache lifecycle disclosures, and explicit non-custody/non-reward flags.",
+        "responses": {
+          "200": {
+            "description": "Pinned public capacity configuration",
+            "headers": {
+              "Cache-Control": { "$ref": "#/components/headers/ConfigCacheControl" }
+            },
+            "content": {
+              "application/vnd.noos.wwm-web-capacity.v1+json": {
+                "schema": { "$ref": "#/components/schemas/CoordinatorConfig" }
+              }
+            }
+          },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/wwm-web-capacity/v1/hosts": {
+      "post": {
+        "operationId": "registerStaticHostV1",
+        "description": "Accepts only one owner-authorized canonical HTTPS origin. The coordinator fetches the fixed well-known manifest and inventory without redirects, rejects private/reserved destinations, verifies signatures and immutable bindings, then probes canonical shares. Active hosts are reverified within 60 seconds; removal, invalidity, lost authorization, or expiry stops future assignments only and cannot erase third-party caches.",
+        "x-max-body-bytes": 65536,
+        "x-fetch-path": "/.well-known/noos/wwm-web-capacity-v1.json",
+        "x-redirect-policy": "REJECT",
+        "x-ssrf-policy": "REJECT_LOOPBACK_PRIVATE_LINK_LOCAL_MULTICAST_RESERVED_UNSPECIFIED_AND_DNS_REBIND",
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/HostRegistrationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Verified off-chain static host registration",
+            "headers": {
+              "Access-Control-Allow-Origin": { "$ref": "#/components/headers/ExplicitCorsOrigin" }
+            },
+            "content": {
+              "application/vnd.noos.wwm-web-capacity.v1+json": {
+                "schema": { "$ref": "#/components/schemas/HostRegistrationResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/CorsError" },
+          "403": { "$ref": "#/components/responses/CorsError" },
+          "413": { "$ref": "#/components/responses/CorsError" },
+          "422": { "$ref": "#/components/responses/CorsError" },
+          "429": { "$ref": "#/components/responses/CorsError" }
+        }
+      },
+      "options": {
+        "operationId": "preflightRegisterStaticHostV1",
+        "description": "Authorizes the exact registered Origin for the host registration mutation with credentials omitted.",
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" }
+        ],
+        "responses": {
+          "204": { "$ref": "#/components/responses/MutationPreflightPost" },
+          "403": { "$ref": "#/components/responses/CorsError" }
+        }
+      }
+    },
+    "/api/wwm-web-capacity/v1/offers": {
+      "post": {
+        "operationId": "createBrowserOfferV1",
+        "description": "Creates an origin-bound opaque 256-bit browser session only after explicit consent version, supported quota, effective byte bound, storage class, upload policy, and active-page assertion are supplied.",
+        "x-max-body-bytes": 65536,
+        "x-pre-opt-in-side-effects": false,
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OfferRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Origin-local advisory browser session",
+            "headers": {
+              "Access-Control-Allow-Origin": { "$ref": "#/components/headers/ExplicitCorsOrigin" },
+              "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+            },
+            "content": {
+              "application/vnd.noos.wwm-web-capacity.v1+json": {
+                "schema": { "$ref": "#/components/schemas/BrowserSession" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/CorsError" },
+          "403": { "$ref": "#/components/responses/CorsError" },
+          "413": { "$ref": "#/components/responses/CorsError" },
+          "422": { "$ref": "#/components/responses/CorsError" },
+          "429": { "$ref": "#/components/responses/CorsError" },
+          "503": { "$ref": "#/components/responses/CorsError" }
+        }
+      },
+      "options": {
+        "operationId": "preflightCreateBrowserOfferV1",
+        "description": "Authorizes the exact registered Origin for the browser offer mutation with credentials omitted.",
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" }
+        ],
+        "responses": {
+          "204": { "$ref": "#/components/responses/MutationPreflightPost" },
+          "403": { "$ref": "#/components/responses/CorsError" }
+        }
+      }
+    },
+    "/api/wwm-web-capacity/v1/heartbeat": {
+      "post": {
+        "operationId": "pollBrowserCapacityV1",
+        "description": "Active-page outbound poll returning at most 256 signed share assignments or one bounded restore task. No background reachability is claimed.",
+        "x-max-body-bytes": 65536,
+        "x-assignment-rows-max": 256,
+        "x-restore-tasks-max": 1,
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/HeartbeatRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded assignment, one restore task, or an idle response",
+            "headers": {
+              "Access-Control-Allow-Origin": { "$ref": "#/components/headers/ExplicitCorsOrigin" },
+              "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+            },
+            "content": {
+              "application/vnd.noos.wwm-web-capacity.v1+json": {
+                "schema": { "$ref": "#/components/schemas/HeartbeatResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/CorsError" },
+          "401": { "$ref": "#/components/responses/CorsError" },
+          "403": { "$ref": "#/components/responses/CorsError" },
+          "413": { "$ref": "#/components/responses/CorsError" },
+          "429": { "$ref": "#/components/responses/CorsError" }
+        }
+      },
+      "options": {
+        "operationId": "preflightPollBrowserCapacityV1",
+        "description": "Authorizes the exact registered Origin for the heartbeat mutation with credentials omitted.",
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" }
+        ],
+        "responses": {
+          "204": { "$ref": "#/components/responses/MutationPreflightPost" },
+          "403": { "$ref": "#/components/responses/CorsError" }
+        }
+      }
+    },
+    "/api/wwm-web-capacity/v1/reports": {
+      "post": {
+        "operationId": "reportBrowserCapacityV1",
+        "description": "Accepts bounded aggregate stored, evicted, error, upload, and coordinate-digest telemetry. Prompts, browsing data, wallets, raw tokens, IPs, user agents, and cross-site identifiers are outside the schema.",
+        "x-max-body-bytes": 65536,
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ParticipantReport" }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Bounded aggregate report accepted",
+            "headers": {
+              "Access-Control-Allow-Origin": { "$ref": "#/components/headers/ExplicitCorsOrigin" },
+              "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+            },
+            "content": {
+              "application/vnd.noos.wwm-web-capacity.v1+json": {
+                "schema": { "$ref": "#/components/schemas/Acknowledgement" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/CorsError" },
+          "401": { "$ref": "#/components/responses/CorsError" },
+          "403": { "$ref": "#/components/responses/CorsError" },
+          "413": { "$ref": "#/components/responses/CorsError" },
+          "429": { "$ref": "#/components/responses/CorsError" }
+        }
+      },
+      "options": {
+        "operationId": "preflightReportBrowserCapacityV1",
+        "description": "Authorizes the exact registered Origin for the participant report mutation with credentials omitted.",
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" }
+        ],
+        "responses": {
+          "204": { "$ref": "#/components/responses/MutationPreflightPost" },
+          "403": { "$ref": "#/components/responses/CorsError" }
+        }
+      }
+    },
+    "/api/wwm-web-capacity/v1/restores/{task_id}": {
+      "put": {
+        "operationId": "uploadBrowserRestoreV1",
+        "description": "Accepts exactly one 1,047,552-byte assigned share while its page session is active. The coordinator enforces the origin and daily egress cap, rejects replay, verifies the transport checksum and canonical noos-da commitment, and writes only to artifact quarantine.",
+        "x-exact-body-bytes": 1047552,
+        "x-write-destination": "ARTIFACT_QUARANTINE_ONLY",
+        "x-canonical-verifier": "noos-da",
+        "parameters": [
+          { "$ref": "#/components/parameters/TaskId" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/SessionToken" },
+          { "$ref": "#/components/parameters/ContentLength" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "x-decoded-bytes": 1047552
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Canonically verified share written to quarantine",
+            "headers": {
+              "Access-Control-Allow-Origin": { "$ref": "#/components/headers/ExplicitCorsOrigin" },
+              "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+            },
+            "content": {
+              "application/vnd.noos.wwm-web-capacity.v1+json": {
+                "schema": { "$ref": "#/components/schemas/RestoreReceipt" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/CorsError" },
+          "401": { "$ref": "#/components/responses/CorsError" },
+          "403": { "$ref": "#/components/responses/CorsError" },
+          "409": { "$ref": "#/components/responses/CorsError" },
+          "413": { "$ref": "#/components/responses/CorsError" },
+          "422": { "$ref": "#/components/responses/CorsError" },
+          "429": { "$ref": "#/components/responses/CorsError" }
+        }
+      },
+      "options": {
+        "operationId": "preflightUploadBrowserRestoreV1",
+        "description": "Authorizes the exact registered Origin for one raw share restore with credentials omitted.",
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" }
+        ],
+        "responses": {
+          "204": { "$ref": "#/components/responses/MutationPreflightPut" },
+          "403": { "$ref": "#/components/responses/CorsError" }
+        }
+      }
+    },
+    "/api/wwm-web-capacity/v1/revoke": {
+      "post": {
+        "operationId": "revokeBrowserCapacityV1",
+        "description": "Expires the origin-local session and assignments. Client-side app-owned deletion remains available offline even if this request fails.",
+        "x-max-body-bytes": 65536,
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RevocationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session revoked; client retains independent offline deletion authority",
+            "headers": {
+              "Access-Control-Allow-Origin": { "$ref": "#/components/headers/ExplicitCorsOrigin" },
+              "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+            },
+            "content": {
+              "application/vnd.noos.wwm-web-capacity.v1+json": {
+                "schema": { "$ref": "#/components/schemas/RevocationResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/CorsError" },
+          "401": { "$ref": "#/components/responses/CorsError" },
+          "403": { "$ref": "#/components/responses/CorsError" },
+          "413": { "$ref": "#/components/responses/CorsError" },
+          "429": { "$ref": "#/components/responses/CorsError" }
+        }
+      },
+      "options": {
+        "operationId": "preflightRevokeBrowserCapacityV1",
+        "description": "Authorizes the exact registered Origin for browser-session revocation with credentials omitted.",
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" }
+        ],
+        "responses": {
+          "204": { "$ref": "#/components/responses/MutationPreflightPost" },
+          "403": { "$ref": "#/components/responses/CorsError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "Origin": {
+        "name": "Origin",
+        "in": "header",
+        "required": true,
+        "description": "Exact registered canonical HTTPS origin. Wildcard and null origins are rejected.",
+        "schema": { "$ref": "#/components/schemas/CanonicalHttpsOrigin" }
+      },
+      "TaskId": {
+        "name": "task_id",
+        "in": "path",
+        "required": true,
+        "schema": { "$ref": "#/components/schemas/Hash32" }
+      },
+      "SessionToken": {
+        "name": "Authorization",
+        "in": "header",
+        "required": true,
+        "description": "Bearer plus the opaque origin-bound 256-bit session token. The server stores only a one-way hash.",
+        "schema": {
+          "type": "string",
+          "pattern": "^Bearer [A-Za-z0-9_-]{43}$",
+          "maxLength": 50
+        }
+      },
+      "ContentLength": {
+        "name": "Content-Length",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "integer", "const": 1047552 }
+      }
+    },
+    "headers": {
+      "ExplicitCorsOrigin": {
+        "description": "Echoes only the exact registered request Origin after authorization.",
+        "schema": { "$ref": "#/components/schemas/CanonicalHttpsOrigin" }
+      },
+      "NoStore": {
+        "description": "Session and mutation responses are not cacheable.",
+        "schema": { "type": "string", "const": "no-store" }
+      },
+      "ConfigCacheControl": {
+        "description": "Public pinned config may be revalidated but not served stale.",
+        "schema": { "type": "string", "const": "public, max-age=60, must-revalidate" }
+      }
+    },
+    "schemas": {
+      "Hash32": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/Hash32"
+      },
+      "CanonicalHttpsOrigin": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/CanonicalHttpsOrigin"
+      },
+      "CoordinatorConfig": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/CoordinatorConfig"
+      },
+      "HostRegistrationRequest": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/HostRegistrationRequest"
+      },
+      "HostRegistrationResponse": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/HostRegistrationResponse"
+      },
+      "OfferRequest": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/OfferRequest"
+      },
+      "BrowserSession": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/BrowserSession"
+      },
+      "HeartbeatRequest": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/HeartbeatRequest"
+      },
+      "HeartbeatResponse": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/HeartbeatResponse"
+      },
+      "ParticipantReport": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/ParticipantReport"
+      },
+      "RestoreReceipt": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/RestoreReceipt"
+      },
+      "RevocationRequest": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/RevocationRequest"
+      },
+      "RevocationResponse": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/RevocationResponse"
+      },
+      "Acknowledgement": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/Acknowledgement"
+      },
+      "ErrorResponse": {
+        "$ref": "../schemas/wwm-web-capacity-v1.schema.json#/$defs/ErrorResponse"
+      }
+    },
+    "responses": {
+      "MutationPreflightPost": {
+        "description": "Authorized explicit-origin preflight for a POST mutation.",
+        "headers": {
+          "Access-Control-Allow-Origin": { "$ref": "#/components/headers/ExplicitCorsOrigin" },
+          "Access-Control-Allow-Methods": {
+            "schema": { "type": "string", "const": "POST" }
+          },
+          "Access-Control-Allow-Headers": {
+            "schema": {
+              "type": "string",
+              "const": "Authorization, Content-Type"
+            }
+          },
+          "Access-Control-Max-Age": {
+            "schema": { "type": "integer", "const": 600 }
+          },
+          "Vary": {
+            "schema": {
+              "type": "string",
+              "const": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+            }
+          }
+        }
+      },
+      "MutationPreflightPut": {
+        "description": "Authorized explicit-origin preflight for the raw PUT restore mutation.",
+        "headers": {
+          "Access-Control-Allow-Origin": { "$ref": "#/components/headers/ExplicitCorsOrigin" },
+          "Access-Control-Allow-Methods": {
+            "schema": { "type": "string", "const": "PUT" }
+          },
+          "Access-Control-Allow-Headers": {
+            "schema": {
+              "type": "string",
+              "const": "Authorization, Content-Length, Content-Type"
+            }
+          },
+          "Access-Control-Max-Age": {
+            "schema": { "type": "integer", "const": 600 }
+          },
+          "Vary": {
+            "schema": {
+              "type": "string",
+              "const": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+            }
+          }
+        }
+      },
+      "Error": {
+        "description": "Bounded public capacity error",
+        "content": {
+          "application/vnd.noos.wwm-web-capacity.v1+json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "CorsError": {
+        "description": "Bounded mutation error. Authorized origins receive an exact non-credentialed CORS response; unauthorized origins receive no permissive CORS header.",
+        "headers": {
+          "Cache-Control": { "$ref": "#/components/headers/NoStore" },
+          "Vary": {
+            "schema": {
+              "type": "string",
+              "const": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+            }
+          }
+        },
+        "content": {
+          "application/vnd.noos.wwm-web-capacity.v1+json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      }
+    }
+  }
+}

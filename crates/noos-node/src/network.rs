@@ -13,7 +13,9 @@ use noos_braid::{BlockHeaderV1, FinalityCertificateV1};
 use noos_codec::{NoosDecode, NoosEncode};
 use noos_da::{encode_body, BodyDaClaimV1, ShardCandidateV1, BODY_TOTAL_SHARDS};
 use noos_ground::GroundTicketV1;
-use noos_p2p::{BodyReplyV1, Multiaddr, P2pHandle, PeerId, ProtocolStore, RangeReplyV1};
+use noos_p2p::{
+    BodyReplyV1, LightUpdateReplyV1, Multiaddr, P2pHandle, PeerId, ProtocolStore, RangeReplyV1,
+};
 use noos_witness::vote::FinalityVoteV1;
 use tokio::runtime::Handle;
 
@@ -220,6 +222,9 @@ impl P2pNetworkEdge {
 
     /// Async tx push to every ready peer (same framing as `announce_tx`).
     pub async fn push_tx(&self, tx_bytes: &[u8], wit_bytes: &[u8]) {
+        if !noos_lumen::wwm::carrier_len_valid(tx_bytes.len(), wit_bytes.len()) {
+            return;
+        }
         let Ok(tx_len) = u32::try_from(tx_bytes.len()) else {
             return;
         };
@@ -298,6 +303,17 @@ impl NetworkEdge for P2pNetworkEdge {
         Ok(Vec::new())
     }
 
+    fn request_light_updates(
+        &mut self,
+        from_height: u64,
+        max: u32,
+    ) -> Result<LightUpdateReplyV1, EdgeError> {
+        let peer = self.select_peer()?;
+        self.runtime
+            .block_on(self.handle.request_light_updates(peer, from_height, max))
+            .map_err(|_| EdgeError::Malformed)
+    }
+
     fn announce_header(&mut self, header: &BlockHeaderV1, ticket: &GroundTicketV1) {
         let bytes = encode_header_announce(header, ticket);
         for peer in self.peers() {
@@ -308,6 +324,9 @@ impl NetworkEdge for P2pNetworkEdge {
     }
 
     fn announce_tx(&mut self, tx_bytes: &[u8], wit_bytes: &[u8]) {
+        if !noos_lumen::wwm::carrier_len_valid(tx_bytes.len(), wit_bytes.len()) {
+            return;
+        }
         let Ok(tx_len) = u32::try_from(tx_bytes.len()) else {
             return;
         };

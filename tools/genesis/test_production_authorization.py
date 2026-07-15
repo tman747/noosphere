@@ -726,7 +726,12 @@ class CutoverTests(AuthorizationFixtures, unittest.TestCase):
             },
             "cutover": {"execution_authority": "SIGNED_G5_ONLY"}, "gates": gates,
         }
-        release = {"identity": {"chain_id": final["chain_id"], "genesis_hash": final["genesis_hash"]}, "source": {"repo_revision": REVISION}}
+        release = {
+            "schema_version": 1, "manifest_kind": "noosphere-release-manifest",
+            "release": {"protocol_version": "v1", "api_version": "v1"},
+            "identity": {"chain_id": final["chain_id"], "genesis_hash": final["genesis_hash"]},
+            "source": {"repo_revision": REVISION},
+        }
         prepared = {
             "manifest_state": "PREPARED_NOT_EXECUTED",
             "execution": {
@@ -756,13 +761,15 @@ class CutoverTests(AuthorizationFixtures, unittest.TestCase):
         values = self.cutover_fixture()
         pa.verify_cutover_authorization(
             values[0], values[1], self.keyring, *values[2:6],
-            trusted_role_keyring_sha256=values[6], promotion_root=values[7], test_mode=True,
+            trusted_role_keyring_sha256=values[6], promotion_schema_version=1,
+            release_schema_version=1, promotion_root=values[7], test_mode=True,
         )
         bad = copy.deepcopy(values[0]); bad["release_manifest_sha256"] = "0" * 64
         with self.assertRaisesRegex(pa.AuthorizationError, "component hash mismatch"):
             pa.verify_cutover_authorization(
                 bad, values[1], self.keyring, *values[2:6],
-                trusted_role_keyring_sha256=values[6], promotion_root=values[7], test_mode=True,
+                trusted_role_keyring_sha256=values[6], promotion_schema_version=1,
+                release_schema_version=1, promotion_root=values[7], test_mode=True,
             )
 
     def test_current_blocked_gate_and_missing_cutover_role_refuse(self):
@@ -771,14 +778,16 @@ class CutoverTests(AuthorizationFixtures, unittest.TestCase):
         with self.assertRaisesRegex(pa.AuthorizationError, "non-PASSED gate"):
             pa.verify_cutover_authorization(
                 authorization, signatures, self.keyring, promotion, release, final, prepared,
-                trusted_role_keyring_sha256=trust_root, promotion_root=root, test_mode=True,
+                trusted_role_keyring_sha256=trust_root, promotion_schema_version=1,
+                release_schema_version=1, promotion_root=root, test_mode=True,
             )
         promotion["gates"][4]["state"] = "PASSED"
         signatures["signatures"].pop()
         with self.assertRaisesRegex(pa.AuthorizationError, "missing/extra role"):
             pa.verify_cutover_authorization(
                 authorization, signatures, self.keyring, promotion, release, final, prepared,
-                trusted_role_keyring_sha256=trust_root, promotion_root=root, test_mode=True,
+                trusted_role_keyring_sha256=trust_root, promotion_schema_version=1,
+                release_schema_version=1, promotion_root=root, test_mode=True,
             )
 
     def test_passed_strings_and_dummy_signature_objects_never_authorize(self):
@@ -797,10 +806,11 @@ class CutoverTests(AuthorizationFixtures, unittest.TestCase):
         authorization = dict(authorization)
         authorization["promotion_ledger_sha256"] = pa.sha256(pa.canonical_json(fabricated) + b"\n")
         signatures = self.sign(authorization, pa.DOMAIN_CUTOVER, pa.CUTOVER_ROLES)
-        with self.assertRaisesRegex(pa.AuthorizationError, "authorization record"):
+        with self.assertRaisesRegex(pa.AuthorizationError, "requirement ID set|authorization record"):
             pa.verify_cutover_authorization(
                 authorization, signatures, self.keyring, fabricated, release, final, prepared,
-                trusted_role_keyring_sha256=trust_root, promotion_root=root, test_mode=True,
+                trusted_role_keyring_sha256=trust_root, promotion_schema_version=1,
+                release_schema_version=1, promotion_root=root, test_mode=True,
             )
 
     def test_signed_gate_file_existence_without_exact_evidence_bytes_fails(self):
@@ -809,7 +819,8 @@ class CutoverTests(AuthorizationFixtures, unittest.TestCase):
         with self.assertRaisesRegex(pa.AuthorizationError, "evidence bytes/hash mismatch"):
             pa.verify_cutover_authorization(
                 authorization, signatures, self.keyring, promotion, release, final, prepared,
-                trusted_role_keyring_sha256=trust_root, promotion_root=root, test_mode=True,
+                trusted_role_keyring_sha256=trust_root, promotion_schema_version=1,
+                release_schema_version=1, promotion_root=root, test_mode=True,
             )
 
 

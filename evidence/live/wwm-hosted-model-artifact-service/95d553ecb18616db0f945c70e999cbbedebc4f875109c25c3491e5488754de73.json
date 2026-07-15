@@ -1,0 +1,155 @@
+{
+  "schema": "noos/wwm-hosted-model-artifact-service/v1",
+  "captured_at": "2026-07-15T08:06:17.705Z",
+  "environment": "LOCAL_TESTNET_FIXTURE",
+  "production_claimed": false,
+  "repository_revision": "adf1325428507b4f06f7c9568066985240fc8747",
+  "service_binary": {
+    "path": "D:/noosphere-targets/integration/release/noos-artifact-service.exe",
+    "bytes": 5678592,
+    "sha256": "9625e03e3ab9b5577dc19f4bf000f79f26c1004a5f172603fdac9b162467852f",
+    "release_build": true
+  },
+  "startup": {
+    "schema": "noos.wwm.artifact-service-startup.v1",
+    "listen": "127.0.0.1:9761",
+    "artifact_root": "D:/noosphere-artifacts/custodian-store",
+    "consensus_root": "C:/tmp/wwm-consensus-placeholder",
+    "production_claimed": false,
+    "public_internet_authorized": false,
+    "upload_lane_enabled": false,
+    "cors_wildcard_scope": "public immutable manifest/share bytes only",
+    "http": {
+      "max_concurrent_requests": 2,
+      "queue_capacity": 4,
+      "per_client_requests_per_second": 128,
+      "max_tracked_clients": 4096,
+      "max_request_metadata_bytes": 16384,
+      "max_range_bytes": 1047552,
+      "queue_wait_millis": 2000,
+      "egress_bytes_per_second": 67108864,
+      "egress_wait_millis": 5000
+    },
+    "verification": {
+      "schema": "noos.wwm.artifact-store-verification.v1",
+      "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+      "source_bytes": 3803452480,
+      "published_sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+      "protocol_payload_root": "d9fd68fd5b262b0b3672f71c633956c93228e6e3f331ed92ef40e2647de475f7",
+      "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+      "stripe_count": 454,
+      "position_count": 12,
+      "position_roots": [
+        "876dca42ebbba4d77cd3d75a07f1048c6c4d678cf5b7a70a261e54243d885723",
+        "0dae9a09efc7995a52f82a3b317ca348e6af468876a9b51d860c48271d3ccade",
+        "cb8028d59b9d563384913436c87089810fe4fb07396f7e7e14491fe84d08eb92",
+        "c551b7b08d4753f2d34c61807a519a0130fb42af3e3ce8c9022906d32e88bc0a",
+        "f161223dd88f2499a6a302a9a73bd225035cc881ae3dbbaf5c6ea1d31b79403b",
+        "16a00fd5b0dd339c656bbb7eaa460f4264eb336ef8c5494aa1b6dde01a49af5c",
+        "3b9a0ce52f270edf449a79720f0c039ef7643bac8cb5b4e8f36be8025a56e46a",
+        "984d8e5466178dab6a2d16241f5b981c23c781279c2e205986fb32059243ca64",
+        "d82cf859624e65eb7ed37bdfed4e72a61dd572097bc8e29d20dfc704782cd1e5",
+        "2f0f66ceb088d2659fd7038571c0c62ed3439df389366afc462f49fe237d90ef",
+        "cb120382623eb4f397640337280f3d4ce85593059434e72220e4deb09e8e979b",
+        "640f3654c30df9d26df3ed2e2066d460a067db481cbf4d6ee4fba48457888b59"
+      ],
+      "verified_share_count": 5448,
+      "encoded_share_bytes": 5707063296,
+      "store_used_bytes": 5708023250,
+      "store_quota_bytes": 8589934592,
+      "published": true
+    }
+  },
+  "final_binary_smoke": {
+    "manifest_status": 200,
+    "manifest_bytes": 381824,
+    "manifest_exact": true,
+    "head_status": 200,
+    "head_content_length": "1047552",
+    "head_accept_ranges": "bytes",
+    "head_etag": "\"976a326d2d18bdb4d3e0d70bdc342a1c0f01820696a17532605ac8c3058cb802\"",
+    "etag_matches_canonical_share_digest": true,
+    "range_status": 206,
+    "range_content_range": "bytes 100-199/1047552",
+    "range_bytes": 100,
+    "range_exact": true,
+    "invalid_range_status": 416,
+    "invalid_range_content_range": "bytes */1047552",
+    "request_body_status": 413
+  },
+  "bounded_load_exercises": {
+    "per_client_rate": {
+      "configured_requests_per_second": 128,
+      "requests": 160,
+      "status_counts": {
+        "200": 128,
+        "429": 32
+      },
+      "pass": true
+    },
+    "request_queue": {
+      "max_concurrency": 2,
+      "queue_capacity": 4,
+      "requests": 24,
+      "result_counts": {
+        "200:1047552": 7,
+        "503:19": 17
+      },
+      "pass": true
+    }
+  },
+  "metrics_after_exercises": {
+    "schema": "noos.wwm.artifact-service-metrics.v1",
+    "uptime_millis": 38010,
+    "requests_total": 189,
+    "active_requests": 0,
+    "queued_requests": 0,
+    "queue_rejections": 17,
+    "rate_rejections": 32,
+    "egress_rejections": 0,
+    "read_failures": 0,
+    "manifest_responses": 1,
+    "share_get_responses": 8,
+    "share_head_responses": 129,
+    "egress_bytes": 7714788,
+    "store_used_bytes": 5708023250,
+    "store_quota_bytes": 8589934592
+  },
+  "compose_binding": {
+    "file": "deploy/wwm/compose.yaml",
+    "separate_internal_network": "artifact",
+    "separate_staging_volume": true,
+    "bounded_command_arguments": true,
+    "validator_or_gateway_listener": false
+  },
+  "verification_commands": [
+    {
+      "command": "cargo test -p noos-artifact-service",
+      "result": "PASS: 4 tests across 3 suites"
+    },
+    {
+      "command": "cargo clippy -p noos-artifact-service --all-targets --no-deps -- -D warnings",
+      "result": "PASS"
+    },
+    {
+      "command": "python -m unittest tools.operations.test_wwm_topology.WwmTopologyTests.test_static_topology_pins_artifact_runtime_and_isolates_services",
+      "result": "PASS: 1 test"
+    }
+  ],
+  "checks": {
+    "manifest_and_share_contract_pass": true,
+    "head_get_206_304_416_semantics_pass": true,
+    "etag_is_canonical_share_digest": true,
+    "no_redirect_route_exists": true,
+    "wildcard_cors_has_no_credentials": true,
+    "exact_bounds_precede_store_read": true,
+    "queue_rate_egress_and_disk_quota_bounded": true,
+    "read_failures": 0,
+    "verdict": "PASS"
+  },
+  "scope_and_non_claims": [
+    "Loopback local-testnet custodian transport only; production and public-Internet authorization remain false.",
+    "No upload lane, validator key, consensus store, inference gateway, or model execution exists in this process.",
+    "This single store is not evidence of production custody diversity or a custody certificate."
+  ]
+}
