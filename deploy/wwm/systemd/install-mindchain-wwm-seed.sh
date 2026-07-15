@@ -5,19 +5,21 @@ if [[ "${EUID}" -ne 0 ]]; then
   echo "installer must run as root" >&2
   exit 1
 fi
-if [[ "$#" -ne 6 ]]; then
-  echo "usage: $0 <witness-index:0..3> <p2p-port> <peer-multiaddr|-> <binary-path> <binary-sha256> <parameters-path>" >&2
+if [[ "$#" -ne 7 ]]; then
+  echo "usage: $0 <role:validator|witness> <witness-index:0..3> <p2p-port> <peer-multiaddr|-> <binary-path> <binary-sha256> <parameters-path>" >&2
   exit 1
 fi
 
-WITNESS_INDEX="$1"
-P2P_PORT="$2"
-BOOTSTRAP_PEER="$3"
-BINARY_SOURCE="$4"
-EXPECTED_SHA256="$5"
-PARAMS_SOURCE="$6"
+NODE_ROLE="$1"
+WITNESS_INDEX="$2"
+P2P_PORT="$3"
+BOOTSTRAP_PEER="$4"
+BINARY_SOURCE="$5"
+EXPECTED_SHA256="$6"
+PARAMS_SOURCE="$7"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
+[[ "${NODE_ROLE}" =~ ^(validator|witness)$ ]] || { echo "role must be validator or witness" >&2; exit 1; }
 [[ "${WITNESS_INDEX}" =~ ^[0-3]$ ]] || { echo "witness index must be 0..3" >&2; exit 1; }
 [[ "${P2P_PORT}" =~ ^[0-9]{4,5}$ ]] || { echo "P2P port is invalid" >&2; exit 1; }
 (( P2P_PORT >= 1024 && P2P_PORT <= 65535 )) || { echo "P2P port is outside 1024..65535" >&2; exit 1; }
@@ -67,8 +69,8 @@ if [[ "${BOOTSTRAP_PEER}" != "-" ]]; then
   BOOTSTRAP_VALUE="${BOOTSTRAP_PEER}"
 fi
 NODE_ENV_TMP="$(mktemp /etc/mindchain-wwm/node.env.XXXXXX)"
-printf 'WITNESS_INDEX=%s\nP2P_LISTEN=/ip4/0.0.0.0/udp/%s/quic-v1\nBOOTSTRAP_PEER=%s\n' \
-  "${WITNESS_INDEX}" "${P2P_PORT}" "${BOOTSTRAP_VALUE}" > "${NODE_ENV_TMP}"
+printf 'NODE_ROLE=%s\nWITNESS_INDEX=%s\nP2P_LISTEN=/ip4/0.0.0.0/udp/%s/quic-v1\nBOOTSTRAP_PEER=%s\n' \
+  "${NODE_ROLE}" "${WITNESS_INDEX}" "${P2P_PORT}" "${BOOTSTRAP_VALUE}" > "${NODE_ENV_TMP}"
 chown root:mindchain-wwm "${NODE_ENV_TMP}"
 chmod 0640 "${NODE_ENV_TMP}"
 mv "${NODE_ENV_TMP}" /etc/mindchain-wwm/node.env
@@ -88,4 +90,4 @@ systemctl restart mindchain-wwm-seed.service
 systemctl start mindchain-wwm-external-probe.timer
 systemctl is-active --quiet mindchain-wwm-seed.service
 
-printf 'installed witness=%s p2p_port=%s binary_sha256=%s\n' "${WITNESS_INDEX}" "${P2P_PORT}" "${ACTUAL_SHA256}"
+printf 'installed role=%s witness=%s p2p_port=%s binary_sha256=%s\n' "${NODE_ROLE}" "${WITNESS_INDEX}" "${P2P_PORT}" "${ACTUAL_SHA256}"

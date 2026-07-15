@@ -1,5 +1,5 @@
 [Unit]
-Description=MindChain WWM public testnet seed witness
+Description=MindChain WWM public testnet seed node
 Documentation=https://wwm-status.mindchain.network/status.json
 After=network-online.target
 Wants=network-online.target

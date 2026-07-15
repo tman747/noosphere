@@ -97,12 +97,11 @@ $Specs = @(
         Name = 'node'
         Exe = $NodeBinary
         Args = @(
-            '--validator',
+            '--devnet-witness', '2',
             '--devnet-witness-fixture',
             '--devnet-bonsai-fixture',
             '--rpc', '127.0.0.1:29652',
             '--rpc-token-file', $TokenFile,
-            '--produce-interval-ms', '1000',
             '--devnet-governance-account', $GovernanceAccount,
             '--p2p-listen', '/ip4/0.0.0.0/udp/29650/quic-v1',
             '--peer', '/ip4/20.15.164.29/udp/31004/quic-v1',

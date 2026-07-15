@@ -23,6 +23,7 @@
   "local_services": {
     "node_rpc": "127.0.0.1:29652",
     "node_p2p": "/ip4/0.0.0.0/udp/29650/quic-v1",
+    "node_role": "witness-2-read-gateway-source",
     "public_gateway": "127.0.0.1:29680",
     "static_artifact_host": "127.0.0.1:29681",
     "artifact_store_api": "127.0.0.1:29682",
@@ -42,6 +43,7 @@
       "ipv4": "20.15.164.29",
       "multiaddr": "/ip4/20.15.164.29/udp/31004/quic-v1",
       "witness_index": 0,
+      "role": "validator-producer",
       "provider": "azure",
       "region": "centralus",
       "machine": "mindchain-seed-1",
@@ -53,6 +55,7 @@
       "ipv4": "172.202.41.123",
       "multiaddr": "/ip4/172.202.41.123/udp/31005/quic-v1",
       "witness_index": 1,
+      "role": "witness",
       "provider": "azure",
       "region": "centralus",
       "machine": "mindchain-seed-2",
