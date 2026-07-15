@@ -43,8 +43,6 @@ def cargo_packages() -> list[dict[str, str]]:
     return sorted(packages, key=lambda package: (package["name"], package["version"], package.get("source", "")))
 
 
-def go_modules(env: dict[str, str]) -> list[dict[str, str]]:
-    return repro_build.go_modules(env)
 
 
 def deterministic_uuid(payload: bytes) -> str:
@@ -84,9 +82,16 @@ def create_bundle(
     details = repro_build.build_target(target, out, revision=revision, smoke=smoke)
     identity = details["source"]
     boundary = candidate_boundary(smoke, builder_profile)
-    metadata_target = out / ".metadata-target"
-    env = repro_build.deterministic_environment(ROOT, metadata_target, target, identity["source_date_epoch"])
     binary_hashes = details["binary_hashes"]
+    module_provenance = details.get("go_module_provenance")
+    modules = module_provenance.get("modules") if isinstance(module_provenance, dict) else None
+    if not isinstance(modules, list) or any(
+        not isinstance(module, dict)
+        or not isinstance(module.get("path"), str)
+        or not isinstance(module.get("version"), str)
+        for module in modules
+    ):
+        raise repro_build.AssuranceError("build details contain no verified Go module graph")
 
     components: list[dict[str, Any]] = [
         {"type": "file", "name": name, "version": version, "hashes": [{"alg": "SHA-256", "content": digest}]}
@@ -101,11 +106,6 @@ def create_bundle(
         if "checksum" in package:
             component["hashes"] = [{"alg": "SHA-256", "content": package["checksum"]}]
         components.append(component)
-    try:
-        modules = go_modules(env)
-    finally:
-        if metadata_target.exists():
-            shutil.rmtree(metadata_target)
     for module in modules:
         components.append({
             "type": "library", "name": module["path"], "version": module["version"],

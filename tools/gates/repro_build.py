@@ -532,7 +532,7 @@ def build_target(target: str, out: Path, *, revision: str | None = None, smoke: 
             source_root, target_dir, target, identity["source_date_epoch"], windows_toolchain=windows_toolchain,
         )
         subprocess.run(["go", "mod", "verify"], cwd=source_go, env=env, check=True)
-        module_count = len(go_modules(env, source_go))
+        modules = go_modules(env, source_go)
         subprocess.run(
             ["cargo", "build", "--locked", "--offline", "--frozen", "--release", "--target", cfg["rust"],
              "-p", "noos-lumen", "--bin", "noos-transition"],
@@ -569,7 +569,8 @@ def build_target(target: str, out: Path, *, revision: str | None = None, smoke: 
                 "locked_download_command": "go mod download all",
                 "offline_list_command": "go list -mod=readonly -m -json all",
                 "offline_graph_verified": True,
-                "module_count": module_count,
+                "module_count": len(modules),
+                "modules": modules,
             },
             "deterministic_environment": locks["deterministic_environment"],
             "post_build_normalization": "forbidden-and-not-performed",

@@ -133,6 +133,9 @@ class ReleaseCiTests(unittest.TestCase):
                 "binary_hashes": binary_hashes,
                 "installed_toolchain_provenance": installed,
                 "windows_toolchain_provenance": None,
+                "go_module_provenance": {
+                    "modules": [{"path": "example.test/dep", "version": "v1.0.0"}],
+                },
             }
             (out / "build-details.json").write_bytes(repro_build.canonical_json(details))
             return details
@@ -141,11 +144,9 @@ class ReleaseCiTests(unittest.TestCase):
             root = Path(directory)
             patches = (
                 mock.patch.object(repro_build, "build_target", side_effect=fake_build),
-                mock.patch.object(repro_build, "deterministic_environment", return_value={}),
                 mock.patch.object(generate_release, "cargo_packages", return_value=[]),
-                mock.patch.object(generate_release, "go_modules", return_value=[{"path": "example.test/dep", "version": "v1.0.0"}]),
             )
-            with patches[0], patches[1], patches[2], patches[3]:
+            with patches[0], patches[1]:
                 for name in ("first", "second"):
                     generate_release.create_bundle(
                         "linux-x86_64", root / name, "test-version", smoke=True,
@@ -160,6 +161,11 @@ class ReleaseCiTests(unittest.TestCase):
             self.assertEqual(manifest["external_builder_gate"], "EXTERNAL_BLOCKED")
             self.assertFalse(manifest["independent_builder_evidence"])
             self.assertEqual(manifest["control_plane"], "github-actions-owner-controlled-smoke-control-plane")
+            sbom = json.loads(first[Path("sbom.cdx.json")])
+            self.assertIn(
+                "pkg:golang/example.test/dep@v1.0.0",
+                {component.get("purl") for component in sbom["components"]},
+            )
 
         with self.assertRaisesRegex(repro_build.AssuranceError, "must remain --smoke"):
             generate_release.candidate_boundary(False, "github-hosted-owner-smoke")
