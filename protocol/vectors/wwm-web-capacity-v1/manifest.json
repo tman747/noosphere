@@ -8,8 +8,8 @@
   },
   "files": {
     "vectors.json": {
-      "bytes": 4070984,
-      "sha256": "517125b644bb12b807eb743d503814da4e9b7ddf628dd6321a748c343960fb3d"
+      "bytes": 4070983,
+      "sha256": "5a41dcfea3dad8b7c3c35dbaec239a3284f2007643211d7204f512bc55d1e05b"
     }
   },
   "format": "noos/wwm-web-capacity/v1/vector-manifest/v1",

@@ -1,0 +1,730 @@
+{
+  "artifact": {
+    "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+    "encoded_bytes": 5707063296,
+    "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+    "model_bytes": 3803452480,
+    "model_sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+    "positions": 12,
+    "reconstruction_threshold": 8,
+    "schedulable_minimum": 9
+  },
+  "chain_bound_inference": {
+    "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+    "finalized_job": {
+      "canonical_record_hex": "0100010050446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c02000106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b03008c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e04002067f65fa8419678956885a3e097561dd4ed472a51f2e98802a8d89de7caf940050001000000000000000600eb06584686e59f077ac84defeabe9bee421c178fbd656313f2b36666d77495f10700e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d0800780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf182090098021a08b5fa7d364e8c4071d4544441c4c53150134102ae38a754207612688c0a00040000000b00100000000c00c32d0000000000000d00030000004945e6f53485dc053ef2c4bb650a86a32f7bc7bdd1fe4bb5b03284f0fe8712055b41ed514d1a07ef3592856297669ed5db5573b642ff7e807f33355ea55bd813610cfd7fa727b723098e1fe9b1881818bd93fc37c8afd37ea7ad9c92150768750e005e4dceae9252ae13495077fe2370e8068dd37ad9b25ac621097578c3cda9b9280f00eb5e9721cbe4372ddd3d5636a1acb1f98b19d2f57d8026c4b62924df26ace86c10000000000000000000000000000000000011000d7d0b041643dc40aac86ab8f2414e325dc2a835c23c724408095bf3fb78f977",
+      "finalized_hash": "e6340aee14858b50888e925bb6197e8db6a71e71ff9b7b501d04f3f1bcb25bf7",
+      "finalized_height": 6912,
+      "id": "50446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c",
+      "kind": "job",
+      "objects_root": "dcde09788f78ef3ad8f413ad703f681d8e43c153f639d851dd57cfab7eb17cff",
+      "proof_hex": "0100cd4c77ffa8e18febb0edfc25eba3d01fe1391c9eecc6beb23a7be52ed0d4f93c0100100200000100010050446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c02000106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b03008c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e04002067f65fa8419678956885a3e097561dd4ed472a51f2e98802a8d89de7caf940050001000000000000000600eb06584686e59f077ac84defeabe9bee421c178fbd656313f2b36666d77495f10700e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d0800780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf182090098021a08b5fa7d364e8c4071d4544441c4c53150134102ae38a754207612688c0a00040000000b00100000000c00c32d0000000000000d00030000004945e6f53485dc053ef2c4bb650a86a32f7bc7bdd1fe4bb5b03284f0fe8712055b41ed514d1a07ef3592856297669ed5db5573b642ff7e807f33355ea55bd813610cfd7fa727b723098e1fe9b1881818bd93fc37c8afd37ea7ad9c92150768750e005e4dceae9252ae13495077fe2370e8068dd37ad9b25ac621097578c3cda9b9280f00eb5e9721cbe4372ddd3d5636a1acb1f98b19d2f57d8026c4b62924df26ace86c10000000000000000000000000000000000011000d7d0b041643dc40aac86ab8f2414e325dc2a835c23c724408095bf3fb78f9770100fd0800000000000000000000000000000000000000000000000000000000000008000000785d51f79ecf16cce8cf445ccbdf8aec384334606dba5cb7d61b0b1b0a26225b43e56a8a82d1d48238e8ee4738a058649a2f766e9809f9929d4e2f8d0e182d477df3bf1f0125ab24cf9347123ce0d7ec42469a14242da57cedb8fa0a51c6588dfe20fad8e645ea87ee8e6bf3f60617721481cf25f4b44f105f42499a5436ae2740c97a814cf98b9879a51ff8d3b645a0ed9aec5169b20c0ec1a1cf47bb11381e2d8d65920cd19f1e2cbffc17df67f73050eb6922768f7fe08ac84063e30b7ec8daf04f449b843c56073e428ad1aba4115d0ab9cc8d19e928400be832fe953b80f33559fb3a6d1ec8679e60184e055b2c5603b89731f9e3c1e7b682eb9c64694bdcde09788f78ef3ad8f413ad703f681d8e43c153f639d851dd57cfab7eb17cff",
+      "record": {
+        "availability_certificate_id": "5e4dceae9252ae13495077fe2370e8068dd37ad9b25ac621097578c3cda9b928",
+        "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+        "deadline_height": 11715,
+        "execution_profile_id": "780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf182",
+        "fund_profile_id": "eb5e9721cbe4372ddd3d5636a1acb1f98b19d2f57d8026c4b62924df26ace86c",
+        "job_id": "50446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c"
+      },
+      "schema": "noos/finalized-wwm-record/v1",
+      "trust_scope": "LOCAL_FULL_NODE_FINALIZED_STATE"
+    },
+    "finalized_receipt": {
+      "canonical_record_hex": "0100010071099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c466020050446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c0300e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d0400d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0050058f310f0412514cea1a31757c9cc9714666b64fb67127914ab08554c4e0b4d5606007ccfac375b7121adfb8c35763b183a7707bb071bd1abbd76128986b16c3b4d330700690d9bbd8d44631fb971e0b0677e10c8d0bb1e08a743bb720eeaab728e30ba270800a61768de8786670eb2aefcc59751657bcdbddc8d750f5fe1073f586debe2d0eb0900780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf1820a00040000000b00100000000c0092a6d621a201b14070eae374065a9492416568310db9bc8be84c434e175c8a1a0d0084408432b597428b7f72798dc79da60d2453c04cf02e7da85a9329310ddaa7c10e00030000004945e6f53485dc053ef2c4bb650a86a32f7bc7bdd1fe4bb5b03284f0fe8712055b41ed514d1a07ef3592856297669ed5db5573b642ff7e807f33355ea55bd813610cfd7fa727b723098e1fe9b1881818bd93fc37c8afd37ea7ad9c92150768750f00030000004945e6f53485dc053ef2c4bb650a86a32f7bc7bdd1fe4bb5b03284f0fe8712055b41ed514d1a07ef3592856297669ed5db5573b642ff7e807f33355ea55bd813610cfd7fa727b723098e1fe9b1881818bd93fc37c8afd37ea7ad9c92150768751000001100e29b0100000000001200e29b0100000000001300001b0000000000001400e6340aee14858b50888e925bb6197e8db6a71e71ff9b7b501d04f3f1bcb25bf7150000000000000000000000000000000000160000000000000000000000000000000000170000000000000000000000000000000000180000190000000000",
+      "finalized_hash": "18f6b0632f9f383b53a161805076aa009b9b05142ff35ffe64bb0c088f1f3808",
+      "finalized_height": 7424,
+      "id": "71099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c466",
+      "kind": "receipt",
+      "objects_root": "194ce38ed8cd809afe88e2839aac98941a7b7ea6ea4706da8a56c01a8b0de9fc",
+      "proof_hex": "0100dd6fbd3d759b8c2fe3650818cab147cfa198d9b3a85bd8380306e5f0b183ddd10100d20200000100010071099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c466020050446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c0300e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d0400d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0050058f310f0412514cea1a31757c9cc9714666b64fb67127914ab08554c4e0b4d5606007ccfac375b7121adfb8c35763b183a7707bb071bd1abbd76128986b16c3b4d330700690d9bbd8d44631fb971e0b0677e10c8d0bb1e08a743bb720eeaab728e30ba270800a61768de8786670eb2aefcc59751657bcdbddc8d750f5fe1073f586debe2d0eb0900780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf1820a00040000000b00100000000c0092a6d621a201b14070eae374065a9492416568310db9bc8be84c434e175c8a1a0d0084408432b597428b7f72798dc79da60d2453c04cf02e7da85a9329310ddaa7c10e00030000004945e6f53485dc053ef2c4bb650a86a32f7bc7bdd1fe4bb5b03284f0fe8712055b41ed514d1a07ef3592856297669ed5db5573b642ff7e807f33355ea55bd813610cfd7fa727b723098e1fe9b1881818bd93fc37c8afd37ea7ad9c92150768750f00030000004945e6f53485dc053ef2c4bb650a86a32f7bc7bdd1fe4bb5b03284f0fe8712055b41ed514d1a07ef3592856297669ed5db5573b642ff7e807f33355ea55bd813610cfd7fa727b723098e1fe9b1881818bd93fc37c8afd37ea7ad9c92150768751000001100e29b0100000000001200e29b0100000000001300001b0000000000001400e6340aee14858b50888e925bb6197e8db6a71e71ff9b7b501d04f3f1bcb25bf71500000000000000000000000000000000001600000000000000000000000000000000001700000000000000000000000000000000001800001900000000000100f40000000000000000000000000000000000000000000000000000000000000005000000785d51f79ecf16cce8cf445ccbdf8aec384334606dba5cb7d61b0b1b0a26225b43e56a8a82d1d48238e8ee4738a058649a2f766e9809f9929d4e2f8d0e182d477df3bf1f0125ab24cf9347123ce0d7ec42469a14242da57cedb8fa0a51c6588d2b0578232fade8ac7e16b950181f96f88f425dc7d240bdb26594ef18b903878878364dea660695f16261e8f4918a4f99eec60207f49121a87a03060ededdce87194ce38ed8cd809afe88e2839aac98941a7b7ea6ea4706da8a56c01a8b0de9fc",
+      "record": {
+        "anchor_block": "e6340aee14858b50888e925bb6197e8db6a71e71ff9b7b501d04f3f1bcb25bf7",
+        "anchor_height": 6912,
+        "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+        "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+        "execution_profile_id": "780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf182",
+        "job_id": "50446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c",
+        "output_root": "84408432b597428b7f72798dc79da60d2453c04cf02e7da85a9329310ddaa7c1",
+        "receipt_id": "71099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c466",
+        "terminal_code": 0,
+        "token_history_root": "92a6d621a201b14070eae374065a9492416568310db9bc8be84c434e175c8a1a"
+      },
+      "schema": "noos/finalized-wwm-record/v1",
+      "trust_scope": "LOCAL_FULL_NODE_FINALIZED_STATE"
+    },
+    "finalized_settlement": {
+      "canonical_record_hex": "010001004e7262f04678024aff9fe33670b756c1b17a384acc166de16c3713d070088b83020050446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c030071099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c4660400eb5e9721cbe4372ddd3d5636a1acb1f98b19d2f57d8026c4b62924df26ace86c050000060000000000000000000700000000000000000000000000000000000800000000000000000000000000000000000900000000000000000000000000000000000a00001b0000000000000b0001000000000000000c0014000000544553544e45545f464958545552455f4f4e4c59",
+      "finalized_hash": "f533a7fd5b57f4954e15de1808cabb529213a9eed85c094936c5008f0b276bb7",
+      "finalized_height": 7936,
+      "id": "4e7262f04678024aff9fe33670b756c1b17a384acc166de16c3713d070088b83",
+      "kind": "settlement",
+      "objects_root": "2175b59a8f1bd1a73c07b9746ecafaa7c5cc4eb931cb767a0cd59ef34bf68a89",
+      "proof_hex": "0100121829ac9fcc780a0b9988552796aba0ae369328e27f278b558c96e989524e870100fb000000010001004e7262f04678024aff9fe33670b756c1b17a384acc166de16c3713d070088b83020050446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c030071099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c4660400eb5e9721cbe4372ddd3d5636a1acb1f98b19d2f57d8026c4b62924df26ace86c050000060000000000000000000700000000000000000000000000000000000800000000000000000000000000000000000900000000000000000000000000000000000a00001b0000000000000b0001000000000000000c0014000000544553544e45545f464958545552455f4f4e4c590100f80000000000000000000000000000000000000000000000000000000000000005000000a158f632e19c69f411fb26a60652ad174b3e6d8731e275e165ecd6855b8972b03f473b61652ca9918a4b6718cc67048d746523ed1cf9421158adc03dee8b2e46da4c36e2e5f6c0b72ca43f94580dbb4eb51f193f0245ef29422bad52d9d29581fa22e267503417c60f70316b963aedbd55990321397c6d38fb1566fa2de07cf699166a30b287f72cf15f6857d598f9ce8bca45fb8294c263d4e72ead8eb482bf2175b59a8f1bd1a73c07b9746ecafaa7c5cc4eb931cb767a0cd59ef34bf68a89",
+      "record": {
+        "fund_profile_id": "eb5e9721cbe4372ddd3d5636a1acb1f98b19d2f57d8026c4b62924df26ace86c",
+        "job_id": "50446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c",
+        "receipt_id": "71099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c466",
+        "settled_height": 6912,
+        "settlement_id": "4e7262f04678024aff9fe33670b756c1b17a384acc166de16c3713d070088b83"
+      },
+      "schema": "noos/finalized-wwm-record/v1",
+      "trust_scope": "LOCAL_FULL_NODE_FINALIZED_STATE"
+    },
+    "inference": {
+      "duration_seconds": 10.172,
+      "event_transcript_sha256": "5e896a3b0fefb0abdae8cfea47a31f7c201b06857b39298b730d28a486ad2c41",
+      "job_id": "50446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c",
+      "output_bytes": 57,
+      "output_chunks": 1,
+      "output_root": "84408432b597428b7f72798dc79da60d2453c04cf02e7da85a9329310ddaa7c1",
+      "output_tokens": 16,
+      "terminal": {
+        "code": "completed",
+        "output_root": "84408432b597428b7f72798dc79da60d2453c04cf02e7da85a9329310ddaa7c1",
+        "type": "terminal"
+      },
+      "token_history_root": "92a6d621a201b14070eae374065a9492416568310db9bc8be84c434e175c8a1a",
+      "tokenization": {
+        "bos_included": false,
+        "stdin_bytes": 57,
+        "token_count": 16,
+        "token_history_root": "92a6d621a201b14070eae374065a9492416568310db9bc8be84c434e175c8a1a",
+        "tokenizer_executable_sha256": "2685f72d8b2c27c72c116d2c6af9bb180adb4bf2f4fc9adee052dbcfe7f266f4"
+      }
+    },
+    "job_id": "50446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c",
+    "open": {
+      "finalized_height": 6717,
+      "finalized_status": {
+        "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+        "finalized": {
+          "epoch": 27,
+          "hash": "e6340aee14858b50888e925bb6197e8db6a71e71ff9b7b501d04f3f1bcb25bf7"
+        },
+        "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+        "justified": {
+          "epoch": 28,
+          "hash": "2a64ca648a289a04474fff14a6c3293d982f0c5708c2086fc5acc7f789cefffa"
+        },
+        "mempool": {
+          "bytes": 0,
+          "txs": 0
+        },
+        "observer": false,
+        "unsafe_head": {
+          "hash": "2a64ca648a289a04474fff14a6c3293d982f0c5708c2086fc5acc7f789cefffa",
+          "height": 7168
+        }
+      },
+      "receipt": {
+        "receipt": {
+          "fee_charged": "1054",
+          "status": 0,
+          "txid": "40c992ab0da214889915e8052d5b67c39ade87984e65e28d73b3d55ca360e9a6"
+        },
+        "state": {
+          "settled_height": 6717,
+          "status_code": 0
+        }
+      },
+      "txid": "40c992ab0da214889915e8052d5b67c39ade87984e65e28d73b3d55ca360e9a6"
+    },
+    "output_root": "84408432b597428b7f72798dc79da60d2453c04cf02e7da85a9329310ddaa7c1",
+    "production_capable": false,
+    "receipt_id": "71099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c466",
+    "record_receipt": {
+      "finalized_height": 7231,
+      "finalized_status": {
+        "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+        "finalized": {
+          "epoch": 29,
+          "hash": "18f6b0632f9f383b53a161805076aa009b9b05142ff35ffe64bb0c088f1f3808"
+        },
+        "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+        "justified": {
+          "epoch": 30,
+          "hash": "8673f08aab4ab3bd85bca0fc267c3113922bd33a9b986d5e9119f7ca9b5afed0"
+        },
+        "mempool": {
+          "bytes": 0,
+          "txs": 0
+        },
+        "observer": false,
+        "unsafe_head": {
+          "hash": "8673f08aab4ab3bd85bca0fc267c3113922bd33a9b986d5e9119f7ca9b5afed0",
+          "height": 7680
+        }
+      },
+      "receipt": {
+        "receipt": {
+          "fee_charged": "1248",
+          "status": 0,
+          "txid": "dae4d79701a63175ff4868b821d6f5d433fdc89027079898d8ca573a740ec01c"
+        },
+        "state": {
+          "settled_height": 7231,
+          "status_code": 0
+        }
+      },
+      "txid": "dae4d79701a63175ff4868b821d6f5d433fdc89027079898d8ca573a740ec01c"
+    },
+    "settle": {
+      "finalized_height": 7683,
+      "finalized_status": {
+        "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+        "finalized": {
+          "epoch": 31,
+          "hash": "f533a7fd5b57f4954e15de1808cabb529213a9eed85c094936c5008f0b276bb7"
+        },
+        "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+        "justified": {
+          "epoch": 32,
+          "hash": "7c89ff4b0c000db201496cb3a3f2f5d2a8a126768ec0826bd5f2049d9fe47733"
+        },
+        "mempool": {
+          "bytes": 0,
+          "txs": 0
+        },
+        "observer": false,
+        "unsafe_head": {
+          "hash": "7c89ff4b0c000db201496cb3a3f2f5d2a8a126768ec0826bd5f2049d9fe47733",
+          "height": 8192
+        }
+      },
+      "receipt": {
+        "receipt": {
+          "fee_charged": "777",
+          "status": 0,
+          "txid": "b2a4e3faebf8bd648315e4ffc9da5ed9c567a3f83954238d7f50725d6eaa316c"
+        },
+        "state": {
+          "settled_height": 7683,
+          "status_code": 0
+        }
+      },
+      "txid": "b2a4e3faebf8bd648315e4ffc9da5ed9c567a3f83954238d7f50725d6eaa316c"
+    },
+    "settlement_id": "4e7262f04678024aff9fe33670b756c1b17a384acc166de16c3713d070088b83",
+    "token_history_root": "92a6d621a201b14070eae374065a9492416568310db9bc8be84c434e175c8a1a"
+  },
+  "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+  "claims": {
+    "admission_and_inference_resumed": true,
+    "canonical_any_eight_repair_completed": true,
+    "cold_cache_was_disposable": true,
+    "fresh_certificate_finalized": true,
+    "inference_job_receipt_settlement_finalized": true,
+    "new_job_admission_failed_closed_at_eight": true,
+    "ordinary_chain_finality_continued": true,
+    "production_availability_claimed": false
+  },
+  "environment": "devnet",
+  "executable_sha256": {
+    "llama_tokenize": "2685f72d8b2c27c72c116d2c6af9bb180adb4bf2f4fc9adee052dbcfe7f266f4",
+    "noos_artifact_service": "20c84afbb80e02ec784c1f82eb534f957d1f8384e07ea30e5ead3117054ffad8",
+    "noos_cli": "2849982dafdabd0c7e9de961c00d24c9f5778b782ad4d98de53abf571e587d0b",
+    "noos_workerd": "658c8fdd60d9d25fc791212b79666f5f86361c66f2c70dfb1c8f10a38d7c752d"
+  },
+  "external_model_egress": [],
+  "final_chain_status": {
+    "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+    "finalized": {
+      "epoch": 31,
+      "hash": "f533a7fd5b57f4954e15de1808cabb529213a9eed85c094936c5008f0b276bb7"
+    },
+    "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+    "justified": {
+      "epoch": 32,
+      "hash": "7c89ff4b0c000db201496cb3a3f2f5d2a8a126768ec0826bd5f2049d9fe47733"
+    },
+    "mempool": {
+      "bytes": 0,
+      "txs": 0
+    },
+    "observer": false,
+    "unsafe_head": {
+      "hash": "7c89ff4b0c000db201496cb3a3f2f5d2a8a126768ec0826bd5f2049d9fe47733",
+      "height": 8192
+    }
+  },
+  "finalized_resolution": {
+    "canonical_resolution_body_sha256": "6e0e557e289748090b181ee8522bc5c429d9b80a4b2a61104fa5f889128470d9",
+    "certificate_id": "5e4dceae9252ae13495077fe2370e8068dd37ad9b25ac621097578c3cda9b928",
+    "hash": "f533a7fd5b57f4954e15de1808cabb529213a9eed85c094936c5008f0b276bb7",
+    "height": 7936,
+    "objects_root": "2175b59a8f1bd1a73c07b9746ecafaa7c5cc4eb931cb767a0cd59ef34bf68a89"
+  },
+  "generated_at": "2026-07-15T19:33:29.816299+00:00",
+  "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+  "initial_finalized_height": 256,
+  "operator_capabilities": {
+    "finalized_record_route": "/wwm-record/{kind}/{id}",
+    "production_capable": false,
+    "schema": "noos/wwm-devnet-operator-capabilities/v1",
+    "typed_open_wwm_job": true,
+    "typed_record_wwm_receipt": true,
+    "typed_settle_wwm_job": true
+  },
+  "phases": [
+    {
+      "offline_positions": [],
+      "ordinary_transaction": {
+        "label": "12-live",
+        "receipt": {
+          "receipt": {
+            "fee_charged": "544",
+            "status": 0,
+            "txid": "f9ee6d6669d8b6a0f46c868f2a7b08395b43b726ecf3ed09421cb63cacb10938"
+          },
+          "state": {
+            "settled_height": 4679,
+            "status_code": 0
+          }
+        },
+        "txid": "f9ee6d6669d8b6a0f46c868f2a7b08395b43b726ecf3ed09421cb63cacb10938"
+      },
+      "phase": "12_live",
+      "quote": {
+        "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+        "available_concurrency": 1,
+        "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+        "live_custodian_positions": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "max_output_tokens": 8,
+        "prompt_tokens": 1,
+        "queue_available": 5,
+        "resident": true,
+        "schedulable_minimum": 9
+      }
+    },
+    {
+      "offline_positions": [
+        0,
+        1,
+        2
+      ],
+      "ordinary_transaction": {
+        "label": "9-live",
+        "receipt": {
+          "receipt": {
+            "fee_charged": "544",
+            "status": 0,
+            "txid": "c834c2d66bab9f8894e8923edeffc0fa4f37e84771d8bf21a5e3076e32b2fc1a"
+          },
+          "state": {
+            "settled_height": 4690,
+            "status_code": 0
+          }
+        },
+        "txid": "c834c2d66bab9f8894e8923edeffc0fa4f37e84771d8bf21a5e3076e32b2fc1a"
+      },
+      "phase": "9_live",
+      "quote": {
+        "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+        "available_concurrency": 1,
+        "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+        "live_custodian_positions": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "max_output_tokens": 8,
+        "prompt_tokens": 1,
+        "queue_available": 5,
+        "resident": true,
+        "schedulable_minimum": 9
+      }
+    },
+    {
+      "canonical_repair": {
+        "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+        "bytes_read": 3804708864,
+        "bytes_written": 475588608,
+        "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+        "position_root": "c551b7b08d4753f2d34c61807a519a0130fb42af3e3ce8c9022906d32e88bc0a",
+        "published": true,
+        "repaired_position": 3,
+        "repaired_shares": 454,
+        "replacement_store_used_bytes": 476368756,
+        "schema": "noos.wwm.artifact-position-repair.v1",
+        "source_positions": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "capacity_quote": {
+        "body": {
+          "error": "availability_not_schedulable",
+          "live_count": 8,
+          "live_positions": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "offline_positions": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "reconstruction_threshold": 8,
+          "schedulable_minimum": 9
+        },
+        "status": 503
+      },
+      "job_admission": {
+        "body": {
+          "error": "availability_not_schedulable",
+          "live_count": 8,
+          "live_positions": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "offline_positions": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "reconstruction_threshold": 8,
+          "schedulable_minimum": 9
+        },
+        "status": 503
+      },
+      "offline_positions": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "ordinary_transaction": {
+        "label": "8-live-admission-closed",
+        "receipt": {
+          "receipt": {
+            "fee_charged": "544",
+            "status": 0,
+            "txid": "31ce945693e8dcc0280ce544cb709ba348db0c0c8922f64e66631b15e9915f6c"
+          },
+          "state": {
+            "settled_height": 4700,
+            "status_code": 0
+          }
+        },
+        "txid": "31ce945693e8dcc0280ce544cb709ba348db0c0c8922f64e66631b15e9915f6c"
+      },
+      "phase": "8_live"
+    },
+    {
+      "chain_bound_inference": {
+        "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+        "finalized_job": {
+          "canonical_record_hex": "0100010050446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c02000106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b03008c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e04002067f65fa8419678956885a3e097561dd4ed472a51f2e98802a8d89de7caf940050001000000000000000600eb06584686e59f077ac84defeabe9bee421c178fbd656313f2b36666d77495f10700e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d0800780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf182090098021a08b5fa7d364e8c4071d4544441c4c53150134102ae38a754207612688c0a00040000000b00100000000c00c32d0000000000000d00030000004945e6f53485dc053ef2c4bb650a86a32f7bc7bdd1fe4bb5b03284f0fe8712055b41ed514d1a07ef3592856297669ed5db5573b642ff7e807f33355ea55bd813610cfd7fa727b723098e1fe9b1881818bd93fc37c8afd37ea7ad9c92150768750e005e4dceae9252ae13495077fe2370e8068dd37ad9b25ac621097578c3cda9b9280f00eb5e9721cbe4372ddd3d5636a1acb1f98b19d2f57d8026c4b62924df26ace86c10000000000000000000000000000000000011000d7d0b041643dc40aac86ab8f2414e325dc2a835c23c724408095bf3fb78f977",
+          "finalized_hash": "e6340aee14858b50888e925bb6197e8db6a71e71ff9b7b501d04f3f1bcb25bf7",
+          "finalized_height": 6912,
+          "id": "50446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c",
+          "kind": "job",
+          "objects_root": "dcde09788f78ef3ad8f413ad703f681d8e43c153f639d851dd57cfab7eb17cff",
+          "proof_hex": "0100cd4c77ffa8e18febb0edfc25eba3d01fe1391c9eecc6beb23a7be52ed0d4f93c0100100200000100010050446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c02000106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b03008c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e04002067f65fa8419678956885a3e097561dd4ed472a51f2e98802a8d89de7caf940050001000000000000000600eb06584686e59f077ac84defeabe9bee421c178fbd656313f2b36666d77495f10700e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d0800780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf182090098021a08b5fa7d364e8c4071d4544441c4c53150134102ae38a754207612688c0a00040000000b00100000000c00c32d0000000000000d00030000004945e6f53485dc053ef2c4bb650a86a32f7bc7bdd1fe4bb5b03284f0fe8712055b41ed514d1a07ef3592856297669ed5db5573b642ff7e807f33355ea55bd813610cfd7fa727b723098e1fe9b1881818bd93fc37c8afd37ea7ad9c92150768750e005e4dceae9252ae13495077fe2370e8068dd37ad9b25ac621097578c3cda9b9280f00eb5e9721cbe4372ddd3d5636a1acb1f98b19d2f57d8026c4b62924df26ace86c10000000000000000000000000000000000011000d7d0b041643dc40aac86ab8f2414e325dc2a835c23c724408095bf3fb78f9770100fd0800000000000000000000000000000000000000000000000000000000000008000000785d51f79ecf16cce8cf445ccbdf8aec384334606dba5cb7d61b0b1b0a26225b43e56a8a82d1d48238e8ee4738a058649a2f766e9809f9929d4e2f8d0e182d477df3bf1f0125ab24cf9347123ce0d7ec42469a14242da57cedb8fa0a51c6588dfe20fad8e645ea87ee8e6bf3f60617721481cf25f4b44f105f42499a5436ae2740c97a814cf98b9879a51ff8d3b645a0ed9aec5169b20c0ec1a1cf47bb11381e2d8d65920cd19f1e2cbffc17df67f73050eb6922768f7fe08ac84063e30b7ec8daf04f449b843c56073e428ad1aba4115d0ab9cc8d19e928400be832fe953b80f33559fb3a6d1ec8679e60184e055b2c5603b89731f9e3c1e7b682eb9c64694bdcde09788f78ef3ad8f413ad703f681d8e43c153f639d851dd57cfab7eb17cff",
+          "record": {
+            "availability_certificate_id": "5e4dceae9252ae13495077fe2370e8068dd37ad9b25ac621097578c3cda9b928",
+            "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+            "deadline_height": 11715,
+            "execution_profile_id": "780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf182",
+            "fund_profile_id": "eb5e9721cbe4372ddd3d5636a1acb1f98b19d2f57d8026c4b62924df26ace86c",
+            "job_id": "50446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c"
+          },
+          "schema": "noos/finalized-wwm-record/v1",
+          "trust_scope": "LOCAL_FULL_NODE_FINALIZED_STATE"
+        },
+        "finalized_receipt": {
+          "canonical_record_hex": "0100010071099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c466020050446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c0300e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d0400d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0050058f310f0412514cea1a31757c9cc9714666b64fb67127914ab08554c4e0b4d5606007ccfac375b7121adfb8c35763b183a7707bb071bd1abbd76128986b16c3b4d330700690d9bbd8d44631fb971e0b0677e10c8d0bb1e08a743bb720eeaab728e30ba270800a61768de8786670eb2aefcc59751657bcdbddc8d750f5fe1073f586debe2d0eb0900780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf1820a00040000000b00100000000c0092a6d621a201b14070eae374065a9492416568310db9bc8be84c434e175c8a1a0d0084408432b597428b7f72798dc79da60d2453c04cf02e7da85a9329310ddaa7c10e00030000004945e6f53485dc053ef2c4bb650a86a32f7bc7bdd1fe4bb5b03284f0fe8712055b41ed514d1a07ef3592856297669ed5db5573b642ff7e807f33355ea55bd813610cfd7fa727b723098e1fe9b1881818bd93fc37c8afd37ea7ad9c92150768750f00030000004945e6f53485dc053ef2c4bb650a86a32f7bc7bdd1fe4bb5b03284f0fe8712055b41ed514d1a07ef3592856297669ed5db5573b642ff7e807f33355ea55bd813610cfd7fa727b723098e1fe9b1881818bd93fc37c8afd37ea7ad9c92150768751000001100e29b0100000000001200e29b0100000000001300001b0000000000001400e6340aee14858b50888e925bb6197e8db6a71e71ff9b7b501d04f3f1bcb25bf7150000000000000000000000000000000000160000000000000000000000000000000000170000000000000000000000000000000000180000190000000000",
+          "finalized_hash": "18f6b0632f9f383b53a161805076aa009b9b05142ff35ffe64bb0c088f1f3808",
+          "finalized_height": 7424,
+          "id": "71099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c466",
+          "kind": "receipt",
+          "objects_root": "194ce38ed8cd809afe88e2839aac98941a7b7ea6ea4706da8a56c01a8b0de9fc",
+          "proof_hex": "0100dd6fbd3d759b8c2fe3650818cab147cfa198d9b3a85bd8380306e5f0b183ddd10100d20200000100010071099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c466020050446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c0300e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d0400d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0050058f310f0412514cea1a31757c9cc9714666b64fb67127914ab08554c4e0b4d5606007ccfac375b7121adfb8c35763b183a7707bb071bd1abbd76128986b16c3b4d330700690d9bbd8d44631fb971e0b0677e10c8d0bb1e08a743bb720eeaab728e30ba270800a61768de8786670eb2aefcc59751657bcdbddc8d750f5fe1073f586debe2d0eb0900780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf1820a00040000000b00100000000c0092a6d621a201b14070eae374065a9492416568310db9bc8be84c434e175c8a1a0d0084408432b597428b7f72798dc79da60d2453c04cf02e7da85a9329310ddaa7c10e00030000004945e6f53485dc053ef2c4bb650a86a32f7bc7bdd1fe4bb5b03284f0fe8712055b41ed514d1a07ef3592856297669ed5db5573b642ff7e807f33355ea55bd813610cfd7fa727b723098e1fe9b1881818bd93fc37c8afd37ea7ad9c92150768750f00030000004945e6f53485dc053ef2c4bb650a86a32f7bc7bdd1fe4bb5b03284f0fe8712055b41ed514d1a07ef3592856297669ed5db5573b642ff7e807f33355ea55bd813610cfd7fa727b723098e1fe9b1881818bd93fc37c8afd37ea7ad9c92150768751000001100e29b0100000000001200e29b0100000000001300001b0000000000001400e6340aee14858b50888e925bb6197e8db6a71e71ff9b7b501d04f3f1bcb25bf71500000000000000000000000000000000001600000000000000000000000000000000001700000000000000000000000000000000001800001900000000000100f40000000000000000000000000000000000000000000000000000000000000005000000785d51f79ecf16cce8cf445ccbdf8aec384334606dba5cb7d61b0b1b0a26225b43e56a8a82d1d48238e8ee4738a058649a2f766e9809f9929d4e2f8d0e182d477df3bf1f0125ab24cf9347123ce0d7ec42469a14242da57cedb8fa0a51c6588d2b0578232fade8ac7e16b950181f96f88f425dc7d240bdb26594ef18b903878878364dea660695f16261e8f4918a4f99eec60207f49121a87a03060ededdce87194ce38ed8cd809afe88e2839aac98941a7b7ea6ea4706da8a56c01a8b0de9fc",
+          "record": {
+            "anchor_block": "e6340aee14858b50888e925bb6197e8db6a71e71ff9b7b501d04f3f1bcb25bf7",
+            "anchor_height": 6912,
+            "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+            "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+            "execution_profile_id": "780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf182",
+            "job_id": "50446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c",
+            "output_root": "84408432b597428b7f72798dc79da60d2453c04cf02e7da85a9329310ddaa7c1",
+            "receipt_id": "71099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c466",
+            "terminal_code": 0,
+            "token_history_root": "92a6d621a201b14070eae374065a9492416568310db9bc8be84c434e175c8a1a"
+          },
+          "schema": "noos/finalized-wwm-record/v1",
+          "trust_scope": "LOCAL_FULL_NODE_FINALIZED_STATE"
+        },
+        "finalized_settlement": {
+          "canonical_record_hex": "010001004e7262f04678024aff9fe33670b756c1b17a384acc166de16c3713d070088b83020050446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c030071099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c4660400eb5e9721cbe4372ddd3d5636a1acb1f98b19d2f57d8026c4b62924df26ace86c050000060000000000000000000700000000000000000000000000000000000800000000000000000000000000000000000900000000000000000000000000000000000a00001b0000000000000b0001000000000000000c0014000000544553544e45545f464958545552455f4f4e4c59",
+          "finalized_hash": "f533a7fd5b57f4954e15de1808cabb529213a9eed85c094936c5008f0b276bb7",
+          "finalized_height": 7936,
+          "id": "4e7262f04678024aff9fe33670b756c1b17a384acc166de16c3713d070088b83",
+          "kind": "settlement",
+          "objects_root": "2175b59a8f1bd1a73c07b9746ecafaa7c5cc4eb931cb767a0cd59ef34bf68a89",
+          "proof_hex": "0100121829ac9fcc780a0b9988552796aba0ae369328e27f278b558c96e989524e870100fb000000010001004e7262f04678024aff9fe33670b756c1b17a384acc166de16c3713d070088b83020050446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c030071099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c4660400eb5e9721cbe4372ddd3d5636a1acb1f98b19d2f57d8026c4b62924df26ace86c050000060000000000000000000700000000000000000000000000000000000800000000000000000000000000000000000900000000000000000000000000000000000a00001b0000000000000b0001000000000000000c0014000000544553544e45545f464958545552455f4f4e4c590100f80000000000000000000000000000000000000000000000000000000000000005000000a158f632e19c69f411fb26a60652ad174b3e6d8731e275e165ecd6855b8972b03f473b61652ca9918a4b6718cc67048d746523ed1cf9421158adc03dee8b2e46da4c36e2e5f6c0b72ca43f94580dbb4eb51f193f0245ef29422bad52d9d29581fa22e267503417c60f70316b963aedbd55990321397c6d38fb1566fa2de07cf699166a30b287f72cf15f6857d598f9ce8bca45fb8294c263d4e72ead8eb482bf2175b59a8f1bd1a73c07b9746ecafaa7c5cc4eb931cb767a0cd59ef34bf68a89",
+          "record": {
+            "fund_profile_id": "eb5e9721cbe4372ddd3d5636a1acb1f98b19d2f57d8026c4b62924df26ace86c",
+            "job_id": "50446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c",
+            "receipt_id": "71099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c466",
+            "settled_height": 6912,
+            "settlement_id": "4e7262f04678024aff9fe33670b756c1b17a384acc166de16c3713d070088b83"
+          },
+          "schema": "noos/finalized-wwm-record/v1",
+          "trust_scope": "LOCAL_FULL_NODE_FINALIZED_STATE"
+        },
+        "inference": {
+          "duration_seconds": 10.172,
+          "event_transcript_sha256": "5e896a3b0fefb0abdae8cfea47a31f7c201b06857b39298b730d28a486ad2c41",
+          "job_id": "50446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c",
+          "output_bytes": 57,
+          "output_chunks": 1,
+          "output_root": "84408432b597428b7f72798dc79da60d2453c04cf02e7da85a9329310ddaa7c1",
+          "output_tokens": 16,
+          "terminal": {
+            "code": "completed",
+            "output_root": "84408432b597428b7f72798dc79da60d2453c04cf02e7da85a9329310ddaa7c1",
+            "type": "terminal"
+          },
+          "token_history_root": "92a6d621a201b14070eae374065a9492416568310db9bc8be84c434e175c8a1a",
+          "tokenization": {
+            "bos_included": false,
+            "stdin_bytes": 57,
+            "token_count": 16,
+            "token_history_root": "92a6d621a201b14070eae374065a9492416568310db9bc8be84c434e175c8a1a",
+            "tokenizer_executable_sha256": "2685f72d8b2c27c72c116d2c6af9bb180adb4bf2f4fc9adee052dbcfe7f266f4"
+          }
+        },
+        "job_id": "50446342e9dec5ad659034300e98c05767b9f3f544d0bbafb10b09bbec7a209c",
+        "open": {
+          "finalized_height": 6717,
+          "finalized_status": {
+            "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+            "finalized": {
+              "epoch": 27,
+              "hash": "e6340aee14858b50888e925bb6197e8db6a71e71ff9b7b501d04f3f1bcb25bf7"
+            },
+            "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+            "justified": {
+              "epoch": 28,
+              "hash": "2a64ca648a289a04474fff14a6c3293d982f0c5708c2086fc5acc7f789cefffa"
+            },
+            "mempool": {
+              "bytes": 0,
+              "txs": 0
+            },
+            "observer": false,
+            "unsafe_head": {
+              "hash": "2a64ca648a289a04474fff14a6c3293d982f0c5708c2086fc5acc7f789cefffa",
+              "height": 7168
+            }
+          },
+          "receipt": {
+            "receipt": {
+              "fee_charged": "1054",
+              "status": 0,
+              "txid": "40c992ab0da214889915e8052d5b67c39ade87984e65e28d73b3d55ca360e9a6"
+            },
+            "state": {
+              "settled_height": 6717,
+              "status_code": 0
+            }
+          },
+          "txid": "40c992ab0da214889915e8052d5b67c39ade87984e65e28d73b3d55ca360e9a6"
+        },
+        "output_root": "84408432b597428b7f72798dc79da60d2453c04cf02e7da85a9329310ddaa7c1",
+        "production_capable": false,
+        "receipt_id": "71099a8e073c980a5911cb6ce3ce18a539a35f4584d5ee522ca6b0f7a9d3c466",
+        "record_receipt": {
+          "finalized_height": 7231,
+          "finalized_status": {
+            "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+            "finalized": {
+              "epoch": 29,
+              "hash": "18f6b0632f9f383b53a161805076aa009b9b05142ff35ffe64bb0c088f1f3808"
+            },
+            "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+            "justified": {
+              "epoch": 30,
+              "hash": "8673f08aab4ab3bd85bca0fc267c3113922bd33a9b986d5e9119f7ca9b5afed0"
+            },
+            "mempool": {
+              "bytes": 0,
+              "txs": 0
+            },
+            "observer": false,
+            "unsafe_head": {
+              "hash": "8673f08aab4ab3bd85bca0fc267c3113922bd33a9b986d5e9119f7ca9b5afed0",
+              "height": 7680
+            }
+          },
+          "receipt": {
+            "receipt": {
+              "fee_charged": "1248",
+              "status": 0,
+              "txid": "dae4d79701a63175ff4868b821d6f5d433fdc89027079898d8ca573a740ec01c"
+            },
+            "state": {
+              "settled_height": 7231,
+              "status_code": 0
+            }
+          },
+          "txid": "dae4d79701a63175ff4868b821d6f5d433fdc89027079898d8ca573a740ec01c"
+        },
+        "settle": {
+          "finalized_height": 7683,
+          "finalized_status": {
+            "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+            "finalized": {
+              "epoch": 31,
+              "hash": "f533a7fd5b57f4954e15de1808cabb529213a9eed85c094936c5008f0b276bb7"
+            },
+            "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+            "justified": {
+              "epoch": 32,
+              "hash": "7c89ff4b0c000db201496cb3a3f2f5d2a8a126768ec0826bd5f2049d9fe47733"
+            },
+            "mempool": {
+              "bytes": 0,
+              "txs": 0
+            },
+            "observer": false,
+            "unsafe_head": {
+              "hash": "7c89ff4b0c000db201496cb3a3f2f5d2a8a126768ec0826bd5f2049d9fe47733",
+              "height": 8192
+            }
+          },
+          "receipt": {
+            "receipt": {
+              "fee_charged": "777",
+              "status": 0,
+              "txid": "b2a4e3faebf8bd648315e4ffc9da5ed9c567a3f83954238d7f50725d6eaa316c"
+            },
+            "state": {
+              "settled_height": 7683,
+              "status_code": 0
+            }
+          },
+          "txid": "b2a4e3faebf8bd648315e4ffc9da5ed9c567a3f83954238d7f50725d6eaa316c"
+        },
+        "settlement_id": "4e7262f04678024aff9fe33670b756c1b17a384acc166de16c3713d070088b83",
+        "token_history_root": "92a6d621a201b14070eae374065a9492416568310db9bc8be84c434e175c8a1a"
+      },
+      "offline_positions": [
+        0,
+        1,
+        2
+      ],
+      "ordinary_transaction": {
+        "label": "repaired-9-live",
+        "receipt": {
+          "receipt": {
+            "fee_charged": "544",
+            "status": 0,
+            "txid": "186fa6537ec5240b65e4a826c54b44e2c1380ac5638a6a4ba444e980483b0f38"
+          },
+          "state": {
+            "settled_height": 6715,
+            "status_code": 0
+          }
+        },
+        "txid": "186fa6537ec5240b65e4a826c54b44e2c1380ac5638a6a4ba444e980483b0f38"
+      },
+      "phase": "repaired_9_live",
+      "quote": {
+        "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+        "available_concurrency": 1,
+        "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+        "live_custodian_positions": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "max_output_tokens": 8,
+        "prompt_tokens": 1,
+        "queue_available": 5,
+        "resident": true,
+        "schedulable_minimum": 9
+      },
+      "repair_chain": {
+        "assignment_root": "f0ba919364596c2306fcec67802f10b523d99742965d65cc1d5fdc18b232ac31",
+        "certificate_id": "5e4dceae9252ae13495077fe2370e8068dd37ad9b25ac621097578c3cda9b928",
+        "old_profile_id": "39e9acb0b265416e86451f2f3c7a2542722047d2e9ddaf8c5a226b8790f3d1a1",
+        "order_id": "31e60d0a69803c7e32aac7eaa9d9383190f09a7ecba72f78fc80a4e9450cb2df",
+        "receipt": {
+          "receipt": {
+            "fee_charged": "5652",
+            "status": 0,
+            "txid": "6220e0e6b0c1edab0831b7482a9b8ce6e5f986867d47f491f6926a5ec07729d5"
+          },
+          "state": {
+            "settled_height": 5444,
+            "status_code": 0
+          }
+        },
+        "repair_id": "f51c832a5895d9368ed0919b51d6039f3ce2dd189c59dc76ffcfb4a81d128eb4",
+        "replacement_commitment_id": "67573e751351a12cec7169c985e5801a32430846b8b396d071ffcfe2e3795f6a",
+        "replacement_profile_id": "19790a30d47c1a0bf1b72018ff56d549a1b65c84dba8b1acaaad7aea338e008a",
+        "txid": "6220e0e6b0c1edab0831b7482a9b8ce6e5f986867d47f491f6926a5ec07729d5"
+      }
+    }
+  ],
+  "production_claimed": false,
+  "publisher_or_gateway_fallback": false,
+  "repository_revision": "05ea3170e5030459b18074f69270707c2ebb4296",
+  "run_id": "6e67a98b5cebccafdd18d21b",
+  "schema": "noos.wwm.hosted-model-demo-evidence.v1",
+  "signature": {
+    "domain": "NOOS/EVIDENCE/WWM-HOSTED-DEMO/V1",
+    "public_key": "17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce",
+    "signature": "afadeaafe3e4e859a634fc37a3b644e1ed89f00930d4db2f71cd05557180404445c45cb4f73d80b3f4243dee6c2816fd01f0d5cd2e3113d6f99707e883456308",
+    "signed_payload_sha256": "23dc94d40da44f02c156e738d09585436b1a7fc26b2bf122cb81722d4870c897",
+    "suite": "Ed25519"
+  }
+}
