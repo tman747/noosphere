@@ -69,7 +69,7 @@ class FixtureServers:
                     return
                 if self.path == "/status":
                     with state.lock:
-                        finalized = max(10_000, state.next_height)
+                        finalized = max(10_240, state.next_height)
                     self._json(200, {
                         "chain_id": CHAIN_ID,
                         "genesis_hash": GENESIS_HASH,
