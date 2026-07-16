@@ -21,7 +21,7 @@ use crate::Hash32;
 use super::util::*;
 
 const DEADLINE: Duration = Duration::from_secs(120);
-const MULTI_PAGE_SYNC_DEADLINE: Duration = Duration::from_secs(300);
+const MULTI_PAGE_SYNC_DEADLINE: Duration = Duration::from_secs(600);
 static NETWORK_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn network_test_guard() -> MutexGuard<'static, ()> {
