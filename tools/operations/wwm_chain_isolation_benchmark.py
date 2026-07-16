@@ -4,8 +4,8 @@
 The operator sends pre-built, unique ordinary transaction envelopes to the
 loopback node RPC. It records live submission, receipt, and finalized-status
 responses at baseline, under a configured synthetic coordinator distribution,
-and while the same coordinator endpoint is deliberately unavailable. Passing
-evidence is signed, insert-once, and explicitly has no production effect.
+and while the same coordinator endpoint is deliberately unavailable. Every
+completed measurement is signed, insert-once, and explicitly non-promoting.
 """
 from __future__ import annotations
 
@@ -39,6 +39,17 @@ SYNTHETIC_SCOPE = "SYNTHETIC_OPERATOR_CONFIG_NOT_REAL_PARTICIPANT_DISTRIBUTION"
 P95_METHOD = "NEAREST_RANK_CEIL_0.95_N_ONE_INDEXED_OVER_INTEGER_MICROSECONDS"
 DEVNET_EPOCH_BLOCKS = 256
 FINALITY_ALIGNMENT_WINDOW_BLOCKS = 1
+PASS_CLAIM = "LIVE_LOOPBACK_DEVNET_CHAIN_ISOLATION_THRESHOLD_MET_ONLY"
+BLOCKED_CLAIM = "LIVE_LOOPBACK_DEVNET_CHAIN_ISOLATION_THRESHOLD_NOT_MET"
+NON_PROMOTING_DECISION = {
+    "production": False,
+    "production_custody": False,
+    "rewards": False,
+    "controls_enabled": False,
+    "decision": "HOLD_DEVNET_ONLY",
+}
+LOADED_THRESHOLD_BLOCKER = "BASE_CHAIN_P95_DEGRADATION_LOADED"
+OUTAGE_THRESHOLD_BLOCKER = "BASE_CHAIN_P95_DEGRADATION_COORDINATOR_OUTAGE"
 HARD_MIN_SAMPLE_FLOOR = 10
 MAX_SAMPLES_PER_PHASE = 10_000
 MAX_COORDINATOR_REQUESTS = 1_000_000
@@ -687,7 +698,7 @@ def sign_evidence(payload: Mapping[str, Any], key: Ed25519PrivateKey) -> dict[st
     }
 
 
-def verify_evidence(evidence: Mapping[str, Any]) -> None:
+def verified_evidence_payload(evidence: Mapping[str, Any]) -> dict[str, Any]:
     require_exact_keys(evidence, {"schema", "payload", "signature"}, "evidence envelope")
     if evidence["schema"] != EVIDENCE_SCHEMA or not isinstance(evidence["payload"], dict) or not isinstance(evidence["signature"], dict):
         raise BenchmarkError("evidence envelope is malformed")
@@ -705,36 +716,47 @@ def verify_evidence(evidence: Mapping[str, Any]) -> None:
         Ed25519PublicKey.from_public_bytes(public).verify(raw_signature, SIGNATURE_DOMAIN + canonical)
     except (ValueError, InvalidSignature) as error:
         raise BenchmarkError("evidence Ed25519 signature is forged or invalid") from error
-    if (
-        payload.get("environment") != "DEVNET"
-        or payload.get("scope") != SCOPE
-        or payload.get("insert_once") is not True
-        or payload.get("verdict") != "PASS"
-        or payload.get("proof_claim") is not True
-    ):
-        raise BenchmarkError("evidence is not a passing insert-once live DEVNET measurement")
-    promotion = payload.get("promotion")
-    if promotion != {"production": False, "production_custody": False, "rewards": False, "controls_enabled": False, "decision": "HOLD_DEVNET_ONLY"}:
-        raise BenchmarkError("evidence is not explicitly non-promoting")
+    return payload
+
+
+def verified_phase_measurements(payload: Mapping[str, Any]) -> tuple[dict[str, Any], int]:
     phases = payload.get("ordinary_rpc_phases")
     if not isinstance(phases, dict) or set(phases) != {"baseline", "loaded", "coordinator_outage"}:
         raise BenchmarkError("evidence phase set is incomplete")
     floor = payload.get("sample_floor")
-    if not isinstance(floor, int) or floor < HARD_MIN_SAMPLE_FLOOR:
+    if not isinstance(floor, int) or isinstance(floor, bool) or floor < HARD_MIN_SAMPLE_FLOOR:
         raise BenchmarkError("evidence sample floor is not meaningful")
     for name, phase in phases.items():
-        if not isinstance(phase, dict) or phase.get("sample_count") < floor or phase.get("p95_method") != P95_METHOD:
+        if not isinstance(phase, dict):
+            raise BenchmarkError(f"evidence phase {name} is malformed")
+        sample_count = phase.get("sample_count")
+        if (
+            not isinstance(sample_count, int)
+            or isinstance(sample_count, bool)
+            or sample_count < floor
+            or phase.get("p95_method") != P95_METHOD
+        ):
             raise BenchmarkError(f"evidence phase {name} has insufficient or ambiguous samples")
         raw = phase.get("raw_samples")
-        if not isinstance(raw, list) or len(raw) != phase["sample_count"]:
+        if not isinstance(raw, list) or len(raw) != sample_count:
             raise BenchmarkError(f"evidence phase {name} does not carry its raw samples")
-        if nearest_rank_p95([row["finality_latency_us"] for row in raw]) != phase.get("finality_p95_us"):
+        finality_samples: list[int] = []
+        for row in raw:
+            if not isinstance(row, dict):
+                raise BenchmarkError(f"evidence phase {name} carries a malformed raw sample")
+            value = row.get("finality_latency_us")
+            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+                raise BenchmarkError(f"evidence phase {name} carries an invalid finality sample")
+            finality_samples.append(value)
+        if nearest_rank_p95(finality_samples) != phase.get("finality_p95_us"):
             raise BenchmarkError(f"evidence phase {name} p95 is forged")
-    base = phases["baseline"]["finality_p95_us"]
-    for key, phase_name in (("loaded_vs_baseline", "loaded"), ("outage_vs_baseline", "coordinator_outage")):
-        expected = degradation(base, phases[phase_name]["finality_p95_us"])
-        if payload.get("degradation", {}).get(key) != expected or not expected["passed"]:
-            raise BenchmarkError(f"evidence {key} degradation does not pass")
+    return phases, floor
+
+
+def verify_non_promoting_measurement(payload: Mapping[str, Any]) -> tuple[dict[str, Any], int]:
+    if payload.get("promotion") != NON_PROMOTING_DECISION:
+        raise BenchmarkError("evidence is not explicitly non-promoting")
+    phases, floor = verified_phase_measurements(payload)
     load = payload.get("coordinator_load")
     outage = payload.get("coordinator_outage")
     if (
@@ -753,6 +775,59 @@ def verify_evidence(evidence: Mapping[str, Any]) -> None:
         raise BenchmarkError("evidence did not observe concurrent coordinator outage while ordinary RPC continued")
     if payload.get("coordinator_restored") is not True:
         raise BenchmarkError("evidence does not show coordinator restoration")
+    return phases, floor
+
+
+def expected_degradations(phases: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    baseline_p95 = phases["baseline"]["finality_p95_us"]
+    return {
+        "loaded_vs_baseline": degradation(baseline_p95, phases["loaded"]["finality_p95_us"]),
+        "outage_vs_baseline": degradation(baseline_p95, phases["coordinator_outage"]["finality_p95_us"]),
+    }
+
+
+def verify_evidence(evidence: Mapping[str, Any]) -> None:
+    payload = verified_evidence_payload(evidence)
+    if (
+        payload.get("environment") != "DEVNET"
+        or payload.get("scope") != SCOPE
+        or payload.get("insert_once") is not True
+        or payload.get("verdict") != "PASS"
+        or payload.get("proof_claim") is not True
+        or payload.get("claim") != PASS_CLAIM
+    ):
+        raise BenchmarkError("evidence is not a passing insert-once live DEVNET measurement")
+    phases, _ = verify_non_promoting_measurement(payload)
+    degradations = payload.get("degradation")
+    for key, expected in expected_degradations(phases).items():
+        if not isinstance(degradations, dict) or degradations.get(key) != expected or not expected["passed"]:
+            raise BenchmarkError(f"evidence {key} degradation does not pass")
+    if payload.get("blockers", []) != []:
+        raise BenchmarkError("passing evidence cannot carry threshold blockers")
+
+
+def verify_blocked_evidence(evidence: Mapping[str, Any]) -> None:
+    payload = verified_evidence_payload(evidence)
+    if (
+        payload.get("environment") != "DEVNET"
+        or payload.get("scope") != SCOPE
+        or payload.get("insert_once") is not True
+        or payload.get("verdict") != "BLOCKED"
+        or payload.get("proof_claim") is not False
+        or payload.get("claim") != BLOCKED_CLAIM
+    ):
+        raise BenchmarkError("evidence is not a blocked insert-once live DEVNET measurement")
+    phases, _ = verify_non_promoting_measurement(payload)
+    expected = expected_degradations(phases)
+    if payload.get("degradation") != expected:
+        raise BenchmarkError("blocked evidence degradation is forged")
+    expected_blockers = []
+    if not expected["loaded_vs_baseline"]["passed"]:
+        expected_blockers.append(LOADED_THRESHOLD_BLOCKER)
+    if not expected["outage_vs_baseline"]["passed"]:
+        expected_blockers.append(OUTAGE_THRESHOLD_BLOCKER)
+    if not expected_blockers or payload.get("blockers") != expected_blockers:
+        raise BenchmarkError("blocked evidence threshold blockers are missing or forged")
 
 
 def write_create_new(path: Path, evidence: Mapping[str, Any]) -> None:
@@ -894,18 +969,12 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
 
     loaded_degradation = degradation(baseline["finality_p95_us"], loaded["finality_p95_us"])
     outage_degradation = degradation(baseline["finality_p95_us"], outage_phase["finality_p95_us"])
+    blockers = []
     if not loaded_degradation["passed"]:
-        raise BenchmarkError(
-            "loaded ordinary finality p95 degradation is greater than or equal to 5%; "
-            f"baseline_us={baseline['finality_p95_us']} loaded_us={loaded['finality_p95_us']} "
-            f"degradation_bps={loaded_degradation['degradation_basis_points']}"
-        )
+        blockers.append(LOADED_THRESHOLD_BLOCKER)
     if not outage_degradation["passed"]:
-        raise BenchmarkError(
-            "coordinator-outage ordinary finality p95 degradation is greater than or equal to 5%; "
-            f"baseline_us={baseline['finality_p95_us']} outage_us={outage_phase['finality_p95_us']} "
-            f"degradation_bps={outage_degradation['degradation_basis_points']}"
-        )
+        blockers.append(OUTAGE_THRESHOLD_BLOCKER)
+    threshold_passed = not blockers
     final_status, _ = recorder.require_json("GET", "/status")
     terminal_node = validate_node_status(final_status, chain_id, genesis_hash)
     if recorder.errors:
@@ -916,10 +985,11 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
         "scope": SCOPE,
         "created_at_utc": datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"),
         "insert_once": True,
-        "verdict": "PASS",
-        "proof_claim": True,
-        "claim": "LIVE_LOOPBACK_DEVNET_CHAIN_ISOLATION_THRESHOLD_MET_ONLY",
-        "promotion": {"production": False, "production_custody": False, "rewards": False, "controls_enabled": False, "decision": "HOLD_DEVNET_ONLY"},
+        "verdict": "PASS" if threshold_passed else "BLOCKED",
+        "proof_claim": threshold_passed,
+        "claim": PASS_CLAIM if threshold_passed else BLOCKED_CLAIM,
+        "blockers": blockers,
+        "promotion": dict(NON_PROMOTING_DECISION),
         "sample_floor": args.sample_floor,
         "samples_per_phase": args.samples,
         "endpoint_identities": {
@@ -956,7 +1026,10 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
         ],
     }
     evidence = sign_evidence(payload, key)
-    verify_evidence(evidence)
+    if threshold_passed:
+        verify_evidence(evidence)
+    else:
+        verify_blocked_evidence(evidence)
     return evidence
 
 
@@ -1003,7 +1076,7 @@ def main(argv: list[str] | None = None) -> int:
         "output": str(args.output),
         "signed_payload_sha256": evidence["signature"]["signed_payload_sha256"],
     }, sort_keys=True))
-    return 0
+    return 0 if evidence["payload"]["verdict"] == "PASS" else 2
 
 
 if __name__ == "__main__":

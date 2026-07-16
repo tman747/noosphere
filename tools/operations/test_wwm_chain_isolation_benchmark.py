@@ -375,11 +375,25 @@ class ChainIsolationBenchmarkTests(unittest.TestCase):
             bench.run_benchmark(self.args())
         self.assertFalse(self.output.exists())
 
-    def test_five_percent_or_higher_loaded_degradation_is_rejected(self) -> None:
+    def test_five_percent_or_higher_loaded_degradation_is_sealed_as_blocked(self) -> None:
         self.servers.state.delays = {"01": 0.005, "02": 0.050, "03": 0.005}
-        with self.assertRaisesRegex(bench.BenchmarkError, "greater than or equal to 5%"):
-            bench.run_benchmark(self.args())
-        self.assertFalse(self.output.exists())
+        evidence = bench.run_benchmark(self.args())
+        payload = evidence["payload"]
+        self.assertEqual(payload["verdict"], "BLOCKED")
+        self.assertFalse(payload["proof_claim"])
+        self.assertIn(bench.LOADED_THRESHOLD_BLOCKER, payload["blockers"])
+        bench.verify_blocked_evidence(evidence)
+        bench.write_create_new(self.output, evidence)
+
+    def test_resigned_forged_blocked_evidence_is_rejected(self) -> None:
+        self.servers.state.delays = {"01": 0.005, "02": 0.050, "03": 0.005}
+        evidence = bench.run_benchmark(self.args())
+        forged_payload = copy.deepcopy(evidence["payload"])
+        forged_payload["blockers"] = []
+        key = Ed25519PrivateKey.from_private_bytes(self.seed.read_bytes())
+        forged = bench.sign_evidence(forged_payload, key)
+        with self.assertRaisesRegex(bench.BenchmarkError, "blockers"):
+            bench.verify_blocked_evidence(forged)
 
     def test_transaction_prefilled_fields_and_duplicates_are_rejected(self) -> None:
         rows = self.transactions.read_text(encoding="utf-8").splitlines()
