@@ -37,6 +37,8 @@ SIGNATURE_DOMAIN = b"NOOS/SIG/WWM-CHAIN-ISOLATION-BENCHMARK/V1\x00"
 SCOPE = "OWNER_CONTROLLED_LOOPBACK_DEVNET_LIVE_MEASUREMENT"
 SYNTHETIC_SCOPE = "SYNTHETIC_OPERATOR_CONFIG_NOT_REAL_PARTICIPANT_DISTRIBUTION"
 P95_METHOD = "NEAREST_RANK_CEIL_0.95_N_ONE_INDEXED_OVER_INTEGER_MICROSECONDS"
+DEVNET_EPOCH_BLOCKS = 256
+FINALITY_ALIGNMENT_WINDOW_BLOCKS = 32
 HARD_MIN_SAMPLE_FLOOR = 10
 MAX_SAMPLES_PER_PHASE = 10_000
 MAX_COORDINATOR_REQUESTS = 1_000_000
@@ -201,8 +203,37 @@ def finalized_height(status: Mapping[str, Any]) -> int:
     if isinstance(finalized.get("height"), int) and finalized["height"] >= 0:
         return finalized["height"]
     if isinstance(finalized.get("epoch"), int) and finalized["epoch"] >= 0:
-        return finalized["epoch"] * 256
+        return finalized["epoch"] * DEVNET_EPOCH_BLOCKS
     raise BenchmarkError("node live status has neither finalized.height nor finalized.epoch")
+
+
+def wait_phase_alignment(
+    name: str,
+    recorder: NodeRecorder,
+    chain_id: str,
+    genesis_hash: str,
+    timeout: float,
+    poll_interval: float,
+) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    poll_count = 0
+    while time.monotonic() < deadline:
+        status, _ = recorder.require_json("GET", "/status")
+        identity = validate_node_status(status, chain_id, genesis_hash)
+        poll_count += 1
+        offset = identity["unsafe_height"] % DEVNET_EPOCH_BLOCKS
+        if offset <= FINALITY_ALIGNMENT_WINDOW_BLOCKS:
+            return {
+                "method": "UNSAFE_HEAD_MODULO_DEVNET_EPOCH",
+                "epoch_blocks": DEVNET_EPOCH_BLOCKS,
+                "window_blocks": FINALITY_ALIGNMENT_WINDOW_BLOCKS,
+                "unsafe_height": identity["unsafe_height"],
+                "finalized_height": identity["finalized_height"],
+                "offset_blocks": offset,
+                "poll_count": poll_count,
+            }
+        time.sleep(poll_interval)
+    raise BenchmarkError(f"{name} phase could not align to a comparable devnet finality window")
 
 
 def validate_coordinator_config(value: Mapping[str, Any], chain_id: str, genesis_hash: str) -> dict[str, Any]:
@@ -795,15 +826,23 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
     coordinator_identity = validate_coordinator_config(live_config, chain_id, genesis_hash)
     transaction_set_sha256 = sha256_bytes(b"".join(sha256_bytes(payload).encode("ascii") + b"\n" for payload in payloads))
 
+    baseline_alignment = wait_phase_alignment(
+        "baseline", recorder, chain_id, genesis_hash, args.phase_timeout, args.poll_interval
+    )
     baseline = run_node_phase("baseline", recorder, payloads[:args.samples], chain_id, genesis_hash, args.phase_timeout, args.poll_interval)
+    baseline["alignment"] = baseline_alignment
 
     load_runner = CoordinatorSaturator(coordinator_url, distribution, args.load_workers, args.http_timeout, args.max_coordinator_requests, True)
     load_runner.start()
     load_window_start: int | None = None
     try:
         load_runner.wait_for_requests(args.sample_floor, args.phase_timeout)
+        loaded_alignment = wait_phase_alignment(
+            "loaded", recorder, chain_id, genesis_hash, args.phase_timeout, args.poll_interval
+        )
         load_window_start = time.perf_counter_ns()
         loaded = run_node_phase("loaded", recorder, payloads[args.samples:2 * args.samples], chain_id, genesis_hash, args.phase_timeout, args.poll_interval)
+        loaded["alignment"] = loaded_alignment
     finally:
         load_window = None if load_window_start is None else (load_window_start, time.perf_counter_ns())
         load_summary = load_runner.stop(load_window)
@@ -825,8 +864,17 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
         outage_window_start: int | None = None
         try:
             outage_runner.wait_for_requests(args.sample_floor, args.phase_timeout)
+            outage_alignment = wait_phase_alignment(
+                "coordinator_outage",
+                recorder,
+                chain_id,
+                genesis_hash,
+                args.phase_timeout,
+                args.poll_interval,
+            )
             outage_window_start = time.perf_counter_ns()
             outage_phase = run_node_phase("coordinator_outage", recorder, payloads[2 * args.samples:], chain_id, genesis_hash, args.phase_timeout, args.poll_interval)
+            outage_phase["alignment"] = outage_alignment
         finally:
             outage_window = None if outage_window_start is None else (outage_window_start, time.perf_counter_ns())
             outage_summary = outage_runner.stop(outage_window)
@@ -847,9 +895,17 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
     loaded_degradation = degradation(baseline["finality_p95_us"], loaded["finality_p95_us"])
     outage_degradation = degradation(baseline["finality_p95_us"], outage_phase["finality_p95_us"])
     if not loaded_degradation["passed"]:
-        raise BenchmarkError("loaded ordinary finality p95 degradation is greater than or equal to 5%")
+        raise BenchmarkError(
+            "loaded ordinary finality p95 degradation is greater than or equal to 5%; "
+            f"baseline_us={baseline['finality_p95_us']} loaded_us={loaded['finality_p95_us']} "
+            f"degradation_bps={loaded_degradation['degradation_basis_points']}"
+        )
     if not outage_degradation["passed"]:
-        raise BenchmarkError("coordinator-outage ordinary finality p95 degradation is greater than or equal to 5%")
+        raise BenchmarkError(
+            "coordinator-outage ordinary finality p95 degradation is greater than or equal to 5%; "
+            f"baseline_us={baseline['finality_p95_us']} outage_us={outage_phase['finality_p95_us']} "
+            f"degradation_bps={outage_degradation['degradation_basis_points']}"
+        )
     final_status, _ = recorder.require_json("GET", "/status")
     terminal_node = validate_node_status(final_status, chain_id, genesis_hash)
     if recorder.errors:
