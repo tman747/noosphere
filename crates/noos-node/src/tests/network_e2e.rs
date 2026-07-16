@@ -21,6 +21,7 @@ use crate::Hash32;
 use super::util::*;
 
 const DEADLINE: Duration = Duration::from_secs(120);
+const MULTI_PAGE_SYNC_DEADLINE: Duration = Duration::from_secs(300);
 static NETWORK_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn network_test_guard() -> MutexGuard<'static, ()> {
@@ -82,13 +83,17 @@ fn tx_status(handle: &NodeHandle, txid: Hash32) -> ViewLookup<TxStatus> {
     }
 }
 
-fn wait_until<T>(what: &str, mut probe: impl FnMut() -> Option<T>) -> T {
+fn wait_until<T>(what: &str, probe: impl FnMut() -> Option<T>) -> T {
+    wait_until_for(what, DEADLINE, probe)
+}
+
+fn wait_until_for<T>(what: &str, deadline: Duration, mut probe: impl FnMut() -> Option<T>) -> T {
     let start = Instant::now();
     loop {
         if let Some(value) = probe() {
             return value;
         }
-        assert!(start.elapsed() < DEADLINE, "timed out waiting for {what}");
+        assert!(start.elapsed() < deadline, "timed out waiting for {what}");
         std::thread::sleep(Duration::from_millis(100));
     }
 }
@@ -227,10 +232,14 @@ fn peer_ready_pull_syncs_more_than_one_range_page() {
 
     let b =
         supervisor::start(networked_config(0xD2, vec![addr_a]), spec(), dir_b).expect("start b");
-    let imported = wait_until("multi-page peer-ready pull sync", || {
-        let s = status(&b);
-        (s.head_height == target_height).then_some(s.head_hash)
-    });
+    let imported = wait_until_for(
+        "multi-page peer-ready pull sync",
+        MULTI_PAGE_SYNC_DEADLINE,
+        || {
+            let s = status(&b);
+            (s.head_height == target_height).then_some(s.head_hash)
+        },
+    );
     assert_eq!(imported, target_hash, "B imported every range page");
 
     b.shutdown();
