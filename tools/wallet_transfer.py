@@ -23,6 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ZERO_ASSET = "00" * 32
+USER_AGENT = "mindchain-wallet-transfer/1"
 HEX32 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -60,6 +61,7 @@ def api_json(base: str, path: str, *, body: dict | None = None, timeout: float =
     data = None if body is None else json.dumps(body, separators=(",", ":")).encode()
     request = urllib.request.Request(url, data=data)
     request.add_header("Accept", "application/vnd.noos.v1+json, application/json")
+    request.add_header("User-Agent", USER_AGENT)
     if data is not None:
         request.add_header("Content-Type", "application/json")
     try:

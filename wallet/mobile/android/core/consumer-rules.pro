@@ -1,0 +1,2 @@
+-keep class org.noosphere.wallet.core.** { *; }
+-keep class com.sun.jna.** { *; }

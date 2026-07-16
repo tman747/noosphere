@@ -1,0 +1,40 @@
+[package]
+name = "noos-wallet-sdk"
+version = "0.1.0"
+description = "UniFFI mobile wallet SDK with fail-closed chain identity and canonical transfer review"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "noos-wallet-sdk-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+default = []
+bindgen = ["uniffi/cli"]
+
+[dependencies]
+blake3 = "=1.8.5"
+hex = "=0.4.3"
+noos-cli = { path = "../noos-cli", default-features = false }
+noos-codec = { path = "../noos-codec" }
+noos-lumen = { path = "../noos-lumen" }
+noos-wallet = { path = "../noos-wallet" }
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+thiserror = "=2.0.18"
+uniffi = "=0.32.0"
+zeroize = "=1.9.0"
+
+[dev-dependencies]
+tempfile = "=3.24.0"
+
+[lints]
+workspace = true

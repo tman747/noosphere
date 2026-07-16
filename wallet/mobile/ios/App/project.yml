@@ -1,0 +1,53 @@
+name: MindChainWalletMobile
+options:
+  bundleIdPrefix: network.mindchain.noosphere
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+packages:
+  MindChainWalletSecurity:
+    path: ..
+targets:
+  MindChainWallet:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Sources
+      - path: ../CoreBindings/MindChainWalletCore.swift
+      - path: ../CoreBindings/MobileNodeSynchronizer.swift
+    resources:
+      - path: Resources
+        excludes:
+          - Info.plist
+          - MindChainWallet.entitlements
+    info:
+      path: Resources/Info.plist
+    entitlements:
+      path: Resources/MindChainWallet.entitlements
+    dependencies:
+      - package: MindChainWalletSecurity
+        product: MindChainWalletSecurity
+      - framework: ../Artifacts/MindChainWalletCoreNative.xcframework
+        embed: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: network.mindchain.noosphere.wallet
+        PRODUCT_NAME: MindChain
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: false
+        ENABLE_USER_SCRIPT_SANDBOXING: true
+schemes:
+  MindChainWallet:
+    build:
+      targets:
+        MindChainWallet: all
+    run:
+      config: Debug
+    archive:
+      config: Release

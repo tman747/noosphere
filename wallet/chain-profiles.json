@@ -9,6 +9,33 @@
       "api_version": "v1",
       "api_base_url": "http://127.0.0.1:18080",
       "max_freshness_ms": "15000"
+    },
+    {
+      "id": "public-valueless-testnet-seed-1",
+      "label": "Public valueless testnet · Central US 1",
+      "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+      "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+      "api_version": "v1",
+      "api_base_url": "https://wwm-seed.mindchain.network",
+      "max_freshness_ms": "15000"
+    },
+    {
+      "id": "public-valueless-testnet-seed-2",
+      "label": "Public valueless testnet · Central US 2",
+      "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+      "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+      "api_version": "v1",
+      "api_base_url": "https://wwm-seed-2.mindchain.network",
+      "max_freshness_ms": "15000"
+    },
+    {
+      "id": "public-valueless-testnet-seed-3",
+      "label": "Public valueless testnet · East US",
+      "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+      "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+      "api_version": "v1",
+      "api_base_url": "https://mindchain-seed-3.eastus.cloudapp.azure.com",
+      "max_freshness_ms": "15000"
     }
   ]
 }

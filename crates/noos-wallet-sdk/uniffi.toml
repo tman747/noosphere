@@ -1,0 +1,14 @@
+[bindings.kotlin]
+package_name = "org.noosphere.wallet.core"
+cdylib_name = "noos_wallet_sdk"
+android = true
+generate_immutable_records = true
+kotlin_target_version = "2.0.20"
+
+[bindings.swift]
+module_name = "MindChainWalletCore"
+ffi_module_name = "MindChainWalletCoreFFI"
+ffi_module_filename = "MindChainWalletCoreFFI"
+cdylib_name = "noos_wallet_sdk"
+generate_immutable_records = true
+generate_codable_conformance = true

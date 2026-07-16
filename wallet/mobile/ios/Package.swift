@@ -8,6 +8,10 @@ let package = Package(
         .library(name: "MindChainWalletSecurity", targets: ["MindChainWalletSecurity"])
     ],
     targets: [
-        .target(name: "MindChainWalletSecurity")
+        .target(name: "MindChainWalletSecurity"),
+        .testTarget(
+            name: "MindChainWalletSecurityTests",
+            dependencies: ["MindChainWalletSecurity"]
+        )
     ]
 )

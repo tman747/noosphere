@@ -29,6 +29,21 @@ mod commands {
     }
 
     #[derive(Deserialize)]
+    pub struct ExportRecoveryRequest {
+        pub wallet_id: String,
+        pub profile_id: String,
+        pub password: String,
+    }
+
+    #[derive(Deserialize)]
+    pub struct ImportRecoveryRequest {
+        pub wallet_id: String,
+        pub profile_id: String,
+        pub password: String,
+        pub package_json: String,
+    }
+
+    #[derive(Deserialize)]
     pub struct VaultDeriveRequest {
         pub wallet_id: String,
         pub purpose: String,
@@ -75,11 +90,48 @@ mod commands {
     }
 
     #[tauri::command]
+    pub fn export_recovery_package_cmd(req: ExportRecoveryRequest) -> Result<String, String> {
+        let profile = ops::chain_profiles()
+            .map_err(code)?
+            .into_iter()
+            .find(|profile| profile.id == req.profile_id)
+            .ok_or_else(|| "chain_profile_unavailable".to_owned())?;
+        let password = Zeroizing::new(req.password);
+        secure_store::export_recovery_package(
+            &req.wallet_id,
+            &profile.chain_id,
+            &profile.genesis_hash,
+            password.as_bytes(),
+        )
+        .map_err(code)
+    }
+
+    #[tauri::command]
+    pub fn import_recovery_package_cmd(
+        req: ImportRecoveryRequest,
+    ) -> Result<secure_store::WalletHandle, String> {
+        let profile = ops::chain_profiles()
+            .map_err(code)?
+            .into_iter()
+            .find(|profile| profile.id == req.profile_id)
+            .ok_or_else(|| "chain_profile_unavailable".to_owned())?;
+        let password = Zeroizing::new(req.password);
+        secure_store::import_recovery_package(
+            &req.wallet_id,
+            &profile.chain_id,
+            &profile.genesis_hash,
+            &req.package_json,
+            password.as_bytes(),
+        )
+        .map_err(code)
+    }
+
+    #[tauri::command]
     pub fn derive_authority_cmd(req: VaultDeriveRequest) -> Result<ops::DeriveResponse, String> {
         let seed = secure_store::load_seed(&req.wallet_id).map_err(code)?;
         let seed_hex = Zeroizing::new(hex::encode(seed.as_slice()));
         ops::derive(&ops::DeriveRequest {
-            seed_hex: seed_hex.to_string(),
+            seed_hex,
             purpose: req.purpose,
             suite: req.suite,
             account: req.account,
@@ -119,7 +171,7 @@ mod commands {
             let seed_hex = Zeroizing::new(hex::encode(seed.as_slice()));
             ops::submit(&ops::SubmitRequest {
                 profile_id: req.profile_id,
-                seed_hex: seed_hex.to_string(),
+                seed_hex,
                 account: req.account,
                 index: req.index,
                 signer_scope: req.signer_scope,
@@ -200,6 +252,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::import_seed_cmd,
             commands::delete_wallet_cmd,
+            commands::export_recovery_package_cmd,
+            commands::import_recovery_package_cmd,
             commands::derive_authority_cmd,
             commands::validate_address_cmd,
             commands::chain_profiles_cmd,
@@ -240,7 +294,7 @@ mod tests {
         for case in cases {
             assert_eq!(case["kind"], "positive", "unexpected vector kind");
             let req = ops::DeriveRequest {
-                seed_hex: case["seed"].as_str().unwrap().to_string(),
+                seed_hex: zeroize::Zeroizing::new(case["seed"].as_str().unwrap().to_string()),
                 purpose: case["purpose"].as_str().unwrap().to_string(),
                 suite: case["suite"].as_u64().map(|s| u32::try_from(s).unwrap()),
                 account: u32::try_from(case["account"].as_u64().unwrap()).unwrap(),
@@ -280,7 +334,7 @@ mod tests {
     fn derivation_rejects_forgeable_requests() {
         let seed = "00".repeat(64);
         let base = ops::DeriveRequest {
-            seed_hex: seed.clone(),
+            seed_hex: zeroize::Zeroizing::new(seed.clone()),
             purpose: "sign".into(),
             suite: None,
             account: 0,
@@ -311,7 +365,7 @@ mod tests {
                 ..base.clone()
             },
             ops::DeriveRequest {
-                seed_hex: "0G".into(),
+                seed_hex: zeroize::Zeroizing::new("0G".to_owned()),
                 ..base.clone()
             },
         ] {
@@ -570,14 +624,27 @@ mod tests {
     }
 
     #[test]
-    fn configured_chain_profile_is_concrete_and_identity_bound() {
+    fn configured_chain_profiles_are_concrete_and_identity_bound() {
         let profiles = ops::chain_profiles().unwrap();
-        assert_eq!(profiles.len(), 1);
-        let profile = &profiles[0];
-        assert_eq!(profile.chain_id.len(), 64);
-        assert_eq!(profile.genesis_hash.len(), 64);
-        assert_eq!(profile.api_version, "v1");
-        assert!(profile.api_base_url.starts_with("http://127.0.0.1:"));
-        assert!(!profile.api_base_url.contains("example"));
+        assert_eq!(profiles.len(), 4);
+        assert!(profiles.iter().all(|profile| {
+            profile.chain_id.len() == 64
+                && profile.genesis_hash.len() == 64
+                && profile.api_version == "v1"
+                && !profile.api_base_url.contains("example")
+        }));
+        let local = profiles
+            .iter()
+            .find(|profile| profile.id == "local-live-devnet")
+            .unwrap();
+        assert!(local.api_base_url.starts_with("http://127.0.0.1:"));
+        let public: Vec<_> = profiles
+            .iter()
+            .filter(|profile| profile.id.starts_with("public-valueless-testnet-"))
+            .collect();
+        assert_eq!(public.len(), 3);
+        assert!(public
+            .iter()
+            .all(|profile| profile.api_base_url.starts_with("https://")));
     }
 }
