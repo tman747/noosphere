@@ -1,0 +1,19 @@
+{
+  "schema": "noos/wwm-continuous-learning-deployment-manifest/v1",
+  "environment": "testnet",
+  "production": false,
+  "execution_enabled": false,
+  "promotion_effect": "NONE",
+  "files": {
+    "tools/operations/wwm_continuous_learning.py": "cccc092527f4543381f10c8b05bbadc0a76d74a17046d4a4d800f88a57990b12",
+    "tools/operations/wwm_model_improvement.py": "5357f90b5a0aeebbbb5f1893b95d31792a5792e225abeaf2cd9f75ab8ebca415",
+    "protocol/schemas/wwm-v2.md": "eb6fbd2bb818c60b922d607b7e9a82989d11319e7eb847841b18025af6e01d51",
+    "deploy/wwm/continuous-learning.testnet.json": "d0598bcb2e2f02e6875f9193a543278fbff1caba9a8a62f62c2aa10d1443cd6e",
+    "deploy/wwm/model-improvement.json": "281dde8af21545771f9e89a6aeec4f0b50a390d6bba768a13bbe307d8d6181eb",
+    "deploy/wwm/licenses/Bonsai-27B/LICENSE.txt": "69849221bfb90053de2134ef5e6d540287b4b98062326492f1f96f5da685524b",
+    "deploy/wwm/licenses/Bonsai-27B/NOTICE.txt": "cef33f95425f9802de78b7b22db0faca84d2216661432a9afcf9620949c21f7e",
+    "deploy/wwm/systemd/mindchain-wwm-learning.service": "4eccef33b5f0cfd25fc91d2b16166401c25ad185f48275974e922ba8ef7a244f",
+    "deploy/wwm/systemd/mindchain-wwm-seed2-rpc-tunnel.service": "33fd5e8544b5d2e29ed294161afdace387f9e1249a81cdf96eda02e7c1e74376",
+    "deploy/wwm/systemd/install-mindchain-wwm-learning.sh": "d11ba7572eaa87429933a7d8f7a487989be0cdaa4e0c64e34db9260c4452d7e9"
+  }
+}

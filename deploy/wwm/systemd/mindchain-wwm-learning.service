@@ -1,0 +1,45 @@
+[Unit]
+Description=MindChain WWM finality-anchored continual-learning coordinator
+After=network-online.target mindchain-wwm-seed.service
+Wants=network-online.target mindchain-wwm-seed.service
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=mindchain-wwm
+Group=mindchain-wwm
+WorkingDirectory=/opt/mindchain-wwm
+ExecStart=/usr/bin/python3 -B -u /opt/mindchain-wwm/tools/operations/wwm_continuous_learning.py --config /etc/mindchain-wwm/continuous-learning.json
+Restart=always
+RestartSec=10s
+TimeoutStopSec=75s
+KillSignal=SIGTERM
+UMask=0077
+Environment=PYTHONHASHSEED=0
+Environment=PYTHONDONTWRITEBYTECODE=1
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+ReadOnlyPaths=/etc/mindchain-wwm /opt/mindchain-wwm
+ReadWritePaths=/var/lib/mindchain-wwm/continuous-learning
+
+[Install]
+WantedBy=multi-user.target
