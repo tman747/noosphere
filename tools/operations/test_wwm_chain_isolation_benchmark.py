@@ -272,6 +272,62 @@ class ChainIsolationBenchmarkTests(unittest.TestCase):
         self.assertFalse(bench.degradation(100_000, 105_000)["passed"])
         self.assertTrue(bench.degradation(100_000, 104_999)["passed"])
 
+    def test_phase_submits_batch_before_polling_finality(self) -> None:
+        payloads = [f"ordinary-{index}".encode() for index in range(bench.HARD_MIN_SAMPLE_FLOOR)]
+
+        class BatchRecorder:
+            base_url = "http://127.0.0.1:1"
+
+            def __init__(self) -> None:
+                self.submitted: dict[str, int] = {}
+
+            def require_json(
+                self, method: str, path: str, body: bytes | None = None
+            ) -> tuple[dict[str, Any], int]:
+                if method == "POST" and path == "/submit_tx" and body is not None:
+                    txid = hashlib.sha256(body).hexdigest()
+                    self.submitted[txid] = len(self.submitted) + 1
+                    return {"accepted": True, "txid": txid}, 1
+                if method == "GET" and path == "/status":
+                    self._require_complete_batch()
+                    height = len(payloads)
+                    return {
+                        "chain_id": CHAIN_ID,
+                        "genesis_hash": GENESIS_HASH,
+                        "unsafe_head": {"height": height},
+                        "finalized": {"height": height},
+                    }, 1
+                raise AssertionError(f"unexpected request: {method} {path}")
+
+            def request(self, method: str, path: str, body: bytes | None = None) -> bench.HttpResult:
+                del body
+                if method != "GET" or not path.startswith("/receipt/"):
+                    raise AssertionError(f"unexpected request: {method} {path}")
+                self._require_complete_batch()
+                txid = path.removeprefix("/receipt/")
+                height = self.submitted[txid]
+                response = {
+                    "state": {"settled_height": height, "status_code": 0},
+                    "receipt": {"txid": txid, "status": 0, "fee_charged": "1"},
+                }
+                return bench.HttpResult(200, bench.canonical_json(response), 1, None)
+
+            def _require_complete_batch(self) -> None:
+                if len(self.submitted) != len(payloads):
+                    raise AssertionError("phase polled before submitting the complete transaction batch")
+
+        report = bench.run_node_phase(
+            "batched",
+            BatchRecorder(),
+            payloads,
+            CHAIN_ID,
+            GENESIS_HASH,
+            phase_timeout=1,
+            poll_interval=0.001,
+        )
+        self.assertEqual(report["sample_count"], len(payloads))
+        self.assertEqual([row["sequence"] for row in report["raw_samples"]], list(range(len(payloads))))
+
     def test_live_success_is_signed_non_promoting_insert_once_evidence(self) -> None:
         evidence = bench.run_benchmark(self.args())
         bench.verify_evidence(evidence)

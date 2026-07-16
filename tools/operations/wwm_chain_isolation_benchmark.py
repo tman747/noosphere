@@ -366,74 +366,103 @@ def run_node_phase(
     phase_timeout: float,
     poll_interval: float,
 ) -> dict[str, Any]:
-    samples: list[dict[str, Any]] = []
+    transactions: list[dict[str, Any]] = []
     for index, payload in enumerate(payloads):
         started = time.perf_counter_ns()
         submitted, submission_request_us = recorder.require_json("POST", "/submit_tx", payload)
         if submitted.get("accepted") is not True:
             raise BenchmarkError(f"{name} transaction {index} was not accepted")
         txid = require_hex32(submitted.get("txid"), f"{name} transaction {index} live txid")
-        deadline = time.monotonic() + phase_timeout
-        receipt_polls = 0
-        receipt: dict[str, Any] | None = None
-        while time.monotonic() < deadline:
-            result = recorder.request("GET", f"/receipt/{txid}")
-            receipt_polls += 1
+        transactions.append({
+            "sequence": index,
+            "payload": payload,
+            "started_ns": started,
+            "submission_latency_us": submission_request_us,
+            "txid": txid,
+            "receipt_polls": 0,
+            "status_polls": 0,
+            "receipt": None,
+            "receipt_latency_us": None,
+            "finality_latency_us": None,
+            "finalized_height": None,
+        })
+
+    deadline = time.monotonic() + phase_timeout
+    pending_receipts = set(range(len(transactions)))
+    while pending_receipts and time.monotonic() < deadline:
+        for item_index in sorted(pending_receipts):
+            transaction = transactions[item_index]
+            result = recorder.request("GET", f"/receipt/{transaction['txid']}")
+            transaction["receipt_polls"] += 1
             if result.status == 200 and result.error is None:
-                candidate = parse_json_body(result.body, recorder.base_url + f"/receipt/{txid}")
+                candidate = parse_json_body(result.body, recorder.base_url + f"/receipt/{transaction['txid']}")
                 candidate_state = candidate.get("state")
                 candidate_record = candidate.get("receipt")
                 candidate_height = candidate_state.get("settled_height") if isinstance(candidate_state, dict) else None
                 if isinstance(candidate_height, int) and not isinstance(candidate_height, bool) and isinstance(candidate_record, dict):
-                    receipt = candidate
-                    break
+                    if (
+                        candidate_height < 0
+                        or candidate_state.get("status_code") != 0
+                        or candidate_record.get("txid") != transaction["txid"]
+                        or candidate_record.get("status") != 0
+                    ):
+                        raise BenchmarkError(f"{name} transaction {transaction['txid']} live receipt is not a successful ordinary settlement")
+                    transaction["receipt"] = candidate
+                    transaction["receipt_latency_us"] = max(
+                        1, (time.perf_counter_ns() - transaction["started_ns"]) // 1000
+                    )
+                    pending_receipts.remove(item_index)
+                    continue
                 if isinstance(candidate_state, dict) and candidate_state.get("status_code") not in {None, 0}:
-                    raise BenchmarkError(f"{name} transaction {txid} reached a failed terminal receipt")
-                time.sleep(poll_interval)
-                continue
-            if result.status != 404:
-                raise BenchmarkError(f"{name} transaction {txid} receipt returned an error instead of a live 404/200")
+                    raise BenchmarkError(f"{name} transaction {transaction['txid']} reached a failed terminal receipt")
+            elif result.status != 404:
+                raise BenchmarkError(
+                    f"{name} transaction {transaction['txid']} receipt returned an error instead of a live 404/200"
+                )
+        if pending_receipts:
             time.sleep(poll_interval)
-        if receipt is None:
-            raise BenchmarkError(f"{name} transaction {txid} produced no live receipt before timeout")
-        receipt_us = max(1, (time.perf_counter_ns() - started) // 1000)
-        state = receipt.get("state")
-        receipt_record = receipt.get("receipt")
-        settled_height = state.get("settled_height") if isinstance(state, dict) else None
-        if (
-            not isinstance(settled_height, int)
-            or isinstance(settled_height, bool)
-            or settled_height < 0
-            or state.get("status_code") != 0
-            or not isinstance(receipt_record, dict)
-            or receipt_record.get("txid") != txid
-            or receipt_record.get("status") != 0
-        ):
-            raise BenchmarkError(f"{name} transaction {txid} live receipt is not a successful ordinary settlement")
-        status_polls = 0
-        terminal_status: dict[str, Any] | None = None
-        while time.monotonic() < deadline:
-            status, _ = recorder.require_json("GET", "/status")
-            status_polls += 1
-            validate_node_status(status, chain_id, genesis_hash)
-            if finalized_height(status) >= settled_height:
-                terminal_status = status
-                break
+    if pending_receipts:
+        transaction = transactions[min(pending_receipts)]
+        raise BenchmarkError(f"{name} transaction {transaction['txid']} produced no live receipt before timeout")
+
+    pending_finality = set(range(len(transactions)))
+    while pending_finality and time.monotonic() < deadline:
+        status, _ = recorder.require_json("GET", "/status")
+        validate_node_status(status, chain_id, genesis_hash)
+        observed_finalized_height = finalized_height(status)
+        observed_at = time.perf_counter_ns()
+        for item_index in sorted(pending_finality):
+            transaction = transactions[item_index]
+            transaction["status_polls"] += 1
+            state = transaction["receipt"]["state"]
+            if observed_finalized_height >= state["settled_height"]:
+                transaction["finalized_height"] = observed_finalized_height
+                transaction["finality_latency_us"] = max(
+                    1, (observed_at - transaction["started_ns"]) // 1000
+                )
+                pending_finality.remove(item_index)
+        if pending_finality:
             time.sleep(poll_interval)
-        if terminal_status is None:
-            raise BenchmarkError(f"{name} transaction {txid} did not receive live finalized coverage before timeout")
-        finality_us = max(1, (time.perf_counter_ns() - started) // 1000)
+    if pending_finality:
+        transaction = transactions[min(pending_finality)]
+        raise BenchmarkError(
+            f"{name} transaction {transaction['txid']} did not receive live finalized coverage before timeout"
+        )
+
+    samples = []
+    for transaction in transactions:
+        state = transaction["receipt"]["state"]
         samples.append({
-            "sequence": index,
-            "transaction_payload_sha256": sha256_bytes(payload),
-            "txid": txid,
-            "settled_height": settled_height,
-            "finalized_height": finalized_height(terminal_status),
-            "submission_latency_us": submission_request_us,
-            "receipt_latency_us": receipt_us,
-            "finality_latency_us": finality_us,
-            "receipt_poll_count": receipt_polls,
-            "status_poll_count": status_polls,
+            "sequence": transaction["sequence"],
+            "transaction_payload_sha256": sha256_bytes(transaction["payload"]),
+            "txid": transaction["txid"],
+            "settled_height": state["settled_height"],
+            "finalized_height": transaction["finalized_height"],
+            "submission_latency_us": transaction["submission_latency_us"],
+            "receipt_latency_us": transaction["receipt_latency_us"],
+            "finality_latency_us": transaction["finality_latency_us"],
+            "receipt_poll_count": transaction["receipt_polls"],
+            "status_poll_count": transaction["status_polls"],
         })
     return phase_summary(samples)
 
