@@ -24,8 +24,8 @@
     "node_rpc": "127.0.0.1:29652",
     "node_p2p": "/ip4/0.0.0.0/udp/29650/quic-v1",
     "node_role": "observer-read-gateway-source",
-    "node_binary_sha256": "ab8af8ef3a182e13dafa796f4ff2449d9ad963690f51e0838a79683384a3dcc1",
-    "node_source_revision": "6ae545ca51092a9f99c7c5209d5c10440a32a207",
+    "node_binary_sha256": "766822ad12035d15f20857917e80c0fe1d6b4ec2ad918592c797548bef2356f0",
+    "node_source_revision": "fe60bacb42f1971db9780428256b1474f97fac9a",
     "bootstrap_peers": [
       "/ip4/20.15.164.29/udp/31004/quic-v1",
       "/ip4/172.202.41.123/udp/31005/quic-v1",
@@ -111,8 +111,8 @@
     "fixture_keys": true,
     "single_operator_control": true,
     "production_eligible": false,
-    "node_source_revision": "6ae545ca51092a9f99c7c5209d5c10440a32a207",
-    "node_binary_sha256": "2394813292c3e1009cbb07133723c7384c7d56c6714abff9888d2034456b245f"
+    "node_source_revision": "fe60bacb42f1971db9780428256b1474f97fac9a",
+    "node_binary_sha256": "31a39594aa05ee34d41b5bb06cbd03e8516fed55f75d021237c3432031b69dcf"
   },
   "host_memory_safety": {
     "mindchain-seed-1_swap_gib": 8,
