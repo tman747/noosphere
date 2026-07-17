@@ -282,6 +282,86 @@ fn second_invalid_certificate_rolls_back_first_and_restart_sees_no_block() {
         .is_none());
 }
 
+#[test]
+fn historical_headers_accept_only_exact_previously_verified_checkpoint_views() {
+    let producer_dir = test_dir("historical-checkpoint-producer");
+    let importer_dir = test_dir("historical-checkpoint-importer");
+    let mut producer = boot_node(&producer_dir, node_config());
+    let mut importer = boot_node(&importer_dir, node_config());
+    let genesis = importer.finalized();
+    let mut first_checkpoint = None;
+    let mut second_checkpoint = None;
+    let mut parent_header = None;
+
+    for height in 1..=2 * EPOCH_LENGTH {
+        let block = produce_full(&mut producer);
+        importer.set_now(block.header.timestamp_ms);
+        import(&mut importer, &block).expect("historical prefix import");
+        if height == EPOCH_LENGTH {
+            first_checkpoint = Some(CheckpointRef {
+                epoch: 1,
+                checkpoint_hash: block.hash,
+            });
+        }
+        if height == 2 * EPOCH_LENGTH {
+            second_checkpoint = Some(CheckpointRef {
+                epoch: 2,
+                checkpoint_hash: block.hash,
+            });
+            parent_header = Some(block.header);
+        }
+    }
+
+    let historical = produce_full(&mut producer);
+    assert_eq!(historical.header.justified_checkpoint, genesis);
+    assert_eq!(historical.header.finalized_checkpoint, genesis);
+    let first_checkpoint = first_checkpoint.expect("epoch-one checkpoint");
+    let second_checkpoint = second_checkpoint.expect("epoch-two checkpoint");
+    let first_certificate = quorum_certificate(&mut importer, genesis, first_checkpoint);
+    importer
+        .queue_certificate(first_certificate)
+        .expect("justify epoch one");
+    let second_certificate = quorum_certificate(&mut importer, first_checkpoint, second_checkpoint);
+    importer
+        .queue_certificate(second_certificate)
+        .expect("justify epoch two and finalize epoch one");
+    assert_eq!(importer.justified(), second_checkpoint);
+    assert_eq!(importer.finalized(), first_checkpoint);
+
+    // Both checkpoints are individually verified, but this pair was never a
+    // tracker view: epoch two justification atomically finalized epoch one.
+    let mut forged_header = historical.header.clone();
+    forged_header.justified_checkpoint = second_checkpoint;
+    forged_header.finalized_checkpoint = genesis;
+    let forged_ticket = reissue(
+        &parent_header.expect("historical parent"),
+        &mut forged_header,
+    );
+    importer.set_now(forged_header.timestamp_ms);
+    let before = observe(&importer);
+    let error = importer
+        .import_block(
+            &forged_header,
+            &forged_ticket,
+            &historical.claim,
+            &historical.shards,
+        )
+        .expect_err("unobserved checkpoint pair");
+    assert!(matches!(
+        error,
+        crate::NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint)
+    ));
+    assert_eq!(observe(&importer), before);
+
+    assert_eq!(
+        import(&mut importer, &historical).expect("verified historical checkpoint view"),
+        ImportOutcome::Executed {
+            hash: historical.hash
+        }
+    );
+    assert_eq!(importer.head(), (2 * EPOCH_LENGTH + 1, historical.hash));
+}
+
 fn orphan_variant(
     name: &str,
     parent: &BlockHeaderV1,

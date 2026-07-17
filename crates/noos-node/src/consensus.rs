@@ -548,7 +548,6 @@ impl<P: StorePort> NodeCore<P> {
         self.pending_certs.len()
     }
 
-
     #[must_use]
     pub fn ledger(&self) -> &LumenLedger {
         &self.ledger
@@ -566,45 +565,45 @@ impl<P: StorePort> NodeCore<P> {
         let height = finalized.expected_height().ok_or(NodeError::Resolution(
             crate::resolver::ResolutionError::TerminalNotFinalized,
         ))?;
-        let finalized_ledger = if self.anchor.0 == finalized.checkpoint_hash && self.anchor.1 == height
-        {
-            self.anchor.2.clone()
-        } else {
-            if height <= self.anchor.1 {
-                return Err(NodeError::Resolution(
-                    crate::resolver::ResolutionError::UnsafeStateRoot,
-                ));
-            }
-            let mut path = Vec::new();
-            let mut cursor = finalized.checkpoint_hash;
-            while cursor != self.anchor.0 {
-                let stored = self.dag.get(&cursor).ok_or(NodeError::Resolution(
-                    crate::resolver::ResolutionError::UnsafeStateRoot,
-                ))?;
-                if stored.header.height <= self.anchor.1 {
+        let finalized_ledger =
+            if self.anchor.0 == finalized.checkpoint_hash && self.anchor.1 == height {
+                self.anchor.2.clone()
+            } else {
+                if height <= self.anchor.1 {
                     return Err(NodeError::Resolution(
                         crate::resolver::ResolutionError::UnsafeStateRoot,
                     ));
                 }
-                path.push(cursor);
-                cursor = stored.header.parent_hash;
-            }
-            path.reverse();
-            let mut ledger = self.anchor.2.clone();
-            for hash in path {
-                let (replay_header, ticket) = self.load_header(&hash)?;
-                let replay_body = self.load_body(&replay_header, &ticket)?;
-                Self::execute_and_verify_on(
-                    &mut ledger,
-                    self.chain_id,
-                    &self.engine,
-                    self.cfg.stable_safety_activation_height,
-                    &replay_header,
-                    &replay_body,
-                )?;
-            }
-            ledger
-        };
+                let mut path = Vec::new();
+                let mut cursor = finalized.checkpoint_hash;
+                while cursor != self.anchor.0 {
+                    let stored = self.dag.get(&cursor).ok_or(NodeError::Resolution(
+                        crate::resolver::ResolutionError::UnsafeStateRoot,
+                    ))?;
+                    if stored.header.height <= self.anchor.1 {
+                        return Err(NodeError::Resolution(
+                            crate::resolver::ResolutionError::UnsafeStateRoot,
+                        ));
+                    }
+                    path.push(cursor);
+                    cursor = stored.header.parent_hash;
+                }
+                path.reverse();
+                let mut ledger = self.anchor.2.clone();
+                for hash in path {
+                    let (replay_header, ticket) = self.load_header(&hash)?;
+                    let replay_body = self.load_body(&replay_header, &ticket)?;
+                    Self::execute_and_verify_on(
+                        &mut ledger,
+                        self.chain_id,
+                        &self.engine,
+                        self.cfg.stable_safety_activation_height,
+                        &replay_header,
+                        &replay_body,
+                    )?;
+                }
+                ledger
+            };
         let header = self
             .dag
             .get(&finalized.checkpoint_hash)
@@ -2212,9 +2211,9 @@ impl<P: StorePort> NodeCore<P> {
         header: &BlockHeaderV1,
         hash: &Hash32,
     ) -> Result<(), NodeError> {
-        let justified = staged.tracker.justified_head();
-        let finalized = staged.tracker.finalized_head();
-        if header.justified_checkpoint != justified || header.finalized_checkpoint != finalized {
+        let justified = header.justified_checkpoint;
+        let finalized = header.finalized_checkpoint;
+        if !staged.tracker.has_checkpoint_view(&justified, &finalized) {
             return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
         }
         for checkpoint in [finalized, justified] {
