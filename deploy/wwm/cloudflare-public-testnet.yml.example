@@ -19,8 +19,8 @@ ingress:
     path: ^/(status\.json|metrics|healthz)$
     service: http://127.0.0.1:29901
   - hostname: wwm-status.mindchain.network
-    service: https://wwm-seed-2.mindchain.network
+    service: https://wwm-seed.mindchain.network
     originRequest:
-      httpHostHeader: wwm-seed-2.mindchain.network
-      originServerName: wwm-seed-2.mindchain.network
+      httpHostHeader: wwm-seed.mindchain.network
+      originServerName: wwm-seed.mindchain.network
   - service: http_status:404
