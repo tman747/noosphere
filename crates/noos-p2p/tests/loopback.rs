@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use noos_p2p::{
     write_raw_declared, BodyReplyV1, Bounded, ChainIdentity, HeaderReplyV1, InboundItem,
@@ -196,10 +196,7 @@ async fn bootstrap_dial_retries_when_listener_starts_late() {
     let (dialer, mut dialer_rx) = spawn(3, chain_a(), MemStore::default(), |_| {});
     dialer.connect(addr.clone());
     wait_for(&mut dialer_rx, "initial bootstrap failure", |event| {
-        matches!(
-            event,
-            P2pEvent::OutgoingConnectionFailed { peer: None }
-        )
+        matches!(event, P2pEvent::OutgoingConnectionFailed { peer: None })
     })
     .await;
 
@@ -562,6 +559,26 @@ async fn rate_limit_trips_score_and_disconnects() {
     for f in floods {
         f.abort();
     }
+}
+
+// ---------------------------------------------------------------------------
+// End-to-end outbound deadline
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+async fn queued_request_times_out_without_ready_peer() {
+    let (a, _a_rx) = spawn(19, chain_a(), MemStore::default(), |_| {});
+    let (b, _b_rx) = spawn(20, chain_a(), MemStore::default(), |_| {});
+    let began = Instant::now();
+
+    let result = timeout(WAIT, a.request_body(b.local_peer_id(), [0x91; 32]))
+        .await
+        .expect("public request future enforces its own deadline");
+    assert_eq!(result, Err(SendError::Timeout));
+    assert!(began.elapsed() < WAIT);
+
+    a.shutdown();
+    b.shutdown();
 }
 
 // ---------------------------------------------------------------------------

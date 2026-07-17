@@ -50,6 +50,10 @@ const SEND_ATTEMPTS: u8 = 2;
 /// block every other peer's sync and gossip work indefinitely.
 const OUTBOUND_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// End-to-end ceiling from enqueue through reconnect and reply delivery.
+/// Per-exchange timeouts cannot bound time spent waiting in the outbox.
+const OUTBOUND_DELIVERY_TIMEOUT: Duration = Duration::from_secs(25);
+
 // ---------------------------------------------------------------------------
 // Public configuration and surface types
 // ---------------------------------------------------------------------------
@@ -416,8 +420,7 @@ impl P2pHandle {
             mix ^= u64::from(*byte) << ((index % 8).wrapping_mul(8));
         }
         let mut bootstrap_dials = lock(&self.shared.bootstrap_dials);
-        let std::collections::hash_map::Entry::Vacant(entry) =
-            bootstrap_dials.entry(addr.clone())
+        let std::collections::hash_map::Entry::Vacant(entry) = bootstrap_dials.entry(addr.clone())
         else {
             return;
         };
@@ -465,7 +468,7 @@ impl P2pHandle {
             header: Bounded(header),
         };
         let rx = self.enqueue(peer, Protocol::BraidHeader, env.encode_canonical());
-        async move { decode_reply::<HeaderReplyV1>(rx.await) }
+        async move { await_reply::<HeaderReplyV1>(rx).await }
     }
 
     /// Request a header by hash.
@@ -479,7 +482,7 @@ impl P2pHandle {
             header_hash,
         };
         let rx = self.enqueue(peer, Protocol::BraidHeader, env.encode_canonical());
-        async move { decode_reply::<HeaderReplyV1>(rx.await) }
+        async move { await_reply::<HeaderReplyV1>(rx).await }
     }
 
     /// Targeted repair: ask THIS peer for THIS body hash
@@ -494,7 +497,7 @@ impl P2pHandle {
             block_hash,
         };
         let rx = self.enqueue(peer, Protocol::BraidBody, env.encode_canonical());
-        async move { decode_reply::<BodyReplyV1>(rx.await) }
+        async move { await_reply::<BodyReplyV1>(rx).await }
     }
 
     /// Push a checkpoint vote (priority lane).
@@ -508,7 +511,7 @@ impl P2pHandle {
             vote: Bounded(vote),
         };
         let rx = self.enqueue(peer, Protocol::BraidVote, env.encode_canonical());
-        async move { decode_reply::<PushReplyV1>(rx.await) }
+        async move { await_reply::<PushReplyV1>(rx).await }
     }
 
     /// Push a transaction (normal lane).
@@ -522,7 +525,7 @@ impl P2pHandle {
             tx: Bounded(tx),
         };
         let rx = self.enqueue(peer, Protocol::LumenTx, env.encode_canonical());
-        async move { decode_reply::<PushReplyV1>(rx.await) }
+        async move { await_reply::<PushReplyV1>(rx).await }
     }
 
     /// Request an ascending header range (priority lane).
@@ -538,7 +541,7 @@ impl P2pHandle {
             max_headers,
         };
         let rx = self.enqueue(peer, Protocol::SyncRange, env.encode_canonical());
-        async move { decode_reply::<RangeReplyV1>(rx.await) }
+        async move { await_reply::<RangeReplyV1>(rx).await }
     }
 
     /// Request finalized light-client history (priority lane). The request and
@@ -561,7 +564,7 @@ impl P2pHandle {
             let Some(rx) = rx else {
                 return Err(SendError::BadReply);
             };
-            let reply = decode_reply::<LightUpdateReplyV1>(rx.await)?;
+            let reply = await_reply::<LightUpdateReplyV1>(rx).await?;
             if reply.chain_id != chain_id
                 || reply.genesis_hash != genesis_hash
                 || reply.requested_start != start_height
@@ -587,7 +590,7 @@ impl P2pHandle {
             chunk_index,
         };
         let rx = self.enqueue(peer, Protocol::SyncSnapshot, env.encode_canonical());
-        async move { decode_reply::<SnapshotReplyV1>(rx.await) }
+        async move { await_reply::<SnapshotReplyV1>(rx).await }
     }
 
     /// Request one DA shard (normal lane).
@@ -603,7 +606,7 @@ impl P2pHandle {
             shard_index,
         };
         let rx = self.enqueue(peer, Protocol::BlobShard, env.encode_canonical());
-        async move { decode_reply::<ShardReplyV1>(rx.await) }
+        async move { await_reply::<ShardReplyV1>(rx).await }
     }
 
     /// Push a Work Loom receipt (normal lane). While the lane is disabled the
@@ -618,7 +621,7 @@ impl P2pHandle {
             receipt: Bounded(receipt),
         };
         let rx = self.enqueue(peer, Protocol::LoomReceipt, env.encode_canonical());
-        async move { decode_reply::<PushReplyV1>(rx.await) }
+        async move { await_reply::<PushReplyV1>(rx).await }
     }
 
     /// Opens a raw substream, bypassing envelopes and lanes — conformance
@@ -671,6 +674,15 @@ fn decode_reply<T: NoosDecode>(
 ) -> Result<T, SendError> {
     let bytes = raw.map_err(|_| SendError::Disconnected)??;
     T::decode_canonical(&bytes).map_err(|_| SendError::BadReply)
+}
+
+async fn await_reply<T: NoosDecode>(
+    rx: oneshot::Receiver<Result<Vec<u8>, SendError>>,
+) -> Result<T, SendError> {
+    let raw = tokio::time::timeout(OUTBOUND_DELIVERY_TIMEOUT, rx)
+        .await
+        .map_err(|_| SendError::Timeout)?;
+    decode_reply(raw)
 }
 
 /// Non-poisoning lock: this crate never panics while holding a mutex, and a
@@ -1476,9 +1488,8 @@ async fn outbox_worker(
         };
         // One in-flight request: open, write, await reply.
         let mut control = shared.control.clone();
-        let outcome: Result<Vec<u8>, SendError> = match tokio::time::timeout(
-            OUTBOUND_REQUEST_TIMEOUT,
-            async {
+        let outcome: Result<Vec<u8>, SendError> =
+            match tokio::time::timeout(OUTBOUND_REQUEST_TIMEOUT, async {
                 let mut s = control
                     .open_stream(peer, sp(item.protocol))
                     .await
@@ -1491,16 +1502,15 @@ async fn outbox_worker(
                     .map_err(|_| SendError::Disconnected)?;
                 let _ = futures::io::AsyncWriteExt::close(&mut s).await;
                 Ok(reply)
-            },
-        )
-        .await
-        {
-            Ok(outcome) => outcome,
-            Err(_) => {
-                shared.cmd(SwarmCmd::Disconnect(peer));
-                Err(SendError::Timeout)
-            }
-        };
+            })
+            .await
+            {
+                Ok(outcome) => outcome,
+                Err(_) => {
+                    shared.cmd(SwarmCmd::Disconnect(peer));
+                    Err(SendError::Timeout)
+                }
+            };
         match outcome {
             Ok(reply) => {
                 let _ = item.reply.send(Ok(reply));
