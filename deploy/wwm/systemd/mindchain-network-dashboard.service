@@ -2,8 +2,7 @@
 Description=MindChain public testnet live network dashboard
 Documentation=https://wwm-status.mindchain.network
 After=network-online.target mindchain-wwm-seed.service mindchain-public-indexer.service
-Wants=network-online.target
-Requires=mindchain-wwm-seed.service mindchain-public-indexer.service
+Wants=network-online.target mindchain-wwm-seed.service mindchain-public-indexer.service
 StartLimitIntervalSec=300
 StartLimitBurst=10
 
