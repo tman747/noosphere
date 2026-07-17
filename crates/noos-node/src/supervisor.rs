@@ -58,6 +58,9 @@ use crate::{Hash32, NodeError};
 /// Bounded inbox capacities (node-v1.md §7.1).
 pub const CONSENSUS_INBOX: usize = 1024;
 pub const STORE_INBOX: usize = 64;
+/// Full-node pull sync stays below the default eight-body-requests/second
+/// peer limit, including low-latency LAN links where transport time is tiny.
+const FULL_SYNC_BODY_REQUEST_PACING: Duration = Duration::from_millis(125);
 
 // ---------------------------------------------------------------------------
 // Store task
@@ -287,12 +290,7 @@ pub enum ConsensusMsg {
     GetWwmRecord {
         kind: noos_lumen::wwm::WwmLeafKind,
         id: Hash32,
-        reply: Reply<
-            Result<
-                (u64, Hash32, noos_lumen::wwm::ResolutionProofV1),
-                String,
-            >,
-        >,
+        reply: Reply<Result<(u64, Hash32, noos_lumen::wwm::ResolutionProofV1), String>>,
     },
     Status {
         reply: Reply<StatusSnapshot>,
@@ -726,11 +724,17 @@ async fn sync_ready_peer(
         let Some(start_height) = before.0.checked_add(1) else {
             return;
         };
-        let Ok(range) = p2p
+        let range = match p2p
             .request_range(peer, start_height, MAX_RANGE_HEADERS)
             .await
-        else {
-            return;
+        {
+            Ok(range) => range,
+            Err(error) => {
+                eprintln!(
+                    "range-sync request failed from peer {peer} at height {start_height}: {error}"
+                );
+                return;
+            }
         };
         if range.headers.0.is_empty() {
             return;
@@ -741,15 +745,15 @@ async fn sync_ready_peer(
             } else {
                 import_wire_block(consensus, p2p, peer, &header.0).await
             };
-            if let Err(_error) = result {
-                #[cfg(test)]
-                {
-                    let height = decode_header_announce(&header.0)
-                        .ok()
-                        .map(|(decoded, _)| decoded.height);
-                    eprintln!("range-sync import stopped at {height:?}: {_error}");
-                }
+            if let Err(error) = result {
+                let height = decode_header_announce(&header.0)
+                    .ok()
+                    .map(|(decoded, _)| decoded.height);
+                eprintln!("range-sync import stopped from peer {peer} at {height:?}: {error}");
                 return;
+            }
+            if mode != NodeMode::Light {
+                tokio::time::sleep(FULL_SYNC_BODY_REQUEST_PACING).await;
             }
         }
         let Some(after) = consensus_sync_head(consensus) else {
@@ -885,11 +889,22 @@ fn spawn_network(
                             let Some(event) = event else { break };
                             match event {
                                 P2pEvent::PeerReady { peer, .. } => {
+                                    eprintln!("p2p peer ready: {peer}");
                                     edge.peer_ready(peer);
                                     sync_ready_peer(&consensus, &p2p, peer).await;
                                 }
-                                P2pEvent::PeerDisconnected { peer }
-                                | P2pEvent::HandshakeRejected { peer, .. } => {
+                                P2pEvent::PeerDisconnected { peer } => {
+                                    eprintln!("p2p peer disconnected: {peer}");
+                                    edge.peer_gone(&peer);
+                                }
+                                P2pEvent::HandshakeRejected {
+                                    peer,
+                                    code,
+                                    by_remote,
+                                } => {
+                                    eprintln!(
+                                        "p2p handshake rejected: peer={peer} code={code:?} by_remote={by_remote}"
+                                    );
                                     edge.peer_gone(&peer);
                                 }
                                 P2pEvent::Inbound { peer, item } => match item {
