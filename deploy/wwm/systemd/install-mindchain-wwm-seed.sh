@@ -54,6 +54,8 @@ install -d -o mindchain-wwm -g mindchain-wwm -m 0700 /var/lib/mindchain-wwm
 install -o root -g root -m 0755 "${BINARY_SOURCE}" /opt/mindchain-wwm/bin/noosd
 install -o root -g root -m 0755 "${SCRIPT_DIR}/mindchain-wwm-seed-launcher.sh" /opt/mindchain-wwm/bin/mindchain-wwm-seed-launcher.sh
 install -o root -g root -m 0755 "${SCRIPT_DIR}/mindchain-wwm-external-probe.py" /opt/mindchain-wwm/bin/mindchain-wwm-external-probe.py
+install -o root -g root -m 0755 "${SCRIPT_DIR}/create-mindchain-seed-snapshot.sh" /opt/mindchain-wwm/bin/create-mindchain-seed-snapshot.sh
+install -o root -g root -m 0755 "${SCRIPT_DIR}/restore-mindchain-seed-snapshot.sh" /opt/mindchain-wwm/bin/restore-mindchain-seed-snapshot.sh
 install -o root -g root -m 0644 "${PARAMS_SOURCE}" /opt/mindchain-wwm/protocol/genesis/devnet-parameters.toml
 install -o root -g root -m 0644 "${SCRIPT_DIR}/mindchain-wwm-seed.service" /etc/systemd/system/mindchain-wwm-seed.service
 install -o root -g root -m 0644 "${SCRIPT_DIR}/mindchain-wwm-external-probe.service" /etc/systemd/system/mindchain-wwm-external-probe.service

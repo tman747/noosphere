@@ -9,6 +9,9 @@ OUTPUT=/tmp/mindchain-seed-state.tgz
 restart_services() {
   systemctl start mindchain-wwm-seed.service
   systemctl start mindchain-public-indexer.service
+  if systemctl cat mindchain-network-dashboard.service >/dev/null 2>&1; then
+    systemctl start mindchain-network-dashboard.service
+  fi
 }
 trap restart_services EXIT
 

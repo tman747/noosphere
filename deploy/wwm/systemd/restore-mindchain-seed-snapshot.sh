@@ -47,3 +47,6 @@ if [[ "${WITH_INDEXER}" == yes ]]; then
   systemctl start mindchain-public-indexer.service
   systemctl is-active --quiet mindchain-public-indexer.service
 fi
+if systemctl cat mindchain-network-dashboard.service >/dev/null 2>&1; then
+  systemctl start mindchain-network-dashboard.service
+fi
