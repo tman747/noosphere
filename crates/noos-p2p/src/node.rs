@@ -46,6 +46,10 @@ const READY_GRACE_MS: u64 = 3_000;
 /// Delivery attempts per queued request across reconnects.
 const SEND_ATTEMPTS: u8 = 2;
 
+/// Hard ceiling for one outbound substream exchange. A silent peer must not
+/// block every other peer's sync and gossip work indefinitely.
+const OUTBOUND_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+
 // ---------------------------------------------------------------------------
 // Public configuration and surface types
 // ---------------------------------------------------------------------------
@@ -175,6 +179,8 @@ pub enum SendError {
     PeerRejected,
     /// Connection lost and delivery attempts exhausted.
     Disconnected,
+    /// The peer left an outbound substream exchange incomplete.
+    Timeout,
     /// The reply failed canonical decode.
     BadReply,
     /// The node is shutting down.
@@ -187,6 +193,7 @@ impl core::fmt::Display for SendError {
             SendError::QueueFull => "queue_full",
             SendError::PeerRejected => "peer_rejected",
             SendError::Disconnected => "disconnected",
+            SendError::Timeout => "timeout",
             SendError::BadReply => "bad_reply",
             SendError::NodeShutdown => "node_shutdown",
         };
@@ -1469,21 +1476,31 @@ async fn outbox_worker(
         };
         // One in-flight request: open, write, await reply.
         let mut control = shared.control.clone();
-        let outcome: Result<Vec<u8>, SendError> = async {
-            let mut s = control
-                .open_stream(peer, sp(item.protocol))
-                .await
-                .map_err(|_| SendError::Disconnected)?;
-            write_frame(&mut s, &item.payload, MAX_FRAME_BYTES)
-                .await
-                .map_err(|_| SendError::Disconnected)?;
-            let reply = read_frame(&mut s, MAX_FRAME_BYTES)
-                .await
-                .map_err(|_| SendError::Disconnected)?;
-            let _ = futures::io::AsyncWriteExt::close(&mut s).await;
-            Ok(reply)
-        }
-        .await;
+        let outcome: Result<Vec<u8>, SendError> = match tokio::time::timeout(
+            OUTBOUND_REQUEST_TIMEOUT,
+            async {
+                let mut s = control
+                    .open_stream(peer, sp(item.protocol))
+                    .await
+                    .map_err(|_| SendError::Disconnected)?;
+                write_frame(&mut s, &item.payload, MAX_FRAME_BYTES)
+                    .await
+                    .map_err(|_| SendError::Disconnected)?;
+                let reply = read_frame(&mut s, MAX_FRAME_BYTES)
+                    .await
+                    .map_err(|_| SendError::Disconnected)?;
+                let _ = futures::io::AsyncWriteExt::close(&mut s).await;
+                Ok(reply)
+            },
+        )
+        .await
+        {
+            Ok(outcome) => outcome,
+            Err(_) => {
+                shared.cmd(SwarmCmd::Disconnect(peer));
+                Err(SendError::Timeout)
+            }
+        };
         match outcome {
             Ok(reply) => {
                 let _ = item.reply.send(Ok(reply));
