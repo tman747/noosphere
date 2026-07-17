@@ -253,6 +253,7 @@ pub enum ConsensusMsg {
         ticket: GroundTicketV1,
         claim: BodyDaClaimV1,
         shards: Vec<ShardCandidateV1>,
+        regossip: bool,
         reply: Reply<Result<ImportOutcome, String>>,
     },
     ImportHeader {
@@ -431,15 +432,18 @@ fn core_loop<P: StorePort>(
                 ticket,
                 claim,
                 shards,
+                regossip,
                 reply,
             } => {
                 let result = core
                     .import_block(&header, &ticket, &claim, &shards)
                     .map_err(|e| e.to_string());
-                // Re-announce newly executed blocks so gossip crosses more
-                // than one hop; the p2p layer suppresses duplicate pushes.
-                if let (Ok(ImportOutcome::Executed { .. }), Some(gossip)) = (&result, gossip) {
-                    let _ = gossip.try_send(OutboundGossip::Header(header, ticket));
+                // Live next-block gossip may cross one more hop. Pull recovery
+                // must not amplify historical pages into rate-limited gossip.
+                if regossip {
+                    if let (Ok(ImportOutcome::Executed { .. }), Some(gossip)) = (&result, gossip) {
+                        let _ = gossip.try_send(OutboundGossip::Header(header, ticket));
+                    }
                 }
                 let _ = reply.send(result);
             }
@@ -613,6 +617,7 @@ async fn import_wire_block(
     p2p: &P2pHandle,
     peer: noos_p2p::PeerId,
     announced: &[u8],
+    regossip: bool,
 ) -> Result<ImportOutcome, String> {
     let (header, ticket) = decode_header_announce(announced)
         .map_err(|error| format!("decode header announce: {error:?}"))?;
@@ -650,6 +655,7 @@ async fn import_wire_block(
             ticket,
             claim: *encoded.claim(),
             shards,
+            regossip,
             reply,
         })
         .map_err(|_| "consensus inbox closed".to_owned())?;
@@ -717,50 +723,39 @@ async fn sync_ready_peer(
     let Some(mode) = consensus_mode(consensus) else {
         return;
     };
-    loop {
-        let Some(before) = consensus_sync_head(consensus) else {
-            return;
-        };
-        let Some(start_height) = before.0.checked_add(1) else {
-            return;
-        };
-        let range = match p2p
-            .request_range(peer, start_height, MAX_RANGE_HEADERS)
-            .await
-        {
-            Ok(range) => range,
-            Err(error) => {
-                eprintln!(
-                    "range-sync request failed from peer {peer} at height {start_height}: {error}"
-                );
-                return;
-            }
-        };
-        if range.headers.0.is_empty() {
+    let Some(before) = consensus_sync_head(consensus) else {
+        return;
+    };
+    let Some(start_height) = before.0.checked_add(1) else {
+        return;
+    };
+    let range = match p2p
+        .request_range(peer, start_height, MAX_RANGE_HEADERS)
+        .await
+    {
+        Ok(range) => range,
+        Err(error) => {
+            eprintln!(
+                "range-sync request failed from peer {peer} at height {start_height}: {error}"
+            );
             return;
         }
-        for header in range.headers.0 {
-            let result = if mode == NodeMode::Light {
-                import_wire_header(consensus, p2p, peer, &header.0).await
-            } else {
-                import_wire_block(consensus, p2p, peer, &header.0).await
-            };
-            if let Err(error) = result {
-                let height = decode_header_announce(&header.0)
-                    .ok()
-                    .map(|(decoded, _)| decoded.height);
-                eprintln!("range-sync import stopped from peer {peer} at {height:?}: {error}");
-                return;
-            }
-            if mode != NodeMode::Light {
-                tokio::time::sleep(FULL_SYNC_BODY_REQUEST_PACING).await;
-            }
-        }
-        let Some(after) = consensus_sync_head(consensus) else {
-            return;
+    };
+    for header in range.headers.0 {
+        let result = if mode == NodeMode::Light {
+            import_wire_header(consensus, p2p, peer, &header.0).await
+        } else {
+            import_wire_block(consensus, p2p, peer, &header.0, false).await
         };
-        if after.0 <= before.0 || !range.more.0 {
+        if let Err(error) = result {
+            let height = decode_header_announce(&header.0)
+                .ok()
+                .map(|(decoded, _)| decoded.height);
+            eprintln!("range-sync import stopped from peer {peer} at {height:?}: {error}");
             return;
+        }
+        if mode != NodeMode::Light {
+            tokio::time::sleep(FULL_SYNC_BODY_REQUEST_PACING).await;
         }
     }
 }
@@ -856,22 +851,33 @@ fn spawn_network(
                 }
 
                 let edge = P2pNetworkEdge::new(p2p.clone(), Handle::current());
+                // Recovery pulls run independently so body downloads never
+                // stall transaction, vote, or live-header gossip processing.
+                let sync_edge = edge.clone();
+                let sync_p2p = p2p.clone();
+                let sync_consensus = consensus.clone();
+                let sync_task = tokio::spawn(async move {
+                    let mut sync_interval = tokio::time::interval(Duration::from_secs(5));
+                    sync_interval
+                        .set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                    let mut sync_cursor = 0_usize;
+                    loop {
+                        sync_interval.tick().await;
+                        let peers = sync_edge.peers();
+                        if peers.is_empty() {
+                            continue;
+                        }
+                        let peer = peers[sync_cursor % peers.len()];
+                        sync_cursor = sync_cursor.wrapping_add(1);
+                        sync_ready_peer(&sync_consensus, &sync_p2p, peer).await;
+                    }
+                });
                 let mut shutdown_rx = shutdown_rx;
-                let mut sync_interval = tokio::time::interval(Duration::from_secs(5));
-                sync_interval
-                    .set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                let mut gossip_open = true;
                 loop {
                     tokio::select! {
-                        _ = &mut shutdown_rx => {
-                            p2p.shutdown();
-                            break;
-                        }
-                        _ = sync_interval.tick() => {
-                            for peer in edge.peers() {
-                                sync_ready_peer(&consensus, &p2p, peer).await;
-                            }
-                        }
-                        gossip = gossip_rx.recv() => {
+                        _ = &mut shutdown_rx => break,
+                        gossip = gossip_rx.recv(), if gossip_open => {
                             match gossip {
                                 Some(OutboundGossip::Header(header, ticket)) => {
                                     edge.push_header(&header, &ticket).await;
@@ -882,7 +888,7 @@ fn spawn_network(
                                 Some(OutboundGossip::Vote(vote)) => {
                                     edge.push_vote(&vote).await;
                                 }
-                                None => {}
+                                None => gossip_open = false,
                             }
                         }
                         event = events.recv() => {
@@ -891,7 +897,6 @@ fn spawn_network(
                                 P2pEvent::PeerReady { peer, .. } => {
                                     eprintln!("p2p peer ready: {peer}");
                                     edge.peer_ready(peer);
-                                    sync_ready_peer(&consensus, &p2p, peer).await;
                                 }
                                 P2pEvent::PeerDisconnected { peer } => {
                                     eprintln!("p2p peer disconnected: {peer}");
@@ -921,10 +926,7 @@ fn spawn_network(
                                             Some((announced, local))
                                                 if local
                                                     .checked_add(1)
-                                                    .is_some_and(|next| announced > next) =>
-                                            {
-                                                sync_ready_peer(&consensus, &p2p, peer).await;
-                                            }
+                                                    .is_some_and(|next| announced > next) => {}
                                             Some(_) => {
                                                 if consensus_mode(&consensus)
                                                     == Some(NodeMode::Light)
@@ -935,7 +937,7 @@ fn spawn_network(
                                                     .await;
                                                 } else {
                                                     let _ = import_wire_block(
-                                                        &consensus, &p2p, peer, &header,
+                                                        &consensus, &p2p, peer, &header, true,
                                                     )
                                                     .await;
                                                 }
@@ -977,6 +979,8 @@ fn spawn_network(
                         }
                     }
                 }
+                sync_task.abort();
+                p2p.shutdown();
             });
         })
         .map_err(|error| NodeError::Config(format!("spawn p2p task: {error}")))?;
