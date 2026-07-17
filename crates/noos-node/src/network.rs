@@ -206,7 +206,7 @@ impl P2pNetworkEdge {
         Ok(peers[index])
     }
 
-    fn peers(&self) -> Vec<PeerId> {
+    pub(crate) fn peers(&self) -> Vec<PeerId> {
         lock(&self.peers).clone()
     }
 

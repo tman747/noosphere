@@ -482,6 +482,7 @@ fn main() -> ExitCode {
     let stop_ctrl = Arc::clone(&stop);
     let _ = ctrlc::set_handler(move || stop_ctrl.store(true, Ordering::SeqCst));
     let mut last_produce_ms: u64 = 0;
+    let mut last_witness_vote_ms: u64 = 0;
     while !stop.load(Ordering::SeqCst) {
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -505,8 +506,11 @@ fn main() -> ExitCode {
             }
         }
         if let Some(index) = devnet_witness {
-            if let Err(error) = handle.devnet_witness_vote_tick(index) {
-                eprintln!("witness vote: {error}");
+            if now_ms.saturating_sub(last_witness_vote_ms) >= 1000 {
+                last_witness_vote_ms = now_ms;
+                if let Err(error) = handle.devnet_witness_vote_tick(index) {
+                    eprintln!("witness vote: {error}");
+                }
             }
         }
         std::thread::sleep(std::time::Duration::from_millis(

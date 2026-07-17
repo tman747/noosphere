@@ -252,12 +252,18 @@ const fn dup_lane(protocol: Protocol) -> Option<usize> {
     }
 }
 
+struct BootstrapDial {
+    backoff: ReconnectBackoff,
+    retry_scheduled: bool,
+}
+
 struct Shared {
     config: P2pConfig,
     local_attestation: ChainAttestationV1,
     local_peer_id: PeerId,
     control: stream::Control,
     peers: Mutex<HashMap<PeerId, PeerEntry>>,
+    bootstrap_dials: Mutex<HashMap<Multiaddr, BootstrapDial>>,
     cooldowns: Mutex<CooldownLedger>,
     dups: Mutex<[DupCache; DUP_LANES]>,
     events: mpsc::UnboundedSender<P2pEvent>,
@@ -354,6 +360,7 @@ impl P2pNode {
             local_peer_id,
             control,
             peers: Mutex::new(HashMap::new()),
+            bootstrap_dials: Mutex::new(HashMap::new()),
             cooldowns: Mutex::new(CooldownLedger::new()),
             dups: Mutex::new([
                 DupCache::new(dup_cap),
@@ -397,6 +404,25 @@ impl P2pHandle {
 
     /// Dials a QUIC multiaddr (fire-and-forget; watch for `PeerReady`).
     pub fn connect(&self, addr: Multiaddr) {
+        let mut mix = self.shared.config.backoff_seed;
+        for (index, byte) in addr.to_vec().iter().enumerate() {
+            mix ^= u64::from(*byte) << ((index % 8).wrapping_mul(8));
+        }
+        let mut bootstrap_dials = lock(&self.shared.bootstrap_dials);
+        let std::collections::hash_map::Entry::Vacant(entry) =
+            bootstrap_dials.entry(addr.clone())
+        else {
+            return;
+        };
+        entry.insert(BootstrapDial {
+            backoff: ReconnectBackoff::new(
+                ReconnectBackoff::DEFAULT_BASE_MS,
+                ReconnectBackoff::DEFAULT_MAX_MS,
+                mix,
+            ),
+            retry_scheduled: false,
+        });
+        drop(bootstrap_dials);
         self.shared.cmd(SwarmCmd::Dial(addr));
     }
 
@@ -788,15 +814,25 @@ async fn swarm_loop(
             cmd = cmd_rx.recv() => match cmd {
                 None | Some(SwarmCmd::Shutdown) => break,
                 Some(SwarmCmd::Dial(addr)) => {
-                    let _ = swarm.dial(addr);
+                    if swarm.dial(addr.clone()).is_err() {
+                        schedule_bootstrap_retry(&shared, addr);
+                    }
                 }
                 Some(SwarmCmd::DialPeer(peer, addr)) => {
-                    let _ = swarm.dial(
-                        DialOpts::peer_id(peer)
-                            .addresses(vec![addr])
-                            .condition(PeerCondition::Disconnected)
-                            .build(),
-                    );
+                    if swarm
+                        .dial(
+                            DialOpts::peer_id(peer)
+                                .addresses(vec![addr])
+                                .condition(PeerCondition::Disconnected)
+                                .build(),
+                        )
+                        .is_err()
+                    {
+                        if let Some(entry) = lock(&shared.peers).get_mut(&peer) {
+                            entry.reconnecting = false;
+                        }
+                        schedule_reconnect(&shared, peer);
+                    }
                 }
                 Some(SwarmCmd::Disconnect(peer)) => {
                     let _ = swarm.disconnect_peer_id(peer);
@@ -826,14 +862,18 @@ fn handle_swarm_event(shared: &Arc<Shared>, event: SwarmEvent<()>) {
             }
             ensure_peer(shared, peer_id);
             let is_dialer = endpoint.is_dialer();
+            let dial_addr = is_dialer.then(|| endpoint.get_remote_address().clone());
+            if let Some(addr) = &dial_addr {
+                lock(&shared.bootstrap_dials).remove(addr);
+            }
             {
                 let mut peers = lock(&shared.peers);
                 if let Some(entry) = peers.get_mut(&peer_id) {
                     entry.connected = true;
                     entry.reconnecting = false;
                     entry.score = 0;
-                    if is_dialer {
-                        entry.dial_addr = Some(endpoint.get_remote_address().clone());
+                    if let Some(addr) = dial_addr {
+                        entry.dial_addr = Some(addr);
                     }
                     // A fresh connection gets a fresh handshake verdict.
                     if *entry.ready_tx.borrow() == ReadyState::Rejected {
@@ -883,9 +923,43 @@ fn handle_swarm_event(shared: &Arc<Shared>, event: SwarmEvent<()>) {
                 }
                 schedule_reconnect(shared, peer);
             }
+            let pending: Vec<_> = lock(&shared.bootstrap_dials).keys().cloned().collect();
+            for addr in pending {
+                schedule_bootstrap_retry(shared, addr);
+            }
         }
         _ => {}
     }
+}
+
+fn schedule_bootstrap_retry(shared: &Arc<Shared>, addr: Multiaddr) {
+    let delay_ms = {
+        let mut bootstrap_dials = lock(&shared.bootstrap_dials);
+        let Some(entry) = bootstrap_dials.get_mut(&addr) else {
+            return;
+        };
+        if entry.retry_scheduled {
+            return;
+        }
+        entry.retry_scheduled = true;
+        entry.backoff.next_delay_ms()
+    };
+    let sh = Arc::clone(shared);
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+        let should_retry = {
+            let mut bootstrap_dials = lock(&sh.bootstrap_dials);
+            if let Some(entry) = bootstrap_dials.get_mut(&addr) {
+                entry.retry_scheduled = false;
+                true
+            } else {
+                false
+            }
+        };
+        if should_retry {
+            sh.cmd(SwarmCmd::Dial(addr));
+        }
+    });
 }
 
 /// Schedules a redial after a deterministic-jitter exponential delay.

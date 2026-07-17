@@ -313,6 +313,7 @@ fn status_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
             r#""unsafe_head":{{"height":{},"hash":"{}"}},"#,
             r#""justified":{{"epoch":{},"hash":"{}"}},"#,
             r#""finalized":{{"epoch":{},"hash":"{}"}},"#,
+            r#""finality_gossip":{{"pending_votes":{},"pending_certificates":{},"accepted":{},"rejected":{}}},"#,
             r#""mempool":{{"txs":{},"bytes":{}}},"observer":{}}}"#
         ),
         hex(&s.chain_id),
@@ -323,6 +324,10 @@ fn status_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
         hex(&s.justified.checkpoint_hash),
         s.finalized.epoch,
         hex(&s.finalized.checkpoint_hash),
+        s.pending_votes,
+        s.pending_certificates,
+        s.inbound_votes_accepted,
+        s.inbound_votes_rejected,
         s.mempool_txs,
         s.mempool_bytes,
         s.observer,

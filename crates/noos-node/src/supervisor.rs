@@ -25,6 +25,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 use std::sync::Arc;
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 use noos_braid::{BlockHeaderV1, CheckpointRef, FinalityCertificateV1, MAX_FINALITY_CERTIFICATES};
 use noos_codec::NoosDecode;
@@ -215,6 +216,10 @@ pub struct StatusSnapshot {
     pub head_hash: Hash32,
     pub justified: CheckpointRef,
     pub finalized: CheckpointRef,
+    pub pending_votes: usize,
+    pub pending_certificates: usize,
+    pub inbound_votes_accepted: u64,
+    pub inbound_votes_rejected: u64,
     pub mempool_txs: usize,
     pub mempool_bytes: usize,
     pub observer: bool,
@@ -365,7 +370,12 @@ pub enum OutboundGossip {
     Vote(FinalityVoteV1),
 }
 
-fn status_of<P: StorePort>(core: &NodeCore<P>, observer: bool) -> StatusSnapshot {
+fn status_of<P: StorePort>(
+    core: &NodeCore<P>,
+    observer: bool,
+    inbound_votes_accepted: u64,
+    inbound_votes_rejected: u64,
+) -> StatusSnapshot {
     let (head_height, head_hash) = core.head();
     StatusSnapshot {
         chain_id: core.chain_id(),
@@ -374,6 +384,10 @@ fn status_of<P: StorePort>(core: &NodeCore<P>, observer: bool) -> StatusSnapshot
         head_hash,
         justified: core.justified(),
         finalized: core.finalized(),
+        pending_votes: core.pending_vote_count(),
+        pending_certificates: core.pending_certificate_count(),
+        inbound_votes_accepted,
+        inbound_votes_rejected,
         mempool_txs: core.mempool.len(),
         mempool_bytes: core.mempool.total_bytes(),
         observer,
@@ -388,6 +402,9 @@ fn core_loop<P: StorePort>(
     rx: &Receiver<ConsensusMsg>,
     gossip: Option<&tokio::sync::mpsc::Sender<OutboundGossip>>,
 ) -> bool {
+    let mut inbound_votes_accepted = 0_u64;
+    let mut inbound_votes_rejected = 0_u64;
+    let mut last_vote_error: Option<String> = None;
     while let Ok(msg) = rx.recv() {
         match msg {
             ConsensusMsg::SubmitTx {
@@ -458,9 +475,17 @@ fn core_loop<P: StorePort>(
             ConsensusMsg::QueueCertificate { cert, reply } => {
                 let _ = reply.send(core.queue_certificate(*cert).map_err(|e| e.to_string()));
             }
-            ConsensusMsg::InboundVote { vote } => {
-                let _ = core.ingest_network_vote(*vote);
-            }
+            ConsensusMsg::InboundVote { vote } => match core.ingest_network_vote(*vote) {
+                Ok(()) => inbound_votes_accepted = inbound_votes_accepted.saturating_add(1),
+                Err(error) => {
+                    inbound_votes_rejected = inbound_votes_rejected.saturating_add(1);
+                    let message = error.to_string();
+                    if last_vote_error.as_deref() != Some(message.as_str()) {
+                        eprintln!("inbound finality vote rejected: {message}");
+                        last_vote_error = Some(message);
+                    }
+                }
+            },
             ConsensusMsg::DevnetFinalityTick { reply } => {
                 let _ = reply.send(core.devnet_finality_tick().map_err(|e| e.to_string()));
             }
@@ -493,7 +518,12 @@ fn core_loop<P: StorePort>(
                 );
             }
             ConsensusMsg::Status { reply } => {
-                let _ = reply.send(status_of(core, observer));
+                let _ = reply.send(status_of(
+                    core,
+                    observer,
+                    inbound_votes_accepted,
+                    inbound_votes_rejected,
+                ));
             }
             ConsensusMsg::SyncHead { reply } => {
                 let _ = reply.send(core.sync_head());
@@ -823,11 +853,19 @@ fn spawn_network(
 
                 let edge = P2pNetworkEdge::new(p2p.clone(), Handle::current());
                 let mut shutdown_rx = shutdown_rx;
+                let mut sync_interval = tokio::time::interval(Duration::from_secs(5));
+                sync_interval
+                    .set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
                 loop {
                     tokio::select! {
                         _ = &mut shutdown_rx => {
                             p2p.shutdown();
                             break;
+                        }
+                        _ = sync_interval.tick() => {
+                            for peer in edge.peers() {
+                                sync_ready_peer(&consensus, &p2p, peer).await;
+                            }
                         }
                         gossip = gossip_rx.recv() => {
                             match gossip {

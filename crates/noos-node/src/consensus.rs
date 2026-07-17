@@ -538,6 +538,16 @@ impl<P: StorePort> NodeCore<P> {
     pub fn finalized(&self) -> CheckpointRef {
         self.tracker.finalized_head()
     }
+    #[must_use]
+    pub fn pending_vote_count(&self) -> usize {
+        self.pending_votes.len()
+    }
+
+    #[must_use]
+    pub fn pending_certificate_count(&self) -> usize {
+        self.pending_certs.len()
+    }
+
 
     #[must_use]
     pub fn ledger(&self) -> &LumenLedger {
@@ -797,13 +807,13 @@ impl<P: StorePort> NodeCore<P> {
             .members()
             .get(witness_index)
             .ok_or_else(|| NodeError::Config("devnet witness index outside fixture set".into()))?;
-        if self.pending_votes.iter().any(|known| {
+        if let Some(known) = self.pending_votes.iter().find(|known| {
             known.epoch == next_epoch
                 && known.source == source
                 && known.target == target
                 && known.validator_id == member.validator_id
         }) {
-            return Ok(None);
+            return Ok(Some(known.clone()));
         }
         let secret = fixture_witness_secret(witness_index).map_err(|_| NodeError::Crypto)?;
         let vote = sign_and_release_vote(

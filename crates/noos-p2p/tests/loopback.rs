@@ -184,6 +184,42 @@ async fn handshake_accepts_matching_chain_and_binds_attestation() {
     assert_eq!(peer, a.local_peer_id());
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn bootstrap_dial_retries_when_listener_starts_late() {
+    let reservation = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    let port = reservation.local_addr().unwrap().port();
+    let addr: noos_p2p::Multiaddr = format!("/ip4/127.0.0.1/udp/{port}/quic-v1")
+        .parse()
+        .unwrap();
+    drop(reservation);
+
+    let (dialer, mut dialer_rx) = spawn(3, chain_a(), MemStore::default(), |_| {});
+    dialer.connect(addr.clone());
+    wait_for(&mut dialer_rx, "initial bootstrap failure", |event| {
+        matches!(
+            event,
+            P2pEvent::OutgoingConnectionFailed { peer: None }
+        )
+    })
+    .await;
+
+    let (listener, mut listener_rx) = spawn(4, chain_a(), MemStore::default(), |config| {
+        config.listen_addr = addr;
+    });
+    let _ = listener.listen_addr().await;
+    wait_for(&mut dialer_rx, "retried dialer PeerReady", |event| {
+        matches!(event, P2pEvent::PeerReady { .. })
+    })
+    .await;
+    wait_for(&mut listener_rx, "late listener PeerReady", |event| {
+        matches!(event, P2pEvent::PeerReady { .. })
+    })
+    .await;
+
+    listener.shutdown();
+    dialer.shutdown();
+}
+
 async fn assert_wrong_chain_rejects(
     dialer: &P2pHandle,
     dialer_rx: &mut mpsc::UnboundedReceiver<P2pEvent>,
