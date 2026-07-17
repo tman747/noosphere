@@ -781,7 +781,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.end_headers()
-        self.wfile.write(body)
+        if self.command != "HEAD":
+            self.wfile.write(body)
 
     def json_response(self, value: dict[str, Any], status: int = 200) -> None:
         self.send_body(status, json.dumps(value, separators=(",", ":")).encode(), "application/json")
@@ -813,6 +814,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_body(200, file.read_bytes(), content_type)
         except Exception as error:
             self.json_response({"error": "unavailable", "detail": str(error)}, 503)
+
+    def do_HEAD(self) -> None:  # noqa: N802
+        self.do_GET()
 
     def log_message(self, pattern: str, *args: object) -> None:
         return

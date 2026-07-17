@@ -1,6 +1,8 @@
 import tempfile
 import sys
 import unittest
+import threading
+import urllib.request
 from pathlib import Path
 from unittest.mock import patch
 
@@ -54,6 +56,28 @@ class DashboardDataTests(unittest.TestCase):
     def tearDown(self):
         self.data.db.close()
         self.temp.cleanup()
+
+    def test_static_routes_support_head(self):
+        app_dir = Path(self.temp.name) / "app"
+        app_dir.mkdir()
+        index = b"<h1>live</h1>"
+        (app_dir / "index.html").write_bytes(index)
+        server = network_dashboard.ThreadingHTTPServer(("127.0.0.1", 0), network_dashboard.Handler)
+        server.app_dir = app_dir
+        server.data = self.data
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/", method="HEAD")
+            with urllib.request.urlopen(request, timeout=5) as response:
+                self.assertEqual(response.status, 200)
+                self.assertEqual(int(response.headers["Content-Length"]), len(index))
+                self.assertEqual(response.read(), b"")
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
+        self.assertFalse(thread.is_alive())
 
     @staticmethod
     def source(url, _token=None):

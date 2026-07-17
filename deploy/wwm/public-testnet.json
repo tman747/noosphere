@@ -158,7 +158,7 @@
     "status_endpoint": "https://wwm-status.mindchain.network/status.json",
     "dashboard_endpoint": "https://wwm-status.mindchain.network",
     "dashboard_refresh_seconds": 5,
-    "dashboard_bundle_sha256": "63c78b014f48915f6f64da8fb286565e25b25799da925f60939a9e63a679c19b",
+    "dashboard_bundle_sha256": "abf786a22f121e0c6efc9d6c28b0590246f06f46a6b2b4e4db05119a6e5b6de4",
     "validator_status_schema": "noos/network-dashboard-validator-status/v1",
     "validator_status_endpoints": [
       "https://wwm-seed.mindchain.network/validator-status.json",
