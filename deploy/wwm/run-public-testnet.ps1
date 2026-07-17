@@ -25,6 +25,16 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$CreatedSupervisorMutex = $false
+$SupervisorMutex = [Threading.Mutex]::new(
+    $true,
+    'Local\MindChainWWMTestnetSupervisor',
+    [ref]$CreatedSupervisorMutex
+)
+if (-not $CreatedSupervisorMutex) {
+    $SupervisorMutex.Dispose()
+    throw 'Another MindChain WWM public-testnet supervisor is already running.'
+}
 $RuntimeRoot = [IO.Path]::GetFullPath($RuntimeRoot)
 $RepoRoot = [IO.Path]::GetFullPath($RepoRoot)
 $TokenFile = Join-Path $RuntimeRoot 'secrets\rpc-token.txt'
@@ -97,7 +107,7 @@ $Specs = @(
         Name = 'node'
         Exe = $NodeBinary
         Args = @(
-            '--devnet-witness', '2',
+            '--observer',
             '--devnet-witness-fixture',
             '--devnet-bonsai-fixture',
             '--rpc', '127.0.0.1:29652',
@@ -106,6 +116,8 @@ $Specs = @(
             '--p2p-listen', '/ip4/0.0.0.0/udp/29650/quic-v1',
             '--peer', '/ip4/20.15.164.29/udp/31004/quic-v1',
             '--peer', '/ip4/172.202.41.123/udp/31005/quic-v1',
+            '--peer', '/ip4/48.217.51.122/udp/31006/quic-v1',
+            '--peer', '/ip4/48.217.51.122/udp/31007/quic-v1',
             '--data-dir', $DataDir
         )
     },
@@ -192,6 +204,34 @@ if (-not $SkipTunnel) {
     }
 }
 
+$ProcessMarkers = @{
+    'node' = $DataDir
+    'artifact-store' = $ArtifactStoreRoot
+    'workerd' = $WorkerdConfig
+    'static-host' = $StaticHostScript
+    'web-capacity' = $CoordinatorConfig
+    'monitor' = $MonitorScript
+    'gateway' = $GatewayScript
+    'cloudflared' = $TunnelConfig
+}
+$RunningProcesses = @(Get-CimInstance Win32_Process)
+foreach ($spec in $Specs) {
+    $resolvedExecutable = (Get-Command -Name $spec.Exe -ErrorAction Stop).Source
+    $marker = [string]$ProcessMarkers[$spec.Name]
+    foreach ($candidate in $RunningProcesses) {
+        if (
+            $candidate.ProcessId -eq $PID -or
+            -not [StringComparer]::OrdinalIgnoreCase.Equals($candidate.ExecutablePath, $resolvedExecutable) -or
+            [string]::IsNullOrEmpty($candidate.CommandLine) -or
+            $candidate.CommandLine.IndexOf($marker, [StringComparison]::OrdinalIgnoreCase) -lt 0
+        ) {
+            continue
+        }
+        Write-Output "stopping stale $($spec.Name) pid=$($candidate.ProcessId)"
+        Stop-Process -Id $candidate.ProcessId -Force -ErrorAction Stop
+    }
+}
+
 $Children = @{}
 $Backoff = @{}
 foreach ($spec in $Specs) { $Backoff[$spec.Name] = 1 }
@@ -261,4 +301,6 @@ finally {
             Stop-Process -Id $managed.Process.Id -Force -ErrorAction SilentlyContinue
         }
     }
+    $SupervisorMutex.ReleaseMutex()
+    $SupervisorMutex.Dispose()
 }

@@ -40,10 +40,32 @@ function averageCadence(history){
   changes.sort((a,b)=>a-b);return changes[Math.floor(changes.length/2)];
 }
 
-function topologySvg(nodes){
-  const positions={producer:[18,50],indexer:[50,27],compute:[80,50],peers:[50,76]};
-  const edges=[["producer","indexer"],["indexer","compute"],["producer","peers"]];
-  return `<svg viewBox="0 0 100 100" role="img" aria-label="Reported network topology">${edges.map(([a,b])=>{const p=positions[a],q=positions[b];return `<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" stroke="#3a352b" stroke-width=".5" ${b==="peers"?'stroke-dasharray="2 2"':''}/>`}).join("")}${nodes.map(node=>{const p=positions[node.id]||[50,50],un=node.state==="unreported";return `<g><${node.id==="compute"?"rect":"circle"} ${node.id==="compute"?`x="${p[0]-3}" y="${p[1]-3}" width="6" height="6"`:`cx="${p[0]}" cy="${p[1]}" r="3"`} fill="${un?'#f7f2e5':'#3a352b'}" stroke="#3a352b" stroke-width=".7" ${un?'stroke-dasharray="1 1"':''}/><text x="${p[0]}" y="${p[1]+9}" text-anchor="middle" font-family="Fira Code" font-size="3" fill="#3a352b">${esc(node.label).toUpperCase()}</text></g>`}).join("")}</svg>`;
+function topologySvg(topology){
+  const nodes=topology?.nodes||[],edges=topology?.edges||[];
+  const positions=new Map();
+  const validators=nodes.filter(node=>node.id.startsWith("validator-")).sort((a,b)=>a.id.localeCompare(b.id));
+  const indexers=nodes.filter(node=>node.id.startsWith("indexer-")).sort((a,b)=>a.id.localeCompare(b.id));
+  validators.forEach((node,index)=>positions.set(node.id,[14,18+index*(64/Math.max(1,validators.length-1))]));
+  indexers.forEach((node,index)=>positions.set(node.id,[72,24+index*(52/Math.max(1,indexers.length-1))]));
+  positions.set("finality",[45,50]);
+  positions.set("gateway",[91,50]);
+  const states=new Map(nodes.map(node=>[node.id,node.state]));
+  const links=edges.map(([from,to])=>{
+    const start=positions.get(from),end=positions.get(to);
+    if(!start||!end)return "";
+    const live=states.get(from)==="online"&&states.get(to)==="online";
+    return `<line class="mesh-edge ${live?"motion-link":"is-muted"}" x1="${start[0]}" y1="${start[1]}" x2="${end[0]}" y2="${end[1]}"/>`;
+  }).join("");
+  const glyphs=nodes.map(node=>{
+    const position=positions.get(node.id);if(!position)return "";
+    const [x,y]=position,state=[...["online","catching_up","degraded","stalled","offline","unreported"]].includes(node.state)?node.state:"unreported";
+    let glyph=`<circle cx="${x}" cy="${y}" r="3.2"/>`;
+    if(node.id==="finality")glyph=`<rect x="${x-3.2}" y="${y-3.2}" width="6.4" height="6.4" transform="rotate(45 ${x} ${y})"/>`;
+    else if(node.id.startsWith("indexer-"))glyph=`<rect x="${x-3}" y="${y-3}" width="6" height="6"/>`;
+    else if(node.id==="gateway")glyph=`<circle cx="${x}" cy="${y}" r="4.1"/><circle class="mesh-core" cx="${x}" cy="${y}" r="1.5"/>`;
+    return `<g class="mesh-node ${esc(state)}">${glyph}<text x="${x}" y="${y+8}" text-anchor="middle">${esc(node.label)}</text><title>${esc(node.label)} · ${esc(node.role)} · ${esc(state)}</title></g>`;
+  }).join("");
+  return `<svg viewBox="0 0 100 100" role="img" aria-label="Live validator, indexer, and observer topology">${links}${glyphs}</svg>`;
 }
 
 function renderOverview(data){
@@ -56,7 +78,7 @@ function renderOverview(data){
   ])}${errors(data)}<div class="content">
   <section class="section"><div class="instrument-grid"><div class="instrument">${sectionHead("Chain activity",`${number(h.length)} retained observations`)}${lineChart(h,"height")}<div class="axis-row"><span>${number(heightMin)} HEIGHT</span><span>NOW · ${number(c.height)}</span></div></div><div class="instrument">${sectionHead("Finality lag","epoch distance")}<div class="lag-scale"><div class="lag-rail"><i class="lag-dot" style="bottom:${Math.min(92,lag*3)}%"></i></div><div class="lag-read"><strong>${number(lag)}</strong><span>EPOCHS BEHIND HEAD</span><span>JUSTIFIED · ${number(c.justification_lag)}</span></div></div></div></div></section>
   <section class="section"><div class="instrument-grid"><div>${sectionHead("Block cadence",`${number(recent.length)} observations`)}<div class="cadence">${recent.map((row,i)=>`<i class="${i===recent.length-1?'latest':''}" style="height:${Math.max(8,Math.min(70,12+(row.height-heightMin)*2))}px"></i>`).join("")||'<div class="unavailable"><span>Awaiting sampled blocks</span></div>'}</div></div><div>${sectionHead("Mempool","operator feed")}<div class="lag-read"><strong>${number(c.mempool_transactions)}</strong><span>TRANSACTIONS · ${number(c.mempool_bytes)} BYTES</span></div></div></div></section>
-  <section class="section"><div class="instrument-grid"><div>${sectionHead("Reported topology","solid = observed · dashed = unreported")}<div class="topology">${topologySvg(data.topology.nodes)}</div><div class="topology-key"><span class="key-solid">reported</span><span class="key-dash">unreported</span></div></div><div>${sectionHead("Service health",new Date(data.observed_ms).toLocaleTimeString())}<div class="service-list">${data.services.map(s=>`<div class="service">${stateDot(s.state)}<span class="service-name">${esc(s.name)}</span><span class="service-detail">${esc(s.state)} · ${esc(s.detail)}</span></div>`).join("")}</div></div></div></section>
+  <section class="section"><div class="instrument-grid"><div>${sectionHead("Live network mesh","animated = reporting · dashed = unavailable")}<div class="topology">${topologySvg(data.topology)}</div><div class="topology-key"><span class="key-solid">live path</span><span class="key-dash">missing or degraded</span></div></div><div>${sectionHead("Service health",new Date(data.observed_ms).toLocaleTimeString())}<div class="service-list">${data.services.map(s=>`<div class="service service-${esc(s.state)}">${stateDot(s.state)}<span class="service-name">${esc(s.name)}</span><span class="service-detail">${esc(s.state)} · ${esc(s.detail)}</span></div>`).join("")}</div></div></div></section>
   <section class="section">${sectionHead("Chain identity","operator-reported")}${kvRows([["chain id",c.chain_id],["genesis hash",c.genesis_hash]])}</section></div>`;
 }
 
@@ -65,6 +87,12 @@ function kvRows(rows){return `<dl>${rows.map(([k,v])=>`<div class="kv"><dt>${esc
 function blockDrawer(block){
   if(!block)return `<div class="drawer"><div class="stamp">SELECT A BLOCK</div><p class="hash">Choose a production ribbon tick or ledger row to inspect operator-reported fields.</p></div>`;
   return `<div class="drawer"><div class="stamp">UNSAFE BLOCK INSPECTION</div>${kvRows([["height",number(block.height)],["slot",number(block.slot)],["hash",block.hash],["parent",block.parent_hash],["timestamp",block.timestamp_ms?new Date(block.timestamp_ms).toISOString():null],["transactions",number((block.txids||[]).length)],["attestations","not reported by node set"]])}</div>`;
+}
+
+function quorumPanel(telemetry,validators=[]){
+  if(telemetry?.state!=="reported")return `<div class="unavailable"><div><strong>VOTE TELEMETRY NOT REPORTED</strong><span>${esc(telemetry?.reason)}</span></div></div>`;
+  const ordered=[...validators].sort((a,b)=>Number(a.witness_index)-Number(b.witness_index));
+  return `<div class="quorum-panel"><div class="quorum-orbit" aria-label="${number(telemetry.online_validators)} of ${number(telemetry.total_validators)} validators reporting"><div class="quorum-core"><strong>${number(telemetry.threshold)}/${number(telemetry.total_validators)}</strong><span>QUORUM</span></div>${ordered.map((validator,index)=>`<div class="quorum-node q${index} ${esc(validator.state)}"><b>W${esc(validator.witness_index)}</b><span>${esc(validator.state)}</span></div>`).join("")}</div><div class="quorum-stats"><div><span>Accepted votes</span><strong>${number(telemetry.accepted)}</strong></div><div><span>Rejected votes</span><strong>${number(telemetry.rejected)}</strong></div><div><span>Pending votes</span><strong>${number(telemetry.pending_votes)}</strong></div><div><span>Pending certificates</span><strong>${number(telemetry.pending_certificates)}</strong></div></div></div>`;
 }
 
 function renderConsensus(data){
@@ -78,7 +106,7 @@ function renderConsensus(data){
   <section class="section">${sectionHead("Finality pipeline",`epoch = floor(height / 256) · ${pct}% through E${number(data.current_epoch)}`)}<div class="pipeline"><div class="stage unsafe"><span class="metric-label">Unsafe</span><div class="metric-value">${number(data.height)}</div><span class="hash">${short(data.unsafe_head?.hash)}</span><div class="progress-track"><i style="width:${pct}%"></i></div></div><div class="connector"><span>${number(data.justification_lag)} EPOCH LAG</span></div><div class="stage justified"><span class="metric-label">Justified</span><div class="metric-value">E${number(data.justified_epoch)}</div><span class="hash">${short(data.justified?.hash)}</span></div><div class="connector"><span>${number(data.finalization_lag)} EPOCH LAG</span></div><div class="stage finalized"><span class="metric-label">Finalized</span><div class="metric-value">E${number(data.finalized_epoch)}</div><span class="hash">${short(data.finalized?.hash)}</span></div></div></section>
   <section class="section">${sectionHead("64-block production ribbon",data.median_block_cadence_ms?`median cadence ${(data.median_block_cadence_ms/1000).toFixed(1)}s`:"cadence unavailable")}<div class="ribbon">${blocks.map(block=>`<button data-block-index="${esc(block.height)}" class="${selectedBlock?.height===block.height?'selected':''}" title="block ${esc(block.height)}"></button>`).join("")}</div></section>
   <section class="section"><div class="split"><div><div class="table-scroll"><table class="ledger"><thead><tr><th>HEIGHT</th><th>SLOT</th><th>HASH</th><th>TX</th><th>TIME</th></tr></thead><tbody>${blocks.slice(-12).reverse().map(b=>`<tr data-block="${esc(b.height)}"><td>${number(b.height)}</td><td>${number(b.slot)}</td><td>${short(b.hash)}</td><td>${number((b.txids||[]).length)}</td><td>${b.timestamp_ms?new Date(b.timestamp_ms).toLocaleTimeString():"—"}</td></tr>`).join("")}</tbody></table></div></div><div id="block-drawer">${blockDrawer(selectedBlock)}</div></div></section>
-  <section class="section"><div class="split"><div>${sectionHead("Quorum participation","certainty boundary")}<div class="unavailable"><div><strong>VOTE TELEMETRY NOT REPORTED</strong><span>${esc(data.quorum_telemetry?.reason)}</span></div></div></div><div>${sectionHead("Chain identity")}${kvRows([["chain id",data.chain_id],["genesis",data.genesis_hash]])}</div></div></section></div>`;
+  <section class="section"><div class="split quorum-split"><div>${sectionHead("Quorum participation","durable vote ingress · live validator reports")}${quorumPanel(data.quorum_telemetry,data.validators)}</div><div>${sectionHead("Chain identity","public testnet · no production authority")}${kvRows([["chain id",data.chain_id],["genesis",data.genesis_hash],["mode",data.environment]])}</div></div></section></div>`;
 }
 
 const stateName={0:"open",1:"claimed",2:"submitted",3:"settled",4:"cancelled"};
@@ -96,23 +124,42 @@ function renderCompute(data){
   <section class="section"><div class="disclosure">ENGINEERING NETWORK · ${esc(data.currency)} · ${esc(data.disclosure)} Values are protocol accounting units, not currency.</div></section></div>`;
 }
 
-function capacity(node){const c=node.capacity;if(!c)return `<span class="node-telemetry">capacity not reported</span>`;return `<div class="capacity-bars" title="${number(c.cpu_threads)} threads · ${number(c.memory_mb)} MB"><i style="height:${Math.min(30,6+c.cpu_threads*5)}px"></i><i style="height:${Math.min(30,6+c.memory_mb/64)}px"></i><i style="height:${c.capabilities&2?30:6}px"></i></div><span class="micro">CPU · MEM · GPU</span>`}
 function renderNodes(data){
-  const online=data.nodes.filter(n=>n.state==="online").length;
+  const validators=data.validators||[],indexers=data.indexers||[];
+  const onlineValidators=validators.filter(node=>node.state==="online").length;
+  const readyIndexers=indexers.filter(indexer=>indexer.ready===true).length;
   const nodeClass=node=>{
     if(node.state!=="online")return "is-offline";
     if(node.last_report_ms&&Date.now()-node.last_report_ms>600000)return "is-offline";
     if(node.last_report_ms&&Date.now()-node.last_report_ms>60000)return "is-stale";
     return "is-online";
   };
-  return `${pageHead("CENTRAL REPORTING PLANE","Node Fleet",[
-    {label:"Reported nodes",value:number(data.nodes.length),sub:`${number(online)} online`},
-    {label:"Active incidents",value:number(data.incidents.length),sub:"source failures"},
-    {label:"Unreported",value:"—",sub:"count unknown"}
+  const topologyNodes=[
+    ...validators.map(node=>({id:node.id,label:`W${node.witness_index}`,role:node.role,state:node.state})),
+    ...indexers.map((node,index)=>({id:`indexer-${index}`,label:`IDX ${index+1}`,role:"public indexer",state:node.state})),
+    {id:"finality",label:"Finality",role:"3-of-4 quorum",state:onlineValidators>=3?"online":"degraded"},
+    {id:"gateway",label:"Observer",role:"read gateway",state:data.nodes.some(node=>node.kind==="observer"&&node.state==="online")?"online":"degraded"}
+  ];
+  const topologyEdges=[
+    ...validators.map(node=>[node.id,"finality"]),
+    ...indexers.map((_,index)=>["finality",`indexer-${index}`]),
+    ["finality","gateway"]
+  ];
+  return `${pageHead("PUBLIC TESTNET CONTROL PLANE","Live Node Fleet",[
+    {label:"Validators",value:`${number(onlineValidators)}/${number(validators.length)}`,sub:"reporting now"},
+    {label:"Indexers",value:`${number(readyIndexers)}/${number(indexers.length)}`,sub:"query-ready"},
+    {label:"Active incidents",value:number(data.incidents.length),sub:"explicit source failures"}
   ])}${errors(data)}<div class="content">
-  <section class="section">${sectionHead("Fleet topology","solid = reported · dashed = not centrally reported")}<div class="topology"><svg viewBox="0 0 100 100" aria-label="Node fleet topology"><line class="edge-confirmed" x1="20" y1="50" x2="51" y2="50" stroke="#3a352b" stroke-width=".6"/><line class="edge-expected" x1="51" y1="50" x2="80" y2="50" stroke="#3a352b" stroke-width=".6" stroke-dasharray="2 2"/><circle class="glyph-reported" cx="20" cy="50" r="4" fill="#3a352b"/><rect class="glyph-reported" x="47" y="46" width="8" height="8" fill="#3a352b"/><circle class="glyph-ghost" cx="80" cy="50" r="4" fill="#f7f2e5" stroke="#3a352b" stroke-width=".7" stroke-dasharray="1 1"/><text x="20" y="63" text-anchor="middle" font-family="Fira Code" font-size="3">PRODUCER</text><text x="51" y="63" text-anchor="middle" font-family="Fira Code" font-size="3">COMPUTE WORKER</text><text x="80" y="63" text-anchor="middle" font-family="Fira Code" font-size="3">MAC · UNREPORTED</text></svg></div></section>
-  <section class="section">${sectionHead("Node comparison rail",`${number(data.nodes.length)} centrally visible`)}<div class="fleet">${data.nodes.map((n,i)=>`<article class="node-row ${nodeClass(n)}" data-node-id="${esc(n.id)}"><div class="node-glyph ${n.role.includes("worker")?"worker":""}">${String(i+1).padStart(2,"0")}</div><div><div class="node-name">${esc(n.label)}</div><div class="node-role">${esc(n.role)}</div></div><div>${kvRows([["state",n.state],["height",number(n.height)],["head",short(n.head_hash)]])}</div><div>${capacity(n)}</div><div class="node-telemetry">${esc(n.telemetry_state.replaceAll("_"," "))}<br>${ago(n.last_report_ms)}</div></article>`).join("")}<article class="node-row is-ghost"><div class="node-glyph">—</div><div><div class="node-name">Mac node</div><div class="node-role">node presence known locally</div></div><div class="node-telemetry">${esc(data.unreported.message)}</div><div class="unavailable"><span>SET UP CENTRAL REPORTER</span></div><div class="node-telemetry">not reported</div></article></div></section>
-  <section class="section">${sectionHead("Fleet incidents","active source failures")}${data.incidents.length?data.incidents.map(x=>`<div class="incident">${esc(x.source).toUpperCase()} · ${esc(x.detail)}</div>`).join(""):`<div class="empty-fleet">NO ACTIVE SOURCE INCIDENTS<br>Unknown fleet telemetry remains explicitly unreported above.</div>`}</section></div>`;
+  <section class="section">${sectionHead("Fleet topology","four logical validators · three VM failure domains · one non-voting observer")}<div class="topology fleet-topology">${topologySvg({nodes:topologyNodes,edges:topologyEdges})}</div></section>
+  <section class="section">${sectionHead("Validator and observer rail",`${number(data.nodes.length)} centrally visible`)}<div class="fleet">${data.nodes.map((node,index)=>{
+    const glyph=node.kind==="validator"?`W${node.witness_index}`:node.kind==="observer"?"OBS":String(index+1).padStart(2,"0");
+    const infrastructure=[node.region,node.zone?`zone ${node.zone}`:null,node.vm_size].filter(Boolean).join(" · ");
+    const gossip=node.finality_gossip;
+    const telemetry=gossip?`votes ${number(gossip.accepted)} accepted · ${number(gossip.rejected)} rejected`:String(node.telemetry_state||"").replaceAll("_"," ");
+    return `<article class="node-row ${nodeClass(node)} kind-${esc(node.kind)}" data-node-id="${esc(node.id)}"><div class="node-glyph ${node.kind==="compute"?"worker":""}">${esc(glyph)}</div><div><div class="node-name">${esc(node.label)}</div><div class="node-role">${esc(node.role)}</div><div class="node-infrastructure">${esc(infrastructure)}</div></div><div>${kvRows([["state",node.state],["height",number(node.height)],["finalized",node.finalized_epoch===undefined?"—":`E${number(node.finalized_epoch)}`]])}</div><div class="node-telemetry">${esc(telemetry)}</div><div class="node-telemetry">${ago(node.last_report_ms)}</div></article>`;
+  }).join("")||`<div class="unavailable"><span>NO NODE REPORTS</span></div>`}</div></section>
+  <section class="section">${sectionHead("Public indexer plane",`${number(readyIndexers)} query-ready endpoints`)}<div class="indexer-rail">${indexers.map((indexer,index)=>`<article class="indexer-row ${esc(indexer.state)}"><div><b>IDX ${index+1}</b><span>${esc(indexer.failure_domain)}</span></div><div>${stateDot(indexer.state)}${esc(indexer.state)}</div><dl><div><dt>UNSAFE</dt><dd>${number(indexer.unsafe_height)}</dd></div><div><dt>FINALIZED</dt><dd>${number(indexer.finalized_height)}</dd></div><div><dt>FRESHNESS</dt><dd>${indexer.freshness_ms>=0?`${number(indexer.freshness_ms)} ms`:"—"}</dd></div></dl></article>`).join("")||`<div class="unavailable"><span>NO INDEXER REPORTS</span></div>`}</div></section>
+  <section class="section">${sectionHead("Fleet incidents","active source failures")}${data.incidents.length?data.incidents.map(incident=>`<div class="incident">${esc(incident.source).toUpperCase()} · ${esc(incident.detail)}</div>`).join(""):`<div class="empty-fleet">NO ACTIVE SOURCE INCIDENTS<br>All currently configured telemetry sources are reporting.</div>`}</section></div>`;
 }
 
 const renderers={overview:renderOverview,consensus:renderConsensus,compute:renderCompute,nodes:renderNodes};

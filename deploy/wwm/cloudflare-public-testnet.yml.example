@@ -16,5 +16,11 @@ ingress:
   - hostname: wwm-artifacts.mindchain.network
     service: http://127.0.0.1:29681
   - hostname: wwm-status.mindchain.network
+    path: ^/(status\.json|metrics|healthz)$
     service: http://127.0.0.1:29901
+  - hostname: wwm-status.mindchain.network
+    service: https://wwm-seed-2.mindchain.network
+    originRequest:
+      httpHostHeader: wwm-seed-2.mindchain.network
+      originServerName: wwm-seed-2.mindchain.network
   - service: http_status:404

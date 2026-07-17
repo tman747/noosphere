@@ -64,10 +64,10 @@
     {
       "id": "network-dashboard",
       "label": "Network dashboard",
-      "kind": "operator_dashboard",
-      "href": "../apps/network-dashboard/",
-      "status": "local_app_surface",
-      "trust_boundary": "operator RPC and secrets must remain private; dashboard data must be sanitized"
+      "kind": "public_network_dashboard",
+      "href": "https://wwm-status.mindchain.network",
+      "status": "live_public_testnet",
+      "trust_boundary": "only sanitized validator, indexer, observer, consensus, and compute telemetry is public; operator RPC and bearer credentials remain private"
     },
     {
       "id": "compute-market",

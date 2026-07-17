@@ -6,29 +6,35 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 if [[ "$#" -ne 7 ]]; then
-  echo "usage: $0 <role:validator|witness> <witness-index:0..3> <p2p-port> <peer-multiaddr|-> <binary-path> <binary-sha256> <parameters-path>" >&2
+  echo "usage: $0 <role:validator|producer-witness|witness> <witness-index:0..3> <p2p-port> <comma-separated-peer-multiaddrs|-> <binary-path> <binary-sha256> <parameters-path>" >&2
   exit 1
 fi
 
 NODE_ROLE="$1"
 WITNESS_INDEX="$2"
 P2P_PORT="$3"
-BOOTSTRAP_PEER="$4"
+BOOTSTRAP_PEERS_ARG="$4"
 BINARY_SOURCE="$5"
 EXPECTED_SHA256="$6"
 PARAMS_SOURCE="$7"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-[[ "${NODE_ROLE}" =~ ^(validator|witness)$ ]] || { echo "role must be validator or witness" >&2; exit 1; }
+[[ "${NODE_ROLE}" =~ ^(validator|producer-witness|witness)$ ]] || { echo "invalid node role" >&2; exit 1; }
 [[ "${WITNESS_INDEX}" =~ ^[0-3]$ ]] || { echo "witness index must be 0..3" >&2; exit 1; }
 [[ "${P2P_PORT}" =~ ^[0-9]{4,5}$ ]] || { echo "P2P port is invalid" >&2; exit 1; }
 (( P2P_PORT >= 1024 && P2P_PORT <= 65535 )) || { echo "P2P port is outside 1024..65535" >&2; exit 1; }
 [[ "${EXPECTED_SHA256}" =~ ^[0-9a-f]{64}$ ]] || { echo "binary SHA-256 is invalid" >&2; exit 1; }
 [[ -f "${BINARY_SOURCE}" && ! -L "${BINARY_SOURCE}" ]] || { echo "binary source is missing or symbolic" >&2; exit 1; }
 [[ -f "${PARAMS_SOURCE}" && ! -L "${PARAMS_SOURCE}" ]] || { echo "genesis parameters source is missing or symbolic" >&2; exit 1; }
-if [[ "${BOOTSTRAP_PEER}" != "-" && ! "${BOOTSTRAP_PEER}" =~ ^/ip4/([0-9]{1,3}\.){3}[0-9]{1,3}/udp/[0-9]{4,5}/quic-v1$ ]]; then
-  echo "bootstrap peer must be a numeric IPv4 QUIC multiaddr or '-'" >&2
-  exit 1
+if [[ "${BOOTSTRAP_PEERS_ARG}" != "-" ]]; then
+  IFS=',' read -r -a bootstrap_peers <<< "${BOOTSTRAP_PEERS_ARG}"
+  (( ${#bootstrap_peers[@]} <= 8 )) || { echo "too many bootstrap peers" >&2; exit 1; }
+  for peer in "${bootstrap_peers[@]}"; do
+    [[ "${peer}" =~ ^/ip4/([0-9]{1,3}\.){3}[0-9]{1,3}/udp/[0-9]{4,5}/quic-v1$ ]] || {
+      echo "bootstrap peers must be numeric IPv4 QUIC multiaddrs or '-'" >&2
+      exit 1
+    }
+  done
 fi
 
 ACTUAL_SHA256="$(sha256sum "${BINARY_SOURCE}" | cut -d' ' -f1)"
@@ -65,11 +71,11 @@ chown root:mindchain-wwm /etc/mindchain-wwm/rpc-token
 chmod 0640 /etc/mindchain-wwm/rpc-token
 
 BOOTSTRAP_VALUE=""
-if [[ "${BOOTSTRAP_PEER}" != "-" ]]; then
-  BOOTSTRAP_VALUE="${BOOTSTRAP_PEER}"
+if [[ "${BOOTSTRAP_PEERS_ARG}" != "-" ]]; then
+  BOOTSTRAP_VALUE="${BOOTSTRAP_PEERS_ARG}"
 fi
 NODE_ENV_TMP="$(mktemp /etc/mindchain-wwm/node.env.XXXXXX)"
-printf 'NODE_ROLE=%s\nWITNESS_INDEX=%s\nP2P_LISTEN=/ip4/0.0.0.0/udp/%s/quic-v1\nBOOTSTRAP_PEER=%s\n' \
+printf 'NODE_ROLE=%s\nWITNESS_INDEX=%s\nP2P_LISTEN=/ip4/0.0.0.0/udp/%s/quic-v1\nBOOTSTRAP_PEERS=%s\n' \
   "${NODE_ROLE}" "${WITNESS_INDEX}" "${P2P_PORT}" "${BOOTSTRAP_VALUE}" > "${NODE_ENV_TMP}"
 chown root:mindchain-wwm "${NODE_ENV_TMP}"
 chmod 0640 "${NODE_ENV_TMP}"

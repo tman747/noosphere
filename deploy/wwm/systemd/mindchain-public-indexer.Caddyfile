@@ -1,0 +1,40 @@
+{$MINDCHAIN_PUBLIC_API_HOST} {
+	@dashboard path / /index.html /app.js /styles.css /favicon.svg /api/health /api/overview /api/consensus /api/compute /api/nodes /validator-status.json
+	handle @dashboard {
+		header {
+			Cache-Control "no-store"
+			Content-Security-Policy "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src https://fonts.gstatic.com; form-action 'none'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"
+			Cross-Origin-Resource-Policy "same-origin"
+			Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+			Referrer-Policy "no-referrer"
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			-Server
+		}
+		reverse_proxy 127.0.0.1:29911 {
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 15s
+			}
+		}
+	}
+
+	handle {
+		header {
+			Cache-Control "no-store"
+			Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+			Cross-Origin-Resource-Policy "same-site"
+			Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+			Referrer-Policy "no-referrer"
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			-Server
+		}
+		reverse_proxy 127.0.0.1:29670 {
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 10s
+			}
+		}
+	}
+}
