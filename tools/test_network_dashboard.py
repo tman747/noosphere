@@ -176,7 +176,7 @@ class DashboardDataTests(unittest.TestCase):
                     "role": "witness",
                     "state": "online",
                     "observed_ms": 9_000,
-                    "unsafe_head": {"height": 520, "hash": f"{index + 1:064x}"},
+                    "unsafe_head": {"height": 100 if index == 3 else 520, "hash": f"{index + 1:064x}"},
                     "justified": {"epoch": 1},
                     "finalized": {"epoch": 1},
                 } for index in indices],
@@ -246,18 +246,20 @@ class DashboardDataTests(unittest.TestCase):
                 nodes = deployed.node_fleet()
                 local_status = deployed.local_validator_status()
             self.assertEqual([item["witness_index"] for item in overview["validators"]], [0, 1, 2, 3])
-            self.assertTrue(all(item["state"] == "online" for item in overview["validators"]))
+            self.assertEqual([item["state"] for item in overview["validators"]], ["online", "online", "online", "catching_up"])
             self.assertEqual(sum(item["ready"] for item in overview["indexers"]), 3)
             self.assertEqual(overview["indexers"][0]["freshness_ms"], -1)
             self.assertEqual(overview["services"][0]["state"], "online")
             self.assertEqual(overview["services"][2]["state"], "degraded")
             self.assertEqual(consensus["quorum_telemetry"]["threshold"], 3)
-            self.assertEqual(consensus["quorum_telemetry"]["online_validators"], 4)
+            self.assertEqual(consensus["quorum_telemetry"]["online_validators"], 3)
             self.assertEqual(len(nodes["validators"]), 4)
             self.assertEqual(len(nodes["nodes"]), 6)
+            self.assertEqual(nodes["validators"][3]["state"], "catching_up")
+            self.assertEqual(nodes["validators"][3]["head_lag"], 420)
             self.assertEqual(nodes["nodes"][4]["state"], "catching_up")
             self.assertEqual(nodes["nodes"][4]["head_lag"], 420)
-            self.assertEqual(nodes["incidents"][0]["source"], "observer")
+            self.assertEqual({incident["source"] for incident in nodes["incidents"]}, {"witness_3", "observer"})
             self.assertNotIn("rpc", local_status["validators"][0])
             self.assertNotIn("token", local_status["validators"][0])
         finally:

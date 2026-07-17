@@ -257,7 +257,24 @@ class DashboardData:
                     "state": "unreported",
                     "observed_ms": None,
                 }
-        return [merged[index] for index in sorted(merged)]
+        fleet = [dict(merged[index]) for index in sorted(merged)]
+        maximum_height = max(
+            (
+                int_value((validator.get("unsafe_head") or {}).get("height"))
+                for validator in fleet
+                if validator.get("state") == "online" and isinstance(validator.get("unsafe_head"), dict)
+            ),
+            default=0,
+        )
+        for validator in fleet:
+            unsafe_head = validator.get("unsafe_head")
+            if validator.get("state") != "online" or not isinstance(unsafe_head, dict):
+                continue
+            head_lag = max(0, maximum_height - int_value(unsafe_head.get("height")))
+            validator["head_lag"] = head_lag
+            if head_lag > EPOCH_LENGTH:
+                validator["state"] = "catching_up"
+        return fleet
 
     def indexer_fleet(
         self,
@@ -663,10 +680,11 @@ class DashboardData:
                 "state": validator.get("state") or "unreported",
                 "height": int_value(unsafe_head.get("height")) if unsafe_head else None,
                 "head_hash": unsafe_head.get("hash"),
+                "head_lag": validator.get("head_lag"),
                 "justified_epoch": int_value(justified.get("epoch")) if justified else None,
                 "finalized_epoch": int_value(finalized.get("epoch")) if finalized else None,
                 "observer": validator.get("observer"),
-                "last_report_ms": validator.get("observed_ms") if validator.get("state") == "online" else None,
+                "last_report_ms": validator.get("observed_ms") if validator.get("state") in {"online", "catching_up"} else None,
                 "region": validator.get("region"),
                 "zone": validator.get("zone"),
                 "vm_size": validator.get("vm_size"),
