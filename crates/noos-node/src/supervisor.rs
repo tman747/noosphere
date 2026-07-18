@@ -498,10 +498,12 @@ fn core_loop<P: StorePort>(
                 let result = core
                     .devnet_witness_vote_tick(witness_index)
                     .map_err(|error| error.to_string());
-                if let (Ok(Some(vote)), Some(gossip)) = (&result, gossip) {
-                    let _ = gossip.try_send(OutboundGossip::Vote(vote.clone()));
+                if let (Ok(votes), Some(gossip)) = (&result, gossip) {
+                    for vote in votes {
+                        let _ = gossip.try_send(OutboundGossip::Vote(vote.clone()));
+                    }
                 }
-                let _ = reply.send(result.map(|vote| vote.is_some()));
+                let _ = reply.send(result.map(|votes| !votes.is_empty()));
             }
             ConsensusMsg::ResolveModel {
                 selector,
