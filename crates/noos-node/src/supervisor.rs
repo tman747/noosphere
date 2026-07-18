@@ -800,6 +800,14 @@ fn load_or_create_p2p_seed(data_dir: &Path) -> Result<[u8; 32], NodeError> {
     }
 }
 
+fn enqueue_inbound_vote(consensus: &SyncSender<ConsensusMsg>, vote: FinalityVoteV1) -> bool {
+    consensus
+        .send(ConsensusMsg::InboundVote {
+            vote: Box::new(vote),
+        })
+        .is_ok()
+}
+
 fn spawn_network(
     settings: crate::network::NetworkSettings,
     chain_id: Hash32,
@@ -964,8 +972,8 @@ fn spawn_network(
                                     }
                                     InboundItem::Vote { vote } => {
                                         if let Ok(vote) = FinalityVoteV1::decode_canonical(&vote) {
-                                            let _ = consensus.try_send(ConsensusMsg::InboundVote {
-                                                vote: Box::new(vote),
+                                            let _ = tokio::task::block_in_place(|| {
+                                                enqueue_inbound_vote(&consensus, vote)
                                             });
                                         }
                                     }
@@ -1170,4 +1178,68 @@ pub fn start(
         network_shutdown,
         network_handle,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use noos_crypto::BlsSecretKey;
+    use std::sync::mpsc::RecvTimeoutError;
+    use std::thread;
+
+    fn test_vote() -> FinalityVoteV1 {
+        let secret = BlsSecretKey::from_seed([7; 32]).expect("test BLS key");
+        FinalityVoteV1::sign(
+            [1; 32],
+            1,
+            CheckpointRef {
+                epoch: 0,
+                checkpoint_hash: [2; 32],
+            },
+            CheckpointRef {
+                epoch: 1,
+                checkpoint_hash: [3; 32],
+            },
+            [7; 32],
+            [4; 32],
+            &secret,
+        )
+        .expect("signed test vote")
+    }
+
+    #[test]
+    fn inbound_vote_waits_for_consensus_capacity_instead_of_dropping() {
+        let (consensus_tx, consensus_rx) = sync_channel(1);
+        consensus_tx
+            .send(ConsensusMsg::SetNow(7))
+            .expect("fill consensus inbox");
+
+        let sender = consensus_tx.clone();
+        let (done_tx, done_rx) = sync_channel(1);
+        let vote_sender = thread::spawn(move || {
+            done_tx
+                .send(enqueue_inbound_vote(&sender, test_vote()))
+                .expect("report vote delivery");
+        });
+
+        assert!(matches!(
+            done_rx.recv_timeout(Duration::from_millis(50)),
+            Err(RecvTimeoutError::Timeout)
+        ));
+        assert!(matches!(
+            consensus_rx.recv_timeout(Duration::from_secs(1)),
+            Ok(ConsensusMsg::SetNow(7))
+        ));
+        assert!(done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("vote delivery result"));
+        match consensus_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("queued inbound vote")
+        {
+            ConsensusMsg::InboundVote { vote } => assert_eq!(vote.epoch, 1),
+            _ => panic!("unexpected consensus message"),
+        }
+        vote_sender.join().expect("vote sender");
+    }
 }
