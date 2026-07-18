@@ -1159,6 +1159,52 @@ impl<P: StorePort> NodeCore<P> {
         Ok(outcome)
     }
 
+    /// Restart-only header replay. A failed boot drops the whole core, so
+    /// durable canonical records can be revalidated in place instead of
+    /// cloning the growing DAG and ledger before every historical header.
+    fn replay_header_stages_in_place(
+        &mut self,
+        header: &BlockHeaderV1,
+        ticket: &GroundTicketV1,
+        certificates: &[FinalityCertificateV1],
+    ) -> Result<InsertOutcome, NodeError> {
+        self.validate_header_non_context(header, ticket)?;
+        if !self.dag.contains(&header.parent_hash) {
+            return self
+                .dag
+                .insert(header.clone(), ticket)
+                .map_err(NodeError::Dag);
+        }
+        self.validate_ticket_in_context_for(&self.dag, header, ticket)?;
+        let outcome = self.dag.insert(header.clone(), ticket)?;
+        let hash = match outcome {
+            InsertOutcome::Inserted { hash } => hash,
+            InsertOutcome::Orphaned { .. } => {
+                return Err(NodeError::Dag(noos_braid::DagError::UnknownBlock));
+            }
+        };
+        for certificate in certificates {
+            self.ensure_snapshot(certificate.target.epoch)?;
+            let ancestry = DagAncestry { dag: &self.dag };
+            let outcome =
+                self.tracker
+                    .ingest_certificate(certificate, &self.registry, &ancestry)?;
+            noos_witness::finality::certificate_digest(certificate).map_err(NodeError::Witness)?;
+            match outcome {
+                IngestOutcome::Duplicate => {}
+                IngestOutcome::Justified => {
+                    self.dag.set_justified(self.tracker.justified_head())?;
+                }
+                IngestOutcome::Finalized(checkpoint) => {
+                    self.dag.set_finalized(checkpoint)?;
+                    self.dag.set_justified(self.tracker.justified_head())?;
+                }
+            }
+        }
+        Self::validate_checkpoint_binding_on(&self.dag, &self.tracker, header, &hash)?;
+        Ok(outcome)
+    }
+
     fn validate_header_non_context(
         &self,
         header: &BlockHeaderV1,
@@ -2359,9 +2405,18 @@ impl<P: StorePort> NodeCore<P> {
         header: &BlockHeaderV1,
         hash: &Hash32,
     ) -> Result<(), NodeError> {
+        Self::validate_checkpoint_binding_on(&staged.dag, &staged.tracker, header, hash)
+    }
+
+    fn validate_checkpoint_binding_on(
+        dag: &HeaderDag,
+        tracker: &FinalityTracker,
+        header: &BlockHeaderV1,
+        hash: &Hash32,
+    ) -> Result<(), NodeError> {
         let justified = header.justified_checkpoint;
         let finalized = header.finalized_checkpoint;
-        if !staged.tracker.has_checkpoint_view(&justified, &finalized) {
+        if !tracker.has_checkpoint_view(&justified, &finalized) {
             return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
         }
         for checkpoint in [finalized, justified] {
@@ -2369,19 +2424,17 @@ impl<P: StorePort> NodeCore<P> {
                 return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
             };
             if height > header.height
-                || staged
-                    .dag
+                || dag
                     .get(&checkpoint.checkpoint_hash)
                     .is_none_or(|stored| stored.header.height != height)
-                || staged
-                    .dag
+                || dag
                     .ancestor_at_height(hash, height)
                     .is_none_or(|ancestor| ancestor.hash != checkpoint.checkpoint_hash)
             {
                 return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
             }
         }
-        if !(DagAncestry { dag: &staged.dag }).descends(&finalized, &justified) {
+        if !(DagAncestry { dag }).descends(&finalized, &justified) {
             return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
         }
         Ok(())
@@ -2486,10 +2539,10 @@ impl<P: StorePort> NodeCore<P> {
             // Trusted-store replay still re-validates: structure, ticket,
             // execution, roots, and the same-block certificate/checkpoint
             // ordering used during live import.
-            self.import_header_stages(
+            self.replay_header_stages_in_place(
                 &header,
                 &ticket,
-                Some(body.finality_certificates.as_slice()),
+                body.finality_certificates.as_slice(),
             )?;
             let exec = self.execute_and_verify(&header, &body).inspect_err(|_| {
                 // A replay failure is a corrupt/foreign store: startup stops.
