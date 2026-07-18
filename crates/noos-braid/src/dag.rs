@@ -158,6 +158,7 @@ pub struct HeaderDag {
     children: BTreeMap<[u8; 32], BTreeSet<[u8; 32]>>,
     by_height: BTreeMap<u64, BTreeSet<[u8; 32]>>,
     by_slot: BTreeMap<u64, BTreeSet<[u8; 32]>>,
+    by_ticket: BTreeMap<TicketTuple, BTreeSet<[u8; 32]>>,
     orphans: BTreeMap<[u8; 32], OrphanHeader>,
     orphans_by_parent: BTreeMap<[u8; 32], BTreeSet<[u8; 32]>>,
     orphan_capacity: usize,
@@ -207,6 +208,7 @@ impl HeaderDag {
             children: BTreeMap::new(),
             by_height: BTreeMap::new(),
             by_slot: BTreeMap::new(),
+            by_ticket: BTreeMap::new(),
             orphans: BTreeMap::new(),
             orphans_by_parent: BTreeMap::new(),
             orphan_capacity,
@@ -229,6 +231,10 @@ impl HeaderDag {
             .insert(stored.hash);
         self.children
             .entry(stored.header.parent_hash)
+            .or_default()
+            .insert(stored.hash);
+        self.by_ticket
+            .entry(stored.ticket)
             .or_default()
             .insert(stored.hash);
         self.headers.insert(stored.hash, stored);
@@ -308,7 +314,19 @@ impl HeaderDag {
     /// The ancestor of `from` (inclusive) at exactly `height`.
     #[must_use]
     pub fn ancestor_at_height(&self, from: &[u8; 32], height: u64) -> Option<&StoredHeader> {
-        self.ancestors(from).find(|s| s.header.height == height)
+        let from_header = self.headers.get(from)?;
+        if height > from_header.header.height {
+            return None;
+        }
+        if let Some(hashes) = self.by_height.get(&height) {
+            if hashes.len() == 1 {
+                return hashes
+                    .first()
+                    .and_then(|only_hash| self.headers.get(only_hash));
+            }
+        }
+        self.ancestors(from)
+            .find(|stored| stored.header.height == height)
     }
 
     /// Most recent `n` timestamps on the chain ending at `from` (inclusive),
@@ -362,15 +380,17 @@ impl HeaderDag {
     /// The window therefore resets whenever finality advances.
     #[must_use]
     pub fn tuple_seen_above_finalized(&self, parent: &[u8; 32], tuple: &TicketTuple) -> bool {
-        for anc in self.ancestors(parent) {
-            if anc.hash == self.finalized.checkpoint_hash {
-                return false;
-            }
-            if anc.ticket == *tuple {
-                return true;
-            }
-        }
-        false
+        let Some(candidates) = self.by_ticket.get(tuple) else {
+            return false;
+        };
+        let finalized_height = self.finalized_height();
+        candidates.iter().any(|candidate| {
+            self.headers
+                .get(candidate)
+                .filter(|stored| stored.header.height > finalized_height)
+                .and_then(|stored| self.ancestor_at_height(parent, stored.header.height))
+                .is_some_and(|ancestor| ancestor.hash == *candidate)
+        })
     }
 
     /// [`DuplicateSet`] view over the ancestors of `parent`, for composing
