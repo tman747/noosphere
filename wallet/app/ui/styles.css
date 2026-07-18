@@ -1,12 +1,12 @@
 :root {
-  color-scheme: dark;
-  --bg: #14161c;
-  --panel: #1c1f27;
-  --ink: #e8e6df;
-  --muted: #9a9890;
-  --accent: #e8b54a;
-  --err: #e06c5b;
-  --ok: #7fb069;
+  color-scheme: light;
+  --bg: #f7f2e5;
+  --panel: #fbf8ef;
+  --ink: #1c1811;
+  --muted: #6b6557;
+  --accent: #b8340f;
+  --err: #b8340f;
+  --ok: #6b7562;
 }
 * { box-sizing: border-box; }
 body {
@@ -20,10 +20,10 @@ body {
 .skip { position: absolute; left: -999px; }
 .skip:focus { position: static; }
 h1 { font-size: 1.4rem; letter-spacing: 0.02em; }
-h2 { font-size: 1.05rem; color: var(--accent); }
+h2 { font-size: 1.05rem; color: var(--ink); }
 section {
   background: var(--panel);
-  border: 1px solid #2a2e39;
+  border: 1px solid rgba(28, 24, 17, .14);
   border-radius: 8px;
   padding: 1rem 1.25rem;
   margin-block: 1rem;
@@ -35,9 +35,9 @@ input, select, textarea {
   width: 100%;
   margin-top: 0.25rem;
   padding: 0.4rem 0.5rem;
-  background: #12141a;
+  background: #fdfaf1;
   color: var(--ink);
-  border: 1px solid #333846;
+  border: 1px solid #cdc5b3;
   border-radius: 4px;
   font-family: ui-monospace, Consolas, monospace;
 }
@@ -49,13 +49,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 button {
   margin-top: 0.75rem;
   padding: 0.45rem 1.1rem;
-  background: var(--accent);
-  color: #14161c;
+  background: var(--ink);
+  color: var(--bg);
   border: 0;
   border-radius: 4px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 160ms ease, opacity 160ms ease;
+  transition: transform 160ms ease, background-color 160ms ease, opacity 160ms ease;
 }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 button:active:not(:disabled) { transform: translateY(1px) scale(0.99); }
@@ -64,7 +64,7 @@ output {
   margin-top: 0.75rem;
   padding: 0.5rem;
   border-radius: 4px;
-  background: #12141a;
+  background: #efe9d9;
   font-family: ui-monospace, Consolas, monospace;
   font-size: 0.85rem;
   white-space: pre-wrap;
@@ -81,7 +81,25 @@ footer p { font-size: 0.8rem; }
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0 1rem;
 }
-button:hover:not(:disabled) { filter: brightness(1.08); }
+.recovery {
+  margin-block: 1rem;
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid #cdc5b3;
+  border-radius: 6px;
+}
+.recovery legend {
+  padding-inline: 0.4rem;
+  color: var(--ink);
+  font-weight: 650;
+}
+.recovery p { margin-top: 0.25rem; }
+button:hover:not(:disabled) { background: #3a352b; }
+#delete-wallet-btn {
+  background: transparent;
+  color: var(--err);
+  border: 1px solid var(--err);
+}
+#delete-wallet-btn:hover:not(:disabled) { background: rgba(184, 52, 15, .08); }
 code, output, input { font-variant-numeric: tabular-nums; }
 
 @media (max-width: 40rem) {
