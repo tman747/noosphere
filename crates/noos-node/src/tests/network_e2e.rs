@@ -154,6 +154,49 @@ fn tx_and_block_propagate_between_two_real_nodes() {
     a.shutdown();
 }
 
+/// A transaction accepted while no peer is connected must not be stranded.
+/// Clock ticks cyclically retry bounded pending entries after a peer appears.
+#[test]
+fn pending_transaction_regossips_after_peer_connects() {
+    let _network_guard = network_test_guard();
+    let a = supervisor::start(
+        networked_config(0xC7, Vec::new()),
+        spec(),
+        test_dir("net-tx-regossip-a"),
+    )
+    .expect("start transaction source");
+    let addr_a = a.p2p_addr.clone().expect("source listens");
+    let chain_id = status(&a).chain_id;
+    let (tx, wit, txid) = signed_transfer(chain_id, 50, &faucet_key(), operator_account(1), 251);
+    assert_eq!(submit(&a, tx, wit).expect("source admits"), txid);
+    assert!(matches!(
+        tx_status(&a, txid),
+        ViewLookup::Found(TxStatus::Pending)
+    ));
+    std::thread::sleep(Duration::from_millis(250));
+
+    let b = supervisor::start(
+        networked_config(0xD8, vec![addr_a]),
+        spec(),
+        test_dir("net-tx-regossip-b"),
+    )
+    .expect("start late peer");
+    let mut tick = 1_u64;
+    wait_until_for(
+        "pending transaction re-gossip after peer connection",
+        Duration::from_secs(30),
+        || {
+            tick = tick.saturating_add(100);
+            a.set_now(GENESIS_TIME_MS.saturating_add(tick))
+                .expect("clock");
+            matches!(tx_status(&b, txid), ViewLookup::Found(TxStatus::Pending)).then_some(())
+        },
+    );
+
+    b.shutdown();
+    a.shutdown();
+}
+
 /// Three independently persisted fixture witness roles reach a real 3-of-4
 /// quorum over QUIC. The producer owns only witness 0; peers B and C own
 /// witnesses 1 and 2, so no single process can manufacture the certificate.

@@ -189,6 +189,8 @@ impl SeenCache {
 pub struct Mempool {
     cfg: MempoolConfig,
     entries: BTreeMap<Hash32, PoolEntry>,
+    /// Arrival order for bounded, cyclic pending-transaction re-gossip.
+    arrival_order: VecDeque<Hash32>,
     /// Eviction order: ascending `(density, seq, txid)` — lowest first.
     by_density: BTreeSet<(u128, u64, Hash32)>,
     /// Per-payer FIFO queues (nonce order).
@@ -207,6 +209,7 @@ impl Mempool {
             cfg,
             entries: BTreeMap::new(),
             by_density: BTreeSet::new(),
+            arrival_order: VecDeque::new(),
             per_account: BTreeMap::new(),
             per_source: BTreeMap::new(),
             seen: SeenCache {
@@ -236,6 +239,34 @@ impl Mempool {
     #[must_use]
     pub fn contains(&self, txid: &Hash32) -> bool {
         self.entries.contains_key(txid)
+    }
+
+    /// Returns a bounded arrival-order batch for cyclic re-gossip.
+    ///
+    /// The caller owns the cursor so transport retries never mutate admission
+    /// order or consensus-visible mempool state.
+    pub(crate) fn regossip_batch(
+        &self,
+        cursor: &mut usize,
+        limit: usize,
+    ) -> Vec<(Vec<u8>, Vec<u8>)> {
+        if self.arrival_order.is_empty() || limit == 0 {
+            *cursor = 0;
+            return Vec::new();
+        }
+        let visit = limit.min(self.arrival_order.len());
+        let mut batch = Vec::with_capacity(visit);
+        for _ in 0..visit {
+            if *cursor >= self.arrival_order.len() {
+                *cursor = 0;
+            }
+            let txid = self.arrival_order[*cursor];
+            *cursor = cursor.saturating_add(1);
+            if let Some(entry) = self.entries.get(&txid) {
+                batch.push((entry.tx_bytes.clone(), entry.wit_bytes.clone()));
+            }
+        }
+        batch
     }
 
     /// Full admission pipeline; returns the txid on acceptance.
@@ -393,12 +424,14 @@ impl Mempool {
         let source_count = self.per_source.entry(source).or_default();
         *source_count = source_count.saturating_add(1);
         self.entries.insert(id, entry);
+        self.arrival_order.push_back(id);
         Ok(id)
     }
 
     /// Removes an entry from every index; returns it when present.
     pub fn remove(&mut self, txid: &Hash32) -> Option<PoolEntry> {
         let entry = self.entries.remove(txid)?;
+        self.arrival_order.retain(|id| id != txid);
         self.by_density.remove(&entry.density_key());
         self.total_bytes = self.total_bytes.saturating_sub(entry.encoded_len());
         if let Some(queue) = self.per_account.get_mut(&entry.payer) {

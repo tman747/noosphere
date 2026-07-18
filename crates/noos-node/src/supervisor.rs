@@ -58,6 +58,10 @@ use crate::{Hash32, NodeError};
 /// Bounded inbox capacities (node-v1.md §7.1).
 pub const CONSENSUS_INBOX: usize = 1024;
 pub const STORE_INBOX: usize = 64;
+/// Pending transactions are retried after queue pressure and peer reconnects.
+/// Forty pushes/second stays below the default per-peer Lumen rate limit.
+const TX_REGOSSIP_INTERVAL_MS: u64 = 100;
+const TX_REGOSSIP_BATCH: usize = 4;
 /// Full-node pull sync stays below the default eight-body-requests/second
 /// peer limit, including low-latency LAN links where transport time is tiny.
 const FULL_SYNC_BODY_REQUEST_PACING: Duration = Duration::from_millis(125);
@@ -404,6 +408,8 @@ fn core_loop<P: StorePort>(
     let mut inbound_votes_accepted = 0_u64;
     let mut inbound_votes_rejected = 0_u64;
     let mut last_vote_error: Option<String> = None;
+    let mut last_tx_regossip_ms = 0_u64;
+    let mut tx_regossip_cursor = 0_usize;
     while let Ok(msg) = rx.recv() {
         match msg {
             ConsensusMsg::SubmitTx {
@@ -606,7 +612,25 @@ fn core_loop<P: StorePort>(
             } => {
                 let _ = reply.send(core.ledger().balance(&account, &asset));
             }
-            ConsensusMsg::SetNow(t) => core.set_now(t),
+            ConsensusMsg::SetNow(t) => {
+                core.set_now(t);
+                if let Some(gossip) = gossip {
+                    if t.saturating_sub(last_tx_regossip_ms) >= TX_REGOSSIP_INTERVAL_MS {
+                        last_tx_regossip_ms = t;
+                        for (tx_bytes, wit_bytes) in core
+                            .mempool
+                            .regossip_batch(&mut tx_regossip_cursor, TX_REGOSSIP_BATCH)
+                        {
+                            if gossip
+                                .try_send(OutboundGossip::Tx(tx_bytes, wit_bytes))
+                                .is_err()
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
             ConsensusMsg::InjectCrash => panic!("injected consensus crash (containment test)"),
             ConsensusMsg::Shutdown => return true,
         }
