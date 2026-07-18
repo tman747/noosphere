@@ -111,8 +111,8 @@
     "fixture_keys": true,
     "single_operator_control": true,
     "production_eligible": false,
-    "node_source_revision": "785c0f65fa52dcc192d8531d227df7af32fbe309",
-    "node_binary_sha256": "9ca1cee1ab09e0a976fcfc18786c500608b93d13415972a6a6129607de5770c9"
+    "node_source_revision": "50a674a16fcf0cecf9c97d213771d183231e35a6",
+    "node_binary_sha256": "e2b623c3161aa943a41502c51a1d316ab9d3ee75e065ceef7061ab6e7bc00d36"
   },
   "host_memory_safety": {
     "mindchain-seed-1_swap_gib": 8,
