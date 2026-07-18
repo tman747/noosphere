@@ -57,6 +57,29 @@ class UpstreamHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
+class FakeWalletService:
+    def __init__(self, wallet_root: Path):
+        self.wallet_root = wallet_root
+        self.posts: list[tuple[str, dict, str]] = []
+
+    @staticmethod
+    def is_get_route(path: str) -> bool:
+        return path == "/api/config"
+
+    @staticmethod
+    def is_post_route(path: str) -> bool:
+        return path == "/api/wallet/build"
+
+    def get(self, path: str, query: str) -> gateway.WalletReply:
+        if path != "/api/config" or query:
+            raise gateway.WalletError(400, "INVALID_REQUEST", "invalid wallet read")
+        return gateway.WalletReply(200, {"chain_id": "11" * 32, "production": False})
+
+    def post(self, path: str, body: dict, client: str) -> gateway.WalletReply:
+        self.posts.append((path, body, client))
+        return gateway.WalletReply(200, {"txid": "77" * 32})
+
+
 class PublicGatewayTests(unittest.TestCase):
     def setUp(self) -> None:
         UpstreamHandler.seen = []
@@ -67,6 +90,10 @@ class PublicGatewayTests(unittest.TestCase):
         self.site.mkdir()
         (self.site / "query.html").write_text("<title>MindChain WWM</title>\n", encoding="utf-8")
         (self.site / "app.js").write_text("globalThis.mindchain = true;\n", encoding="utf-8")
+        self.wallet = self.root / "wallet"
+        self.wallet.mkdir()
+        (self.wallet / "index.html").write_text("<title>Harbor iPhone Wallet</title>\n", encoding="utf-8")
+        self.wallet_service = FakeWalletService(self.wallet.resolve())
         self.token_path = self.root / "rpc-token.txt"
         self.token_path.write_text(UpstreamHandler.expected_token + "\n", encoding="ascii")
 
@@ -83,6 +110,7 @@ class PublicGatewayTests(unittest.TestCase):
             site_root=self.site.resolve(),
             allowed_origins=frozenset({"https://mindchain.network", "https://wwm.mindchain.network"}),
             connect_origins=frozenset({"https://wwm-artifacts.mindchain.network"}),
+            wallet_service=self.wallet_service,
         )
         self.public = gateway.GatewayServer(config)
         self.public_thread = threading.Thread(target=self.public.serve_forever, daemon=True)
@@ -210,6 +238,47 @@ class PublicGatewayTests(unittest.TestCase):
         resumed = connection.getresponse()
         self.assertEqual(resumed.status, 200)
         resumed.read()
+
+    def test_scoped_wallet_routes_are_writable_without_opening_generic_gateway_writes(self) -> None:
+        status, _, wallet_page = self.request("/wallet/")
+        self.assertEqual(status, 200)
+        self.assertIn(b"Harbor iPhone Wallet", wallet_page)
+
+        status, _, config = self.request("/api/config")
+        self.assertEqual(status, 200)
+        self.assertFalse(json.loads(config)["production"])
+
+        status, _, built = self.request(
+            "/api/wallet/build",
+            method="POST",
+            body=b'{"amount":"1"}',
+            headers={"Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.5"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(built)["txid"], "77" * 32)
+        self.assertEqual(self.wallet_service.posts, [
+            ("/api/wallet/build", {"amount": "1"}, "203.0.113.5")
+        ])
+
+        status, headers, _ = self.request(
+            "/api/wallet/build",
+            method="OPTIONS",
+            headers={
+                "Origin": "https://wwm.mindchain.network",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        self.assertEqual(status, 204)
+        self.assertEqual(headers["Access-Control-Allow-Methods"], "GET, HEAD, POST, OPTIONS")
+
+        status, _, body = self.request(
+            "/api/wallet/build",
+            method="POST",
+            body=b"{}",
+            headers={"Content-Type": "application/json", "Origin": "https://untrusted.example"},
+        )
+        self.assertEqual(status, 403)
+        self.assertEqual(json.loads(body)["error"]["code"], "ORIGIN_NOT_ALLOWED")
 
     def test_config_requires_loopback_origins_and_nontrivial_secret_file(self) -> None:
         arguments = argparse.Namespace(

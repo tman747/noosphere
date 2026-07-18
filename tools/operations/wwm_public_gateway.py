@@ -6,6 +6,7 @@ import json
 import mimetypes
 import re
 import socket
+import sys
 import threading
 import urllib.error
 import urllib.request
@@ -13,6 +14,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 from urllib.parse import urlsplit
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from tools.operations.wwm_wallet_gateway import (  # noqa: E402
+    MAX_BODY_BYTES,
+    WalletError,
+    WalletReply,
+    WalletService,
+)
 
 SCHEMA: Final[str] = "noos/wwm-public-testnet-gateway/v1"
 MAX_UPSTREAM_BYTES: Final[int] = 2 * 1024 * 1024
@@ -34,6 +46,7 @@ class GatewayConfig:
     site_root: Path
     allowed_origins: frozenset[str]
     connect_origins: frozenset[str]
+    wallet_service: WalletService | None = None
 
 
 def canonical_json(value: object) -> bytes:
@@ -89,14 +102,30 @@ def load_config(args: argparse.Namespace) -> GatewayConfig:
         raise GatewayError("site root must be a directory")
     allowed_origins = frozenset(validate_origin(value) for value in args.allow_origin)
     connect_origins = frozenset(validate_origin(value) for value in args.connect_origin)
+    node_rpc = validate_node_rpc(args.node_rpc)
+    wallet_service = None
+    wallet_root = getattr(args, "wallet_root", None)
+    if wallet_root is not None:
+        try:
+            wallet_service = WalletService(
+                api_base=args.wallet_api_base,
+                node_rpc=node_rpc,
+                node_token=token,
+                cli_path=args.wallet_cli,
+                wallet_root=wallet_root,
+                faucet_db=args.wallet_faucet_db,
+            )
+        except WalletError as error:
+            raise GatewayError(error.message) from error
     return GatewayConfig(
         listen_host=listen_host,
         listen_port=listen_port,
-        node_rpc=validate_node_rpc(args.node_rpc),
+        node_rpc=node_rpc,
         node_token=token,
         site_root=site_root,
         allowed_origins=allowed_origins,
         connect_origins=connect_origins,
+        wallet_service=wallet_service,
     )
 
 
@@ -125,17 +154,25 @@ class PublicGatewayHandler(http.server.BaseHTTPRequestHandler):
         print(f"gateway {self.client_address[0]} {format % args}", flush=True)
 
     def do_OPTIONS(self) -> None:  # noqa: N802
+        parsed = urlsplit(self.path)
+        wallet_post = (
+            self.config.wallet_service is not None
+            and not parsed.query
+            and self.config.wallet_service.is_post_route(parsed.path)
+        )
+        allowed_methods = {"GET", "HEAD", "POST"} if wallet_post else {"GET", "HEAD"}
         requested_method = self.headers.get("Access-Control-Request-Method")
-        if requested_method not in {None, "GET", "HEAD"}:
-            self._json_error(405, "METHOD_NOT_ALLOWED", "public testnet gateway is read-only")
+        if requested_method not in {None, *allowed_methods}:
+            self._json_error(405, "METHOD_NOT_ALLOWED", "method is not available on this public testnet route")
             return
         if not self._origin_allowed():
             self._json_error(403, "ORIGIN_NOT_ALLOWED", "browser origin is not authorized")
             return
+        rendered_methods = "GET, HEAD, POST, OPTIONS" if wallet_post else "GET, HEAD, OPTIONS"
         self.send_response(204)
         self._security_headers("no-store")
-        self.send_header("Allow", "GET, HEAD, OPTIONS")
-        self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+        self.send_header("Allow", rendered_methods)
+        self.send_header("Access-Control-Allow-Methods", rendered_methods)
         self.send_header("Access-Control-Allow-Headers", "Accept, Content-Type")
         self.send_header("Access-Control-Max-Age", "300")
         self.send_header("Content-Length", "0")
@@ -148,7 +185,7 @@ class PublicGatewayHandler(http.server.BaseHTTPRequestHandler):
         self._dispatch(send_body=True)
 
     def do_POST(self) -> None:  # noqa: N802
-        self._reject_write()
+        self._wallet_post()
 
     def do_PUT(self) -> None:  # noqa: N802
         self._reject_write()
@@ -174,6 +211,23 @@ class PublicGatewayHandler(http.server.BaseHTTPRequestHandler):
             self._json_error(403, "ORIGIN_NOT_ALLOWED", "browser origin is not authorized")
             return
         parsed = urlsplit(self.path)
+        wallet = self.config.wallet_service
+        if wallet is not None and wallet.is_get_route(parsed.path):
+            try:
+                reply = wallet.get(parsed.path, parsed.query)
+                self._wallet_json(reply, send_body)
+            except WalletError as error:
+                self._wallet_error(error, send_body)
+            return
+        if parsed.path == "/wallet" or parsed.path.startswith("/wallet/"):
+            if parsed.query or parsed.fragment:
+                self._json_error(400, "INVALID_PATH", "query strings are not accepted")
+                return
+            if wallet is None:
+                self._json_error(404, "NOT_FOUND", "resource not found")
+                return
+            self._wallet_static(parsed.path, send_body)
+            return
         if parsed.query or parsed.fragment:
             self._json_error(400, "INVALID_PATH", "query strings are not accepted")
             return
@@ -191,6 +245,99 @@ class PublicGatewayHandler(http.server.BaseHTTPRequestHandler):
             self._proxy(f"/wwm-record/{record.group(1)}/{record.group(2)}", send_body)
             return
         self._static(parsed.path, send_body)
+
+    def _wallet_post(self) -> None:
+        if not self._origin_allowed():
+            self._json_error(403, "ORIGIN_NOT_ALLOWED", "browser origin is not authorized")
+            return
+        parsed = urlsplit(self.path)
+        wallet = self.config.wallet_service
+        if (
+            wallet is None
+            or parsed.query
+            or parsed.fragment
+            or not wallet.is_post_route(parsed.path)
+        ):
+            self._reject_write()
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = 0
+        if length <= 0 or length > MAX_BODY_BYTES:
+            self._wallet_error(
+                WalletError(413, "INVALID_BODY_SIZE", "Request body must be between 1 and 65536 bytes."),
+                True,
+            )
+            return
+        if self.headers.get_content_type() != "application/json":
+            self._wallet_error(
+                WalletError(415, "UNSUPPORTED_MEDIA_TYPE", "Wallet requests require application/json."),
+                True,
+            )
+            return
+        try:
+            body = json.loads(self.rfile.read(length))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self._wallet_error(WalletError(400, "MALFORMED_JSON", "Request body is not valid JSON."), True)
+            return
+        if not isinstance(body, dict):
+            self._wallet_error(WalletError(400, "MALFORMED_JSON", "Request body must be a JSON object."), True)
+            return
+        client = self.headers.get("CF-Connecting-IP") or self.client_address[0]
+        try:
+            self._wallet_json(wallet.post(parsed.path, body, client), True)
+        except WalletError as error:
+            self._wallet_error(error, True)
+
+    def _wallet_static(self, request_path: str, send_body: bool) -> None:
+        wallet = self.config.wallet_service
+        if wallet is None:
+            self._json_error(404, "NOT_FOUND", "resource not found")
+            return
+        relative = "index.html" if request_path in {"/wallet", "/wallet/"} else request_path.removeprefix("/wallet/")
+        self._serve_static_file(wallet.wallet_root, relative, send_body)
+
+    def _wallet_json(self, reply: WalletReply, send_body: bool) -> None:
+        body = canonical_json(reply.value)
+        self.send_response(reply.status)
+        self._security_headers("no-store")
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        if reply.retry_after is not None:
+            self.send_header("Retry-After", str(reply.retry_after))
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if send_body:
+            self.wfile.write(body)
+
+    def _wallet_error(self, error: WalletError, send_body: bool) -> None:
+        self._wallet_json(
+            WalletReply(
+                error.status,
+                {
+                    "schema": "noos/public-testnet-wallet-error/v1",
+                    "error": error.message,
+                    "code": error.code,
+                    "production": False,
+                },
+                retry_after=error.retry_after,
+            ),
+            send_body,
+        )
+
+    def _serve_static_file(self, root: Path, relative: str, send_body: bool) -> None:
+        candidate = (root / relative).resolve()
+        if root not in candidate.parents or not candidate.is_file():
+            self._json_error(404, "NOT_FOUND", "resource not found")
+            return
+        size = candidate.stat().st_size
+        if size > MAX_STATIC_BYTES:
+            self._json_error(413, "STATIC_RESOURCE_TOO_LARGE", "resource exceeds gateway bound")
+            return
+        body = candidate.read_bytes()
+        content_type = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
+        cache = "no-store" if candidate.suffix.lower() in {".html", ".json", ".webmanifest"} else "public, max-age=300"
+        self._reply(200, content_type, body, cache, send_body)
 
     def _origin_allowed(self) -> bool:
         origin = self.headers.get("Origin")
@@ -251,18 +398,7 @@ class PublicGatewayHandler(http.server.BaseHTTPRequestHandler):
 
     def _static(self, request_path: str, send_body: bool) -> None:
         relative = "query.html" if request_path == "/" else request_path.lstrip("/")
-        candidate = (self.config.site_root / relative).resolve()
-        if self.config.site_root not in candidate.parents or not candidate.is_file():
-            self._json_error(404, "NOT_FOUND", "resource not found")
-            return
-        size = candidate.stat().st_size
-        if size > MAX_STATIC_BYTES:
-            self._json_error(413, "STATIC_RESOURCE_TOO_LARGE", "resource exceeds gateway bound")
-            return
-        body = candidate.read_bytes()
-        content_type = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
-        cache = "no-store" if candidate.suffix.lower() in {".html", ".json"} else "public, max-age=300"
-        self._reply(200, content_type, body, cache, send_body)
+        self._serve_static_file(self.config.site_root, relative, send_body)
 
     def _security_headers(self, cache_control: str) -> None:
         self.send_header("Cache-Control", cache_control)
@@ -335,6 +471,7 @@ def serve(config: GatewayConfig) -> None:
                 "listen": f"{config.listen_host}:{config.listen_port}",
                 "node_rpc": config.node_rpc,
                 "site_root": str(config.site_root),
+                "wallet_enabled": config.wallet_service is not None,
                 "production": False,
                 "promotion_effect": "NONE",
             },
@@ -349,13 +486,32 @@ def serve(config: GatewayConfig) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Read-only public gateway for the WWM MindChain testnet")
+    parser = argparse.ArgumentParser(description="Public WWM gateway with scoped valueless-testnet wallet relay")
     parser.add_argument("--listen", default="127.0.0.1:29680")
     parser.add_argument("--node-rpc", default="http://127.0.0.1:29652")
     parser.add_argument("--node-token-file", type=Path, required=True)
     parser.add_argument("--site-root", type=Path, required=True)
     parser.add_argument("--allow-origin", action="append", default=[])
     parser.add_argument("--connect-origin", action="append", default=[])
+    parser.add_argument(
+        "--wallet-api-base",
+        default="https://wwm-seed-2.mindchain.network",
+    )
+    parser.add_argument(
+        "--wallet-cli",
+        type=Path,
+        default=Path("C:/mindchain/wwm-testnet/bin/noos-cli.exe"),
+    )
+    parser.add_argument(
+        "--wallet-root",
+        type=Path,
+        default=PROJECT_ROOT / "apps" / "mind-market" / "wallet",
+    )
+    parser.add_argument(
+        "--wallet-faucet-db",
+        type=Path,
+        default=Path("C:/mindchain/wwm-testnet/wallet/faucet.sqlite3"),
+    )
     return parser.parse_args()
 
 

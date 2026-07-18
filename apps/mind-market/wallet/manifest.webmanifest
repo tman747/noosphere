@@ -1,7 +1,7 @@
 {
   "name": "Harbor Wallet for MindChain",
   "short_name": "Harbor Wallet",
-  "description": "Self-custody MindChain wallet with locally encrypted Ed25519 keys.",
+  "description": "Self-custody iPhone wallet for the valueless MindChain public testnet.",
   "id": "/wallet/",
   "start_url": "/wallet/",
   "scope": "/wallet/",
@@ -10,5 +10,9 @@
   "theme_color": "#11241f",
   "orientation": "any",
   "categories": ["finance", "productivity"],
-  "icons": [{"src":"/wallet/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+  "icons": [
+    {"src":"/wallet/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"/wallet/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"},
+    {"src":"/wallet/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}
+  ]
 }
