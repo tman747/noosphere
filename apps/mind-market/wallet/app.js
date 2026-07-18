@@ -186,7 +186,9 @@ async function sendPayment(form) {
   if (built.chain_id !== state.config.chain_id || built.genesis_hash !== state.config.genesis_hash) throw new Error("Unsigned builder returned the wrong chain identity");
   if (!await reviewTransaction("Sign this transfer?", [["From", state.account], ["To", values.recipient], ["Asset", values.asset], ["Amount", values.amount], ["Transaction ID", built.txid], ["Chain", built.chain_id]])) { notice("Transaction cancelled before signing."); return; }
   const settled = await signSimulateSubmit(built);
-  notice(`Included ${short(settled.txid)} on the public testnet. Recipient account is payable.`); form.reset(); await refresh();
+  form.reset();
+  await refresh();
+  notice(`Included ${settled.txid} at height ${settled.receipt?.inclusion?.height ?? "pending"} on the public testnet.`);
 }
 
 async function convertPsm(form) {
@@ -265,12 +267,20 @@ $("#send-form").addEventListener("submit", async (event) => { event.preventDefau
 $("#psm-form").addEventListener("submit", async (event) => { event.preventDefault(); if (state.busy) return; setBusy(true); try { await convertPsm(event.currentTarget); } catch (error) { notice(error.message, true); } finally { setBusy(false); } });
 $("#psm-market").addEventListener("change", updatePsmSelection);
 $("#psm-kind").addEventListener("change", updatePsmSelection);
-$("#faucet").addEventListener("click", async () => { setBusy(true); try { const result = await post("/api/wallet/faucet", { account: state.account, amount: "1000000" }); notice(`Received 1,000,000 valueless NOOS_TEST: ${short(result.txid)}`); await refresh(); } catch (error) { notice(error.message, true); } finally { setBusy(false); } });
+$("#faucet").addEventListener("click", async () => {
+  setBusy(true);
+  try {
+    const result = await post("/api/wallet/faucet", { account: state.account, amount: "1000000" });
+    await refresh();
+    notice(`Received 1,000,000 valueless NOOS_TEST in ${result.txid} at height ${result.receipt?.inclusion?.height ?? "pending"}.`);
+  } catch (error) { notice(error.message, true); }
+  finally { setBusy(false); }
+});
 $("#refresh").addEventListener("click", refresh);
 $("#copy-account").addEventListener("click", async () => { await navigator.clipboard.writeText(state.account); notice("Account public key copied."); });
 $("#backup").addEventListener("click", () => { const blob = new Blob([JSON.stringify(state.vault, null, 2)], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `harbor-wallet-${state.account.slice(0, 8)}.json`; link.click(); URL.revokeObjectURL(link.href); notice("Encrypted backup created. Keep it with the password; never share either."); });
 $("#lock").addEventListener("click", () => { state.privateKey = null; state.account = null; showAuth("unlock"); });
 window.addEventListener("beforeinstallprompt", (event) => { event.preventDefault(); state.installPrompt = event; $("#install").hidden = false; });
 $("#install").addEventListener("click", async () => { if (!state.installPrompt) return notice("On iPhone Safari: tap Share, then Add to Home Screen."); await state.installPrompt.prompt(); state.installPrompt = null; });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/wallet/sw.js");
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/wallet/sw.js", { updateViaCache: "none" });
 vaultGet().then((vault) => { state.vault = vault; showAuth(vault ? "unlock" : "create"); }).catch((error) => status(error.message, true));
