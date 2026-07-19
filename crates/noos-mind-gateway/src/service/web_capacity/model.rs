@@ -10,10 +10,8 @@ pub const HOST_VERIFICATION_MAX_AGE_SECONDS: u64 = 60;
 pub const HOST_MANIFEST_SIGNATURE_DOMAIN: &str = "NOOS/SIG/WWM-WEB-HOST-MANIFEST/V1";
 pub const ASSIGNMENT_SIGNATURE_DOMAIN: &str = "NOOS/SIG/WWM-WEB-ASSIGNMENT/V1";
 pub const RESTORE_TASK_SIGNATURE_DOMAIN: &str = "NOOS/SIG/WWM-WEB-RESTORE-TASK/V1";
-pub const RESTORE_IMPORT_INDEX_SIGNATURE_DOMAIN: &str =
-    "NOOS/SIG/WWM-WEB-RESTORE-IMPORT-INDEX/V1";
-pub const RESTORE_IMPORT_INDEX_RECORD_KIND: &str =
-    "WEB_RESTORED_POSITION_IMPORT_INDEX";
+pub const RESTORE_IMPORT_INDEX_SIGNATURE_DOMAIN: &str = "NOOS/SIG/WWM-WEB-RESTORE-IMPORT-INDEX/V1";
+pub const RESTORE_IMPORT_INDEX_RECORD_KIND: &str = "WEB_RESTORED_POSITION_IMPORT_INDEX";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -377,7 +375,6 @@ pub struct QueueRestoreAdminReport {
     pub rewards: bool,
     pub insert_once: bool,
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct HeartbeatResponse {

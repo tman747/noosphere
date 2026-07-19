@@ -284,13 +284,17 @@ fn assignments_balance_coordinates_before_adding_second_copies() {
     add_test_session(&store, [0x31; 32], 0x41, now);
     add_test_session(&store, [0x32; 32], 0x42, now);
 
-    let first = store.select_assignment_rows([0x31; 32], now, 2, &[]).unwrap();
+    let first = store
+        .select_assignment_rows([0x31; 32], now, 2, &[])
+        .unwrap();
     assert_eq!(coordinates(&first), vec![(0, 0), (0, 1)]);
     store
         .insert_assignment(&"51".repeat(32), [0x31; 32], "{}", now, now + 600, &first)
         .unwrap();
 
-    let second = store.select_assignment_rows([0x32; 32], now, 2, &[]).unwrap();
+    let second = store
+        .select_assignment_rows([0x32; 32], now, 2, &[])
+        .unwrap();
     assert_eq!(coordinates(&second), vec![(0, 2), (0, 3)]);
 }
 
@@ -333,7 +337,9 @@ fn assignments_diversify_provider_cluster_and_region_after_coordinate_balance() 
     add_test_session(&store, [0x61; 32], 0x71, now);
     add_test_session(&store, [0x62; 32], 0x72, now);
 
-    let first = store.select_assignment_rows([0x61; 32], now, 3, &[]).unwrap();
+    let first = store
+        .select_assignment_rows([0x61; 32], now, 3, &[])
+        .unwrap();
     assert_eq!(coordinates(&first), host_coordinates);
     assert_eq!(
         first.iter().map(|(host, _)| host[0]).collect::<Vec<_>>(),
@@ -358,7 +364,9 @@ fn assignments_diversify_provider_cluster_and_region_after_coordinate_balance() 
         .insert_assignment(&"81".repeat(32), [0x61; 32], "{}", now, now + 600, &first)
         .unwrap();
 
-    let second = store.select_assignment_rows([0x62; 32], now, 3, &[]).unwrap();
+    let second = store
+        .select_assignment_rows([0x62; 32], now, 3, &[])
+        .unwrap();
     assert_eq!(coordinates(&second), host_coordinates);
     let first_provider = first
         .iter()
@@ -464,10 +472,8 @@ fn concurrent_heartbeats_reserve_diverse_coordinates_atomically() {
                 barrier.wait();
                 store
                     .reserve_assignment(token_hash, now, 2, &[], |rows| {
-                        let public_rows = rows
-                            .iter()
-                            .map(|(_, row)| row.clone())
-                            .collect::<Vec<_>>();
+                        let public_rows =
+                            rows.iter().map(|(_, row)| row.clone()).collect::<Vec<_>>();
                         let rows_value = serde_json::to_value(&public_rows).unwrap();
                         let rows_bytes = canonical_json(&rows_value).unwrap();
                         let assignment_id = super::security::domain_hash_hex(
@@ -495,7 +501,10 @@ fn concurrent_heartbeats_reserve_diverse_coordinates_atomically() {
     assigned.sort_by(|left, right| left.1.cmp(&right.1));
     assert_ne!(assigned[0].0, assigned[1].0);
     assert_eq!(
-        assigned.iter().map(|(_, rows)| rows.clone()).collect::<Vec<_>>(),
+        assigned
+            .iter()
+            .map(|(_, rows)| rows.clone())
+            .collect::<Vec<_>>(),
         vec![vec![(0, 0), (0, 1)], vec![(0, 2), (0, 3)]]
     );
 }
@@ -519,18 +528,26 @@ fn assignment_respects_available_bytes_and_excludes_held_digests() {
     let held = super::security::decode_hex32(&test_protocol_digest(0, 0)).unwrap();
     let available = 3 * super::model::SHARE_BYTES - 1;
     let rows = store
-        .reserve_assignment([0x51; 32], now, (available / super::model::SHARE_BYTES) as usize, &[held], |rows| {
-            Ok((
-                "53".repeat(32),
-                "{}".to_owned(),
-                now + 600,
-                rows.iter().map(|(_, row)| row.clone()).collect::<Vec<_>>(),
-            ))
-        })
+        .reserve_assignment(
+            [0x51; 32],
+            now,
+            (available / super::model::SHARE_BYTES) as usize,
+            &[held],
+            |rows| {
+                Ok((
+                    "53".repeat(32),
+                    "{}".to_owned(),
+                    now + 600,
+                    rows.iter().map(|(_, row)| row.clone()).collect::<Vec<_>>(),
+                ))
+            },
+        )
         .unwrap()
         .unwrap();
     assert_eq!(rows.len(), 2);
-    assert!(rows.iter().all(|row| row.protocol_share_digest != test_protocol_digest(0, 0)));
+    assert!(rows
+        .iter()
+        .all(|row| row.protocol_share_digest != test_protocol_digest(0, 0)));
     assert!(rows.iter().map(|row| row.bytes).sum::<u64>() <= available);
 }
 
@@ -600,7 +617,10 @@ fn stale_successful_refresh_cannot_replace_a_newer_registration() {
             &stale_inventory,
         )
         .unwrap());
-    assert_eq!(store.active_host_refresh_targets().unwrap()[0].generation, 2);
+    assert_eq!(
+        store.active_host_refresh_targets().unwrap()[0].generation,
+        2
+    );
     add_test_session(&store, [0x71; 32], 0x72, now);
     assert_eq!(
         coordinates(
@@ -711,8 +731,7 @@ fn configured_store_caps_fail_closed_at_each_global_boundary() {
         .insert_assignment(&"32".repeat(32), token_hash, "{}", now, now + 600, &rows)
         .is_err());
 
-    let (_, inventory) =
-        test_host_records(0x11, "https://a.example", &[(0, 0)], now + 3_600);
+    let (_, inventory) = test_host_records(0x11, "https://a.example", &[(0, 0)], now + 3_600);
     let coordinate = &inventory.rows[0];
     for task_id in ["41".repeat(32), "42".repeat(32)] {
         store
@@ -831,8 +850,7 @@ fn add_test_host(
     coordinates: &[(u32, u8)],
     expires_at: u64,
 ) {
-    let (manifest, inventory) =
-        test_host_records(host_byte, origin, coordinates, expires_at);
+    let (manifest, inventory) = test_host_records(host_byte, origin, coordinates, expires_at);
     store
         .replace_host(
             &format!("{host_byte:02x}").repeat(32),
@@ -925,7 +943,9 @@ fn test_host_records(
 }
 
 fn test_protocol_digest(stripe: u32, position: u8) -> String {
-    let coordinate = stripe.saturating_mul(12).saturating_add(u32::from(position));
+    let coordinate = stripe
+        .saturating_mul(12)
+        .saturating_add(u32::from(position));
     format!("{:08x}", coordinate).repeat(8)
 }
 
@@ -978,11 +998,7 @@ fn admin_restore_service() -> (
     let mut sink = AdminFirstShareSink::default();
     let canonical_manifest = noos_da::artifact::ArtifactEncoderV1::new()
         .unwrap()
-        .encode(
-            &mut std::io::Cursor::new(vec![0x5a]),
-            &mut sink,
-            9,
-        )
+        .encode(&mut std::io::Cursor::new(vec![0x5a]), &mut sink, 9)
         .unwrap();
     let commitment = canonical_manifest.stripes[0].shares[0];
     let source_origin = "https://source.example";
@@ -1136,7 +1152,11 @@ fn queue_restore_admin_is_signed_insert_once_and_rejects_invalid_lifecycle_reque
     service
         .inner
         .store
-        .revoke_session(token_hash, &request.canonical_origin, now_seconds().unwrap())
+        .revoke_session(
+            token_hash,
+            &request.canonical_origin,
+            now_seconds().unwrap(),
+        )
         .unwrap();
     let mut revoked = request.clone();
     revoked.expires_at = revoked.expires_at.saturating_add(1);
@@ -1203,22 +1223,13 @@ fn restored_position_export_is_signed_complete_and_reverifies_quarantine_bytes()
     let mut sink = AdminFirstShareSink::default();
     noos_da::artifact::ArtifactEncoderV1::new()
         .unwrap()
-        .encode(
-            &mut std::io::Cursor::new(vec![0x5a]),
-            &mut sink,
-            9,
-        )
+        .encode(&mut std::io::Cursor::new(vec![0x5a]), &mut sink, 9)
         .unwrap();
     let coordinate_digest = super::security::domain_hash_hex(
         noos_crypto::DomainId::WwmWebCoordinateIdV1,
         &[
             service.inner.config.chain_binding.artifact_id.as_bytes(),
-            service
-                .inner
-                .config
-                .chain_binding
-                .manifest_root
-                .as_bytes(),
+            service.inner.config.chain_binding.manifest_root.as_bytes(),
             &0_u32.to_le_bytes(),
             &[0],
         ],
@@ -1257,7 +1268,10 @@ fn restored_position_export_is_signed_complete_and_reverifies_quarantine_bytes()
     let index = service
         .export_restored_position_index(0, now, now + 60)
         .unwrap();
-    assert_eq!(index.record_kind, super::model::RESTORE_IMPORT_INDEX_RECORD_KIND);
+    assert_eq!(
+        index.record_kind,
+        super::model::RESTORE_IMPORT_INDEX_RECORD_KIND
+    );
     assert_eq!(index.rows.len(), 1);
     assert_eq!(index.rows[0].task, queued.task);
     assert_eq!(
@@ -1284,10 +1298,8 @@ fn restored_position_export_is_signed_complete_and_reverifies_quarantine_bytes()
         .contains("transport bytes mismatch"));
     std::fs::write(&path, &sink.first_share).unwrap();
 
-    let canonical_index = super::security::canonical_json(
-        &serde_json::to_value(&index).unwrap(),
-    )
-    .unwrap();
+    let canonical_index =
+        super::security::canonical_json(&serde_json::to_value(&index).unwrap()).unwrap();
     let manifest = &service.inner.canonical_manifest;
     let evidence = super::model::WebRestoredPositionImportEvidence {
         schema: "noos.wwm.web-restored-position-import-evidence.v1".to_owned(),
@@ -1314,7 +1326,10 @@ fn restored_position_export_is_signed_complete_and_reverifies_quarantine_bytes()
     assert!(service
         .release_restored_position(&index, &forged_evidence, now + 1)
         .is_err());
-    assert!(path.exists(), "failed evidence deleted quarantine before import proof");
+    assert!(
+        path.exists(),
+        "failed evidence deleted quarantine before import proof"
+    );
     assert_eq!(
         service
             .inner

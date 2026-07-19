@@ -6,9 +6,9 @@
 //! and insert-once.
 
 use crate::snapshot::{
-    CitationSpan, DeterministicLexicalIndex, KnowledgeIndexRoots, KnowledgeSnapshot,
-    RetrievalHit, RetrievalProfile, RetrievalProfileClass, RetrievalReceipt, SnapshotBuilder,
-    SnapshotCatalog, SnapshotError, MIN_SNAPSHOT_BUILDERS,
+    CitationSpan, DeterministicLexicalIndex, KnowledgeIndexRoots, KnowledgeSnapshot, RetrievalHit,
+    RetrievalProfile, RetrievalProfileClass, RetrievalReceipt, SnapshotBuilder, SnapshotCatalog,
+    SnapshotError, MIN_SNAPSHOT_BUILDERS,
 };
 use crate::{
     BlindCredentialVerifier, ChallengeStatus, ContentPayload, ContributorIdentity, Hash32,
@@ -239,7 +239,8 @@ impl RightsFirstKnowledgeService {
         let mut control_clusters = BTreeSet::new();
         let mut implementation_roots = BTreeSet::new();
         for report in &reports {
-            if report.eligible_mindlink_ids != expected_ids || report.index_roots != expected_roots {
+            if report.eligible_mindlink_ids != expected_ids || report.index_roots != expected_roots
+            {
                 return Err(KnowledgeServiceError::BuilderDisagreement);
             }
             control_clusters.insert(report.builder.control_cluster);
@@ -314,7 +315,6 @@ impl RightsFirstKnowledgeService {
         Ok(snapshot_id)
     }
 
-
     pub fn register_advisory_index(
         &mut self,
         manifest: AdvisoryIndexManifest,
@@ -334,9 +334,7 @@ impl RightsFirstKnowledgeService {
                         .any(|builder| builder.builder_key == manifest.builder_key)
                 })
         {
-            return Err(KnowledgeServiceError::Snapshot(
-                SnapshotError::InvalidIndex,
-            ));
+            return Err(KnowledgeServiceError::Snapshot(SnapshotError::InvalidIndex));
         }
         let key = (
             manifest.snapshot_id,
@@ -366,10 +364,10 @@ impl RightsFirstKnowledgeService {
             .deterministic_indexes
             .get(&request.snapshot_id)
             .ok_or(SnapshotError::InvalidIndex)?;
-        if index.snapshot_id != snapshot.snapshot_id || index.index_root != snapshot.index_roots.lexical_root {
-            return Err(KnowledgeServiceError::Snapshot(
-                SnapshotError::InvalidIndex,
-            ));
+        if index.snapshot_id != snapshot.snapshot_id
+            || index.index_root != snapshot.index_roots.lexical_root
+        {
+            return Err(KnowledgeServiceError::Snapshot(SnapshotError::InvalidIndex));
         }
         let hits = index.search(&request.query, request.maximum_results)?;
         if hits.is_empty() {
@@ -509,8 +507,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        ChallengeState, MindLinkDraft, MindLinkType, ModerationState, Provenance,
-        ProvenanceSource, RightsPolicy,
+        ChallengeState, MindLinkDraft, MindLinkType, ModerationState, Provenance, ProvenanceSource,
+        RightsPolicy,
     };
 
     fn h(value: u8) -> Hash32 {
@@ -615,10 +613,9 @@ mod tests {
     fn accepted_service() -> (RightsFirstKnowledgeService, Keypair, Keypair, Hash32) {
         let contributor = Keypair::from_seed([1; 32]);
         let reviewer = Keypair::from_seed([2; 32]);
-        let mut service = RightsFirstKnowledgeService::new(BTreeSet::from([
-            reviewer.public_key().into_bytes(),
-        ]))
-        .unwrap();
+        let mut service =
+            RightsFirstKnowledgeService::new(BTreeSet::from([reviewer.public_key().into_bytes()]))
+                .unwrap();
         let id = service.intake_signed(signed_link(&contributor)).unwrap();
         let stages = [
             (Lifecycle::Submitted, Lifecycle::Quarantined),
@@ -857,19 +854,19 @@ mod tests {
         );
         assert_eq!(
             stale_service.register_signed_snapshot(stale, profile),
-            Err(KnowledgeServiceError::Snapshot(SnapshotError::UnknownParent))
+            Err(KnowledgeServiceError::Snapshot(
+                SnapshotError::UnknownParent
+            ))
         );
     }
-
 
     #[test]
     fn valid_signed_intake_binds_exact_text_source_and_explicit_rights() {
         let contributor = Keypair::from_seed([3; 32]);
         let reviewer = Keypair::from_seed([4; 32]);
-        let mut service = RightsFirstKnowledgeService::new(BTreeSet::from([
-            reviewer.public_key().into_bytes(),
-        ]))
-        .unwrap();
+        let mut service =
+            RightsFirstKnowledgeService::new(BTreeSet::from([reviewer.public_key().into_bytes()]))
+                .unwrap();
         let id = service.intake_signed(signed_link(&contributor)).unwrap();
         let stored = service.graph().mindlink(&id).unwrap();
         assert_eq!(
@@ -884,10 +881,7 @@ mod tests {
         assert_eq!(stored.rights.visibility, Visibility::Public);
         assert_eq!(stored.rights.retrieval_permission, Permission::Allow);
         assert_eq!(stored.rights.training_permission, Permission::Deny);
-        assert_eq!(
-            stored.rights.derivative_model_permission,
-            Permission::Deny
-        );
+        assert_eq!(stored.rights.derivative_model_permission, Permission::Deny);
         assert!(stored.rights.attribution_required);
         assert_eq!(stored.rights.retention_request, REVOCATION_SEMANTICS_V1);
     }
@@ -955,10 +949,9 @@ mod tests {
     fn public_visibility_never_grants_training_or_derivative_consent() {
         let contributor = Keypair::from_seed([7; 32]);
         let reviewer = Keypair::from_seed([8; 32]);
-        let mut service = RightsFirstKnowledgeService::new(BTreeSet::from([
-            reviewer.public_key().into_bytes(),
-        ]))
-        .unwrap();
+        let mut service =
+            RightsFirstKnowledgeService::new(BTreeSet::from([reviewer.public_key().into_bytes()]))
+                .unwrap();
         let id = service.intake_signed(signed_link(&contributor)).unwrap();
         let rights = &service.graph().mindlink(&id).unwrap().rights;
         assert_eq!(rights.visibility, Visibility::Public);
@@ -972,10 +965,9 @@ mod tests {
     fn mandatory_challenge_revocation_and_append_only_replay_law() {
         let contributor = Keypair::from_seed([9; 32]);
         let reviewer = Keypair::from_seed([10; 32]);
-        let mut service = RightsFirstKnowledgeService::new(BTreeSet::from([
-            reviewer.public_key().into_bytes(),
-        ]))
-        .unwrap();
+        let mut service =
+            RightsFirstKnowledgeService::new(BTreeSet::from([reviewer.public_key().into_bytes()]))
+                .unwrap();
         let id = service.intake_signed(signed_link(&contributor)).unwrap();
         let model_or_untrusted_actor = Keypair::from_seed([11; 32]);
         assert_eq!(
@@ -1000,9 +992,7 @@ mod tests {
         service.apply_transition(quarantined.clone()).unwrap();
         assert_eq!(
             service.apply_transition(quarantined),
-            Err(KnowledgeServiceError::Mind(
-                MindError::DuplicateTransition
-            ))
+            Err(KnowledgeServiceError::Mind(MindError::DuplicateTransition))
         );
         service
             .apply_transition(transition(
@@ -1070,9 +1060,7 @@ mod tests {
         assert!(service.graph().mindlink(&id).is_some());
         assert_eq!(
             service.apply_transition(revoke),
-            Err(KnowledgeServiceError::Mind(
-                MindError::DuplicateTransition
-            ))
+            Err(KnowledgeServiceError::Mind(MindError::DuplicateTransition))
         );
     }
 
@@ -1143,9 +1131,7 @@ mod tests {
             maximum_results: 8,
             retrieval_policy_root: h(92),
         };
-        let mut result = service
-            .retrieve_pinned(&executor, request.clone())
-            .unwrap();
+        let mut result = service.retrieve_pinned(&executor, request.clone()).unwrap();
         assert_eq!(result.hits.len(), 1);
         assert_eq!(result.citations.len(), 1);
         assert_eq!(result.citations[0].mindlink_id, id);

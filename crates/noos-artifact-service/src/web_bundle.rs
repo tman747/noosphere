@@ -1353,23 +1353,21 @@ mod tests {
                 }],
                 signing_seed: [7; 32],
             };
-            let error = export_bundle_core(
-                &manifest,
-                binding.clone(),
-                config,
-                |_, _, output| {
-                    output.copy_from_slice(&share);
-                    Ok(())
-                },
-            )
+            let error = export_bundle_core(&manifest, binding.clone(), config, |_, _, output| {
+                output.copy_from_slice(&share);
+                Ok(())
+            })
             .unwrap_err();
             assert!(error.contains("canonical Bonsai release"));
             assert!(!output_root.exists());
-            fs::write(substituted_file, if label == "license" {
-                CANONICAL_LICENSE
-            } else {
-                CANONICAL_NOTICE
-            })
+            fs::write(
+                substituted_file,
+                if label == "license" {
+                    CANONICAL_LICENSE
+                } else {
+                    CANONICAL_NOTICE
+                },
+            )
             .unwrap();
         }
 

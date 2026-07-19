@@ -3,9 +3,7 @@
 use crate::config::ExecutorConfig;
 use crate::executor::residency::verify_file;
 use crate::executor::security::{validate_runtime_args, SecurityError};
-use crate::runtime::process::{
-    private_file_prompt_child_spec, ChildSpec, StdoutFilter,
-};
+use crate::runtime::process::{private_file_prompt_child_spec, ChildSpec, StdoutFilter};
 use std::fmt;
 const RUNTIME_STDOUT_OVERHEAD_BYTES: usize = 65_536;
 
@@ -269,7 +267,10 @@ mod tests {
             .iter()
             .any(|argument| argument == "--no-show-timings"));
         assert!(spec.args.windows(2).any(|args| args == ["--color", "off"]));
-        assert!(spec.args.iter().any(|argument| argument == "--skip-chat-parsing"));
+        assert!(spec
+            .args
+            .iter()
+            .any(|argument| argument == "--skip-chat-parsing"));
         assert!(spec
             .args
             .windows(2)

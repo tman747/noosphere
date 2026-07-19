@@ -275,7 +275,6 @@ mod tests {
             8
         );
 
-
         fs::write(&path, map_json(&identities, 7)).unwrap();
         assert!(matches!(
             load_verified_custodian_map(&config, &identities),

@@ -204,7 +204,6 @@ fn filter_pinned_llama_cli_transcript(
     Ok(output.to_vec())
 }
 
-
 /// Run a network-inert child. The environment is cleared, prompt content is
 /// carried by stdin or a private zeroed-on-drop file (never argv/environment),
 /// and stdout is the only accepted output.

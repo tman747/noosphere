@@ -1,7 +1,5 @@
 use noos_crypto::{hash_domain, DomainId, Keypair};
-use noos_mind::service::{
-    PinnedRetrievalRequest, RightsFirstKnowledgeService,
-};
+use noos_mind::service::{PinnedRetrievalRequest, RightsFirstKnowledgeService};
 use noos_mind::snapshot::{
     CitationSpan, KnowledgeIndexRoots, KnowledgeSnapshot, RetrievalProfile, RetrievalReceipt,
     SnapshotBuilder, SnapshotSignature, WWM_KNOWLEDGE_SNAPSHOTS_ENABLED,
@@ -91,9 +89,18 @@ enum ContentRecord {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 enum ContributorRecord {
-    Named { public_key: String, display_name: String },
-    Pseudonymous { public_key: String, display_name: String },
-    BlindCredential { credential_root: String, display_name: String },
+    Named {
+        public_key: String,
+        display_name: String,
+    },
+    Pseudonymous {
+        public_key: String,
+        display_name: String,
+    },
+    BlindCredential {
+        credential_root: String,
+        display_name: String,
+    },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -303,23 +310,40 @@ fn invalid(message: impl Into<String>) -> Box<dyn Error> {
 }
 
 fn parse_hash(value: &str, field: &str) -> Result<Hash32, Box<dyn Error>> {
-    let bytes = hex::decode(value).map_err(|_| invalid(format!("{field} must be lowercase hex")))?;
-    if bytes.len() != 32 || value.len() != 64 || value.bytes().any(|byte| byte.is_ascii_uppercase()) {
-        return Err(invalid(format!("{field} must be exactly 32 lowercase hex bytes")));
+    let bytes =
+        hex::decode(value).map_err(|_| invalid(format!("{field} must be lowercase hex")))?;
+    if bytes.len() != 32 || value.len() != 64 || value.bytes().any(|byte| byte.is_ascii_uppercase())
+    {
+        return Err(invalid(format!(
+            "{field} must be exactly 32 lowercase hex bytes"
+        )));
     }
-    bytes.try_into().map_err(|_| invalid(format!("invalid {field}")))
+    bytes
+        .try_into()
+        .map_err(|_| invalid(format!("invalid {field}")))
 }
 
 fn parse_signature(value: &str, field: &str) -> Result<[u8; 64], Box<dyn Error>> {
-    let bytes = hex::decode(value).map_err(|_| invalid(format!("{field} must be lowercase hex")))?;
-    if bytes.len() != 64 || value.len() != 128 || value.bytes().any(|byte| byte.is_ascii_uppercase()) {
-        return Err(invalid(format!("{field} must be exactly 64 lowercase hex bytes")));
+    let bytes =
+        hex::decode(value).map_err(|_| invalid(format!("{field} must be lowercase hex")))?;
+    if bytes.len() != 64
+        || value.len() != 128
+        || value.bytes().any(|byte| byte.is_ascii_uppercase())
+    {
+        return Err(invalid(format!(
+            "{field} must be exactly 64 lowercase hex bytes"
+        )));
     }
-    bytes.try_into().map_err(|_| invalid(format!("invalid {field}")))
+    bytes
+        .try_into()
+        .map_err(|_| invalid(format!("invalid {field}")))
 }
 
 fn parse_hashes(values: &[String], field: &str) -> Result<Vec<Hash32>, Box<dyn Error>> {
-    values.iter().map(|value| parse_hash(value, field)).collect()
+    values
+        .iter()
+        .map(|value| parse_hash(value, field))
+        .collect()
 }
 
 fn parse_lifecycle(value: &str) -> Result<Lifecycle, Box<dyn Error>> {
@@ -351,27 +375,47 @@ fn parse_permission(value: &str) -> Result<Permission, Box<dyn Error>> {
 impl MindLinkRecord {
     fn into_core(self) -> Result<MindLink, Box<dyn Error>> {
         let content = match self.content {
-            ContentRecord::Public { original_text, summary, summary_derived } => ContentPayload::Public {
+            ContentRecord::Public {
+                original_text,
+                summary,
+                summary_derived,
+            } => ContentPayload::Public {
                 original_text,
                 summary,
                 summary_derived,
             },
-            ContentRecord::Sealed { encrypted_content_root, summary, summary_derived } => ContentPayload::Sealed {
-                encrypted_content_root: parse_hash(&encrypted_content_root, "encrypted_content_root")?,
+            ContentRecord::Sealed {
+                encrypted_content_root,
+                summary,
+                summary_derived,
+            } => ContentPayload::Sealed {
+                encrypted_content_root: parse_hash(
+                    &encrypted_content_root,
+                    "encrypted_content_root",
+                )?,
                 summary,
                 summary_derived,
             },
         };
         let contributor = match self.contributor {
-            ContributorRecord::Named { public_key, display_name } => ContributorIdentity::Named {
+            ContributorRecord::Named {
+                public_key,
+                display_name,
+            } => ContributorIdentity::Named {
                 public_key: parse_hash(&public_key, "contributor.public_key")?,
                 display_name,
             },
-            ContributorRecord::Pseudonymous { public_key, display_name } => ContributorIdentity::Pseudonymous {
+            ContributorRecord::Pseudonymous {
+                public_key,
+                display_name,
+            } => ContributorIdentity::Pseudonymous {
                 public_key: parse_hash(&public_key, "contributor.public_key")?,
                 display_name,
             },
-            ContributorRecord::BlindCredential { credential_root, display_name } => ContributorIdentity::BlindCredential {
+            ContributorRecord::BlindCredential {
+                credential_root,
+                display_name,
+            } => ContributorIdentity::BlindCredential {
                 credential_root: parse_hash(&credential_root, "contributor.credential_root")?,
                 display_name,
             },
@@ -412,41 +456,54 @@ impl MindLinkRecord {
             "REVOKED_FUTURE_USE" => ModerationStatus::RevokedFutureUse,
             _ => return Err(invalid("invalid moderation status")),
         };
-        let authority = self.authority.into_iter().map(|record| {
-            Ok(AuthorityStatement {
-                domain: record.domain,
-                statement: record.statement,
-                evidence_root: parse_hash(&record.evidence_root, "authority.evidence_root")?,
-                valid_from_height: record.valid_from_height,
-                expires_height: record.expires_height,
+        let authority = self
+            .authority
+            .into_iter()
+            .map(|record| {
+                Ok(AuthorityStatement {
+                    domain: record.domain,
+                    statement: record.statement,
+                    evidence_root: parse_hash(&record.evidence_root, "authority.evidence_root")?,
+                    valid_from_height: record.valid_from_height,
+                    expires_height: record.expires_height,
+                })
             })
-        }).collect::<Result<Vec<_>, Box<dyn Error>>>()?;
-        let sources = self.provenance.sources.into_iter().map(|record| {
-            Ok(ProvenanceSource {
-                uri: record.uri,
-                content_hash: parse_hash(&record.content_hash, "provenance.content_hash")?,
-                title: record.title,
-                publisher: record.publisher,
-                retrieved_at_unix_seconds: record.retrieved_at_unix_seconds,
+            .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+        let sources = self
+            .provenance
+            .sources
+            .into_iter()
+            .map(|record| {
+                Ok(ProvenanceSource {
+                    uri: record.uri,
+                    content_hash: parse_hash(&record.content_hash, "provenance.content_hash")?,
+                    title: record.title,
+                    publisher: record.publisher,
+                    retrieved_at_unix_seconds: record.retrieved_at_unix_seconds,
+                })
             })
-        }).collect::<Result<Vec<_>, Box<dyn Error>>>()?;
-        let relations = self.relations.into_iter().map(|record| {
-            let kind = match record.kind.as_str() {
-                "SUPPORTS" => RelationKind::Supports,
-                "CONTRADICTS" => RelationKind::Contradicts,
-                "CORRECTS" => RelationKind::Corrects,
-                "TRANSLATES" => RelationKind::Translates,
-                "DERIVES" => RelationKind::Derives,
-                "DUPLICATES" => RelationKind::Duplicates,
-                "CONTEXTUALIZES" => RelationKind::Contextualizes,
-                _ => return Err(invalid("invalid relation kind")),
-            };
-            Ok(RelationEdge {
-                kind,
-                target_id: parse_hash(&record.target_id, "relation.target_id")?,
-                reason: record.reason,
+            .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+        let relations = self
+            .relations
+            .into_iter()
+            .map(|record| {
+                let kind = match record.kind.as_str() {
+                    "SUPPORTS" => RelationKind::Supports,
+                    "CONTRADICTS" => RelationKind::Contradicts,
+                    "CORRECTS" => RelationKind::Corrects,
+                    "TRANSLATES" => RelationKind::Translates,
+                    "DERIVES" => RelationKind::Derives,
+                    "DUPLICATES" => RelationKind::Duplicates,
+                    "CONTEXTUALIZES" => RelationKind::Contextualizes,
+                    _ => return Err(invalid("invalid relation kind")),
+                };
+                Ok(RelationEdge {
+                    kind,
+                    target_id: parse_hash(&record.target_id, "relation.target_id")?,
+                    reason: record.reason,
+                })
             })
-        }).collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+            .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
         Ok(MindLink {
             predecessors: parse_hashes(&self.predecessors, "predecessor")?,
             supersedes: parse_hashes(&self.supersedes, "supersedes")?,
@@ -461,8 +518,14 @@ impl MindLinkRecord {
             authority,
             provenance: Provenance {
                 sources,
-                evidence_ids: parse_hashes(&self.provenance.evidence_ids, "provenance.evidence_id")?,
-                derived_from: parse_hashes(&self.provenance.derived_from, "provenance.derived_from")?,
+                evidence_ids: parse_hashes(
+                    &self.provenance.evidence_ids,
+                    "provenance.evidence_id",
+                )?,
+                derived_from: parse_hashes(
+                    &self.provenance.derived_from,
+                    "provenance.derived_from",
+                )?,
                 c2pa_manifest_refs: self.provenance.c2pa_manifest_refs,
             },
             relations,
@@ -471,7 +534,9 @@ impl MindLinkRecord {
                 retrieval_permission: parse_permission(&self.rights.retrieval_permission)?,
                 training_permission: parse_permission(&self.rights.training_permission)?,
                 commercial_use: parse_permission(&self.rights.commercial_use)?,
-                derivative_model_permission: parse_permission(&self.rights.derivative_model_permission)?,
+                derivative_model_permission: parse_permission(
+                    &self.rights.derivative_model_permission,
+                )?,
                 attribution_required: self.rights.attribution_required,
                 license: self.rights.license,
                 retention_request: self.rights.retention_request,
@@ -481,12 +546,21 @@ impl MindLinkRecord {
                 status: challenge_status,
                 policy_root: parse_hash(&self.challenge.policy_root, "challenge.policy_root")?,
                 bond_micro_noos: self.challenge.bond_micro_noos,
-                open_challenge_ids: parse_hashes(&self.challenge.open_challenge_ids, "challenge.id")?,
+                open_challenge_ids: parse_hashes(
+                    &self.challenge.open_challenge_ids,
+                    "challenge.id",
+                )?,
             },
             moderation: ModerationState {
-                namespace_root: parse_hash(&self.moderation.namespace_root, "moderation.namespace_root")?,
+                namespace_root: parse_hash(
+                    &self.moderation.namespace_root,
+                    "moderation.namespace_root",
+                )?,
                 status: moderation_status,
-                decision_ids: parse_hashes(&self.moderation.decision_ids, "moderation.decision_id")?,
+                decision_ids: parse_hashes(
+                    &self.moderation.decision_ids,
+                    "moderation.decision_id",
+                )?,
             },
             initial_lifecycle: parse_lifecycle(&self.initial_lifecycle)?,
             created_height: self.created_height,
@@ -509,7 +583,10 @@ impl TransitionRecord {
             actor_key: parse_hash(&self.actor_key, "transition.actor_key")?,
             reason_root: parse_hash(&self.reason_root, "transition.reason_root")?,
             challenge_ids: parse_hashes(&self.challenge_ids, "transition.challenge_id")?,
-            moderation_decision_ids: parse_hashes(&self.moderation_decision_ids, "transition.moderation_decision_id")?,
+            moderation_decision_ids: parse_hashes(
+                &self.moderation_decision_ids,
+                "transition.moderation_decision_id",
+            )?,
             height: self.height,
             transition_id: parse_hash(&self.transition_id, "transition.transition_id")?,
             signature: parse_signature(&self.signature, "transition.signature")?,
@@ -538,34 +615,66 @@ impl SnapshotRecord {
             None => None,
         };
         Ok(KnowledgeSnapshot {
-            parent_snapshot_id: self.parent_snapshot_id.map(|value| parse_hash(&value, "parent_snapshot_id")).transpose()?,
-            eligible_mindlink_ids: parse_hashes(&self.eligible_mindlink_ids, "eligible_mindlink_id")?,
+            parent_snapshot_id: self
+                .parent_snapshot_id
+                .map(|value| parse_hash(&value, "parent_snapshot_id"))
+                .transpose()?,
+            eligible_mindlink_ids: parse_hashes(
+                &self.eligible_mindlink_ids,
+                "eligible_mindlink_id",
+            )?,
             exclusion_ids: parse_hashes(&self.exclusion_ids, "exclusion_id")?,
             rights_policy_root: parse_hash(&self.rights_policy_root, "rights_policy_root")?,
-            normalization_profile_root: parse_hash(&self.normalization_profile_root, "normalization_profile_root")?,
-            chunking_profile_root: parse_hash(&self.chunking_profile_root, "chunking_profile_root")?,
+            normalization_profile_root: parse_hash(
+                &self.normalization_profile_root,
+                "normalization_profile_root",
+            )?,
+            chunking_profile_root: parse_hash(
+                &self.chunking_profile_root,
+                "chunking_profile_root",
+            )?,
             embedding_capsule_and_profile,
             index_roots: self.index_roots.into_core()?,
-            builders: self.builders.into_iter().map(|builder| {
-                Ok(SnapshotBuilder {
-                    builder_key: parse_hash(&builder.builder_key, "builder.key")?,
-                    control_cluster: parse_hash(&builder.control_cluster, "builder.control_cluster")?,
-                    implementation_root: parse_hash(&builder.implementation_root, "builder.implementation_root")?,
+            builders: self
+                .builders
+                .into_iter()
+                .map(|builder| {
+                    Ok(SnapshotBuilder {
+                        builder_key: parse_hash(&builder.builder_key, "builder.key")?,
+                        control_cluster: parse_hash(
+                            &builder.control_cluster,
+                            "builder.control_cluster",
+                        )?,
+                        implementation_root: parse_hash(
+                            &builder.implementation_root,
+                            "builder.implementation_root",
+                        )?,
+                    })
                 })
-            }).collect::<Result<Vec<_>, Box<dyn Error>>>()?,
+                .collect::<Result<Vec<_>, Box<dyn Error>>>()?,
             builder_threshold: self.builder_threshold,
-            availability_certificate_id: parse_hash(&self.availability_certificate_id, "availability_certificate_id")?,
+            availability_certificate_id: parse_hash(
+                &self.availability_certificate_id,
+                "availability_certificate_id",
+            )?,
             challenge_end_height: self.challenge_end_height,
             activation_height: self.activation_height,
             retirement_height: self.retirement_height,
-            rollback_parent_id: self.rollback_parent_id.map(|value| parse_hash(&value, "rollback_parent_id")).transpose()?,
+            rollback_parent_id: self
+                .rollback_parent_id
+                .map(|value| parse_hash(&value, "rollback_parent_id"))
+                .transpose()?,
             snapshot_id: parse_hash(&self.snapshot_id, "snapshot_id")?,
-            signatures: self.signatures.into_iter().map(|signature| {
-                Ok(SnapshotSignature {
-                    builder_index: signature.builder_index,
-                    signature: parse_signature(&signature.signature, "snapshot.signature")?,
+            signatures: self
+                .signatures
+                .into_iter()
+                .map(|signature| {
+                    Ok(SnapshotSignature {
+                        builder_index: signature.builder_index,
+                        signature: parse_signature(&signature.signature, "snapshot.signature")?,
+                    })
                 })
-            }).collect::<Result<Vec<_>, Box<dyn Error>>>()?,
+                .collect::<Result<Vec<_>, Box<dyn Error>>>()?,
         })
     }
 }
@@ -596,13 +705,21 @@ fn receipt_evidence(receipt: RetrievalReceipt) -> ReceiptEvidence {
         query_commitment: hex::encode(receipt.query_commitment),
         retrieval_policy_root: hex::encode(receipt.retrieval_policy_root),
         index_roots: roots_evidence(receipt.index_roots),
-        selected_mindlink_ids: receipt.selected_mindlink_ids.into_iter().map(hex::encode).collect(),
+        selected_mindlink_ids: receipt
+            .selected_mindlink_ids
+            .into_iter()
+            .map(hex::encode)
+            .collect(),
         rank_scores_q20: receipt.rank_scores_q20,
-        citation_spans: receipt.citation_spans.into_iter().map(|span: CitationSpan| CitationSpanEvidence {
-            selected_index: span.selected_index,
-            context_start: span.context_start,
-            context_end: span.context_end,
-        }).collect(),
+        citation_spans: receipt
+            .citation_spans
+            .into_iter()
+            .map(|span: CitationSpan| CitationSpanEvidence {
+                selected_index: span.selected_index,
+                context_start: span.context_start,
+                context_end: span.context_end,
+            })
+            .collect(),
         output_context_root: hex::encode(receipt.output_context_root),
         executor_key: hex::encode(receipt.executor_key),
         receipt_id: hex::encode(receipt.receipt_id),
@@ -624,7 +741,9 @@ fn canonical_json(value: &Value, output: &mut Vec<u8>) -> Result<(), Box<dyn Err
         Value::Array(values) => {
             output.push(b'[');
             for (index, value) in values.iter().enumerate() {
-                if index != 0 { output.push(b','); }
+                if index != 0 {
+                    output.push(b',');
+                }
                 canonical_json(value, output)?;
             }
             output.push(b']');
@@ -632,7 +751,9 @@ fn canonical_json(value: &Value, output: &mut Vec<u8>) -> Result<(), Box<dyn Err
         Value::Object(values) => {
             output.push(b'{');
             for (index, (key, value)) in values.iter().enumerate() {
-                if index != 0 { output.push(b','); }
+                if index != 0 {
+                    output.push(b',');
+                }
                 output.extend_from_slice(serde_json::to_string(key)?.as_bytes());
                 output.push(b':');
                 canonical_json(value, output)?;
@@ -665,21 +786,26 @@ fn execute(request_bytes: &[u8], executor_seed: [u8; 32]) -> Result<Vec<u8>, Box
     {
         return Err(invalid("production controls must remain disabled"));
     }
-    let reviewer_keys = request.reviewer_keys.iter()
+    let reviewer_keys = request
+        .reviewer_keys
+        .iter()
         .map(|key| parse_hash(key, "reviewer_key"))
         .collect::<Result<BTreeSet<_>, _>>()?;
     if reviewer_keys.len() != request.reviewer_keys.len() {
         return Err(invalid("reviewer keys must be unique"));
     }
     let executor = Keypair::from_seed(executor_seed);
-    if executor.public_key().into_bytes() != parse_hash(&request.executor_public_key, "executor_public_key")? {
+    if executor.public_key().into_bytes()
+        != parse_hash(&request.executor_public_key, "executor_public_key")?
+    {
         return Err(invalid("executor seed does not match requested public key"));
     }
     let mut service = RightsFirstKnowledgeService::new(reviewer_keys)
         .map_err(|error| invalid(format!("service initialization rejected: {error:?}")))?;
     let mut contribution_ids = Vec::with_capacity(request.mindlinks.len());
     for record in request.mindlinks {
-        let id = service.intake_signed(record.into_core()?)
+        let id = service
+            .intake_signed(record.into_core()?)
             .map_err(|error| invalid(format!("MindLink intake rejected: {error:?}")))?;
         contribution_ids.push(id);
     }
@@ -688,33 +814,61 @@ fn execute(request_bytes: &[u8], executor_seed: [u8; 32]) -> Result<Vec<u8>, Box
     for record in request.transitions {
         let transition = record.into_core()?;
         transition_ids.push(transition.transition_id);
-        service.apply_transition(transition)
+        service
+            .apply_transition(transition)
             .map_err(|error| invalid(format!("lifecycle transition rejected: {error:?}")))?;
     }
     transition_ids.sort_unstable();
     for id in &contribution_ids {
-        if service.graph().state(id).map(|state| state.lifecycle) != Some(Lifecycle::SnapshotAccepted) {
-            return Err(invalid("every contribution must complete mandatory challenge and snapshot acceptance"));
+        if service.graph().state(id).map(|state| state.lifecycle)
+            != Some(Lifecycle::SnapshotAccepted)
+        {
+            return Err(invalid(
+                "every contribution must complete mandatory challenge and snapshot acceptance",
+            ));
         }
     }
-    let profile = RetrievalProfile::deterministic_ascii_v1(request.retrieval.profile_maximum_results)
-        .map_err(|error| invalid(format!("retrieval profile rejected: {error:?}")))?;
+    let profile =
+        RetrievalProfile::deterministic_ascii_v1(request.retrieval.profile_maximum_results)
+            .map_err(|error| invalid(format!("retrieval profile rejected: {error:?}")))?;
     let snapshot = request.snapshot.into_core()?;
-    let snapshot_id = service.register_signed_snapshot(snapshot, profile)
+    let snapshot_id = service
+        .register_signed_snapshot(snapshot, profile)
         .map_err(|error| invalid(format!("signed snapshot rejected: {error:?}")))?;
     if snapshot_id != parse_hash(&request.retrieval.snapshot_id, "retrieval.snapshot_id")? {
-        return Err(invalid("pinned query snapshot disagrees with signed snapshot"));
+        return Err(invalid(
+            "pinned query snapshot disagrees with signed snapshot",
+        ));
     }
-    let result = service.retrieve_pinned(&executor, PinnedRetrievalRequest {
-        job_id: parse_hash(&request.retrieval.job_id, "retrieval.job_id")?,
-        snapshot_id,
-        query: request.retrieval.query,
-        maximum_results: request.retrieval.maximum_results,
-        retrieval_policy_root: parse_hash(&request.retrieval.retrieval_policy_root, "retrieval.policy_root")?,
-    }).map_err(|error| invalid(format!("pinned retrieval rejected: {error:?}")))?;
-    result.receipt.validate().map_err(|error| invalid(format!("receipt verification failed: {error:?}")))?;
-    let contribution_root = digest_ids(DomainId::WwmMindlink, b"OPERATOR-EVIDENCE-CONTRIBUTIONS/V1", &contribution_ids)?;
-    let transition_root = digest_ids(DomainId::WwmMindlinkTransition, b"OPERATOR-EVIDENCE-TRANSITIONS/V1", &transition_ids)?;
+    let result = service
+        .retrieve_pinned(
+            &executor,
+            PinnedRetrievalRequest {
+                job_id: parse_hash(&request.retrieval.job_id, "retrieval.job_id")?,
+                snapshot_id,
+                query: request.retrieval.query,
+                maximum_results: request.retrieval.maximum_results,
+                retrieval_policy_root: parse_hash(
+                    &request.retrieval.retrieval_policy_root,
+                    "retrieval.policy_root",
+                )?,
+            },
+        )
+        .map_err(|error| invalid(format!("pinned retrieval rejected: {error:?}")))?;
+    result
+        .receipt
+        .validate()
+        .map_err(|error| invalid(format!("receipt verification failed: {error:?}")))?;
+    let contribution_root = digest_ids(
+        DomainId::WwmMindlink,
+        b"OPERATOR-EVIDENCE-CONTRIBUTIONS/V1",
+        &contribution_ids,
+    )?;
+    let transition_root = digest_ids(
+        DomainId::WwmMindlinkTransition,
+        b"OPERATOR-EVIDENCE-TRANSITIONS/V1",
+        &transition_ids,
+    )?;
     let evidence = OperatorEvidence {
         schema: EVIDENCE_SCHEMA,
         contribution_root: hex::encode(contribution_root),
@@ -723,12 +877,16 @@ fn execute(request_bytes: &[u8], executor_seed: [u8; 32]) -> Result<Vec<u8>, Box
         snapshot_root: hex::encode(snapshot_id),
         index_roots: roots_evidence(result.receipt.index_roots),
         receipt_root: hex::encode(result.receipt.receipt_id),
-        citations: result.citations.into_iter().map(|citation| CitationEvidence {
-            mindlink_id: hex::encode(citation.mindlink_id),
-            content_root: hex::encode(citation.content_root),
-            context_start: citation.context_start,
-            context_end: citation.context_end,
-        }).collect(),
+        citations: result
+            .citations
+            .into_iter()
+            .map(|citation| CitationEvidence {
+                mindlink_id: hex::encode(citation.mindlink_id),
+                content_root: hex::encode(citation.content_root),
+                context_start: citation.context_start,
+                context_end: citation.context_end,
+            })
+            .collect(),
         retrieval_receipt: receipt_evidence(result.receipt),
         production_controls: ProductionControls {
             wwm_mindlink_registry_enabled: WWM_MINDLINK_REGISTRY_ENABLED,
@@ -740,7 +898,10 @@ fn execute(request_bytes: &[u8], executor_seed: [u8; 32]) -> Result<Vec<u8>, Box
     };
     let value = serde_json::to_value(evidence)?;
     let mut bytes = Vec::new();
-    canonical_json(&Value::Object(value.as_object().cloned().unwrap_or_else(Map::new)), &mut bytes)?;
+    canonical_json(
+        &Value::Object(value.as_object().cloned().unwrap_or_else(Map::new)),
+        &mut bytes,
+    )?;
     bytes.push(b'\n');
     Ok(bytes)
 }
@@ -753,13 +914,20 @@ fn read_bounded(path: &Path, maximum: u64, label: &str) -> Result<Vec<u8>, Box<d
     Ok(fs::read(path)?)
 }
 
-fn run_paths(request_path: &Path, output_path: &Path, seed_path: &Path) -> Result<(), Box<dyn Error>> {
+fn run_paths(
+    request_path: &Path,
+    output_path: &Path,
+    seed_path: &Path,
+) -> Result<(), Box<dyn Error>> {
     let request = read_bounded(request_path, MAX_REQUEST_BYTES, "request")?;
     let seed_bytes = read_bounded(seed_path, 128, "executor seed")?;
     let seed_text = std::str::from_utf8(&seed_bytes)?.trim();
     let seed = parse_hash(seed_text, "executor seed")?;
     let evidence = execute(&request, seed)?;
-    let mut output = OpenOptions::new().write(true).create_new(true).open(output_path)?;
+    let mut output = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(output_path)?;
     output.write_all(&evidence)?;
     output.sync_all()?;
     Ok(())
@@ -768,9 +936,15 @@ fn run_paths(request_path: &Path, output_path: &Path, seed_path: &Path) -> Resul
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = env::args_os().skip(1).collect::<Vec<_>>();
     if arguments.len() != 3 {
-        return Err(invalid("usage: mindlink_retrieval_operator <request.json> <evidence.json> <executor-seed.hex>"));
+        return Err(invalid(
+            "usage: mindlink_retrieval_operator <request.json> <evidence.json> <executor-seed.hex>",
+        ));
     }
-    run_paths(Path::new(&arguments[0]), Path::new(&arguments[1]), Path::new(&arguments[2]))
+    run_paths(
+        Path::new(&arguments[0]),
+        Path::new(&arguments[1]),
+        Path::new(&arguments[2]),
+    )
 }
 
 #[cfg(test)]
@@ -926,8 +1100,18 @@ mod tests {
                         retrieved_at_unix_seconds: source.retrieved_at_unix_seconds,
                     })
                     .collect(),
-                evidence_ids: value.provenance.evidence_ids.iter().map(hex::encode).collect(),
-                derived_from: value.provenance.derived_from.iter().map(hex::encode).collect(),
+                evidence_ids: value
+                    .provenance
+                    .evidence_ids
+                    .iter()
+                    .map(hex::encode)
+                    .collect(),
+                derived_from: value
+                    .provenance
+                    .derived_from
+                    .iter()
+                    .map(hex::encode)
+                    .collect(),
                 c2pa_manifest_refs: value.provenance.c2pa_manifest_refs.clone(),
             },
             relations: vec![],
@@ -1098,10 +1282,9 @@ mod tests {
                 )
             })
             .collect::<Vec<_>>();
-        let mut fixture_service = RightsFirstKnowledgeService::new(BTreeSet::from([
-            reviewer.public_key().into_bytes(),
-        ]))
-        .unwrap();
+        let mut fixture_service =
+            RightsFirstKnowledgeService::new(BTreeSet::from([reviewer.public_key().into_bytes()]))
+                .unwrap();
         fixture_service.intake_signed(link.clone()).unwrap();
         for value in &transitions {
             fixture_service.apply_transition(value.clone()).unwrap();
@@ -1159,7 +1342,10 @@ mod tests {
             plan.chunking_profile_root,
             plan.embedding_capsule_and_profile,
             reports[0].index_roots,
-            builders.iter().map(|(_, builder)| builder.clone()).collect(),
+            builders
+                .iter()
+                .map(|(_, builder)| builder.clone())
+                .collect(),
             plan.builder_threshold,
             plan.availability_certificate_id,
             plan.challenge_end_height,
@@ -1199,27 +1385,48 @@ mod tests {
         let (request, seed, snapshot_id) = signed_fixture();
         let evidence = execute(&request, seed).unwrap();
         assert!(evidence.ends_with(b"\n"));
-        assert!(!evidence.windows(64).any(|window| window == hex::encode(seed).as_bytes()));
+        assert!(!evidence
+            .windows(64)
+            .any(|window| window == hex::encode(seed).as_bytes()));
         assert!(!String::from_utf8_lossy(&evidence).contains("Gauge 7 read"));
         let value: Value = serde_json::from_slice(&evidence).unwrap();
         assert_eq!(value["snapshot_root"], snapshot_id);
         assert_eq!(value["citations"].as_array().unwrap().len(), 1);
-        assert_eq!(value["production_controls"]["wwm_mindlink_registry_enabled"], false);
-        assert_eq!(value["production_controls"]["wwm_knowledge_snapshots_enabled"], false);
-        assert_eq!(value["production_controls"]["wwm_public_retrieval_enabled"], false);
-        assert_eq!(value["production_controls"]["wwm_training_promotion_enabled"], false);
+        assert_eq!(
+            value["production_controls"]["wwm_mindlink_registry_enabled"],
+            false
+        );
+        assert_eq!(
+            value["production_controls"]["wwm_knowledge_snapshots_enabled"],
+            false
+        );
+        assert_eq!(
+            value["production_controls"]["wwm_public_retrieval_enabled"],
+            false
+        );
+        assert_eq!(
+            value["production_controls"]["wwm_training_promotion_enabled"],
+            false
+        );
         let receipt = &value["retrieval_receipt"];
         let index = &receipt["index_roots"];
         RetrievalReceipt {
             job_id: parse_hash(receipt["job_id"].as_str().unwrap(), "job").unwrap(),
             snapshot_id: parse_hash(receipt["snapshot_id"].as_str().unwrap(), "snapshot").unwrap(),
-            query_commitment: parse_hash(receipt["query_commitment"].as_str().unwrap(), "query").unwrap(),
-            retrieval_policy_root: parse_hash(receipt["retrieval_policy_root"].as_str().unwrap(), "policy").unwrap(),
+            query_commitment: parse_hash(receipt["query_commitment"].as_str().unwrap(), "query")
+                .unwrap(),
+            retrieval_policy_root: parse_hash(
+                receipt["retrieval_policy_root"].as_str().unwrap(),
+                "policy",
+            )
+            .unwrap(),
             index_roots: KnowledgeIndexRoots {
-                lexical_root: parse_hash(index["lexical_root"].as_str().unwrap(), "lexical").unwrap(),
+                lexical_root: parse_hash(index["lexical_root"].as_str().unwrap(), "lexical")
+                    .unwrap(),
                 vector_root: parse_hash(index["vector_root"].as_str().unwrap(), "vector").unwrap(),
                 graph_root: parse_hash(index["graph_root"].as_str().unwrap(), "graph").unwrap(),
-                citation_root: parse_hash(index["citation_root"].as_str().unwrap(), "citation").unwrap(),
+                citation_root: parse_hash(index["citation_root"].as_str().unwrap(), "citation")
+                    .unwrap(),
             },
             selected_mindlink_ids: receipt["selected_mindlink_ids"]
                 .as_array()
@@ -1238,15 +1445,22 @@ mod tests {
                 .unwrap()
                 .iter()
                 .map(|span| CitationSpan {
-                    selected_index: u16::try_from(span["selected_index"].as_u64().unwrap()).unwrap(),
+                    selected_index: u16::try_from(span["selected_index"].as_u64().unwrap())
+                        .unwrap(),
                     context_start: u32::try_from(span["context_start"].as_u64().unwrap()).unwrap(),
                     context_end: u32::try_from(span["context_end"].as_u64().unwrap()).unwrap(),
                 })
                 .collect(),
-            output_context_root: parse_hash(receipt["output_context_root"].as_str().unwrap(), "context").unwrap(),
-            executor_key: parse_hash(receipt["executor_key"].as_str().unwrap(), "executor").unwrap(),
+            output_context_root: parse_hash(
+                receipt["output_context_root"].as_str().unwrap(),
+                "context",
+            )
+            .unwrap(),
+            executor_key: parse_hash(receipt["executor_key"].as_str().unwrap(), "executor")
+                .unwrap(),
             receipt_id: parse_hash(receipt["receipt_id"].as_str().unwrap(), "receipt").unwrap(),
-            signature: parse_signature(receipt["signature"].as_str().unwrap(), "signature").unwrap(),
+            signature: parse_signature(receipt["signature"].as_str().unwrap(), "signature")
+                .unwrap(),
         }
         .validate()
         .unwrap();
@@ -1264,7 +1478,10 @@ mod tests {
 
         let mut replay: Value = serde_json::from_slice(&request).unwrap();
         let duplicate = replay["transitions"][0].clone();
-        replay["transitions"].as_array_mut().unwrap().insert(1, duplicate);
+        replay["transitions"]
+            .as_array_mut()
+            .unwrap()
+            .insert(1, duplicate);
         assert!(execute(&serde_json::to_vec(&replay).unwrap(), seed).is_err());
 
         let mut same_cluster: Value = serde_json::from_slice(&request).unwrap();

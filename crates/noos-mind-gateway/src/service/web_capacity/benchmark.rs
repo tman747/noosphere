@@ -1,3 +1,4 @@
+use super::store::{StoreBenchmarkSnapshot, WebCapacityStore, WebCapacityStoreLimits};
 use super::{
     config::HARD_MAX_ACTIVE_ASSIGNMENTS,
     model::{
@@ -8,7 +9,6 @@ use super::{
     session_token_hash, validate_heartbeat, validate_offer, validate_report, validate_revocation,
     WebCapacityConfig, WebCapacityError,
 };
-use super::store::{StoreBenchmarkSnapshot, WebCapacityStore, WebCapacityStoreLimits};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use noos_crypto::DomainId;
 use serde::{Deserialize, Serialize};
@@ -124,10 +124,16 @@ pub struct ChurnDistribution {
 impl ChurnDistribution {
     pub fn from_path(path: &Path) -> Result<Self, BenchmarkError> {
         let bytes = fs::read(path).map_err(|error| {
-            BenchmarkError::new(format!("cannot read distribution {}: {error}", path.display()))
+            BenchmarkError::new(format!(
+                "cannot read distribution {}: {error}",
+                path.display()
+            ))
         })?;
         let distribution: Self = serde_json::from_slice(&bytes).map_err(|error| {
-            BenchmarkError::new(format!("invalid closed distribution {}: {error}", path.display()))
+            BenchmarkError::new(format!(
+                "invalid closed distribution {}: {error}",
+                path.display()
+            ))
         })?;
         distribution.validate()?;
         Ok(distribution)
@@ -146,7 +152,9 @@ impl ChurnDistribution {
             || self.assertions.max_sqlite_bytes == 0
             || self.assertions.max_peak_queue > 256
         {
-            return Err(BenchmarkError::new("distribution assertions are outside benchmark bounds"));
+            return Err(BenchmarkError::new(
+                "distribution assertions are outside benchmark bounds",
+            ));
         }
         match self.scope {
             DistributionScope::SyntheticFixture => {
@@ -196,12 +204,7 @@ impl ChurnDistribution {
         let mut unsigned = self.clone();
         unsigned.signature = None;
         let value = serde_json::to_value(unsigned)?;
-        verify_json_signature(
-            DomainId::SigWwmWebEvidenceV1,
-            signer,
-            signature,
-            &value,
-        )?;
+        verify_json_signature(DomainId::SigWwmWebEvidenceV1, signer, signature, &value)?;
         Ok(())
     }
 }
@@ -274,9 +277,7 @@ impl StateMetrics {
         self.active_assignments = self.active_assignments.max(value.active_assignments);
         self.assignment_rows = self.assignment_rows.max(value.assignment_rows);
         self.reports = self.reports.max(value.reports);
-        self.pending_restore_tasks = self
-            .pending_restore_tasks
-            .max(value.pending_restore_tasks);
+        self.pending_restore_tasks = self.pending_restore_tasks.max(value.pending_restore_tasks);
         self.verifying_restore_tasks = self
             .verifying_restore_tasks
             .max(value.verifying_restore_tasks);
@@ -393,7 +394,10 @@ pub fn run_benchmark(
             "only SYNTHETIC_FIXTURE can run without separately trusted pilot evidence",
         ));
     }
-    if !matches!(config.experiment_state, super::model::ExperimentState::LocalFixture) {
+    if !matches!(
+        config.experiment_state,
+        super::model::ExperimentState::LocalFixture
+    ) {
         return Err(BenchmarkError::new(
             "benchmark requires the LOCAL_FIXTURE coordinator profile",
         ));
@@ -443,27 +447,15 @@ pub fn run_benchmark(
                 &mut sessions,
                 &mut raw_tokens,
             )?,
-            EventKind::Heartbeat => execute_heartbeat(
-                &store,
-                &origin,
-                logical_time,
-                &mut rng,
-                &mut sessions,
-            )?,
-            EventKind::Report => execute_report(
-                &store,
-                &origin,
-                logical_time,
-                &mut rng,
-                &mut sessions,
-            )?,
-            EventKind::Revoke => execute_revoke(
-                &store,
-                &origin,
-                logical_time,
-                &mut rng,
-                &mut sessions,
-            )?,
+            EventKind::Heartbeat => {
+                execute_heartbeat(&store, &origin, logical_time, &mut rng, &mut sessions)?
+            }
+            EventKind::Report => {
+                execute_report(&store, &origin, logical_time, &mut rng, &mut sessions)?
+            }
+            EventKind::Revoke => {
+                execute_revoke(&store, &origin, logical_time, &mut rng, &mut sessions)?
+            }
             EventKind::Expiry => {
                 logical_time = logical_time
                     .saturating_add(REAL_PILOT_SECONDS)
@@ -475,13 +467,7 @@ pub fn run_benchmark(
             }
             EventKind::Replacement => {
                 if !sessions.is_empty() {
-                    let _ = execute_revoke(
-                        &store,
-                        &origin,
-                        logical_time,
-                        &mut rng,
-                        &mut sessions,
-                    )?;
+                    let _ = execute_revoke(&store, &origin, logical_time, &mut rng, &mut sessions)?;
                 }
                 execute_offer(
                     &store,
@@ -524,7 +510,9 @@ pub fn run_benchmark(
 
     let final_snapshot = store.benchmark_snapshot(logical_time)?;
     if final_snapshot.invalid_token_hash_rows != 0 {
-        return Err(BenchmarkError::new("session token hashing invariant failed"));
+        return Err(BenchmarkError::new(
+            "session token hashing invariant failed",
+        ));
     }
     let final_state = StateMetrics::from(final_snapshot);
     peak.observe(final_state);
@@ -534,7 +522,9 @@ pub fn run_benchmark(
     assert_caps(&config, distribution, peak, peak_sqlite_bytes)?;
     let raw_session_tokens_persisted = sqlite_contains_any(&config.data_path, &raw_tokens)?;
     if raw_session_tokens_persisted {
-        return Err(BenchmarkError::new("raw session token was persisted in SQLite"));
+        return Err(BenchmarkError::new(
+            "raw session token was persisted in SQLite",
+        ));
     }
     checksum.update(&final_state.active_sessions.to_le_bytes());
     checksum.update(&final_state.reports.to_le_bytes());
@@ -550,7 +540,9 @@ pub fn run_benchmark(
         max_concurrent_restore_verifications: config.max_concurrent_restore_verifications,
     };
     if caps.max_active_assignments > HARD_MAX_ACTIVE_ASSIGNMENTS {
-        return Err(BenchmarkError::new("assignment cap exceeds compiled maximum"));
+        return Err(BenchmarkError::new(
+            "assignment cap exceeds compiled maximum",
+        ));
     }
     Ok(BenchmarkReport {
         schema: REPORT_SCHEMA,
@@ -599,10 +591,14 @@ fn prepare_state_root(path: &Path) -> Result<(), BenchmarkError> {
 }
 
 fn restart_checkpoints(event_count: u64) -> Vec<u64> {
-    let mut values = [event_count / 4, event_count / 2, event_count.saturating_mul(3) / 4]
-        .into_iter()
-        .filter(|value| *value > 0 && *value < event_count)
-        .collect::<Vec<_>>();
+    let mut values = [
+        event_count / 4,
+        event_count / 2,
+        event_count.saturating_mul(3) / 4,
+    ]
+    .into_iter()
+    .filter(|value| *value > 0 && *value < event_count)
+    .collect::<Vec<_>>();
     values.sort_unstable();
     values.dedup();
     values
@@ -867,7 +863,9 @@ fn assert_caps(
         )));
     }
     if peak.pending_restore_tasks > distribution.assertions.max_peak_queue {
-        return Err(BenchmarkError::new("observed restore queue exceeds distribution bound"));
+        return Err(BenchmarkError::new(
+            "observed restore queue exceeds distribution bound",
+        ));
     }
     Ok(())
 }
@@ -888,10 +886,7 @@ fn file_len(path: &Path) -> Result<u64, BenchmarkError> {
     }
 }
 
-fn sqlite_contains_any(
-    path: &Path,
-    forbidden: &HashSet<String>,
-) -> Result<bool, BenchmarkError> {
+fn sqlite_contains_any(path: &Path, forbidden: &HashSet<String>) -> Result<bool, BenchmarkError> {
     if forbidden.is_empty() {
         return Ok(false);
     }
@@ -1081,12 +1076,20 @@ mod tests {
         unsigned.scope = DistributionScope::SignedReal30Day;
         unsigned.observed_from = Some(100);
         unsigned.observed_until = Some(100 + REAL_PILOT_SECONDS);
-        assert!(unsigned.validate().unwrap_err().to_string().contains("trusted signer"));
+        assert!(unsigned
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("trusted signer"));
 
         let mut short = unsigned;
         short.signer_public_key = Some("11".repeat(32));
         short.signature = Some("22".repeat(64));
         short.observed_until = Some(100 + REAL_PILOT_SECONDS - 1);
-        assert!(short.validate().unwrap_err().to_string().contains("shorter than 30 days"));
+        assert!(short
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("shorter than 30 days"));
     }
 }
