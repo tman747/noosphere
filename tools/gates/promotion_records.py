@@ -147,7 +147,7 @@ def validate_schema_dispatch(ledger: Mapping[str, Any], root: Path, schema_versi
         raise PromotionValidationError("V2 promotion ledger permits mixed WWM bytes")
     if contracts.get("action_registry") != {
         "container": "ActionV1", "first_discriminant": 40,
-        "last_discriminant": 59, "variant_count": 60,
+        "last_discriminant": 65, "variant_count": 66,
     }:
         raise PromotionValidationError("V2 action discriminant/count contract mismatch")
     if contracts.get("transaction_bounds") != {
@@ -164,6 +164,7 @@ def validate_schema_dispatch(ledger: Mapping[str, Any], root: Path, schema_versi
         "target": "/model-resolution/<selector>", "max_bytes": 262144,
         "max_proofs": 17, "normal_leaf_count": 17,
         "authorized_target": "/authorized-config/<config_id>", "authorized_max_bytes": 393216,
+        "neural_target": "/neural-oracle/<query_id>", "neural_response_max_bytes": 16384,
     }:
         raise PromotionValidationError("V2 resolver contract mismatch")
     expected_tags = {
@@ -258,11 +259,12 @@ def validate_protocol_release_manifest_header(manifest: Mapping[str, Any], root:
             raise PromotionValidationError(f"immutable V1 release predecessor bytes/root mismatch: {relative}")
     if manifest.get("activation_boundary") != {
         "controls_enabled": False, "promotion_effect": "NONE",
-        "dns_cutover": "PROHIBITED", "model_execution": "OFF_CHAIN_ONLY",
+        "dns_cutover": "PROHIBITED",
+        "model_execution": "LARGE_MODELS_OFF_CHAIN_BOUNDED_L1_NEURAL_ONLY",
     }:
         raise PromotionValidationError("V2 release manifest fabricates activation or promotion")
     contracts = manifest.get("contracts", {})
-    if contracts.get("action_variant_count") != 60 or contracts.get("action_discriminants") != list(range(40, 60)):
+    if contracts.get("action_variant_count") != 66 or contracts.get("action_discriminants") != list(range(40, 66)):
         raise PromotionValidationError("V2 release action registry mismatch")
     if contracts.get("payload_tags") != {
         "41": ["InstallProfile", "TransitionCapability"],
@@ -275,6 +277,8 @@ def validate_protocol_release_manifest_header(manifest: Mapping[str, Any], root:
     if contracts.get("resolver") != {
         "normal_max_bytes": 262144, "normal_max_proofs": 17,
         "authorized_max_bytes": 393216,
+        "neural_target": "/neural-oracle/<query_id>",
+        "neural_response_max_bytes": 16384,
     }:
         raise PromotionValidationError("V2 release resolver bounds mismatch")
     if contracts.get("light_update") != {

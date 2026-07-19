@@ -12,6 +12,7 @@ noos-codec = { path = "../noos-codec" }
 noos-crypto = { path = "../noos-crypto" }
 noos-stable-safety = { path = "../noos-stable-safety" }
 blake3 = "1.8"
+smallvec = "=1.15.2"
 
 [lints]
 workspace = true

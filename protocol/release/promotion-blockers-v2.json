@@ -44,7 +44,7 @@
   "contracts": {
     "schema": "protocol/schemas/wwm-v2.md",
     "crypto_domain_registry": "protocol/spec/crypto-domains-v1.csv",
-    "action_registry": {"container": "ActionV1", "first_discriminant": 40, "last_discriminant": 59, "variant_count": 60},
+    "action_registry": {"container": "ActionV1", "first_discriminant": 40, "last_discriminant": 65, "variant_count": 66},
     "payload_tags": {
       "action_41": ["InstallProfile", "TransitionCapability"],
       "action_50": ["InstallProfile", "TransitionCapability"],
@@ -54,12 +54,13 @@
     },
     "resolver": {
       "target": "/model-resolution/<selector>", "max_bytes": 262144, "max_proofs": 17, "normal_leaf_count": 17,
-      "authorized_target": "/authorized-config/<config_id>", "authorized_max_bytes": 393216
+      "authorized_target": "/authorized-config/<config_id>", "authorized_max_bytes": 393216,
+      "neural_target": "/neural-oracle/<query_id>", "neural_response_max_bytes": 16384
     },
     "light_update": {"protocol": "/noos/sync/light-update/2", "max_items": 128, "max_item_bytes": 262144, "request_min_items": 1},
     "transaction_bounds": {"action_call_max_bytes": 65536, "tx_plus_witness_max_bytes": 65532, "tx_push_max_bytes": 65536, "tx_push_length_prefix_bytes": 4},
     "v1_decode_policy": "REJECT_V1_WWM_BYTES",
-    "model_execution": "OFF_CHAIN_ONLY"
+    "model_execution": "LARGE_MODELS_OFF_CHAIN_BOUNDED_L1_NEURAL_ONLY"
   },
   "cutover": {
     "dns_cutover": "PROHIBITED",

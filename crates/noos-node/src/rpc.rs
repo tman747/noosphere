@@ -10,12 +10,17 @@
 //! POST /submit_tx   {"tx":"<hex>","witnesses":"<hex>"} → txid;
 //!                   observer mode → 409 feature_disabled with the
 //!                   mechanism id, never empty success
+//! POST /submit_tx_batch
+//!                   {"transactions":[{"tx":"<hex>","witnesses":"<hex>"},...]}
+//!                   → input-aligned acceptance results
 //! GET  /model-resolution/<alias>
 //!                   finalized 17-leaf WWM graph plus canonical proof bytes;
 //!                   full model weights are never returned or stored on chain
 //! GET  /block/<height|hash-hex>
 //! GET  /wwm-record/<job|receipt|settlement>/<id>
 //!                   one canonical lifecycle record and its finalized object proof
+//! GET  /neural-oracle/<query-id>
+//!                   finalized raw neural result and its object proof
 //! GET  /blocks/<start-height>/<limit> (authenticated, limit 1..64)
 //! GET  /receipt/<txid-hex>
 //! GET  /assets      fixed-supply user asset registry
@@ -45,11 +50,13 @@ use crate::view::{TxStatus, ViewLookup};
 use crate::Hash32;
 use noos_braid::EPOCH_LENGTH;
 use noos_codec::{NoosDecode, NoosEncode};
+use noos_lumen::neural_oracle::{
+    neural_result_key, NeuralOracleMode, NeuralOracleResultV1, NeuralOracleStatus,
+};
 use noos_lumen::objects::BoundedBytes;
 use noos_lumen::wwm::{
     carrier_len_valid, ResolutionSelectorKind, ResolutionSelectorV1, ResolutionValueV1,
-    WwmControlMode, WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmSettlementV1,
-    MAX_TX_WITNESS_BYTES,
+    WwmControlMode, WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmSettlementV1, MAX_TX_WITNESS_BYTES,
 };
 
 /// RPC configuration.
@@ -125,6 +132,7 @@ pub fn start(
 // ---------------------------------------------------------------------------
 
 const MAX_REQUEST_BYTES: usize = 512 * 1024;
+const MAX_SUBMIT_BATCH: usize = 256;
 
 fn http(status: &str, content_type: &str, body: &str) -> String {
     format!(
@@ -228,12 +236,16 @@ fn handle_connection(
     match (method.as_str(), path.as_str()) {
         ("GET", "/status") => status_route(consensus_tx),
         ("POST", "/submit_tx") => submit_route(cfg, consensus_tx, &body),
+        ("POST", "/submit_tx_batch") => submit_batch_route(cfg, consensus_tx, &body),
         ("POST", "/simulate_tx") => simulate_route(consensus_tx, &body),
         _ if method == "GET" && path.starts_with("/model-resolution/") => {
             model_resolution_route(consensus_tx, &path["/model-resolution/".len()..])
         }
         _ if method == "GET" && path.starts_with("/wwm-record/") => {
             wwm_record_route(consensus_tx, &path["/wwm-record/".len()..])
+        }
+        _ if method == "GET" && path.starts_with("/neural-oracle/") => {
+            neural_oracle_result_route(consensus_tx, &path["/neural-oracle/".len()..])
         }
         _ if method == "GET" && path.starts_with("/blocks/") => {
             blocks_route(consensus_tx, &path["/blocks/".len()..])
@@ -313,6 +325,7 @@ fn status_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
             r#""unsafe_head":{{"height":{},"hash":"{}"}},"#,
             r#""justified":{{"epoch":{},"hash":"{}"}},"#,
             r#""finalized":{{"epoch":{},"hash":"{}"}},"#,
+            r#""finality_gossip":{{"pending_votes":{},"pending_certificates":{},"accepted":{},"rejected":{}}},"#,
             r#""mempool":{{"txs":{},"bytes":{}}},"observer":{}}}"#
         ),
         hex(&s.chain_id),
@@ -323,6 +336,10 @@ fn status_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
         hex(&s.justified.checkpoint_hash),
         s.finalized.epoch,
         hex(&s.finalized.checkpoint_hash),
+        s.pending_votes,
+        s.pending_certificates,
+        s.inbound_votes_accepted,
+        s.inbound_votes_rejected,
         s.mempool_txs,
         s.mempool_bytes,
         s.observer,
@@ -557,13 +574,7 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
         "job" => WwmLeafKind::Job,
         "receipt" => WwmLeafKind::Receipt,
         "settlement" => WwmLeafKind::Settlement,
-        _ => {
-            return json_error(
-                "400 Bad Request",
-                "malformed",
-                "unknown WWM record kind",
-            )
-        }
+        _ => return json_error("400 Bad Request", "malformed", "unknown WWM record kind"),
     };
     let Some(id) = unhex32(id_raw) else {
         return json_error("400 Bad Request", "malformed", "bad WWM record id");
@@ -586,9 +597,7 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
             "finalized WWM record lookup failed",
         );
     };
-    if !proof.verify()
-        || proof.state_key != noos_lumen::wwm::wwm_profile_key(kind, &id)
-    {
+    if !proof.verify() || proof.state_key != noos_lumen::wwm::wwm_profile_key(kind, &id) {
         return json_error(
             "500 Internal Server Error",
             "invalid_local_proof",
@@ -608,7 +617,13 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
                 "fund_profile_id": hex(&job.fund_profile_id),
                 "deadline_height": job.deadline_height,
             }),
-            _ => return json_error("500 Internal Server Error", "invalid_local_record", "job decode failed"),
+            _ => {
+                return json_error(
+                    "500 Internal Server Error",
+                    "invalid_local_record",
+                    "job decode failed",
+                )
+            }
         },
         WwmLeafKind::Receipt => match WwmReceiptV1::decode_canonical(value.as_slice()) {
             Ok(receipt) if receipt.receipt_id == id => serde_json::json!({
@@ -623,20 +638,30 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
                 "anchor_block": hex(&receipt.anchor_block),
                 "terminal_code": receipt.terminal_code as u8,
             }),
-            _ => return json_error("500 Internal Server Error", "invalid_local_record", "receipt decode failed"),
-        },
-        WwmLeafKind::Settlement => {
-            match WwmSettlementV1::decode_canonical(value.as_slice()) {
-                Ok(settlement) if settlement.settlement_id == id => serde_json::json!({
-                    "settlement_id": hex(&settlement.settlement_id),
-                    "job_id": hex(&settlement.job_id),
-                    "receipt_id": hex(&settlement.receipt_id),
-                    "fund_profile_id": hex(&settlement.fund_profile_id),
-                    "settled_height": settlement.settled_height,
-                }),
-                _ => return json_error("500 Internal Server Error", "invalid_local_record", "settlement decode failed"),
+            _ => {
+                return json_error(
+                    "500 Internal Server Error",
+                    "invalid_local_record",
+                    "receipt decode failed",
+                )
             }
-        }
+        },
+        WwmLeafKind::Settlement => match WwmSettlementV1::decode_canonical(value.as_slice()) {
+            Ok(settlement) if settlement.settlement_id == id => serde_json::json!({
+                "settlement_id": hex(&settlement.settlement_id),
+                "job_id": hex(&settlement.job_id),
+                "receipt_id": hex(&settlement.receipt_id),
+                "fund_profile_id": hex(&settlement.fund_profile_id),
+                "settled_height": settlement.settled_height,
+            }),
+            _ => {
+                return json_error(
+                    "500 Internal Server Error",
+                    "invalid_local_record",
+                    "settlement decode failed",
+                )
+            }
+        },
         _ => unreachable!("kind is closed above"),
     };
     let body = serde_json::json!({
@@ -661,6 +686,100 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
     }
 }
 
+fn neural_oracle_result_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> String {
+    let Some(query_id) = unhex32(raw) else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "expected /neural-oracle/<hex32>",
+        );
+    };
+    let Some(result) = round_trip(consensus_tx, |reply| ConsensusMsg::GetNeuralOracleResult {
+        query_id,
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "consensus task did not answer",
+        );
+    };
+    let Ok((height, finalized_hash, proof)) = result else {
+        return json_error(
+            "409 Conflict",
+            "finalized_state_unavailable",
+            "finalized neural-oracle result lookup failed",
+        );
+    };
+    if !proof.verify() || proof.state_key != neural_result_key(&query_id) {
+        return json_error(
+            "500 Internal Server Error",
+            "invalid_local_proof",
+            "local finalized neural-oracle proof failed verification",
+        );
+    }
+    let ResolutionValueV1::Present(value) = &proof.value else {
+        return json_error(
+            "404 Not Found",
+            "not_found",
+            "neural-oracle result is not finalized",
+        );
+    };
+    let result = match NeuralOracleResultV1::decode_canonical(value.as_slice()) {
+        Ok(result) if result.query_id == query_id => result,
+        _ => {
+            return json_error(
+                "500 Internal Server Error",
+                "invalid_local_record",
+                "neural-oracle result decode failed",
+            )
+        }
+    };
+    let mode = match result.mode {
+        NeuralOracleMode::L1Deterministic => "L1_DETERMINISTIC",
+        NeuralOracleMode::WwmQuorum => "WWM_QUORUM",
+    };
+    let status = match result.status {
+        NeuralOracleStatus::Success => "SUCCESS",
+        NeuralOracleStatus::NoQuorum => "NO_QUORUM",
+    };
+    let signer_profile_ids = result
+        .signer_profile_ids
+        .as_slice()
+        .iter()
+        .map(|profile_id| hex(profile_id))
+        .collect::<Vec<_>>();
+    let body = serde_json::json!({
+        "schema": "noos/finalized-neural-oracle-result/v1",
+        "trust_scope": "LOCAL_FULL_NODE_FINALIZED_STATE",
+        "query_id": hex(&result.query_id),
+        "result_id": hex(&result.result_id),
+        "mode": mode,
+        "status": status,
+        "source_id": hex(&result.source_id),
+        "execution_profile_id": hex(&result.execution_profile_id),
+        "input_root": hex(&result.input_root),
+        "raw_response_hex": hex(result.response.as_slice()),
+        "response_bytes": result.response.len(),
+        "output_root": hex(&result.output_root),
+        "transcript_root": hex(&result.transcript_root),
+        "signer_profile_ids": signer_profile_ids,
+        "result_finalized_height": result.finalized_height,
+        "finalized_height": height,
+        "finalized_hash": hex(&finalized_hash),
+        "objects_root": hex(&proof.objects_root),
+        "canonical_result_hex": hex(value.as_slice()),
+        "proof_hex": hex(&proof.encode_canonical()),
+    });
+    match serde_json::to_string(&body) {
+        Ok(body) => http("200 OK", "application/json", &body),
+        Err(_) => json_error(
+            "500 Internal Server Error",
+            "serialization_failed",
+            "neural-oracle result serialization failed",
+        ),
+    }
+}
 
 fn submit_route(cfg: &RpcConfig, consensus_tx: &SyncSender<ConsensusMsg>, body: &[u8]) -> String {
     if cfg.observer {
@@ -693,6 +812,68 @@ fn submit_route(cfg: &RpcConfig, consensus_tx: &SyncSender<ConsensusMsg>, body: 
             "503 Service Unavailable",
             "consensus_unavailable",
             "no reply",
+        ),
+    }
+}
+
+fn submit_batch_route(
+    cfg: &RpcConfig,
+    consensus_tx: &SyncSender<ConsensusMsg>,
+    body: &[u8],
+) -> String {
+    if cfg.observer {
+        return feature_disabled(
+            "node.tx_submission.observer",
+            "observer mode: transaction submission is disabled on this node",
+        );
+    }
+    let Ok(envelopes) = decode_envelope_batch(body) else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "expected 1..256 canonical hex transaction envelopes",
+        );
+    };
+    let submissions = envelopes
+        .into_iter()
+        .map(|(tx_bytes, wit_bytes)| (tx_bytes, wit_bytes, 1))
+        .collect();
+    let result = round_trip(consensus_tx, |reply| ConsensusMsg::SubmitTxBatch {
+        submissions,
+        reply,
+    });
+    let Some(results) = result else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no reply",
+        );
+    };
+    let accepted = results.iter().filter(|result| result.is_ok()).count();
+    let items = results
+        .into_iter()
+        .map(|result| match result {
+            Ok(txid) => serde_json::json!({
+                "accepted": true,
+                "txid": hex(&txid),
+            }),
+            Err(error) => serde_json::json!({
+                "accepted": false,
+                "error": { "code": error.code() },
+            }),
+        })
+        .collect::<Vec<_>>();
+    let response = serde_json::json!({
+        "accepted": accepted,
+        "rejected": items.len().saturating_sub(accepted),
+        "results": items,
+    });
+    match serde_json::to_string(&response) {
+        Ok(body) => http("200 OK", "application/json", &body),
+        Err(_) => json_error(
+            "500 Internal Server Error",
+            "serialization_failed",
+            "batch response serialization failed",
         ),
     }
 }
@@ -749,10 +930,7 @@ fn simulate_route(consensus_tx: &SyncSender<ConsensusMsg>, body: &[u8]) -> Strin
     }
 }
 
-fn decode_envelope(body: &[u8]) -> Result<(Vec<u8>, Vec<u8>), ()> {
-    let text = std::str::from_utf8(body).map_err(|_| ())?;
-    let tx_hex = json_str_field(text, "tx").ok_or(())?;
-    let witness_hex = json_str_field(text, "witnesses").ok_or(())?;
+fn decode_hex_envelope(tx_hex: &str, witness_hex: &str) -> Result<(Vec<u8>, Vec<u8>), ()> {
     if tx_hex
         .len()
         .checked_add(witness_hex.len())
@@ -760,12 +938,42 @@ fn decode_envelope(body: &[u8]) -> Result<(Vec<u8>, Vec<u8>), ()> {
     {
         return Err(());
     }
-    let tx_bytes = unhex(&tx_hex).ok_or(())?;
-    let witness_bytes = unhex(&witness_hex).ok_or(())?;
+    let tx_bytes = unhex(tx_hex).ok_or(())?;
+    let witness_bytes = unhex(witness_hex).ok_or(())?;
     if !carrier_len_valid(tx_bytes.len(), witness_bytes.len()) {
         return Err(());
     }
     Ok((tx_bytes, witness_bytes))
+}
+
+fn decode_envelope(body: &[u8]) -> Result<(Vec<u8>, Vec<u8>), ()> {
+    let text = std::str::from_utf8(body).map_err(|_| ())?;
+    let tx_hex = json_str_field(text, "tx").ok_or(())?;
+    let witness_hex = json_str_field(text, "witnesses").ok_or(())?;
+    decode_hex_envelope(&tx_hex, &witness_hex)
+}
+
+fn decode_envelope_batch(body: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, ()> {
+    let value: serde_json::Value = serde_json::from_slice(body).map_err(|_| ())?;
+    let items = value
+        .get("transactions")
+        .and_then(serde_json::Value::as_array)
+        .filter(|items| (1..=MAX_SUBMIT_BATCH).contains(&items.len()))
+        .ok_or(())?;
+    items
+        .iter()
+        .map(|item| {
+            let tx_hex = item
+                .get("tx")
+                .and_then(serde_json::Value::as_str)
+                .ok_or(())?;
+            let witness_hex = item
+                .get("witnesses")
+                .and_then(serde_json::Value::as_str)
+                .ok_or(())?;
+            decode_hex_envelope(tx_hex, witness_hex)
+        })
+        .collect()
 }
 
 fn block_route(consensus_tx: &SyncSender<ConsensusMsg>, id_raw: &str) -> String {

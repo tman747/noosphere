@@ -34,6 +34,7 @@
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::time::Instant;
 
 use noos_braid::{
     BlockBodyV1, BlockHeaderV1, Bytes48, Bytes96, CheckpointRef, FinalityCertificateV1,
@@ -43,7 +44,7 @@ use noos_braid::{
 use noos_codec::{NoosDecode, NoosEncode};
 use noos_crypto::{bls_verify, BlsPublicKey, BlsSecretKey, BlsSignature, DomainId};
 use noos_da::{
-    encode_body, reconstruct_and_verify, AvailabilityLedger, BodyDaClaimV1, DaError,
+    encode_body, reconstruct_and_verify_in_place, AvailabilityLedger, BodyDaClaimV1, DaError,
     ReconstructedBodyV1, ShardCandidateV1,
 };
 use noos_ground::{
@@ -63,22 +64,25 @@ use noos_witness::finality::{
 use noos_witness::membership::{build_snapshot, SnapshotOutcome};
 use noos_witness::vote::{validate_vote, CheckpointView, FinalityVoteV1};
 
-use crate::auth::{GrainContractEngine, NodeAuthVerifier, PreverifiedSignatureAuth};
+use crate::auth::{
+    capture_authorization_snapshot, pipelined_transaction_prechecks, GrainContractEngine,
+    NodeAuthVerifier, PreverifiedSignatureAuth,
+};
 use crate::devnet_fixture::fixture_witness_secret;
 use crate::genesis::{
     BuiltGenesis, GenesisSpec, DEVNET_PROPOSER_SEED, PROPOSER_POOL_ACCOUNT, TREASURY_ACCOUNT,
     WITNESS_POOL_ACCOUNT,
 };
-use crate::mempool::{AdmitError, Mempool, MempoolConfig, SourceId};
+use crate::mempool::{AdmissionEnvelope, AdmitError, Mempool, MempoolConfig, SourceId};
 use crate::metrics::Metrics;
 use crate::roots::{
     body_cert_root, body_receipt_root, body_ticket_root, body_tx_root, body_witness_root,
-    check_blob_descriptors, da_form_bytes, sum_usage,
+    check_blob_descriptors, da_form_bytes, decode_da_form, sum_usage,
 };
 use crate::store_port::{
     key_certificate, key_header, key_height, StorePort, KEY_FINALIZED, KEY_HEAD, KEY_JUSTIFIED,
 };
-use crate::view::ChainView;
+use crate::view::{ChainView, TxStatus, ViewLookup};
 use crate::witness_role::sign_and_release_vote;
 use crate::{Hash32, NodeError};
 
@@ -184,80 +188,69 @@ pub struct ProducedBlock {
     pub shards: Vec<ShardCandidateV1>,
 }
 
-const PARALLEL_SIGNATURE_MIN_TRANSACTIONS: usize = 32;
-
-#[derive(Clone)]
-struct SignaturePrecheck {
-    authorizations: Vec<(Hash32, Vec<u8>)>,
-}
-
-fn verify_transaction_signatures(
-    ledger: &LumenLedger,
-    transaction: &TransactionV1,
-    witnesses: &TransactionWitnessesV1,
-) -> Option<SignaturePrecheck> {
-    if transaction.account_inputs.len() != witnesses.intents.len() {
-        return None;
-    }
-    let id = txid(transaction);
-    let verifier = NodeAuthVerifier;
-    let mut authorizations = Vec::with_capacity(transaction.account_inputs.len());
-    for (account_id, intent) in transaction
-        .account_inputs
-        .iter()
-        .zip(witnesses.intents.iter())
-    {
-        if intent.tx_commitment != id {
-            return None;
-        }
-        let account = ledger.get_account(account_id)?;
-        if !verifier.verify_signature(
-            intent.signature_suite,
-            account.auth_descriptor.as_slice(),
-            &id,
-            intent.signature.as_slice(),
-        ) {
-            return None;
-        }
-        authorizations.push((*account_id, account.auth_descriptor.as_slice().to_vec()));
-    }
-    Some(SignaturePrecheck { authorizations })
-}
-
-#[allow(clippy::arithmetic_side_effects)]
-fn parallel_signature_prechecks(
-    ledger: &LumenLedger,
-    body: &BlockBodyV1,
-) -> Vec<Option<SignaturePrecheck>> {
-    let transaction_count = body.transactions.len();
-    let mut checks = vec![None; transaction_count];
-    if transaction_count < PARALLEL_SIGNATURE_MIN_TRANSACTIONS {
-        return checks;
-    }
-    let workers = std::thread::available_parallelism()
-        .map_or(1, usize::from)
-        .min(transaction_count);
-    let chunk_size = transaction_count.div_ceil(workers);
-    std::thread::scope(|scope| {
-        for (chunk_index, check_chunk) in checks.chunks_mut(chunk_size).enumerate() {
-            let start = chunk_index * chunk_size;
-            scope.spawn(move || {
-                for (offset, check) in check_chunk.iter_mut().enumerate() {
-                    let index = start + offset;
-                    let transaction = &body.transactions.as_slice()[index];
-                    let witnesses = &body.segregated_witnesses.as_slice()[index];
-                    *check = verify_transaction_signatures(ledger, transaction, witnesses);
-                }
-            });
-        }
-    });
-    checks
-}
-
 struct ExecResult {
     receipts: Vec<ReceiptV1>,
     merged_delta: StateDelta,
     roots: LumenRoots,
+}
+
+#[derive(Default)]
+struct DeltaAccumulator {
+    entries: BTreeMap<(TreeId, Hash32, Option<Hash32>), Option<Vec<u8>>>,
+    receipts: Vec<DeltaEntry>,
+}
+
+impl DeltaAccumulator {
+    fn push(&mut self, delta: StateDelta) {
+        for entry in delta.entries {
+            if entry.tree == TreeId::Receipts {
+                self.receipts.push(entry);
+            } else {
+                self.entries
+                    .insert((entry.tree, entry.key, entry.sub_key), entry.value);
+            }
+        }
+    }
+
+    fn finish(mut self) -> StateDelta {
+        self.receipts
+            .sort_by(|left, right| (left.key, left.sub_key).cmp(&(right.key, right.sub_key)));
+        let mut receipts: Vec<DeltaEntry> = Vec::with_capacity(self.receipts.len());
+        for entry in self.receipts {
+            if let Some(previous) = receipts.last_mut() {
+                if previous.key == entry.key && previous.sub_key == entry.sub_key {
+                    *previous = entry;
+                    continue;
+                }
+            }
+            receipts.push(entry);
+        }
+
+        let mut entries = Vec::with_capacity(self.entries.len().saturating_add(receipts.len()));
+        let mut ordered = self.entries.into_iter().peekable();
+        while ordered
+            .peek()
+            .is_some_and(|((tree, _, _), _)| *tree < TreeId::Receipts)
+        {
+            let ((tree, key, sub_key), value) = ordered.next().expect("peeked delta entry");
+            entries.push(DeltaEntry {
+                tree,
+                key,
+                sub_key,
+                value,
+            });
+        }
+        entries.extend(receipts);
+        entries.extend(ordered.map(|((tree, key, sub_key), value)| DeltaEntry {
+            tree,
+            key,
+            sub_key,
+            value,
+        }));
+        StateDelta {
+            entries: entries.into(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -272,13 +265,24 @@ struct StagedConsensus {
     availability: AvailabilityLedger,
     orphan_blocks: BTreeMap<Hash32, ParkedBlock>,
     mempool: Mempool,
-    view: ChainView,
 }
 
 #[derive(Clone)]
 struct StagedBody {
     header: BlockHeaderV1,
-    body: BlockBodyV1,
+    body: Arc<BlockBodyV1>,
+}
+
+struct ViewConnection {
+    header: BlockHeaderV1,
+    hash: Hash32,
+    receipts: Vec<ReceiptV1>,
+}
+
+#[derive(Default)]
+struct ViewPlan {
+    disconnect_heights: Vec<u64>,
+    connections: Vec<ViewConnection>,
 }
 
 /// DAG-backed checkpoint ancestry oracle for the finality tracker.
@@ -365,7 +369,6 @@ impl<P: StorePort> NodeCore<P> {
             availability: self.availability.clone(),
             orphan_blocks: self.orphan_blocks.clone(),
             mempool: self.mempool.clone(),
-            view: self.view.clone(),
         }
     }
 
@@ -380,7 +383,6 @@ impl<P: StorePort> NodeCore<P> {
         self.availability = staged.availability;
         self.orphan_blocks = staged.orphan_blocks;
         self.mempool = staged.mempool;
-        self.view = staged.view;
     }
 
     /// Boots a node: installs genesis when the store is fresh, otherwise
@@ -476,7 +478,7 @@ impl<P: StorePort> NodeCore<P> {
                 hash: built.header.body_da_root,
                 bytes: built.body_bytes.clone(),
             });
-            let seq = core.port.commit(&ws)?;
+            let seq = core.port.commit(ws)?;
             core.metrics.set(&core.metrics.store_seq, seq);
         } else {
             core.replay_from_store()?;
@@ -538,10 +540,34 @@ impl<P: StorePort> NodeCore<P> {
     pub fn finalized(&self) -> CheckpointRef {
         self.tracker.finalized_head()
     }
+    #[must_use]
+    pub fn pending_vote_count(&self) -> usize {
+        self.pending_votes.len()
+    }
+
+    #[must_use]
+    pub fn pending_certificate_count(&self) -> usize {
+        self.pending_certs.len()
+    }
 
     #[must_use]
     pub fn ledger(&self) -> &LumenLedger {
         &self.ledger
+    }
+
+    #[must_use]
+    pub fn tx_status(&self, txid: &Hash32) -> ViewLookup<TxStatus> {
+        match self.view.local_tx_status(txid) {
+            ViewLookup::Found(status) => ViewLookup::Found(status),
+            ViewLookup::Pruned => ViewLookup::Pruned,
+            ViewLookup::NotFound => match self.ledger.get_receipt_settlement(txid) {
+                Some((height, _)) if height < self.view.pruned_before_height() => {
+                    ViewLookup::Pruned
+                }
+                Some((height, status)) => ViewLookup::Found(TxStatus::Settled { height, status }),
+                None => ViewLookup::NotFound,
+            },
+        }
     }
 
     #[must_use]
@@ -556,45 +582,45 @@ impl<P: StorePort> NodeCore<P> {
         let height = finalized.expected_height().ok_or(NodeError::Resolution(
             crate::resolver::ResolutionError::TerminalNotFinalized,
         ))?;
-        let finalized_ledger = if self.anchor.0 == finalized.checkpoint_hash && self.anchor.1 == height
-        {
-            self.anchor.2.clone()
-        } else {
-            if height <= self.anchor.1 {
-                return Err(NodeError::Resolution(
-                    crate::resolver::ResolutionError::UnsafeStateRoot,
-                ));
-            }
-            let mut path = Vec::new();
-            let mut cursor = finalized.checkpoint_hash;
-            while cursor != self.anchor.0 {
-                let stored = self.dag.get(&cursor).ok_or(NodeError::Resolution(
-                    crate::resolver::ResolutionError::UnsafeStateRoot,
-                ))?;
-                if stored.header.height <= self.anchor.1 {
+        let finalized_ledger =
+            if self.anchor.0 == finalized.checkpoint_hash && self.anchor.1 == height {
+                self.anchor.2.clone()
+            } else {
+                if height <= self.anchor.1 {
                     return Err(NodeError::Resolution(
                         crate::resolver::ResolutionError::UnsafeStateRoot,
                     ));
                 }
-                path.push(cursor);
-                cursor = stored.header.parent_hash;
-            }
-            path.reverse();
-            let mut ledger = self.anchor.2.clone();
-            for hash in path {
-                let (replay_header, ticket) = self.load_header(&hash)?;
-                let replay_body = self.load_body(&replay_header, &ticket)?;
-                Self::execute_and_verify_on(
-                    &mut ledger,
-                    self.chain_id,
-                    &self.engine,
-                    self.cfg.stable_safety_activation_height,
-                    &replay_header,
-                    &replay_body,
-                )?;
-            }
-            ledger
-        };
+                let mut path = Vec::new();
+                let mut cursor = finalized.checkpoint_hash;
+                while cursor != self.anchor.0 {
+                    let stored = self.dag.get(&cursor).ok_or(NodeError::Resolution(
+                        crate::resolver::ResolutionError::UnsafeStateRoot,
+                    ))?;
+                    if stored.header.height <= self.anchor.1 {
+                        return Err(NodeError::Resolution(
+                            crate::resolver::ResolutionError::UnsafeStateRoot,
+                        ));
+                    }
+                    path.push(cursor);
+                    cursor = stored.header.parent_hash;
+                }
+                path.reverse();
+                let mut ledger = self.anchor.2.clone();
+                for hash in path {
+                    let (replay_header, ticket) = self.load_header(&hash)?;
+                    let replay_body = self.load_body(&replay_header, &ticket)?;
+                    Self::execute_and_verify_on(
+                        &mut ledger,
+                        self.chain_id,
+                        &self.engine,
+                        self.cfg.stable_safety_activation_height,
+                        &replay_header,
+                        &replay_body,
+                    )?;
+                }
+                ledger
+            };
         let header = self
             .dag
             .get(&finalized.checkpoint_hash)
@@ -627,6 +653,21 @@ impl<P: StorePort> NodeCore<P> {
         }
         let (ledger, header, finalized) = self.finalized_ledger_snapshot()?;
         let key = noos_lumen::wwm::wwm_profile_key(kind, &id);
+        Ok((
+            header.height,
+            finalized.checkpoint_hash,
+            ledger.finalized_object_proof(key),
+        ))
+    }
+
+    /// Returns the raw neural-oracle result and membership proof from the
+    /// exact finalized ledger snapshot. Unsafe-head results are never exposed.
+    pub fn finalized_neural_oracle_result(
+        &self,
+        query_id: Hash32,
+    ) -> Result<(u64, Hash32, noos_lumen::wwm::ResolutionProofV1), NodeError> {
+        let (ledger, header, finalized) = self.finalized_ledger_snapshot()?;
+        let key = noos_lumen::neural_oracle::neural_result_key(&query_id);
         Ok((
             header.height,
             finalized.checkpoint_hash,
@@ -797,13 +838,13 @@ impl<P: StorePort> NodeCore<P> {
             .members()
             .get(witness_index)
             .ok_or_else(|| NodeError::Config("devnet witness index outside fixture set".into()))?;
-        if self.pending_votes.iter().any(|known| {
+        if let Some(known) = self.pending_votes.iter().find(|known| {
             known.epoch == next_epoch
                 && known.source == source
                 && known.target == target
                 && known.validator_id == member.validator_id
         }) {
-            return Ok(None);
+            return Ok(Some(known.clone()));
         }
         let secret = fixture_witness_secret(witness_index).map_err(|_| NodeError::Crypto)?;
         let vote = sign_and_release_vote(
@@ -975,14 +1016,14 @@ impl<P: StorePort> NodeCore<P> {
         certificates: Option<&[FinalityCertificateV1]>,
     ) -> Result<InsertOutcome, NodeError> {
         self.validate_header_non_context(header, ticket)?;
-        let mut staged = self.staged_consensus();
-        if !staged.dag.contains(&header.parent_hash) {
-            let outcome = staged.dag.insert(header.clone(), ticket)?;
-            self.dag = staged.dag;
+        let mut dag = self.dag.clone();
+        if !dag.contains(&header.parent_hash) {
+            let outcome = dag.insert(header.clone(), ticket)?;
+            self.dag = dag;
             return Ok(outcome);
         }
-        self.validate_ticket_in_context_for(&staged.dag, header, ticket)?;
-        let outcome = staged.dag.insert(header.clone(), ticket)?;
+        self.validate_ticket_in_context_for(&dag, header, ticket)?;
+        let outcome = dag.insert(header.clone(), ticket)?;
         let hash = match outcome {
             InsertOutcome::Inserted { hash } => hash,
             InsertOutcome::Orphaned { .. } => {
@@ -994,11 +1035,19 @@ impl<P: StorePort> NodeCore<P> {
                 what: "finality certificate evidence absent",
             });
         }
-        self.stage_certificates(&mut staged, certificates.unwrap_or_default(), None)?;
-        Self::validate_checkpoint_binding(&staged, header, &hash)?;
-        self.dag = staged.dag;
-        self.tracker = staged.tracker;
-        self.registry = staged.registry;
+        let mut tracker = self.tracker.clone();
+        let mut registry = self.registry.clone();
+        self.stage_certificates(
+            &mut dag,
+            &mut tracker,
+            &mut registry,
+            certificates.unwrap_or_default(),
+            None,
+        )?;
+        Self::validate_checkpoint_binding(&dag, &tracker, header, &hash)?;
+        self.dag = dag;
+        self.tracker = tracker;
+        self.registry = registry;
         Ok(outcome)
     }
 
@@ -1206,7 +1255,8 @@ impl<P: StorePort> NodeCore<P> {
                         })
                         .and_then(|()| {
                             Self::validate_checkpoint_binding(
-                                &candidate,
+                                &candidate.dag,
+                                &candidate.tracker,
                                 &orphan.header,
                                 &orphan.hash,
                             )
@@ -1222,7 +1272,9 @@ impl<P: StorePort> NodeCore<P> {
         }
     }
 
-    /// Full import: the complete seven-stage pipeline.
+    /// Full import from borrowed candidates. Production transports should use
+    /// [`Self::import_block_owned`] to transfer large shard buffers without a
+    /// copy.
     pub fn import_block(
         &mut self,
         header: &BlockHeaderV1,
@@ -1230,6 +1282,18 @@ impl<P: StorePort> NodeCore<P> {
         claim: &BodyDaClaimV1,
         shards: &[ShardCandidateV1],
     ) -> Result<ImportOutcome, NodeError> {
+        self.import_block_owned(header, ticket, claim, shards.to_vec())
+    }
+
+    /// Full seven-stage import consuming transport-owned shard buffers.
+    pub fn import_block_owned(
+        &mut self,
+        header: &BlockHeaderV1,
+        ticket: &GroundTicketV1,
+        claim: &BodyDaClaimV1,
+        mut shards: Vec<ShardCandidateV1>,
+    ) -> Result<ImportOutcome, NodeError> {
+        let profile = std::env::var_os("NOOS_THROUGHPUT_PROFILE").is_some();
         if self.cfg.mode == NodeMode::Light {
             return self.import_header_light(header, ticket);
         }
@@ -1256,7 +1320,7 @@ impl<P: StorePort> NodeCore<P> {
                         header: header.clone(),
                         ticket: *ticket,
                         claim: *claim,
-                        shards: shards.to_vec(),
+                        shards,
                     },
                 );
             }
@@ -1265,8 +1329,9 @@ impl<P: StorePort> NodeCore<P> {
             return Ok(ImportOutcome::Orphaned { hash });
         }
 
+        let reconstruction_started = Instant::now();
         // Stage 3: DA reconstruction. Insufficient shards PARK the block.
-        let body = match self.reconstruct_body(header, ticket, claim, shards) {
+        let body = match self.reconstruct_body_in_place(header, ticket, claim, &mut shards) {
             Ok(body) => body,
             Err(NodeError::Da(DaError::NotEnoughValidShards { .. })) => {
                 self.parked.insert(
@@ -1275,7 +1340,7 @@ impl<P: StorePort> NodeCore<P> {
                         header: header.clone(),
                         ticket: *ticket,
                         claim: *claim,
-                        shards: shards.to_vec(),
+                        shards,
                     },
                 );
                 self.metrics
@@ -1286,6 +1351,12 @@ impl<P: StorePort> NodeCore<P> {
                 return Err(e);
             }
         };
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE validator_reconstruction_seconds={:.9}",
+                reconstruction_started.elapsed().as_secs_f64()
+            );
+        }
         self.validate_stage_commit(hash, header, ticket, body)
     }
 
@@ -1342,28 +1413,25 @@ impl<P: StorePort> NodeCore<P> {
         claim: &BodyDaClaimV1,
         shards: &[ShardCandidateV1],
     ) -> Result<ReconstructedBlockBody, NodeError> {
+        let mut owned = shards.to_vec();
+        self.reconstruct_body_in_place(header, ticket, claim, &mut owned)
+    }
+
+    fn reconstruct_body_in_place(
+        &self,
+        header: &BlockHeaderV1,
+        ticket: &GroundTicketV1,
+        claim: &BodyDaClaimV1,
+        shards: &mut [ShardCandidateV1],
+    ) -> Result<ReconstructedBlockBody, NodeError> {
         let da_root = noos_crypto::Hash32::from_bytes(header.body_da_root);
-        let reconstructed = reconstruct_and_verify(&da_root, claim, shards)?;
+        let reconstructed = reconstruct_and_verify_in_place(&da_root, claim, shards)?;
         // Stage 0 for the body: canonical decode of the DA form. The
         // receipt-root interchange impossibility is a HEADER decode law;
         // body collection bounds (incl. hard-zero Loom claims) die here.
-        let mut body = BlockBodyV1::decode_canonical(reconstructed.bytes())?;
+        let mut body = decode_da_form(reconstructed.bytes())?;
         body.ground_ticket = GroundTicketWire(*ticket);
 
-        // Body/header cross-checks (node-v1.md §3).
-        if body_tx_root(&body.transactions)? != header.tx_root {
-            return Err(NodeError::RootMismatch { field: "tx_root" });
-        }
-        if body_witness_root(&body.segregated_witnesses)? != header.witness_root {
-            return Err(NodeError::RootMismatch {
-                field: "witness_root",
-            });
-        }
-        if body_cert_root(&body.finality_certificates)? != header.finality_certificate_root {
-            return Err(NodeError::RootMismatch {
-                field: "finality_certificate_root",
-            });
-        }
         if header.evidence_root != ZERO_ROOT {
             return Err(NodeError::RootMismatch {
                 field: "evidence_root",
@@ -1384,6 +1452,58 @@ impl<P: StorePort> NodeCore<P> {
         })
     }
 
+    fn validate_body_commitments(
+        header: &BlockHeaderV1,
+        body: &BlockBodyV1,
+    ) -> Result<(), NodeError> {
+        // Body-list commitments are independent and potentially hundreds of
+        // megabytes each. Hash them concurrently, then compare in field order.
+        let (tx_root, witness_root, certificate_root) =
+            std::thread::scope(|scope| -> Result<_, NodeError> {
+                let tx = scope.spawn(|| body_tx_root(&body.transactions));
+                let witness = scope.spawn(|| body_witness_root(&body.segregated_witnesses));
+                let certificate = scope.spawn(|| body_cert_root(&body.finality_certificates));
+                Ok((
+                    tx.join().map_err(|_| NodeError::Crypto)??,
+                    witness.join().map_err(|_| NodeError::Crypto)??,
+                    certificate.join().map_err(|_| NodeError::Crypto)??,
+                ))
+            })?;
+        if tx_root != header.tx_root {
+            return Err(NodeError::RootMismatch { field: "tx_root" });
+        }
+        if witness_root != header.witness_root {
+            return Err(NodeError::RootMismatch {
+                field: "witness_root",
+            });
+        }
+        if certificate_root != header.finality_certificate_root {
+            return Err(NodeError::RootMismatch {
+                field: "finality_certificate_root",
+            });
+        }
+        Ok(())
+    }
+
+    fn restore_detached_receipt_state(
+        &mut self,
+        staged: &mut StagedConsensus,
+        bodies: &BTreeMap<Hash32, StagedBody>,
+    ) {
+        for block in bodies.values() {
+            for witnesses in block.body.segregated_witnesses.iter() {
+                for intent in witnesses.intents.iter() {
+                    staged.ledger.remove_receipt_after_height_for_staging(
+                        &intent.tx_commitment,
+                        self.exec_height,
+                    );
+                }
+            }
+        }
+        let receipts = staged.ledger.take_receipt_state_for_staging();
+        self.ledger.replace_receipt_state_for_staging(receipts);
+    }
+
     fn validate_stage_commit(
         &mut self,
         hash: Hash32,
@@ -1391,46 +1511,102 @@ impl<P: StorePort> NodeCore<P> {
         ticket: &GroundTicketV1,
         body: ReconstructedBlockBody,
     ) -> Result<ImportOutcome, NodeError> {
+        let profile = std::env::var_os("NOOS_THROUGHPUT_PROFILE").is_some();
+        let staging_started = Instant::now();
+        let detach_receipts = header.parent_hash == self.exec_head
+            && header.height == self.exec_height.saturating_add(1);
         let mut staged = self.staged_consensus();
+        if detach_receipts {
+            drop(self.ledger.take_receipt_state_for_staging());
+        }
         let mut writes = WriteSet::default();
         let mut bodies = BTreeMap::new();
-        self.stage_connected_block(
-            &mut staged,
-            &mut writes,
-            &mut bodies,
-            hash,
-            header,
-            ticket,
-            body,
-            true,
-        )?;
-        self.stage_reachable_orphans(&mut staged, &mut writes, &mut bodies, hash);
-        let (reorged, connected_blocks, settled_txs) =
-            self.stage_fork_choice(&mut staged, &mut writes, &bodies)?;
-        self.stage_refresh_anchor(&mut staged, &bodies)?;
+        let staging_result = (|| {
+            self.stage_connected_block(
+                &mut staged,
+                &mut writes,
+                &mut bodies,
+                hash,
+                header,
+                ticket,
+                body,
+                true,
+            )?;
+            self.stage_reachable_orphans(&mut staged, &mut writes, &mut bodies, hash);
+            let (reorged, connected_blocks, settled_txs, view_plan) =
+                self.stage_fork_choice(&mut staged, &mut writes, &bodies)?;
+            self.stage_refresh_anchor(&mut staged, &bodies)?;
 
-        let justified = staged.tracker.justified_head();
-        let finalized = staged.tracker.finalized_head();
-        writes
-            .indices
-            .push((KEY_JUSTIFIED.to_vec(), Some(justified.encode_canonical())));
-        writes
-            .indices
-            .push((KEY_FINALIZED.to_vec(), Some(finalized.encode_canonical())));
-        staged.view.heads.justified = justified;
-        staged.view.heads.finalized = finalized;
+            let justified = staged.tracker.justified_head();
+            let finalized = staged.tracker.finalized_head();
+            writes
+                .indices
+                .push((KEY_JUSTIFIED.to_vec(), Some(justified.encode_canonical())));
+            writes
+                .indices
+                .push((KEY_FINALIZED.to_vec(), Some(finalized.encode_canonical())));
 
-        let canonical = staged
-            .dag
-            .ancestor_at_height(&staged.exec_head, header.height)
-            .is_some_and(|ancestor| ancestor.hash == hash);
-        let outcome = if canonical {
-            ImportOutcome::Executed { hash }
-        } else {
-            ImportOutcome::SideChain { hash }
+            let canonical = staged
+                .dag
+                .ancestor_at_height(&staged.exec_head, header.height)
+                .is_some_and(|ancestor| ancestor.hash == hash);
+            let outcome = if canonical {
+                ImportOutcome::Executed { hash }
+            } else {
+                ImportOutcome::SideChain { hash }
+            };
+            Ok::<_, NodeError>((
+                reorged,
+                connected_blocks,
+                settled_txs,
+                view_plan,
+                justified,
+                finalized,
+                outcome,
+            ))
+        })();
+        let (reorged, connected_blocks, settled_txs, view_plan, justified, finalized, outcome) =
+            match staging_result {
+                Ok(result) => result,
+                Err(error) => {
+                    if detach_receipts {
+                        self.restore_detached_receipt_state(&mut staged, &bodies);
+                    }
+                    return Err(error);
+                }
+            };
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE validator_staging_seconds={:.9}",
+                staging_started.elapsed().as_secs_f64()
+            );
+        }
+        let store_started = Instant::now();
+        let seq = match self.port.commit(writes) {
+            Ok(seq) => seq,
+            Err(error) => {
+                if detach_receipts {
+                    self.restore_detached_receipt_state(&mut staged, &bodies);
+                }
+                return Err(error);
+            }
         };
-        let seq = self.port.commit(&writes)?;
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE validator_store_commit_seconds={:.9}",
+                store_started.elapsed().as_secs_f64()
+            );
+        }
         self.install_staged_consensus(staged);
+        for height in view_plan.disconnect_heights {
+            self.view.disconnect_block(height);
+        }
+        for connection in view_plan.connections {
+            self.view
+                .connect_block(&connection.header, connection.hash, connection.receipts);
+        }
+        self.view.heads.justified = justified;
+        self.view.heads.finalized = finalized;
 
         let m = &self.metrics;
         m.set(&m.store_seq, seq);
@@ -1439,12 +1615,8 @@ impl<P: StorePort> NodeCore<P> {
         m.set(&m.finalized_epoch, finalized.epoch);
         m.set(&m.mempool_txs, self.mempool.len() as u64);
         m.set(&m.mempool_bytes, self.mempool.total_bytes() as u64);
-        for _ in 0..connected_blocks {
-            m.inc(&m.blocks_imported_total);
-        }
-        for _ in 0..settled_txs {
-            m.inc(&m.txs_settled_total);
-        }
+        m.add(&m.blocks_imported_total, connected_blocks);
+        m.add(&m.txs_settled_total, settled_txs);
         if reorged {
             m.inc(&m.reorgs_total);
         }
@@ -1479,13 +1651,19 @@ impl<P: StorePort> NodeCore<P> {
             });
         }
 
-        self.stage_certificates(staged, body.finality_certificates.as_slice(), Some(writes))?;
-        Self::validate_checkpoint_binding(staged, header, &hash)?;
-        // The selected head is executed and root-verified by
-        // `stage_fork_choice` before any write commits. Validate inert
-        // side-chain bodies here; avoid executing the canonical candidate
-        // twice.
+        self.stage_certificates(
+            &mut staged.dag,
+            &mut staged.tracker,
+            &mut staged.registry,
+            body.finality_certificates.as_slice(),
+            Some(writes),
+        )?;
+        Self::validate_checkpoint_binding(&staged.dag, &staged.tracker, header, &hash)?;
+        // Body commitments and state execution for the selected candidate run
+        // concurrently in `stage_fork_choice`; both must succeed before the
+        // durable write. Inert side chains are fully checked here.
         if !defer_selected_validation || staged.dag.select_head() != Some(hash) {
+            Self::validate_body_commitments(header, &body)?;
             self.validate_body_at_parent(staged, bodies, header, &body)?;
         }
 
@@ -1504,7 +1682,7 @@ impl<P: StorePort> NodeCore<P> {
         {
             writes.blobs.push(Blob {
                 hash: header.body_da_root,
-                bytes: body.encode_canonical(),
+                bytes: availability.into_bytes(),
             });
         }
         staged.orphan_blocks.remove(&hash);
@@ -1512,7 +1690,7 @@ impl<P: StorePort> NodeCore<P> {
             hash,
             StagedBody {
                 header: header.clone(),
-                body,
+                body: Arc::new(body),
             },
         );
         Ok(())
@@ -1626,7 +1804,12 @@ impl<P: StorePort> NodeCore<P> {
                                 .map(|_| ())
                         })
                         .and_then(|()| {
-                            Self::validate_checkpoint_binding(&candidate, &orphan.header, &hash)
+                            Self::validate_checkpoint_binding(
+                                &candidate.dag,
+                                &candidate.tracker,
+                                &orphan.header,
+                                &hash,
+                            )
                         })
                 };
                 if result.is_ok() {
@@ -1655,7 +1838,10 @@ impl<P: StorePort> NodeCore<P> {
         }
         let (header, ticket) = self.load_header(hash)?;
         let body = self.load_body(&header, &ticket)?;
-        Ok(StagedBody { header, body })
+        Ok(StagedBody {
+            header,
+            body: Arc::new(body),
+        })
     }
 
     fn stage_fork_choice(
@@ -1663,12 +1849,12 @@ impl<P: StorePort> NodeCore<P> {
         staged: &mut StagedConsensus,
         writes: &mut WriteSet,
         bodies: &BTreeMap<Hash32, StagedBody>,
-    ) -> Result<(bool, u64, u64), NodeError> {
+    ) -> Result<(bool, u64, u64, ViewPlan), NodeError> {
         let Some(best) = staged.dag.select_head() else {
-            return Ok((false, 0, 0));
+            return Ok((false, 0, 0, ViewPlan::default()));
         };
         if best == staged.exec_head {
-            return Ok((false, 0, 0));
+            return Ok((false, 0, 0, ViewPlan::default()));
         }
         for ancestor in staged.dag.ancestors(&best) {
             if ancestor.hash == staged.exec_head || ancestor.header.height == 0 {
@@ -1680,7 +1866,7 @@ impl<P: StorePort> NodeCore<P> {
                     ancestor.header.body_da_root,
                 ))
             {
-                return Ok((false, 0, 0));
+                return Ok((false, 0, 0, ViewPlan::default()));
             }
         }
 
@@ -1707,48 +1893,60 @@ impl<P: StorePort> NodeCore<P> {
             plan.connect.clone()
         };
 
-        let mut deltas = Vec::new();
+        let mut deltas = DeltaAccumulator::default();
+        let mut final_roots = None;
         let mut executed = BTreeMap::new();
         for hash in execution_path {
             let block = self.staged_body(bodies, &hash)?;
-            let exec = Self::execute_and_verify_on(
-                &mut staged.ledger,
-                self.chain_id,
-                &self.engine,
-                self.cfg.stable_safety_activation_height,
-                &block.header,
-                &block.body,
-            )?;
-            deltas.push(exec.merged_delta.clone());
+            let mut exec = std::thread::scope(|scope| -> Result<_, NodeError> {
+                let commitments =
+                    scope.spawn(|| Self::validate_body_commitments(&block.header, &block.body));
+                let execution = Self::execute_and_verify_on(
+                    &mut staged.ledger,
+                    self.chain_id,
+                    &self.engine,
+                    self.cfg.stable_safety_activation_height,
+                    &block.header,
+                    &block.body,
+                );
+                commitments.join().map_err(|_| NodeError::Crypto)??;
+                execution
+            })?;
+            final_roots = Some(exec.roots);
+            deltas.push(std::mem::take(&mut exec.merged_delta));
             executed.insert(hash, (block, exec));
         }
 
+        let mut view_plan = ViewPlan::default();
         for hash in &plan.disconnect {
             if let Some(stored) = staged.dag.get(hash) {
-                staged.view.disconnect_block(stored.header.height);
+                view_plan.disconnect_heights.push(stored.header.height);
             }
         }
         let mut settled_txs = 0_u64;
         for hash in &plan.connect {
-            let (block, exec) = executed.get(hash).ok_or(NodeError::BodyMismatch {
+            let (block, exec) = executed.remove(hash).ok_or(NodeError::BodyMismatch {
                 what: "staged execution result missing",
             })?;
-            let settled: Vec<Hash32> = exec.receipts.iter().map(|r| r.txid).collect();
             settled_txs = settled_txs.saturating_add(exec.receipts.len() as u64);
-            staged
-                .mempool
-                .on_block_connected(&settled, block.header.height.saturating_add(1));
-            staged
-                .view
-                .connect_block(&block.header, *hash, &exec.receipts);
+            if !staged.mempool.is_empty() {
+                let settled = exec
+                    .receipts
+                    .iter()
+                    .map(|receipt| receipt.txid)
+                    .collect::<Vec<_>>();
+                staged
+                    .mempool
+                    .on_block_connected(&settled, block.header.height.saturating_add(1));
+            }
             writes
                 .indices
                 .push((key_height(block.header.height), Some(hash.to_vec())));
-            for receipt in &exec.receipts {
-                let mut value = block.header.height.to_le_bytes().to_vec();
-                value.extend_from_slice(&receipt.encode_canonical());
-                writes.receipts.push((receipt.txid.to_vec(), Some(value)));
-            }
+            view_plan.connections.push(ViewConnection {
+                header: block.header,
+                hash: *hash,
+                receipts: exec.receipts,
+            });
         }
         staged.exec_head = best;
         staged.exec_height = staged
@@ -1757,12 +1955,12 @@ impl<P: StorePort> NodeCore<P> {
             .ok_or(NodeError::Dag(noos_braid::DagError::UnknownBlock))?
             .header
             .height;
-        writes.delta = merge_deltas(deltas);
-        writes.roots = Some(staged.ledger.roots());
+        writes.delta = deltas.finish();
+        writes.roots = Some(final_roots.unwrap_or_else(|| staged.ledger.roots()));
         writes
             .indices
             .push((KEY_HEAD.to_vec(), Some(best.to_vec())));
-        Ok((reorged, plan.connect.len() as u64, settled_txs))
+        Ok((reorged, plan.connect.len() as u64, settled_txs, view_plan))
     }
 
     fn stage_refresh_anchor(
@@ -1837,7 +2035,8 @@ impl<P: StorePort> NodeCore<P> {
         header: &BlockHeaderV1,
         body: &BlockBodyV1,
     ) -> Result<ExecResult, NodeError> {
-        let mut deltas: Vec<StateDelta> = Vec::new();
+        let profile = std::env::var_os("NOOS_THROUGHPUT_PROFILE").is_some();
+        let mut deltas = DeltaAccumulator::default();
         if let Some(activation_height) = stable_safety_activation_height {
             deltas.push(
                 ledger
@@ -1885,50 +2084,115 @@ impl<P: StorePort> NodeCore<P> {
             chain_id,
             height: header.height,
         };
-        let signature_prechecks = parallel_signature_prechecks(ledger, body);
+        let snapshot_started = Instant::now();
+        let authorization_snapshot =
+            capture_authorization_snapshot(ledger, body.transactions.as_slice());
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE validator_authorization_snapshot_seconds={:.9}",
+                snapshot_started.elapsed().as_secs_f64()
+            );
+        }
+        let transactions_started = Instant::now();
         let auth = NodeAuthVerifier;
-        let preverified_auth = PreverifiedSignatureAuth;
         let mut receipts: Vec<ReceiptV1> = Vec::with_capacity(body.transactions.len());
-        for (index, (tx, wits)) in body
-            .transactions
-            .iter()
-            .zip(body.segregated_witnesses.iter())
-            .enumerate()
-        {
-            let signatures_unchanged = signature_prechecks[index].as_ref().is_some_and(|check| {
-                check.authorizations.iter().all(|(account_id, descriptor)| {
-                    ledger.get_account(account_id).is_some_and(|account| {
-                        account.auth_descriptor.as_slice() == descriptor.as_slice()
-                    })
-                })
+        let (execution_result, balance_root_delta) =
+            ledger.with_deferred_balance_roots(|ledger, deferred| {
+                pipelined_transaction_prechecks(
+                    &authorization_snapshot,
+                    body.transactions.as_slice(),
+                    body.segregated_witnesses.as_slice(),
+                    |start, checks| {
+                        for (offset, precheck) in checks.iter().enumerate() {
+                            let index = start.saturating_add(offset);
+                            let tx = &body.transactions.as_slice()[index];
+                            let wits = &body.segregated_witnesses.as_slice()[index];
+                            let precheck = precheck.as_ref();
+                            let signatures_unchanged = precheck.is_some_and(|check| {
+                                check.signatures_reusable(
+                                    &authorization_snapshot,
+                                    ledger,
+                                    deferred,
+                                    tx,
+                                )
+                            });
+                            let transaction_id =
+                                precheck.map_or_else(|| txid(tx), |check| check.transaction_id());
+                            let preverified_auth = PreverifiedSignatureAuth::new(transaction_id);
+                            let verifier: &dyn AuthVerifier = if signatures_unchanged {
+                                &preverified_auth
+                            } else {
+                                &auth
+                            };
+                            let (transaction_len, witness_len) = precheck.map_or_else(
+                                || (tx.encode_canonical().len(), wits.encode_canonical().len()),
+                                |check| check.encoded_lengths(),
+                            );
+                            let encoded_len = transaction_len.checked_add(witness_len).ok_or(
+                                NodeError::LumenReject(
+                                    noos_lumen::state::RejectReason::OversizedEncoding,
+                                ),
+                            )?;
+                            if !carrier_len_valid(transaction_len, witness_len) {
+                                return Err(NodeError::LumenReject(
+                                    noos_lumen::state::RejectReason::OversizedEncoding,
+                                ));
+                            }
+                            let outcome = if signatures_unchanged {
+                                match ledger.try_apply_preverified_simple_transfer_deferred(
+                                    &ctx,
+                                    tx,
+                                    wits,
+                                    encoded_len,
+                                    transaction_id,
+                                    deferred,
+                                ) {
+                                    Ok(Some(outcome)) => Ok(outcome),
+                                    Ok(None) => ledger
+                                        .apply_canonical_decoded_transaction_deferred(
+                                            &ctx,
+                                            tx,
+                                            wits,
+                                            encoded_len,
+                                            engine,
+                                            verifier,
+                                            deferred,
+                                        ),
+                                    Err(reason) => Err(reason),
+                                }
+                            } else {
+                                ledger.apply_canonical_decoded_transaction_deferred(
+                                    &ctx,
+                                    tx,
+                                    wits,
+                                    encoded_len,
+                                    engine,
+                                    verifier,
+                                    deferred,
+                                )
+                            }
+                            .map_err(NodeError::LumenReject)?;
+                            match outcome {
+                                noos_lumen::state::ApplyOutcome::Applied { receipt, delta }
+                                | noos_lumen::state::ApplyOutcome::Failed {
+                                    receipt, delta, ..
+                                } => {
+                                    receipts.push(receipt);
+                                    deltas.push(delta);
+                                }
+                            }
+                        }
+                        Ok::<(), NodeError>(())
+                    },
+                )
             });
-            let verifier: &dyn AuthVerifier = if signatures_unchanged {
-                &preverified_auth
-            } else {
-                &auth
-            };
-            let tx_bytes = tx.encode_canonical();
-            let wit_bytes = wits.encode_canonical();
-            let encoded_len =
-                tx_bytes
-                    .len()
-                    .checked_add(wit_bytes.len())
-                    .ok_or(NodeError::LumenReject(
-                        noos_lumen::state::RejectReason::OversizedEncoding,
-                    ))?;
-            if !carrier_len_valid(tx_bytes.len(), wit_bytes.len()) {
-                return Err(NodeError::LumenReject(
-                    noos_lumen::state::RejectReason::OversizedEncoding,
-                ));
-            }
-            let outcome = ledger
-                .apply_canonical_decoded_transaction(&ctx, tx, wits, encoded_len, engine, verifier)
-                .map_err(NodeError::LumenReject)?;
-            receipts.push(outcome.receipt().clone());
-            match outcome {
-                noos_lumen::state::ApplyOutcome::Applied { delta, .. }
-                | noos_lumen::state::ApplyOutcome::Failed { delta, .. } => deltas.push(delta),
-            }
+        execution_result?;
+        deltas.push(balance_root_delta);
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE validator_transactions_seconds={:.9}",
+                transactions_started.elapsed().as_secs_f64()
+            );
         }
 
         // Resource totals, then the end-of-block controller step.
@@ -1950,8 +2214,26 @@ impl<P: StorePort> NodeCore<P> {
                 .map_err(NodeError::LumenReject)?,
         );
 
-        // Stage 5: ALL claimed roots (six Lumen + both receipt roots).
-        let roots = ledger.roots();
+        let post_execution_started = Instant::now();
+        // State roots, the ordered receipt-list root, and final write-set
+        // ordering depend only on completed execution and can run together.
+        let (roots, execution_receipt_root, merged_delta) =
+            std::thread::scope(|scope| -> Result<_, NodeError> {
+                let roots_worker = scope.spawn(|| ledger.roots());
+                let receipt_worker = scope.spawn(|| body_receipt_root(&receipts));
+                let merged_delta = deltas.finish();
+                Ok((
+                    roots_worker.join().map_err(|_| NodeError::Crypto)?,
+                    receipt_worker.join().map_err(|_| NodeError::Crypto)??,
+                    merged_delta,
+                ))
+            })?;
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE validator_post_execution_seconds={:.9}",
+                post_execution_started.elapsed().as_secs_f64()
+            );
+        }
         let checks: [(&'static str, Hash32, Hash32); 7] = [
             ("notes_root", header.notes_root, roots.notes_root),
             (
@@ -1973,7 +2255,7 @@ impl<P: StorePort> NodeCore<P> {
             (
                 "execution_receipt_root",
                 header.execution_receipt_root,
-                body_receipt_root(&receipts)?,
+                execution_receipt_root,
             ),
         ];
         for (field, claimed, actual) in checks {
@@ -1984,7 +2266,7 @@ impl<P: StorePort> NodeCore<P> {
 
         Ok(ExecResult {
             receipts,
-            merged_delta: merge_deltas(deltas),
+            merged_delta,
             roots,
         })
     }
@@ -1996,12 +2278,19 @@ impl<P: StorePort> NodeCore<P> {
         hash: Hash32,
         header: &BlockHeaderV1,
         ticket: &GroundTicketV1,
-        body: &BlockBodyV1,
-        exec: &ExecResult,
+        exec: ExecResult,
+        da_bytes: Vec<u8>,
     ) -> Result<(), NodeError> {
+        let profile = std::env::var_os("NOOS_THROUGHPUT_PROFILE").is_some();
+        let prepare_started = Instant::now();
+        let ExecResult {
+            receipts,
+            merged_delta,
+            roots,
+        } = exec;
         let mut ws = WriteSet {
-            delta: exec.merged_delta.clone(),
-            roots: Some(exec.roots),
+            delta: merged_delta,
+            roots: Some(roots),
             ..WriteSet::default()
         };
         let mut header_bytes = header.encode_canonical();
@@ -2010,32 +2299,37 @@ impl<P: StorePort> NodeCore<P> {
         ws.indices
             .push((key_height(header.height), Some(hash.to_vec())));
         ws.indices.push((KEY_HEAD.to_vec(), Some(hash.to_vec())));
-        for r in &exec.receipts {
-            let mut value = header.height.to_le_bytes().to_vec();
-            value.extend_from_slice(&r.encode_canonical());
-            ws.receipts.push((r.txid.to_vec(), Some(value)));
-        }
         ws.blobs.push(Blob {
             hash: header.body_da_root,
-            bytes: body.encode_canonical(),
+            bytes: da_bytes,
         });
-        let seq = self.port.commit(&ws)?;
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE producer_store_prepare_seconds={:.9}",
+                prepare_started.elapsed().as_secs_f64()
+            );
+        }
+        let seq = self.port.commit(ws)?;
 
         self.exec_head = hash;
         self.exec_height = header.height;
-        let settled: Vec<Hash32> = exec.receipts.iter().map(|r| r.txid).collect();
-        let next_height = header.height.saturating_add(1);
-        self.mempool.on_block_connected(&settled, next_height);
-        self.view.connect_block(header, hash, &exec.receipts);
-        let m = &self.metrics;
-        m.set(&m.height, header.height);
-        m.set(&m.store_seq, seq);
-        m.inc(&m.blocks_imported_total);
-        m.set(&m.mempool_txs, self.mempool.len() as u64);
-        m.set(&m.mempool_bytes, self.mempool.total_bytes() as u64);
-        for _ in &settled {
-            m.inc(&m.txs_settled_total);
+        let settled_count = receipts.len() as u64;
+        if !self.mempool.is_empty() {
+            let settled = receipts
+                .iter()
+                .map(|receipt| receipt.txid)
+                .collect::<Vec<_>>();
+            self.mempool
+                .on_block_connected(&settled, header.height.saturating_add(1));
         }
+        self.view.connect_block(header, hash, receipts);
+        let metrics = &self.metrics;
+        metrics.set(&metrics.height, header.height);
+        metrics.set(&metrics.store_seq, seq);
+        metrics.inc(&metrics.blocks_imported_total);
+        metrics.set(&metrics.mempool_txs, self.mempool.len() as u64);
+        metrics.set(&metrics.mempool_bytes, self.mempool.total_bytes() as u64);
+        metrics.add(&metrics.txs_settled_total, settled_count);
         Ok(())
     }
 
@@ -2111,7 +2405,7 @@ impl<P: StorePort> NodeCore<P> {
         }
         ws.indices
             .push((KEY_HEAD.to_vec(), Some(new_head.to_vec())));
-        let seq = self.port.commit(&ws)?;
+        let seq = self.port.commit(ws)?;
         self.metrics.set(&self.metrics.store_seq, seq);
         Ok(())
     }
@@ -2150,7 +2444,8 @@ impl<P: StorePort> NodeCore<P> {
             let exec = self.execute_and_verify(&header, &body)?;
             // Replay updates memory + receipts/indices; the state delta is
             // recommitted so the state CF converges to the replayed branch.
-            self.commit_executed_block(hash, &header, &ticket, &body, &exec)?;
+            let da_bytes = da_form_bytes(&body);
+            self.commit_executed_block(hash, &header, &ticket, exec, da_bytes)?;
         }
         Ok(())
     }
@@ -2159,16 +2454,16 @@ impl<P: StorePort> NodeCore<P> {
 
     fn stage_certificates(
         &self,
-        staged: &mut StagedConsensus,
+        dag: &mut HeaderDag,
+        tracker: &mut FinalityTracker,
+        registry: &mut SnapshotRegistry,
         certificates: &[FinalityCertificateV1],
         mut writes: Option<&mut WriteSet>,
     ) -> Result<(), NodeError> {
         for cert in certificates {
-            self.ensure_snapshot_for(&mut staged.registry, cert.target.epoch)?;
-            let ancestry = DagAncestry { dag: &staged.dag };
-            let outcome = staged
-                .tracker
-                .ingest_certificate(cert, &staged.registry, &ancestry)?;
+            self.ensure_snapshot_for(registry, cert.target.epoch)?;
+            let ancestry = DagAncestry { dag };
+            let outcome = tracker.ingest_certificate(cert, registry, &ancestry)?;
             let digest =
                 noos_witness::finality::certificate_digest(cert).map_err(NodeError::Witness)?;
             if !matches!(outcome, IngestOutcome::Duplicate) {
@@ -2182,11 +2477,11 @@ impl<P: StorePort> NodeCore<P> {
             match outcome {
                 IngestOutcome::Duplicate => {}
                 IngestOutcome::Justified => {
-                    staged.dag.set_justified(staged.tracker.justified_head())?;
+                    dag.set_justified(tracker.justified_head())?;
                 }
                 IngestOutcome::Finalized(cp) => {
-                    staged.dag.set_finalized(cp)?;
-                    staged.dag.set_justified(staged.tracker.justified_head())?;
+                    dag.set_finalized(cp)?;
+                    dag.set_justified(tracker.justified_head())?;
                 }
             }
         }
@@ -2198,12 +2493,13 @@ impl<P: StorePort> NodeCore<P> {
     /// what permits a same-block certificate transition while making absent,
     /// reordered, or mismatched evidence fail closed.
     fn validate_checkpoint_binding(
-        staged: &StagedConsensus,
+        dag: &HeaderDag,
+        tracker: &FinalityTracker,
         header: &BlockHeaderV1,
         hash: &Hash32,
     ) -> Result<(), NodeError> {
-        let justified = staged.tracker.justified_head();
-        let finalized = staged.tracker.finalized_head();
+        let justified = tracker.justified_head();
+        let finalized = tracker.finalized_head();
         if header.justified_checkpoint != justified || header.finalized_checkpoint != finalized {
             return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
         }
@@ -2212,19 +2508,17 @@ impl<P: StorePort> NodeCore<P> {
                 return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
             };
             if height > header.height
-                || staged
-                    .dag
+                || dag
                     .get(&checkpoint.checkpoint_hash)
                     .is_none_or(|stored| stored.header.height != height)
-                || staged
-                    .dag
+                || dag
                     .ancestor_at_height(hash, height)
                     .is_none_or(|ancestor| ancestor.hash != checkpoint.checkpoint_hash)
             {
                 return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
             }
         }
-        if !(DagAncestry { dag: &staged.dag }).descends(&finalized, &justified) {
+        if !(DagAncestry { dag }).descends(&finalized, &justified) {
             return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
         }
         Ok(())
@@ -2233,7 +2527,13 @@ impl<P: StorePort> NodeCore<P> {
     fn process_certificate(&mut self, cert: &FinalityCertificateV1) -> Result<(), NodeError> {
         let mut staged = self.staged_consensus();
         let mut ws = WriteSet::default();
-        self.stage_certificates(&mut staged, std::slice::from_ref(cert), Some(&mut ws))?;
+        self.stage_certificates(
+            &mut staged.dag,
+            &mut staged.tracker,
+            &mut staged.registry,
+            std::slice::from_ref(cert),
+            Some(&mut ws),
+        )?;
         if ws.indices.is_empty() {
             return Ok(());
         }
@@ -2244,10 +2544,10 @@ impl<P: StorePort> NodeCore<P> {
             .push((KEY_JUSTIFIED.to_vec(), Some(justified.encode_canonical())));
         ws.indices
             .push((KEY_FINALIZED.to_vec(), Some(finalized.encode_canonical())));
-        let seq = self.port.commit(&ws)?;
-        staged.view.heads.justified = justified;
-        staged.view.heads.finalized = finalized;
+        let seq = self.port.commit(ws)?;
         self.install_staged_consensus(staged);
+        self.view.heads.justified = justified;
+        self.view.heads.finalized = finalized;
         let m = &self.metrics;
         m.set(&m.store_seq, seq);
         m.set(&m.justified_epoch, justified.epoch);
@@ -2276,7 +2576,7 @@ impl<P: StorePort> NodeCore<P> {
             .ok_or(NodeError::BodyMismatch {
                 what: "body blob missing",
             })?;
-        let mut body = BlockBodyV1::decode_canonical(&bytes)?;
+        let mut body = decode_da_form(&bytes)?;
         body.ground_ticket = GroundTicketWire(*ticket);
         Ok(body)
     }
@@ -2343,7 +2643,7 @@ impl<P: StorePort> NodeCore<P> {
             self.exec_height = header.height;
             let encoded = encode_body(&da_form_bytes(&body))?;
             self.availability.record_encoded(&encoded);
-            self.view.connect_block(&header, hash, &exec.receipts);
+            self.view.connect_block(&header, hash, exec.receipts);
             if header.height == finalized_height {
                 self.anchor = (hash, height, self.ledger.clone());
             }
@@ -2429,6 +2729,37 @@ impl<P: StorePort> NodeCore<P> {
         Ok(id)
     }
 
+    /// Bounded batch submission. CPU-heavy immutable admission stages run in
+    /// parallel; duplicate, eviction, FIFO, and capacity mutations remain in
+    /// exact input order.
+    pub fn submit_tx_batch(
+        &mut self,
+        submissions: &[AdmissionEnvelope<'_>],
+    ) -> Vec<Result<Hash32, AdmitError>> {
+        let Some(prices) = self.ledger.fee_state().map(|state| state.prices()) else {
+            return vec![Err(AdmitError::Malformed); submissions.len()];
+        };
+        const PREPARATION_BATCH_MAX: usize = 32_768;
+        let next_height = self.exec_height.saturating_add(1);
+        let mut results = Vec::with_capacity(submissions.len());
+        for batch in submissions.chunks(PREPARATION_BATCH_MAX) {
+            let batch_results =
+                self.mempool
+                    .admit_batch(batch, next_height, &self.chain_id, &prices, &self.ledger);
+            for id in batch_results
+                .iter()
+                .filter_map(|result| result.as_ref().ok())
+            {
+                self.view.note_pending(*id);
+            }
+            results.extend(batch_results);
+        }
+        let metrics = &self.metrics;
+        metrics.set(&metrics.mempool_txs, self.mempool.len() as u64);
+        metrics.set(&metrics.mempool_bytes, self.mempool.total_bytes() as u64);
+        results
+    }
+
     /// Execute a transaction against a discardable Lumen overlay at the next
     /// block height. This performs full canonical decoding, witness and
     /// signature checks, fee calculation, action execution, and postconditions
@@ -2455,6 +2786,7 @@ impl<P: StorePort> NodeCore<P> {
     /// (ch01 §4.3 production order; the ticket search binds the fixed
     /// proposal commitment).
     pub fn produce_block(&mut self) -> Result<ProducedBlock, NodeError> {
+        let profile = std::env::var_os("NOOS_THROUGHPUT_PROFILE").is_some();
         self.apply_fork_choice()?;
         let parent_hash = self.exec_head;
         let parent = self
@@ -2495,7 +2827,7 @@ impl<P: StorePort> NodeCore<P> {
         }
 
         // System transitions first, mirroring the import order exactly.
-        let mut deltas: Vec<StateDelta> = Vec::new();
+        let mut deltas = DeltaAccumulator::default();
         if let Some(activation_height) = self.cfg.stable_safety_activation_height {
             deltas.push(
                 self.ledger
@@ -2522,6 +2854,7 @@ impl<P: StorePort> NodeCore<P> {
 
         // Deterministic template, executed on the live ledger; entries the
         // state rejects are dropped from the pool (invalid at this state).
+        let template_started = Instant::now();
         let capacity =
             self.ledger
                 .fee_params()
@@ -2529,66 +2862,96 @@ impl<P: StorePort> NodeCore<P> {
                 .ok_or(NodeError::RootMismatch {
                     field: "fee_params",
                 })?;
-        let template: Vec<(Hash32, TransactionV1, TransactionWitnessesV1, usize, bool)> = self
-            .mempool
-            .template(&capacity)
-            .into_iter()
-            .map(|entry| {
-                let signatures_preverified =
-                    entry
-                        .signature_authorizations
-                        .iter()
-                        .all(|(account_id, descriptor)| {
-                            self.ledger.get_account(account_id).is_some_and(|account| {
-                                account.auth_descriptor.as_slice() == descriptor.as_slice()
-                            })
-                        });
-                (
-                    entry.txid,
-                    entry.tx.clone(),
-                    entry.witnesses.clone(),
-                    entry.encoded_len(),
-                    signatures_preverified,
-                )
-            })
-            .collect();
+        let template = self.mempool.take_template(&capacity);
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE producer_template_seconds={:.9}",
+                template_started.elapsed().as_secs_f64()
+            );
+        }
+        let execution_started = Instant::now();
         let ctx = BlockContext {
             chain_id: self.chain_id,
             height,
         };
         let engine = self.engine.clone();
         let auth = NodeAuthVerifier;
-        let preverified_auth = PreverifiedSignatureAuth;
         let mut receipts: Vec<ReceiptV1> = Vec::new();
         let mut included: Vec<(TransactionV1, TransactionWitnessesV1)> = Vec::new();
         let mut dropped: Vec<Hash32> = Vec::new();
-        for (txid, tx, witnesses, encoded_len, signatures_preverified) in template {
-            let verifier: &dyn noos_lumen::engine::AuthVerifier = if signatures_preverified {
-                &preverified_auth
-            } else {
-                &auth
-            };
-            match self.ledger.apply_canonical_decoded_transaction(
-                &ctx,
-                &tx,
-                &witnesses,
-                encoded_len,
-                &engine,
-                verifier,
-            ) {
-                Ok(outcome) => {
-                    receipts.push(outcome.receipt().clone());
-                    match outcome {
-                        noos_lumen::state::ApplyOutcome::Applied { delta, .. }
-                        | noos_lumen::state::ApplyOutcome::Failed { delta, .. } => {
-                            deltas.push(delta);
+        let ((), balance_root_delta) =
+            self.ledger.with_deferred_balance_roots(|ledger, deferred| {
+                for entry in template {
+                    let signatures_preverified =
+                        entry
+                            .signature_authorizations
+                            .iter()
+                            .all(|(account_id, descriptor)| {
+                                ledger.deferred_auth_descriptor_matches(
+                                    deferred, account_id, descriptor,
+                                )
+                            });
+                    let encoded_len = entry.encoded_len();
+                    let txid = entry.txid;
+                    let tx = entry.tx;
+                    let witnesses = entry.witnesses;
+                    let preverified_auth = PreverifiedSignatureAuth::new(txid);
+                    let verifier: &dyn noos_lumen::engine::AuthVerifier = if signatures_preverified
+                    {
+                        &preverified_auth
+                    } else {
+                        &auth
+                    };
+                    let applied = if signatures_preverified {
+                        match ledger.try_apply_preverified_simple_transfer_deferred(
+                            &ctx,
+                            &tx,
+                            &witnesses,
+                            encoded_len,
+                            txid,
+                            deferred,
+                        ) {
+                            Ok(Some(outcome)) => Ok(outcome),
+                            Ok(None) => ledger.apply_canonical_decoded_transaction_deferred(
+                                &ctx,
+                                &tx,
+                                &witnesses,
+                                encoded_len,
+                                &engine,
+                                verifier,
+                                deferred,
+                            ),
+                            Err(reason) => Err(reason),
                         }
+                    } else {
+                        ledger.apply_canonical_decoded_transaction_deferred(
+                            &ctx,
+                            &tx,
+                            &witnesses,
+                            encoded_len,
+                            &engine,
+                            verifier,
+                            deferred,
+                        )
+                    };
+                    match applied {
+                        Ok(outcome) => {
+                            match outcome {
+                                noos_lumen::state::ApplyOutcome::Applied { receipt, delta }
+                                | noos_lumen::state::ApplyOutcome::Failed {
+                                    receipt, delta, ..
+                                } => {
+                                    receipts.push(receipt);
+                                    deltas.push(delta);
+                                }
+                            }
+                            included.push((tx, witnesses));
+                        }
+                        Err(_) => dropped.push(txid),
                     }
-                    included.push((tx, witnesses));
                 }
-                Err(_) => dropped.push(txid),
-            }
-        }
+            });
+        deltas.push(balance_root_delta);
         for txid in &dropped {
             self.mempool.remove(txid);
             self.view.drop_pending(txid);
@@ -2600,8 +2963,12 @@ impl<P: StorePort> NodeCore<P> {
                 .end_block_fee_update(&usage)
                 .map_err(NodeError::LumenReject)?,
         );
-        let roots = self.ledger.roots();
-
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE producer_execution_seconds={:.9}",
+                execution_started.elapsed().as_secs_f64()
+            );
+        }
         // Assemble the body directly from the canonical typed values retained
         // at admission; no encode/decode round trip occurs on the hot path.
         let (txs, wits): (Vec<_>, Vec<_>) = included.into_iter().unzip();
@@ -2625,6 +2992,87 @@ impl<P: StorePort> NodeCore<P> {
         let membership_root = self.snapshot_root(epoch);
         let proposer_key = Bytes48(self.proposer_secret.public_key().into_bytes());
 
+        // State roots, body-list commitments, DA coding, and final delta
+        // materialization are independent after ordered execution. Run them
+        // concurrently and join before constructing the signed header.
+        let parallel_started = Instant::now();
+        let ledger = &self.ledger;
+        let (
+            roots,
+            tx_root,
+            witness_root,
+            execution_receipt_root,
+            finality_certificate_root,
+            da_bytes,
+            encoded,
+            merged_delta,
+            roots_seconds,
+            commitments_seconds,
+            da_seconds,
+            merge_seconds,
+        ) = std::thread::scope(|scope| -> Result<_, NodeError> {
+            let roots_worker = scope.spawn(|| {
+                let started = Instant::now();
+                (ledger.roots(), started.elapsed().as_secs_f64())
+            });
+            let commitments_worker = scope.spawn(|| {
+                let started = Instant::now();
+                let result = (|| {
+                    Ok::<_, NodeError>((
+                        body_tx_root(&body.transactions)?,
+                        body_witness_root(&body.segregated_witnesses)?,
+                        body_receipt_root(&receipts)?,
+                        body_cert_root(&body.finality_certificates)?,
+                    ))
+                })();
+                (result, started.elapsed().as_secs_f64())
+            });
+            let da_worker = scope.spawn(|| {
+                let started = Instant::now();
+                let result = (|| {
+                    let da_bytes = da_form_bytes(&body);
+                    let encoded = encode_body(&da_bytes)?;
+                    Ok::<_, NodeError>((da_bytes, encoded))
+                })();
+                (result, started.elapsed().as_secs_f64())
+            });
+            let merge_started = Instant::now();
+            let merged_delta = deltas.finish();
+            let merge_seconds = merge_started.elapsed().as_secs_f64();
+
+            let (roots, roots_seconds) = roots_worker.join().map_err(|_| NodeError::Crypto)?;
+            let (commitments, commitments_seconds) =
+                commitments_worker.join().map_err(|_| NodeError::Crypto)?;
+            let (tx_root, witness_root, execution_receipt_root, finality_certificate_root) =
+                commitments?;
+            let (da, da_seconds) = da_worker.join().map_err(|_| NodeError::Crypto)?;
+            let (da_bytes, encoded) = da?;
+            Ok((
+                roots,
+                tx_root,
+                witness_root,
+                execution_receipt_root,
+                finality_certificate_root,
+                da_bytes,
+                encoded,
+                merged_delta,
+                roots_seconds,
+                commitments_seconds,
+                da_seconds,
+                merge_seconds,
+            ))
+        })?;
+        if profile {
+            eprintln!("NOOS_PROFILE producer_state_roots_seconds={roots_seconds:.9}");
+            eprintln!("NOOS_PROFILE producer_commitments_seconds={commitments_seconds:.9}");
+            eprintln!("NOOS_PROFILE producer_da_seconds={da_seconds:.9}");
+            eprintln!("NOOS_PROFILE producer_delta_merge_seconds={merge_seconds:.9}");
+            eprintln!(
+                "NOOS_PROFILE producer_parallel_post_execution_seconds={:.9}",
+                parallel_started.elapsed().as_secs_f64()
+            );
+        }
+
         let mut header = BlockHeaderV1 {
             chain_id: self.chain_id,
             height,
@@ -2632,11 +3080,11 @@ impl<P: StorePort> NodeCore<P> {
             timestamp_ms: ts,
             parent_hash,
             proposer_key,
-            tx_root: body_tx_root(&body.transactions)?,
-            witness_root: body_witness_root(&body.segregated_witnesses)?,
-            execution_receipt_root: body_receipt_root(&receipts)?,
+            tx_root,
+            witness_root,
+            execution_receipt_root,
             evidence_root: ZERO_ROOT,
-            body_da_root: ZERO_ROOT,
+            body_da_root: encoded.shard_root().into_bytes(),
             notes_root: roots.notes_root,
             nullifiers_root: roots.nullifiers_root,
             accounts_root: roots.accounts_root,
@@ -2645,7 +3093,7 @@ impl<P: StorePort> NodeCore<P> {
             params_root: roots.params_root,
             justified_checkpoint: self.dag.justified(),
             finalized_checkpoint: self.dag.finalized(),
-            finality_certificate_root: body_cert_root(&body.finality_certificates)?,
+            finality_certificate_root,
             witness_membership_root: membership_root,
             ground_profile_id: noos_ground::GROUND_PROFILE_ID_V1,
             ground_target: expected_target.to_le_bytes(),
@@ -2668,11 +3116,7 @@ impl<P: StorePort> NodeCore<P> {
             },
             proposer_signature: Bytes96([0; 96]),
         };
-
-        // DA commitment BEFORE the search (ch01 §4.3 steps 5-6).
-        let da_bytes = da_form_bytes(&body);
-        let encoded = encode_body(&da_bytes)?;
-        header.body_da_root = encoded.shard_root().into_bytes();
+        let mining_started = Instant::now();
 
         let commitment = header
             .proposal_commitment()
@@ -2693,6 +3137,12 @@ impl<P: StorePort> NodeCore<P> {
             .proposer_secret
             .sign_domain(DomainId::BlsProposer, commitment.as_bytes())
             .map_err(|_| NodeError::Crypto)?;
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE producer_mining_seconds={:.9}",
+                mining_started.elapsed().as_secs_f64()
+            );
+        }
         header.proposer_signature = Bytes96(sig.into_bytes());
 
         // Connect + commit through the ordinary paths.
@@ -2708,24 +3158,29 @@ impl<P: StorePort> NodeCore<P> {
             }
         };
         self.availability.record_encoded(&encoded);
+        let claim = *encoded.claim();
         let exec = ExecResult {
             receipts,
-            merged_delta: merge_deltas(deltas),
+            merged_delta,
             roots,
         };
-        self.commit_executed_block(hash, &header, &ticket, &body, &exec)?;
+        let commit_started = Instant::now();
+        self.commit_executed_block(hash, &header, &ticket, exec, da_bytes)?;
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE producer_store_commit_seconds={:.9}",
+                commit_started.elapsed().as_secs_f64()
+            );
+        }
         self.metrics.inc(&self.metrics.blocks_produced_total);
 
-        let mut shards = Vec::with_capacity(noos_da::BODY_TOTAL_SHARDS);
-        for i in 0..noos_da::BODY_TOTAL_SHARDS {
-            shards.push(encoded.candidate(i as u32)?);
-        }
+        let shards = encoded.into_candidates()?;
         Ok(ProducedBlock {
             hash,
             header,
             ticket,
             body,
-            claim: *encoded.claim(),
+            claim,
             shards,
         })
     }
@@ -2781,21 +3236,9 @@ pub fn decode_header_record(bytes: &[u8]) -> Result<(BlockHeaderV1, GroundTicket
 /// (last-write-wins per `(tree, key, sub_key)` slot).
 #[must_use]
 pub fn merge_deltas(deltas: Vec<StateDelta>) -> StateDelta {
-    let mut map: BTreeMap<(TreeId, Hash32, Option<Hash32>), Option<Vec<u8>>> = BTreeMap::new();
+    let mut merged = DeltaAccumulator::default();
     for delta in deltas {
-        for e in delta.entries {
-            map.insert((e.tree, e.key, e.sub_key), e.value);
-        }
+        merged.push(delta);
     }
-    StateDelta {
-        entries: map
-            .into_iter()
-            .map(|((tree, key, sub_key), value)| DeltaEntry {
-                tree,
-                key,
-                sub_key,
-                value,
-            })
-            .collect(),
-    }
+    merged.finish()
 }

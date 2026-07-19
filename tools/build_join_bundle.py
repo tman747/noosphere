@@ -40,7 +40,7 @@ def main() -> int:
     profile_path = Path(args.profile).resolve()
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     profile = json.loads(profile_path.read_text(encoding="utf-8"))
-    if manifest.get("schema") != "noos/lan-testnet/v1":
+    if manifest.get("schema") != "noos/lan-testnet/v2":
         raise SystemExit("unsupported LAN manifest")
     params = Path(manifest["params"])
     if not params.is_absolute():

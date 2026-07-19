@@ -15,6 +15,12 @@ use noos_codec::{NoosDecode, NoosEncode};
 use crate::engine::{AuthVerifier, ContractEngine, EngineOutcome, EngineTrap};
 use crate::fees::{self, FeeParamsV1, FeeStateV1};
 use crate::issuance::{EmissionSharesV1, IssuanceParamsV1};
+use crate::neural_oracle::{
+    neural_output_root, neural_program_id, neural_reply_commitment, neural_result_key,
+    neural_transcript_root, EvaluateNeuralProgramV1, FinalizeNeuralOracleQueryV1,
+    NeuralOracleCommitV1, NeuralOracleMode, NeuralOracleQueryV1, NeuralOracleRevealV1,
+    NeuralOracleStatus, NeuralProgramV1,
+};
 use crate::objects::{
     agent_private_payment_schema_root, agent_private_payment_scope, asset_id, compute_job_id,
     debt_position_id, lending_market_id, liquidity_position_id, note_id, oracle_feed_id, pool_id,
@@ -28,12 +34,12 @@ use crate::state::{
     LumenRoots, RejectReason, SimulationOutcome, StateDelta, TreeId, CONTROL_PREFIX, NOOS_ASSET,
     PARAM_ISSUANCE,
 };
-use crate::wwm::{
-    wwm_profile_key, FundBucketTag, ModelCapsuleV2, SignatureEntryV1, WwmControlMode,
-    WwmControlStateV1, WwmEvidenceTier, WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmSettlementV1,
-    WwmTerminalCode,
-};
 use crate::test_util::SplitMix64;
+use crate::wwm::{
+    wwm_profile_key, CapabilityProfileV1, CapabilitySetV1, CapabilityStatus, FundBucketTag,
+    ModelCapsuleV2, RegistryEpochVectorV1, SignatureEntryV1, WwmControlMode, WwmControlStateV1,
+    WwmEvidenceTier, WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmSettlementV1, WwmTerminalCode,
+};
 use crate::Hash32;
 
 const CHAIN: Hash32 = [0x11; 32];
@@ -281,6 +287,18 @@ fn assert_roots_eq(a: &LumenRoots, b: &LumenRoots) {
     assert_eq!(a.params_root, b.params_root, "params_root diverged");
 }
 
+fn merged_delta_map(
+    deltas: Vec<StateDelta>,
+) -> std::collections::BTreeMap<(TreeId, Hash32, Option<Hash32>), Option<Vec<u8>>> {
+    let mut merged = std::collections::BTreeMap::new();
+    for delta in deltas {
+        for entry in delta.entries {
+            merged.insert((entry.tree, entry.key, entry.sub_key), entry.value);
+        }
+    }
+    merged
+}
+
 /// Create an object and return its derived id.
 fn create_object(ledger: &mut LumenLedger, height: u64, code_hash: Hash32) -> Hash32 {
     let (tx_bytes, wit_bytes, tx) = build_tx(
@@ -363,6 +381,149 @@ fn canonical_decoded_application_matches_raw_application() {
         .unwrap();
     assert_eq!(raw.receipt(), decoded.receipt());
     assert_roots_eq(&raw_ledger.roots(), &decoded_ledger.roots());
+}
+
+#[test]
+fn deferred_balance_roots_match_ordinary_ordered_execution() {
+    let mut base = genesis();
+    let trapping_object = create_object(&mut base, 1, TRAP_CODE);
+    let transactions = vec![
+        build_tx(
+            2,
+            vec![],
+            vec![PAYER],
+            vec![
+                ActionV1::WithdrawFromAccount {
+                    account_id: PAYER,
+                    asset_id: NOOS_ASSET,
+                    amount: 100,
+                },
+                ActionV1::DepositToAccount {
+                    account_id: GOV,
+                    asset_id: NOOS_ASSET,
+                    amount: 100,
+                },
+            ],
+            vec![],
+        ),
+        build_tx(
+            3,
+            vec![],
+            vec![PAYER, GOV],
+            vec![
+                ActionV1::WithdrawFromAccount {
+                    account_id: GOV,
+                    asset_id: NOOS_ASSET,
+                    amount: 40,
+                },
+                ActionV1::DepositToAccount {
+                    account_id: PAYER,
+                    asset_id: NOOS_ASSET,
+                    amount: 40,
+                },
+            ],
+            vec![],
+        ),
+        build_tx(
+            4,
+            vec![],
+            vec![PAYER],
+            vec![ActionV1::CallObject {
+                object_id: trapping_object,
+                input: BoundedBytes::new(vec![0xAA]).unwrap(),
+            }],
+            vec![],
+        ),
+    ];
+    let mut ordinary = base.clone();
+    let mut deferred = base;
+    let mut ordinary_receipts = Vec::new();
+    let mut ordinary_deltas = Vec::new();
+    for (tx_bytes, witness_bytes, tx) in &transactions {
+        let witnesses = TransactionWitnessesV1::decode_canonical(witness_bytes).unwrap();
+        let outcome = ordinary
+            .apply_canonical_decoded_transaction(
+                &ctx(2),
+                tx,
+                &witnesses,
+                tx_bytes.len() + witness_bytes.len(),
+                &StubEngine,
+                &AcceptAll,
+            )
+            .unwrap();
+        match outcome {
+            ApplyOutcome::Applied { receipt, delta } => {
+                ordinary_receipts.push((receipt, None));
+                ordinary_deltas.push(delta);
+            }
+            ApplyOutcome::Failed {
+                receipt,
+                delta,
+                code,
+            } => {
+                ordinary_receipts.push((receipt, Some(code)));
+                ordinary_deltas.push(delta);
+            }
+        }
+    }
+
+    let mut deferred_receipts = Vec::new();
+    let mut deferred_deltas = Vec::new();
+    let (execution_result, final_balance_roots) =
+        deferred.with_deferred_balance_roots(|ledger, roots| {
+            for (tx_bytes, witness_bytes, tx) in &transactions {
+                let witnesses = TransactionWitnessesV1::decode_canonical(witness_bytes).unwrap();
+                let outcome = match ledger
+                    .try_apply_preverified_simple_transfer_deferred(
+                        &ctx(2),
+                        tx,
+                        &witnesses,
+                        tx_bytes.len() + witness_bytes.len(),
+                        txid(tx),
+                        roots,
+                    )
+                    .unwrap()
+                {
+                    Some(outcome) => outcome,
+                    None => ledger
+                        .apply_canonical_decoded_transaction_deferred(
+                            &ctx(2),
+                            tx,
+                            &witnesses,
+                            tx_bytes.len() + witness_bytes.len(),
+                            &StubEngine,
+                            &AcceptAll,
+                            roots,
+                        )
+                        .unwrap(),
+                };
+                match outcome {
+                    ApplyOutcome::Applied { receipt, delta } => {
+                        deferred_receipts.push((receipt, None));
+                        deferred_deltas.push(delta);
+                    }
+                    ApplyOutcome::Failed {
+                        receipt,
+                        delta,
+                        code,
+                    } => {
+                        deferred_receipts.push((receipt, Some(code)));
+                        deferred_deltas.push(delta);
+                    }
+                }
+            }
+            Ok::<(), RejectReason>(())
+        });
+    execution_result.unwrap();
+    deferred_deltas.push(final_balance_roots);
+
+    assert_eq!(ordinary_receipts, deferred_receipts);
+    assert_eq!(
+        merged_delta_map(ordinary_deltas),
+        merged_delta_map(deferred_deltas)
+    );
+    assert_roots_eq(&ordinary.roots(), &deferred.roots());
+    assert_eq!(ordinary, deferred);
 }
 
 #[test]
@@ -2268,22 +2429,380 @@ fn wwm_flow_fixture(
 }
 
 fn apply_wwm_action(ledger: &mut LumenLedger, height: u64, action: ActionV1) -> ApplyOutcome {
-    let (tx, witnesses, _) = build_tx(
-        height,
-        vec![],
-        vec![PAYER, GOV],
-        vec![action],
-        vec![],
-    );
+    let (tx, witnesses, _) = build_tx(height, vec![], vec![PAYER, GOV], vec![action], vec![]);
     ledger
-        .apply_transaction(
-            &ctx(height),
-            &tx,
-            &witnesses,
-            &StubEngine,
-            &AcceptAll,
-        )
+        .apply_transaction(&ctx(height), &tx, &witnesses, &StubEngine, &AcceptAll)
         .unwrap()
+}
+
+fn neural_reporter_profile(
+    profile_id: Hash32,
+    operator_id: Hash32,
+    control_marker: u8,
+) -> CapabilityProfileV1 {
+    CapabilityProfileV1 {
+        profile_id,
+        status: CapabilityStatus::Active,
+        beneficial_control_root: [control_marker; 32],
+        region_id: [control_marker.wrapping_add(1); 32],
+        asn: u32::from(control_marker),
+        provider_root: [control_marker.wrapping_add(2); 32],
+        software_lineage_root: [control_marker.wrapping_add(3); 32],
+        attestation_epoch: 1,
+        attestation_expiry: 100,
+        capability_bitmap: 1,
+        selection_weight: 1,
+        endpoint_root: [control_marker.wrapping_add(4); 32],
+        staging_bytes: 1,
+        capacity_bytes: 1,
+        headroom_bytes: 1,
+        operator_id,
+        signing_key: [control_marker.wrapping_add(5); 32],
+        reviewer_id: [control_marker.wrapping_add(6); 32],
+        reviewer_signature: BoundedBytes::new(vec![control_marker]).unwrap(),
+    }
+}
+
+fn install_neural_reporters(ledger: &mut LumenLedger, job: &mut WwmJobV1) -> (Hash32, [Hash32; 3]) {
+    let set_id = [0x60; 32];
+    let profile_ids = [[0x61; 32], [0x62; 32], [0x63; 32]];
+    let executor_set = CapabilitySetV1 {
+        set_id,
+        prior_set_id: [0x5f; 32],
+        epoch: 1,
+        entries: BoundedList::new(vec![
+            neural_reporter_profile(profile_ids[0], PAYER, 0x71),
+            neural_reporter_profile(profile_ids[1], GOV, 0x72),
+            neural_reporter_profile(profile_ids[2], EMERGENCY, 0x73),
+        ])
+        .unwrap(),
+    };
+    assert!(executor_set.validate());
+    let registry = RegistryEpochVectorV1 {
+        vector_id: [0x64; 32],
+        executor_set_id: set_id,
+        executor_epoch: 1,
+        custodian_set_id: [0x65; 32],
+        custodian_epoch: 1,
+        fee_policy_id: [0x66; 32],
+        fee_epoch: 1,
+        fund_profile_id: job.fund_profile_id,
+        fund_epoch: 1,
+        service_directory_id: [0x67; 32],
+        service_epoch: 1,
+    };
+    ledger.install_neural_oracle_fixture_for_test(&registry, &executor_set);
+    job.selected_executor_ids = BoundedList::new(profile_ids.to_vec()).unwrap();
+    (set_id, profile_ids)
+}
+
+#[test]
+fn neural_l1_program_evaluates_with_exact_trinary_result() {
+    let (mut ledger, _, _, _) = wwm_flow_fixture(WwmControlMode::Testnet);
+    let issued_before = ledger.total_issued();
+    let mut program = NeuralProgramV1 {
+        program_id: [0; 32],
+        input_width: 2,
+        hidden_width: 2,
+        output_width: 1,
+        hidden_weights: BoundedBytes::new(vec![2, 0, 1, 2]).unwrap(),
+        hidden_biases: BoundedBytes::new(vec![0, 0]).unwrap(),
+        output_weights: BoundedBytes::new(vec![2, 0]).unwrap(),
+        output_biases: BoundedBytes::new(vec![0]).unwrap(),
+    };
+    program.program_id = neural_program_id(&program);
+    assert!(matches!(
+        apply_wwm_action(
+            &mut ledger,
+            10,
+            ActionV1::RegisterNeuralProgram(program.clone())
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+
+    let query_id = [0x68; 32];
+    assert!(matches!(
+        apply_wwm_action(
+            &mut ledger,
+            11,
+            ActionV1::EvaluateNeuralProgram(EvaluateNeuralProgramV1 {
+                query_id,
+                program_id: program.program_id,
+                requester: PAYER,
+                input: BoundedBytes::new(vec![2, 0]).unwrap(),
+            })
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    let result = ledger.get_neural_oracle_result(&query_id).unwrap();
+    assert_eq!(result.mode, NeuralOracleMode::L1Deterministic);
+    assert_eq!(result.status, NeuralOracleStatus::Success);
+    assert_eq!(result.source_id, program.program_id);
+    assert_eq!(result.response.as_slice(), &[2]);
+    assert!(result.signer_profile_ids.is_empty());
+    assert_eq!(result.output_root, neural_output_root(&[2]));
+    assert_eq!(ledger.total_issued(), issued_before);
+    assert_eq!(ledger.emission_minted(), 0);
+    assert!(ledger
+        .finalized_object_proof(neural_result_key(&query_id))
+        .verify());
+
+    let (mut disabled, _, _, _) = wwm_flow_fixture(WwmControlMode::Disabled);
+    assert!(matches!(
+        apply_wwm_action(
+            &mut disabled,
+            10,
+            ActionV1::RegisterNeuralProgram(program.clone())
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    let disabled_query_id = [0x69; 32];
+    assert!(matches!(
+        apply_wwm_action(
+            &mut disabled,
+            11,
+            ActionV1::EvaluateNeuralProgram(EvaluateNeuralProgramV1 {
+                query_id: disabled_query_id,
+                program_id: program.program_id,
+                requester: PAYER,
+                input: BoundedBytes::new(vec![2, 0]).unwrap(),
+            })
+        ),
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert!(disabled
+        .get_neural_oracle_result(&disabled_query_id)
+        .is_none());
+}
+
+#[test]
+fn neural_wwm_quorum_preserves_raw_response_and_binds_receipt() {
+    let (mut ledger, mut job, mut receipt, _) = wwm_flow_fixture(WwmControlMode::Testnet);
+    let (executor_set_id, profile_ids) = install_neural_reporters(&mut ledger, &mut job);
+    assert!(matches!(
+        apply_wwm_action(&mut ledger, 10, ActionV1::OpenWwmJob(job.clone())),
+        ApplyOutcome::Applied { .. }
+    ));
+    let query = NeuralOracleQueryV1 {
+        query_id: job.job_id,
+        job_id: job.job_id,
+        requester: PAYER,
+        executor_set_id,
+        executor_set_epoch: 1,
+        input_root: job.offchain_envelope_root,
+        max_response_bytes: 128,
+        threshold: 2,
+        commit_deadline: 13,
+        reveal_deadline: 18,
+    };
+    let mut single_reporter = query.clone();
+    single_reporter.threshold = 1;
+    assert!(matches!(
+        apply_wwm_action(
+            &mut ledger,
+            11,
+            ActionV1::OpenNeuralOracleQuery(single_reporter)
+        ),
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert!(matches!(
+        apply_wwm_action(
+            &mut ledger,
+            11,
+            ActionV1::OpenNeuralOracleQuery(query.clone())
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+
+    let mut collision_program = NeuralProgramV1 {
+        program_id: [0; 32],
+        input_width: 1,
+        hidden_width: 1,
+        output_width: 1,
+        hidden_weights: BoundedBytes::new(vec![2]).unwrap(),
+        hidden_biases: BoundedBytes::new(vec![0]).unwrap(),
+        output_weights: BoundedBytes::new(vec![2]).unwrap(),
+        output_biases: BoundedBytes::new(vec![0]).unwrap(),
+    };
+    collision_program.program_id = neural_program_id(&collision_program);
+    assert!(matches!(
+        apply_wwm_action(
+            &mut ledger,
+            11,
+            ActionV1::RegisterNeuralProgram(collision_program.clone())
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply_wwm_action(
+            &mut ledger,
+            12,
+            ActionV1::EvaluateNeuralProgram(EvaluateNeuralProgramV1 {
+                query_id: job.job_id,
+                program_id: collision_program.program_id,
+                requester: PAYER,
+                input: BoundedBytes::new(vec![2]).unwrap(),
+            })
+        ),
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+
+    let response = b"raw model bytes: no median, trim, or reinterpretation";
+    let output_root = neural_output_root(response);
+    let transcript_root = neural_transcript_root(response);
+    let nonces = [[0x81; 32], [0x82; 32]];
+    for (index, height) in [12, 13].into_iter().enumerate() {
+        let commitment = neural_reply_commitment(
+            &job.job_id,
+            &profile_ids[index],
+            &output_root,
+            &transcript_root,
+            &nonces[index],
+        );
+        assert!(matches!(
+            apply_wwm_action(
+                &mut ledger,
+                height,
+                ActionV1::CommitNeuralOracleReply(NeuralOracleCommitV1 {
+                    query_id: job.job_id,
+                    reporter_profile_id: profile_ids[index],
+                    commitment,
+                })
+            ),
+            ApplyOutcome::Applied { .. }
+        ));
+    }
+    for (index, height) in [14, 15].into_iter().enumerate() {
+        assert!(matches!(
+            apply_wwm_action(
+                &mut ledger,
+                height,
+                ActionV1::RevealNeuralOracleReply(NeuralOracleRevealV1 {
+                    query_id: job.job_id,
+                    reporter_profile_id: profile_ids[index],
+                    response: BoundedBytes::new(response.to_vec()).unwrap(),
+                    transcript_root,
+                    nonce: nonces[index],
+                })
+            ),
+            ApplyOutcome::Applied { .. }
+        ));
+    }
+
+    let result = ledger.get_neural_oracle_result(&job.job_id).unwrap();
+    assert_eq!(result.mode, NeuralOracleMode::WwmQuorum);
+    assert_eq!(result.status, NeuralOracleStatus::Success);
+    assert_eq!(result.response.as_slice(), response);
+    assert_eq!(result.output_root, output_root);
+    assert_eq!(result.transcript_root, transcript_root);
+    assert_eq!(result.signer_profile_ids.as_slice(), &profile_ids[..2]);
+
+    receipt.output_root = result.output_root;
+    receipt.token_history_root = result.transcript_root;
+    receipt.signer_ids = result.signer_profile_ids.clone();
+    receipt.control_cluster_ids = BoundedList::new(vec![[0x91; 32], [0x92; 32]]).unwrap();
+    receipt.evidence_tier = WwmEvidenceTier::MatchedQuorum;
+    receipt.anchor_height = 16;
+    receipt.signatures = BoundedList::new(
+        profile_ids[..2]
+            .iter()
+            .map(|profile_id| SignatureEntryV1 {
+                signer_id: *profile_id,
+                signature: BoundedBytes::new(vec![1]).unwrap(),
+            })
+            .collect(),
+    )
+    .unwrap();
+    assert!(matches!(
+        apply_wwm_action(&mut ledger, 16, ActionV1::RecordWwmReceipt(receipt.clone())),
+        ApplyOutcome::Applied { .. }
+    ));
+    let proof =
+        ledger.finalized_object_proof(wwm_profile_key(WwmLeafKind::Receipt, &receipt.receipt_id));
+    assert!(proof.verify());
+    let crate::wwm::ResolutionValueV1::Present(stored) = proof.value else {
+        panic!("receipt proof must contain the canonical receipt");
+    };
+    let stored = WwmReceiptV1::decode_canonical(stored.as_slice()).unwrap();
+    assert_eq!(stored.output_root, result.output_root);
+    assert_eq!(stored.token_history_root, result.transcript_root);
+}
+
+#[test]
+fn neural_wwm_timeout_finalizes_explicit_no_quorum_receipt() {
+    let (mut ledger, mut job, mut receipt, _) = wwm_flow_fixture(WwmControlMode::Testnet);
+    let (executor_set_id, _) = install_neural_reporters(&mut ledger, &mut job);
+    job.job_id = [0xa4; 32];
+    job.offchain_envelope_root = [0xa5; 32];
+    assert!(matches!(
+        apply_wwm_action(&mut ledger, 10, ActionV1::OpenWwmJob(job.clone())),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply_wwm_action(
+            &mut ledger,
+            11,
+            ActionV1::OpenNeuralOracleQuery(NeuralOracleQueryV1 {
+                query_id: job.job_id,
+                job_id: job.job_id,
+                requester: PAYER,
+                executor_set_id,
+                executor_set_epoch: 1,
+                input_root: job.offchain_envelope_root,
+                max_response_bytes: 64,
+                threshold: 2,
+                commit_deadline: 12,
+                reveal_deadline: 14,
+            })
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply_wwm_action(
+            &mut ledger,
+            15,
+            ActionV1::FinalizeNeuralOracleQuery(FinalizeNeuralOracleQueryV1 {
+                query_id: job.job_id,
+            })
+        ),
+        ApplyOutcome::Applied { .. }
+    ));
+
+    let result = ledger.get_neural_oracle_result(&job.job_id).unwrap();
+    assert_eq!(result.mode, NeuralOracleMode::WwmQuorum);
+    assert_eq!(result.status, NeuralOracleStatus::NoQuorum);
+    assert!(result.response.is_empty());
+    assert!(result.signer_profile_ids.is_empty());
+    assert_eq!(result.output_root, [0; 32]);
+    assert_eq!(result.transcript_root, [0; 32]);
+
+    receipt.receipt_id = [0xa6; 32];
+    receipt.job_id = job.job_id;
+    receipt.output_tokens = 0;
+    receipt.output_root = [0; 32];
+    receipt.token_history_root = [0; 32];
+    receipt.signer_ids = BoundedList::default();
+    receipt.control_cluster_ids = BoundedList::default();
+    receipt.evidence_tier = WwmEvidenceTier::NoQuorum;
+    receipt.anchor_height = 16;
+    receipt.metered_amount = 0;
+    receipt.paid_amount = 0;
+    receipt.refunded_amount = job.reserved_amount;
+    receipt.terminal_code = WwmTerminalCode::NoQuorum;
+    receipt.signatures = BoundedList::default();
+    assert!(matches!(
+        apply_wwm_action(&mut ledger, 16, ActionV1::RecordWwmReceipt(receipt)),
+        ApplyOutcome::Applied { .. }
+    ));
 }
 
 #[test]
@@ -2294,19 +2813,11 @@ fn testnet_wwm_job_receipt_settlement_flow_is_insert_once_and_bound() {
         ApplyOutcome::Applied { .. }
     ));
     assert!(matches!(
-        apply_wwm_action(
-            &mut ledger,
-            11,
-            ActionV1::RecordWwmReceipt(receipt.clone())
-        ),
+        apply_wwm_action(&mut ledger, 11, ActionV1::RecordWwmReceipt(receipt.clone())),
         ApplyOutcome::Applied { .. }
     ));
     assert!(matches!(
-        apply_wwm_action(
-            &mut ledger,
-            12,
-            ActionV1::SettleWwmJob(settlement.clone())
-        ),
+        apply_wwm_action(&mut ledger, 12, ActionV1::SettleWwmJob(settlement.clone())),
         ApplyOutcome::Applied { .. }
     ));
     for (kind, id) in [
@@ -2344,30 +2855,21 @@ fn testnet_wwm_flow_rejects_disabled_wrong_capsule_job_and_receipt() {
     let (mut wrong_capsule, mut job, _, _) = wwm_flow_fixture(WwmControlMode::Testnet);
     job.capsule_id = [0xa1; 32];
     assert!(matches!(
-        apply_wwm_action(
-            &mut wrong_capsule,
-            10,
-            ActionV1::OpenWwmJob(job)
-        ),
+        apply_wwm_action(&mut wrong_capsule, 10, ActionV1::OpenWwmJob(job)),
         ApplyOutcome::Failed {
             code: FailCode::PostconditionFailed,
             ..
         }
     ));
 
-    let (mut ledger, job, mut receipt, mut settlement) =
-        wwm_flow_fixture(WwmControlMode::Testnet);
+    let (mut ledger, job, mut receipt, mut settlement) = wwm_flow_fixture(WwmControlMode::Testnet);
     assert!(matches!(
         apply_wwm_action(&mut ledger, 10, ActionV1::OpenWwmJob(job)),
         ApplyOutcome::Applied { .. }
     ));
     receipt.job_id = [0xa2; 32];
     assert!(matches!(
-        apply_wwm_action(
-            &mut ledger,
-            11,
-            ActionV1::RecordWwmReceipt(receipt)
-        ),
+        apply_wwm_action(&mut ledger, 11, ActionV1::RecordWwmReceipt(receipt)),
         ApplyOutcome::Failed {
             code: FailCode::PostconditionFailed,
             ..
@@ -2380,20 +2882,12 @@ fn testnet_wwm_flow_rejects_disabled_wrong_capsule_job_and_receipt() {
         ApplyOutcome::Applied { .. }
     ));
     assert!(matches!(
-        apply_wwm_action(
-            &mut ledger,
-            11,
-            ActionV1::RecordWwmReceipt(receipt)
-        ),
+        apply_wwm_action(&mut ledger, 11, ActionV1::RecordWwmReceipt(receipt)),
         ApplyOutcome::Applied { .. }
     ));
     settlement.receipt_id = [0xa3; 32];
     assert!(matches!(
-        apply_wwm_action(
-            &mut ledger,
-            12,
-            ActionV1::SettleWwmJob(settlement)
-        ),
+        apply_wwm_action(&mut ledger, 12, ActionV1::SettleWwmJob(settlement)),
         ApplyOutcome::Failed {
             code: FailCode::PostconditionFailed,
             ..

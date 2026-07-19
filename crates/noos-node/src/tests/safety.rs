@@ -132,7 +132,7 @@ struct FailingBarrier {
 }
 
 impl StorePort for FailingBarrier {
-    fn commit(&mut self, ws: &WriteSet) -> Result<u64, NodeError> {
+    fn commit(&mut self, ws: noos_store::WriteSet) -> Result<u64, NodeError> {
         self.inner.commit(ws)
     }
     fn persist_safety(&mut self, _kind: u16, _payload: &[u8]) -> Result<u64, NodeError> {

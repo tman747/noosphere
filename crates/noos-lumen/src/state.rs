@@ -13,14 +13,24 @@
 //! Whole-state clones are prohibited on these paths (plan §4.1); the only
 //! full-map walk is root recomputation, which allocates no state copy.
 
-use std::collections::BTreeMap;
+use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet};
 
 use noos_codec::{NoosDecode, NoosEncode};
 use noos_stable_safety::{DebtPosition as SafetyDebtPosition, SafetyPolicy, SafetyState};
+use smallvec::SmallVec;
 
 use crate::engine::{AuthVerifier, ContractEngine};
 use crate::fees::{self, FeeParamsV1, FeeStateV1, Usage};
 use crate::issuance::{EmissionSharesV1, IssuanceParamsV1};
+use crate::neural_oracle::{
+    evaluate_neural_program, neural_commit_key, neural_input_root, neural_output_root,
+    neural_program_key, neural_query_key, neural_reply_commitment, neural_result_id,
+    neural_result_key, neural_reveal_key, neural_transcript_root, validate_neural_program,
+    NeuralOracleCommitRecordV1, NeuralOracleMode, NeuralOracleQueryV1, NeuralOracleResultV1,
+    NeuralOracleRevealRecordV1, NeuralOracleStatus, NeuralProgramV1, MAX_NEURAL_ORACLE_REPORTERS,
+    MAX_NEURAL_ORACLE_RESPONSE_BYTES, NEURAL_ORACLE_QUORUM_THRESHOLD,
+};
 use crate::objects::{
     agent_private_payment_schema_root, agent_private_payment_scope, asset_id as derive_asset_id,
     compute_job_id as derive_compute_job_id, debt_position_id as derive_debt_position_id,
@@ -35,14 +45,15 @@ use crate::objects::{
     OracleReportV1, ParamRecordV1, PendingParamV1, PoolV1, PrivatePaymentV1, ReceiptV1,
     ResourceVector, StableAssetV1, StableSafetyV1, TransactionV1, TransactionWitnessesV1,
 };
-use crate::smt::Smt;
+use crate::smt::{ReceiptSmt, Smt};
 use crate::wwm::{
     genesis_fund_ledger, wwm_fixed_key, wwm_profile_key, CapabilityMutationV1, CapabilitySetV1,
     CapabilityStatus, CustodianCapabilityMutationV2, CustodianCapabilitySetV1, FundBucketTag,
     FundLedgerStatus, FundMutationLockRefV1, FundMutationLockStatus, FundMutationLockV1,
     FundProfileV1, ModelCapsuleV2, RegisterFundProfilePayloadV1, RegistryEpochVectorV1,
     ResolutionProofV1, TestnetModelRegistrationV1, TransitionWwmControlPayloadV1, WwmControlMode,
-    WwmControlStateV1, WwmFundLedgerV1, WwmJobV1, WwmLeafKind, WwmReceiptV1,
+    WwmControlStateV1, WwmEvidenceTier, WwmFundLedgerV1, WwmJobV1, WwmLeafKind, WwmReceiptV1,
+    WwmTerminalCode,
 };
 use crate::Hash32;
 
@@ -192,12 +203,12 @@ type DeltaMap = BTreeMap<(TreeId, Hash32, Option<Hash32>), Option<Vec<u8>>>;
 /// insertion-order independent.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct StateDelta {
-    pub entries: Vec<DeltaEntry>,
+    pub entries: SmallVec<[DeltaEntry; 3]>,
 }
 
 impl StateDelta {
     fn from_map(map: DeltaMap) -> Self {
-        let entries = map
+        let entries: SmallVec<[DeltaEntry; 3]> = map
             .into_iter()
             .map(|((tree, key, sub_key), value)| DeltaEntry {
                 tree,
@@ -213,6 +224,19 @@ impl StateDelta {
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
+}
+/// Block-scoped capability for postponing liquid-balance subtree roots.
+///
+/// The token has no public constructor: callers obtain it only inside
+/// [`LumenLedger::with_deferred_balance_roots`], which always materializes
+/// every dirty account root before returning.
+#[derive(Debug)]
+pub struct DeferredBalanceRoots {
+    dirty_accounts: BTreeSet<Hash32>,
+    dirty_account_records: BTreeSet<Hash32>,
+    cached_accounts: BTreeMap<Hash32, AccountV1>,
+    fee_params: Option<FeeParamsV1>,
+    prices: Option<fees::Prices>,
 }
 
 // ---------------------------------------------------------------------------
@@ -338,8 +362,8 @@ impl SimulationOutcome {
     }
 }
 
-struct PreparedTransaction {
-    tx: TransactionV1,
+struct PreparedTransaction<'a> {
+    tx: Cow<'a, TransactionV1>,
     actions: Vec<ActionV1>,
     txid: Hash32,
     input_notes: Vec<(Hash32, NoteV1)>,
@@ -397,18 +421,66 @@ pub enum GenesisError {
 // Overlay
 // ---------------------------------------------------------------------------
 
+#[derive(Debug)]
+struct TinyMap<K, V> {
+    entries: SmallVec<[(K, V); 4]>,
+}
+
+impl<K, V> Default for TinyMap<K, V> {
+    fn default() -> Self {
+        Self {
+            entries: SmallVec::new(),
+        }
+    }
+}
+
+impl<K: Ord, V> TinyMap<K, V> {
+    fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    fn get(&self, key: &K) -> Option<&V> {
+        self.entries
+            .binary_search_by(|(candidate, _)| candidate.cmp(key))
+            .ok()
+            .map(|index| &self.entries[index].1)
+    }
+
+    fn insert(&mut self, key: K, value: V) -> Option<V> {
+        match self
+            .entries
+            .binary_search_by(|(candidate, _)| candidate.cmp(&key))
+        {
+            Ok(index) => Some(std::mem::replace(&mut self.entries[index].1, value)),
+            Err(index) => {
+                self.entries.insert(index, (key, value));
+                None
+            }
+        }
+    }
+}
+
+impl<K, V> IntoIterator for TinyMap<K, V> {
+    type Item = (K, V);
+    type IntoIter = smallvec::IntoIter<[(K, V); 4]>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.entries.into_iter()
+    }
+}
+
 /// Bounded copy-on-write overlay keyed by touched entries. Reads fall
 /// through to the base ledger; writes stay here until commit.
 #[derive(Debug, Default)]
 struct Overlay {
-    notes: BTreeMap<Hash32, Option<Vec<u8>>>,
-    nullifiers: BTreeMap<Hash32, Option<Vec<u8>>>,
-    accounts: BTreeMap<Hash32, Option<Vec<u8>>>,
-    objects: BTreeMap<Hash32, Option<Vec<u8>>>,
-    receipts: BTreeMap<Hash32, Option<Vec<u8>>>,
-    params: BTreeMap<Hash32, Option<Vec<u8>>>,
+    notes: TinyMap<Hash32, Option<Vec<u8>>>,
+    nullifiers: TinyMap<Hash32, Option<Vec<u8>>>,
+    accounts: TinyMap<Hash32, Option<Vec<u8>>>,
+    objects: TinyMap<Hash32, Option<Vec<u8>>>,
+    receipts: TinyMap<Hash32, Option<ReceiptV1>>,
+    params: TinyMap<Hash32, Option<Vec<u8>>>,
     /// (account, asset) -> new amount; 0 removes the balance leaf.
-    balances: BTreeMap<(Hash32, Hash32), u128>,
+    balances: TinyMap<(Hash32, Hash32), u128>,
     state_reads: u64,
     state_writes: u64,
 }
@@ -437,7 +509,7 @@ pub struct LumenLedger {
     nullifiers: Smt,
     accounts: Smt,
     objects: Smt,
-    receipts: Smt,
+    receipts: ReceiptSmt,
     params: Smt,
     /// account_id -> (asset_id -> amount) sub-tree backing
     /// `AccountV1.liquid_balances_root`.
@@ -736,6 +808,24 @@ impl LumenLedger {
             .and_then(|b| AccountV1::decode_canonical(b).ok())
     }
 
+    /// Checks the current account authorization while reusing the block-local
+    /// decoded account cache populated by deferred simple transfers.
+    #[must_use]
+    pub fn deferred_auth_descriptor_matches(
+        &self,
+        deferred: &DeferredBalanceRoots,
+        id: &Hash32,
+        expected: &[u8],
+    ) -> bool {
+        deferred.cached_accounts.get(id).map_or_else(
+            || {
+                self.get_account(id)
+                    .is_some_and(|account| account.auth_descriptor.as_slice() == expected)
+            },
+            |account| account.auth_descriptor.as_slice() == expected,
+        )
+    }
+
     #[must_use]
     pub fn get_object(&self, id: &Hash32) -> Option<ObjectV1> {
         self.objects
@@ -789,6 +879,27 @@ impl LumenLedger {
             .iter()
             .filter_map(|(_, bytes)| OracleReportV1::decode_canonical(bytes).ok())
             .collect()
+    }
+
+    #[must_use]
+    pub fn get_neural_program(&self, id: &Hash32) -> Option<NeuralProgramV1> {
+        self.objects
+            .get(&neural_program_key(id))
+            .and_then(|bytes| NeuralProgramV1::decode_canonical(bytes).ok())
+    }
+
+    #[must_use]
+    pub fn get_neural_oracle_query(&self, id: &Hash32) -> Option<NeuralOracleQueryV1> {
+        self.objects
+            .get(&neural_query_key(id))
+            .and_then(|bytes| NeuralOracleQueryV1::decode_canonical(bytes).ok())
+    }
+
+    #[must_use]
+    pub fn get_neural_oracle_result(&self, id: &Hash32) -> Option<NeuralOracleResultV1> {
+        self.objects
+            .get(&neural_result_key(id))
+            .and_then(|bytes| NeuralOracleResultV1::decode_canonical(bytes).ok())
     }
 
     #[must_use]
@@ -900,6 +1011,22 @@ impl LumenLedger {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn install_neural_oracle_fixture_for_test(
+        &mut self,
+        registry: &RegistryEpochVectorV1,
+        executor_set: &CapabilitySetV1,
+    ) {
+        self.objects.insert(
+            wwm_fixed_key(WwmLeafKind::RegistryEpochVector),
+            registry.encode_canonical(),
+        );
+        self.objects.insert(
+            wwm_profile_key(WwmLeafKind::ExecutorCapabilitySet, &executor_set.set_id),
+            executor_set.encode_canonical(),
+        );
+    }
+
     #[must_use]
     pub fn pools(&self) -> Vec<PoolV1> {
         self.objects
@@ -955,9 +1082,31 @@ impl LumenLedger {
 
     #[must_use]
     pub fn get_receipt(&self, txid: &Hash32) -> Option<ReceiptV1> {
-        self.receipts
-            .get(txid)
-            .and_then(|b| ReceiptV1::decode_canonical(b).ok())
+        self.receipts.get(txid).cloned()
+    }
+
+    #[must_use]
+    pub fn get_receipt_settlement(&self, txid: &Hash32) -> Option<(u64, u16)> {
+        self.receipts.settlement(txid)
+    }
+
+    /// Transfers the settled-receipt index between node-owned atomic staging
+    /// states. Transactions can only append a previously absent txid. Failed
+    /// staging removes only receipts settled above the pre-stage canonical
+    /// height, preserving any historical receipt named by invalid replay data.
+    #[doc(hidden)]
+    pub fn take_receipt_state_for_staging(&mut self) -> ReceiptSmt {
+        std::mem::take(&mut self.receipts)
+    }
+
+    #[doc(hidden)]
+    pub fn replace_receipt_state_for_staging(&mut self, receipts: ReceiptSmt) {
+        self.receipts = receipts;
+    }
+
+    #[doc(hidden)]
+    pub fn remove_receipt_after_height_for_staging(&mut self, txid: &Hash32, settled_height: u64) {
+        self.receipts.remove_if_settled_after(txid, settled_height);
     }
 
     #[must_use]
@@ -1189,8 +1338,27 @@ impl LumenLedger {
         Ok(StateDelta::from_map(delta))
     }
 
-    /// Direct balance write + account-root refresh (emission/commit paths).
+    /// Direct balance write + account-root refresh (emission/ordinary commit paths).
     fn set_balance_direct(
+        &mut self,
+        account: &Hash32,
+        asset: &Hash32,
+        amount: u128,
+        delta: &mut DeltaMap,
+    ) {
+        self.set_balance_leaf_direct(account, asset, amount, delta);
+        self.refresh_balance_root_direct(account, delta);
+    }
+
+    /// Flush cached nonce updates before a general deferred transaction.
+    fn flush_deferred_accounts(&mut self, deferred: &mut DeferredBalanceRoots) {
+        for (account_id, account) in std::mem::take(&mut deferred.cached_accounts) {
+            self.accounts.insert(account_id, account.encode_canonical());
+            deferred.dirty_account_records.insert(account_id);
+        }
+    }
+    /// Update one balance leaf without hashing its account subtree.
+    fn set_balance_leaf_direct(
         &mut self,
         account: &Hash32,
         asset: &Hash32,
@@ -1202,12 +1370,20 @@ impl LumenLedger {
             tree.remove(asset);
             delta.insert((TreeId::AccountBalances, *account, Some(*asset)), None);
         } else {
-            tree.insert(*asset, encode_amount(amount));
+            let encoded = encode_amount(amount);
+            tree.insert(*asset, encoded.clone());
             delta.insert(
                 (TreeId::AccountBalances, *account, Some(*asset)),
-                Some(encode_amount(amount)),
+                Some(encoded),
             );
         }
+    }
+
+    /// Bind an account record to the current root of its balance subtree.
+    fn refresh_balance_root_direct(&mut self, account: &Hash32, delta: &mut DeltaMap) {
+        let Some(tree) = self.balances.get(account) else {
+            return;
+        };
         let new_root = tree.root();
         if let Some(mut acct) = self.get_account(account) {
             if acct.liquid_balances_root != new_root {
@@ -1217,6 +1393,18 @@ impl LumenLedger {
                 delta.insert((TreeId::Accounts, *account, None), Some(bytes));
             }
         }
+    }
+
+    fn set_balance_deferred(
+        &mut self,
+        account: &Hash32,
+        asset: &Hash32,
+        amount: u128,
+        delta: &mut DeltaMap,
+        deferred: &mut DeferredBalanceRoots,
+    ) {
+        self.set_balance_leaf_direct(account, asset, amount, delta);
+        deferred.dirty_accounts.insert(*account);
     }
 
     // -- fee controller -------------------------------------------------------
@@ -1352,15 +1540,69 @@ impl LumenLedger {
         engine: &dyn ContractEngine,
         auth: &dyn AuthVerifier,
     ) -> Result<ApplyOutcome, RejectReason> {
-        let prepared = self.prepare_transaction(ctx, tx_bytes, witness_bytes, auth)?;
+        let prepared = self.prepare_transaction(ctx, tx_bytes, witness_bytes, auth, None)?;
         match self.evaluate_transaction(ctx, &prepared, engine) {
             EvaluatedTransaction::Applied { overlay, receipt } => {
-                let delta = self.commit_overlay(overlay);
+                let delta = self.commit_overlay(overlay, ctx.height);
                 Ok(ApplyOutcome::Applied { receipt, delta })
             }
             EvaluatedTransaction::Failed { receipt, code } => {
-                Ok(self.commit_failure_receipt(&prepared.tx, receipt, code))
+                Ok(self.commit_failure_receipt(&prepared.tx, receipt, code, ctx.height))
             }
+        }
+    }
+    /// Execute a block-scoped transaction batch while hashing each touched
+    /// account's liquid-balance subtree exactly once at the end.
+    ///
+    /// Transaction order, reads, writes, receipts, and final roots are
+    /// unchanged. The returned delta contains the final account records and
+    /// MUST be ordered after the per-transaction deltas in the durable write
+    /// set.
+    pub fn with_deferred_balance_roots<R>(
+        &mut self,
+        execute: impl FnOnce(&mut Self, &mut DeferredBalanceRoots) -> R,
+    ) -> (R, StateDelta) {
+        let fee_params = self.fee_params();
+        let prices = self.fee_state().map(|state| state.prices());
+        let mut deferred = DeferredBalanceRoots {
+            dirty_accounts: BTreeSet::new(),
+            dirty_account_records: BTreeSet::new(),
+            cached_accounts: BTreeMap::new(),
+            fee_params,
+            prices,
+        };
+        let result = execute(self, &mut deferred);
+        let delta = self.materialize_deferred_balance_roots(deferred);
+        (result, delta)
+    }
+
+    /// Raw canonical transaction application for a block-scoped deferred-root
+    /// batch. Use only inside [`Self::with_deferred_balance_roots`].
+    pub fn apply_transaction_deferred(
+        &mut self,
+        ctx: &BlockContext,
+        tx_bytes: &[u8],
+        witness_bytes: &[u8],
+        engine: &dyn ContractEngine,
+        auth: &dyn AuthVerifier,
+        deferred: &mut DeferredBalanceRoots,
+    ) -> Result<ApplyOutcome, RejectReason> {
+        self.flush_deferred_accounts(deferred);
+        let fee_context = deferred.fee_params.as_ref().zip(deferred.prices.as_ref());
+        let prepared = self.prepare_transaction(ctx, tx_bytes, witness_bytes, auth, fee_context)?;
+        match self.evaluate_transaction(ctx, &prepared, engine) {
+            EvaluatedTransaction::Applied { overlay, receipt } => {
+                let delta = self.commit_overlay_deferred(overlay, deferred, ctx.height);
+                Ok(ApplyOutcome::Applied { receipt, delta })
+            }
+            EvaluatedTransaction::Failed { receipt, code } => Ok(self
+                .commit_failure_receipt_deferred(
+                    &prepared.tx,
+                    receipt,
+                    code,
+                    deferred,
+                    ctx.height,
+                )),
         }
     }
 
@@ -1381,20 +1623,298 @@ impl LumenLedger {
             u64::try_from(encoded_len).map_err(|_| RejectReason::OversizedEncoding)?;
         let prepared = self.prepare_decoded_transaction(
             ctx,
-            tx.clone(),
-            witnesses.clone(),
+            Cow::Borrowed(tx),
+            witnesses,
             encoded_len,
             auth,
+            None,
         )?;
         match self.evaluate_transaction(ctx, &prepared, engine) {
             EvaluatedTransaction::Applied { overlay, receipt } => {
-                let delta = self.commit_overlay(overlay);
+                let delta = self.commit_overlay(overlay, ctx.height);
                 Ok(ApplyOutcome::Applied { receipt, delta })
             }
             EvaluatedTransaction::Failed { receipt, code } => {
-                Ok(self.commit_failure_receipt(&prepared.tx, receipt, code))
+                Ok(self.commit_failure_receipt(&prepared.tx, receipt, code, ctx.height))
             }
         }
+    }
+    /// Canonically decoded transaction application for a block-scoped
+    /// deferred-root batch. Use only inside
+    /// [`Self::with_deferred_balance_roots`].
+    pub fn apply_canonical_decoded_transaction_deferred(
+        &mut self,
+        ctx: &BlockContext,
+        tx: &TransactionV1,
+        witnesses: &TransactionWitnessesV1,
+        encoded_len: usize,
+        engine: &dyn ContractEngine,
+        auth: &dyn AuthVerifier,
+        deferred: &mut DeferredBalanceRoots,
+    ) -> Result<ApplyOutcome, RejectReason> {
+        self.flush_deferred_accounts(deferred);
+        let encoded_len =
+            u64::try_from(encoded_len).map_err(|_| RejectReason::OversizedEncoding)?;
+        let fee_context = deferred.fee_params.as_ref().zip(deferred.prices.as_ref());
+        let prepared = self.prepare_decoded_transaction(
+            ctx,
+            Cow::Borrowed(tx),
+            witnesses,
+            encoded_len,
+            auth,
+            fee_context,
+        )?;
+        match self.evaluate_transaction(ctx, &prepared, engine) {
+            EvaluatedTransaction::Applied { overlay, receipt } => {
+                let delta = self.commit_overlay_deferred(overlay, deferred, ctx.height);
+                Ok(ApplyOutcome::Applied { receipt, delta })
+            }
+            EvaluatedTransaction::Failed { receipt, code } => Ok(self
+                .commit_failure_receipt_deferred(
+                    &prepared.tx,
+                    receipt,
+                    code,
+                    deferred,
+                    ctx.height,
+                )),
+        }
+    }
+
+    /// Fast path for the native signed-transfer shape used by payment
+    /// workloads. The caller must have verified the sole account signature
+    /// against the current descriptor. Ineligible shapes return `Ok(None)`
+    /// and use the general engine; eligible transactions preserve every
+    /// rejection, failure-charge, resource, nonce, receipt, and balance law.
+    pub fn try_apply_preverified_simple_transfer_deferred(
+        &mut self,
+        ctx: &BlockContext,
+        tx: &TransactionV1,
+        witnesses: &TransactionWitnessesV1,
+        encoded_len: usize,
+        transaction_id: Hash32,
+        deferred: &mut DeferredBalanceRoots,
+    ) -> Result<Option<ApplyOutcome>, RejectReason> {
+        if !tx.note_inputs.is_empty()
+            || tx.account_inputs.len() != 1
+            || !tx.object_access_list.is_empty()
+            || tx.actions.len() != 2
+            || !tx.outputs.is_empty()
+            || !tx.evidence_refs.is_empty()
+            || tx.account_inputs.as_slice().first() != Some(&tx.fee_payer)
+        {
+            return Ok(None);
+        }
+        let actions = tx.actions.as_slice();
+        let Ok(ActionV1::WithdrawFromAccount {
+            account_id: sender,
+            asset_id: withdraw_asset,
+            amount: withdraw_amount,
+        }) = ActionV1::decode_canonical(actions[0].as_slice())
+        else {
+            return Ok(None);
+        };
+        let Ok(ActionV1::DepositToAccount {
+            account_id: recipient,
+            asset_id: deposit_asset,
+            amount: deposit_amount,
+        }) = ActionV1::decode_canonical(actions[1].as_slice())
+        else {
+            return Ok(None);
+        };
+        if sender != tx.fee_payer
+            || withdraw_asset != deposit_asset
+            || withdraw_amount != deposit_amount
+        {
+            return Ok(None);
+        }
+        if recipient != sender
+            && !deferred.cached_accounts.contains_key(&recipient)
+            && self.get_account(&recipient).is_none()
+        {
+            // The general path creates a first-deposit recipient account.
+            return Ok(None);
+        }
+
+        let encoded_len =
+            u64::try_from(encoded_len).map_err(|_| RejectReason::OversizedEncoding)?;
+        if tx.chain_id != ctx.chain_id {
+            return Err(RejectReason::WrongChain);
+        }
+        if tx.format_version != TransactionV1::VERSION {
+            return Err(RejectReason::WrongFormatVersion);
+        }
+        if ctx.height > tx.expiry_height {
+            return Err(RejectReason::Expired);
+        }
+        let fee_params = deferred
+            .fee_params
+            .clone()
+            .ok_or(RejectReason::GovernanceDenied)?;
+        let prices = deferred.prices.ok_or(RejectReason::GovernanceDenied)?;
+        let declared = fees::usage_from_resources(&tx.resource_limits);
+        let capacity = fee_params.capacity();
+        for dimension in 0..fees::DIMENSIONS {
+            if declared[dimension] > capacity[dimension] {
+                return Err(RejectReason::ResourceLimitExceedsCapacity);
+            }
+        }
+        if encoded_len > tx.resource_limits.bytes {
+            return Err(RejectReason::OversizedEncoding);
+        }
+        if self.receipts.contains(&transaction_id) {
+            return Err(RejectReason::TxAlreadySettled);
+        }
+        if !deferred.cached_accounts.contains_key(&sender) {
+            let account = self
+                .get_account(&sender)
+                .ok_or(RejectReason::UnknownAccountInput)?;
+            deferred.cached_accounts.insert(sender, account);
+        }
+        if tx.witness_root != derive_witness_root(&witnesses.lock_reveals) {
+            return Err(RejectReason::WitnessRootMismatch);
+        }
+        if witnesses.intents.len() != 1 || !witnesses.lock_reveals.is_empty() {
+            return Err(RejectReason::MissingWitness);
+        }
+        let intent = &witnesses.intents.as_slice()[0];
+        if intent.tx_commitment != transaction_id {
+            return Err(RejectReason::SignatureInvalid);
+        }
+
+        let max_fee = fees::fee(&prices, &declared).ok_or(RejectReason::FeeOverflow)?;
+        if self.balance(&tx.fee_payer, &NOOS_ASSET) < max_fee {
+            return Err(RejectReason::InsufficientFeeBalance);
+        }
+
+        let mut balances = TinyMap::<(Hash32, Hash32), u128>::default();
+        let account_nonce = deferred
+            .cached_accounts
+            .get(&sender)
+            .expect("cached sender")
+            .nonce;
+        let next_nonce = account_nonce.checked_add(1);
+        let mut failure = next_nonce.is_none().then_some(FailCode::Overflow);
+
+        if failure.is_none() {
+            let sender_before = self.balance(&sender, &withdraw_asset);
+            match sender_before.checked_sub(withdraw_amount) {
+                None => failure = Some(FailCode::InsufficientBalance),
+                Some(sender_after) => {
+                    balances.insert((sender, withdraw_asset), sender_after);
+                    let recipient_before = balances
+                        .get(&(recipient, deposit_asset))
+                        .copied()
+                        .unwrap_or_else(|| self.balance(&recipient, &deposit_asset));
+                    match recipient_before.checked_add(deposit_amount) {
+                        None => failure = Some(FailCode::Overflow),
+                        Some(recipient_after) => {
+                            balances.insert((recipient, deposit_asset), recipient_after);
+                        }
+                    }
+                }
+            }
+        }
+
+        let measured = ResourceVector {
+            bytes: encoded_len,
+            grain_steps: 0,
+            proof_units: 0,
+            state_reads: 0,
+            state_writes: 3,
+            blob_bytes: 0,
+        };
+        let mut charged = 0_u128;
+        if failure.is_none() {
+            if !measured.fits_within(&tx.resource_limits) {
+                failure = Some(FailCode::ResourceOverrun);
+            } else {
+                match fees::fee(&prices, &fees::usage_from_resources(&measured)) {
+                    None => failure = Some(FailCode::Overflow),
+                    Some(actual_fee) => {
+                        charged = actual_fee.min(max_fee);
+                        let payer_balance = balances
+                            .get(&(tx.fee_payer, NOOS_ASSET))
+                            .copied()
+                            .unwrap_or_else(|| self.balance(&tx.fee_payer, &NOOS_ASSET));
+                        match payer_balance.checked_sub(charged) {
+                            None => failure = Some(FailCode::InsufficientBalance),
+                            Some(after_fee) => {
+                                balances.insert((tx.fee_payer, NOOS_ASSET), after_fee);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let (receipt, failed_code) = if let Some(code) = failure {
+            let receipt = failure_receipt(&transaction_id, code, max_fee, &fee_params, encoded_len);
+            balances = TinyMap::default();
+            let after = self
+                .balance(&tx.fee_payer, &NOOS_ASSET)
+                .saturating_sub(receipt.fee_charged);
+            balances.insert((tx.fee_payer, NOOS_ASSET), after);
+            let account = deferred
+                .cached_accounts
+                .get_mut(&sender)
+                .expect("cached sender");
+            account.nonce = account.nonce.saturating_add(1);
+            (receipt, Some(code))
+        } else {
+            let account = deferred
+                .cached_accounts
+                .get_mut(&sender)
+                .expect("cached sender");
+            account.nonce = next_nonce.expect("checked nonce");
+            (
+                ReceiptV1 {
+                    txid: transaction_id,
+                    status: 0,
+                    fee_charged: charged,
+                    resources_used: measured,
+                },
+                None,
+            )
+        };
+
+        let receipt_bytes = receipt.encode_canonical();
+        self.receipts
+            .insert(transaction_id, receipt.clone(), ctx.height);
+        let mut entries = SmallVec::<[DeltaEntry; 3]>::new();
+        entries.push(DeltaEntry {
+            tree: TreeId::Receipts,
+            key: transaction_id,
+            sub_key: None,
+            value: Some(receipt_bytes),
+        });
+        for ((account, asset), amount) in balances {
+            let tree = self.balances.entry(account).or_default();
+            let value = if amount == 0 {
+                tree.remove(&asset);
+                None
+            } else {
+                let encoded = encode_amount(amount);
+                tree.insert(asset, encoded.clone());
+                Some(encoded)
+            };
+            entries.push(DeltaEntry {
+                tree: TreeId::AccountBalances,
+                key: account,
+                sub_key: Some(asset),
+                value,
+            });
+            deferred.dirty_accounts.insert(account);
+        }
+        deferred.dirty_account_records.insert(sender);
+        let delta = StateDelta { entries };
+        Ok(Some(match failed_code {
+            Some(code) => ApplyOutcome::Failed {
+                receipt,
+                delta,
+                code,
+            },
+            None => ApplyOutcome::Applied { receipt, delta },
+        }))
     }
 
     /// Execute the exact admission, authorization, fee, and action pipeline
@@ -1407,7 +1927,7 @@ impl LumenLedger {
         engine: &dyn ContractEngine,
         auth: &dyn AuthVerifier,
     ) -> Result<SimulationOutcome, RejectReason> {
-        let prepared = self.prepare_transaction(ctx, tx_bytes, witness_bytes, auth)?;
+        let prepared = self.prepare_transaction(ctx, tx_bytes, witness_bytes, auth, None)?;
         Ok(match self.evaluate_transaction(ctx, &prepared, engine) {
             EvaluatedTransaction::Applied { receipt, .. } => SimulationOutcome::Applied { receipt },
             EvaluatedTransaction::Failed { receipt, code } => {
@@ -1422,7 +1942,8 @@ impl LumenLedger {
         tx_bytes: &[u8],
         witness_bytes: &[u8],
         auth: &dyn AuthVerifier,
-    ) -> Result<PreparedTransaction, RejectReason> {
+        fee_context: Option<(&FeeParamsV1, &fees::Prices)>,
+    ) -> Result<PreparedTransaction<'static>, RejectReason> {
         let tx =
             TransactionV1::decode_canonical(tx_bytes).map_err(|_| RejectReason::Noncanonical)?;
         let witnesses = TransactionWitnessesV1::decode_canonical(witness_bytes)
@@ -1432,24 +1953,38 @@ impl LumenLedger {
             .zip(u64::try_from(witness_bytes.len()).ok())
             .and_then(|(transaction, witness)| transaction.checked_add(witness))
             .ok_or(RejectReason::OversizedEncoding)?;
-        self.prepare_decoded_transaction(ctx, tx, witnesses, encoded_len, auth)
+        self.prepare_decoded_transaction(
+            ctx,
+            Cow::Owned(tx),
+            &witnesses,
+            encoded_len,
+            auth,
+            fee_context,
+        )
     }
 
-    fn prepare_decoded_transaction(
+    fn prepare_decoded_transaction<'a>(
         &self,
         ctx: &BlockContext,
-        tx: TransactionV1,
-        witnesses: TransactionWitnessesV1,
+        tx: Cow<'a, TransactionV1>,
+        witnesses: &TransactionWitnessesV1,
         encoded_len: u64,
         auth: &dyn AuthVerifier,
-    ) -> Result<PreparedTransaction, RejectReason> {
+        fee_context: Option<(&FeeParamsV1, &fees::Prices)>,
+    ) -> Result<PreparedTransaction<'a>, RejectReason> {
         let mut actions: Vec<ActionV1> = Vec::with_capacity(tx.actions.len());
         for raw in tx.actions.iter() {
             let action = ActionV1::decode_canonical(raw.as_slice())
                 .map_err(|_| RejectReason::ActionMalformed)?;
             actions.push(action);
         }
-        let txid = crate::objects::txid(&tx);
+        let txid = auth.precomputed_transaction_id(&tx).map_or_else(
+            || crate::objects::txid(&tx),
+            |precomputed| {
+                debug_assert_eq!(precomputed, crate::objects::txid(&tx));
+                precomputed
+            },
+        );
         if tx.chain_id != ctx.chain_id {
             return Err(RejectReason::WrongChain);
         }
@@ -1459,8 +1994,16 @@ impl LumenLedger {
         if ctx.height > tx.expiry_height {
             return Err(RejectReason::Expired);
         }
-        let fee_params = self.fee_params().ok_or(RejectReason::GovernanceDenied)?;
-        let fee_state = self.fee_state().ok_or(RejectReason::GovernanceDenied)?;
+        let (fee_params, prices) = if let Some((fee_params, prices)) = fee_context {
+            (fee_params.clone(), *prices)
+        } else {
+            let fee_params = self.fee_params().ok_or(RejectReason::GovernanceDenied)?;
+            let prices = self
+                .fee_state()
+                .ok_or(RejectReason::GovernanceDenied)?
+                .prices();
+            (fee_params, prices)
+        };
         let capacity = fee_params.capacity();
         let declared = fees::usage_from_resources(&tx.resource_limits);
         for i in 0..fees::DIMENSIONS {
@@ -1565,7 +2108,6 @@ impl LumenLedger {
             }
             planned_outputs.push((id, note.clone()));
         }
-        let prices = fee_state.prices();
         let max_fee = fees::fee(&prices, &declared).ok_or(RejectReason::FeeOverflow)?;
         if self.balance(&tx.fee_payer, &NOOS_ASSET) < max_fee {
             return Err(RejectReason::InsufficientFeeBalance);
@@ -1587,7 +2129,7 @@ impl LumenLedger {
     fn evaluate_transaction(
         &self,
         ctx: &BlockContext,
-        prepared: &PreparedTransaction,
+        prepared: &PreparedTransaction<'_>,
         engine: &dyn ContractEngine,
     ) -> EvaluatedTransaction {
         let exec = self.execute_in_overlay(
@@ -1662,7 +2204,7 @@ impl LumenLedger {
                 };
                 overlay
                     .receipts
-                    .insert(prepared.txid, Some(receipt.encode_canonical()));
+                    .insert(prepared.txid, Some(receipt.clone()));
                 EvaluatedTransaction::Applied { overlay, receipt }
             }
             Err(code) => EvaluatedTransaction::Failed {
@@ -1856,6 +2398,60 @@ impl LumenLedger {
                 {
                     return Err(RejectReason::CapabilityDenied);
                 }
+                ActionV1::RegisterNeuralProgram(_) if !gov_ok() => {
+                    return Err(RejectReason::GovernanceDenied);
+                }
+                ActionV1::EvaluateNeuralProgram(v) if !signed(&v.requester) => {
+                    return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::OpenNeuralOracleQuery(v) if !signed(&v.requester) => {
+                    return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::CommitNeuralOracleReply(v) => {
+                    let operator = self
+                        .neural_reporter_operator(&v.query_id, &v.reporter_profile_id)
+                        .ok_or(RejectReason::CapabilityDenied)?;
+                    if !signed(&operator) {
+                        return Err(RejectReason::CapabilityDenied);
+                    }
+                }
+                ActionV1::RevealNeuralOracleReply(v) => {
+                    let operator = self
+                        .neural_reporter_operator(&v.query_id, &v.reporter_profile_id)
+                        .ok_or(RejectReason::CapabilityDenied)?;
+                    if !signed(&operator) {
+                        return Err(RejectReason::CapabilityDenied);
+                    }
+                }
+                ActionV1::RecordWwmReceipt(v) => {
+                    if let Some(result) = self.get_neural_oracle_result(&v.job_id) {
+                        match result.status {
+                            NeuralOracleStatus::Success => {
+                                if result.signer_profile_ids.is_empty() {
+                                    return Err(RejectReason::CapabilityDenied);
+                                }
+                                for profile_id in result.signer_profile_ids.iter() {
+                                    let operator = self
+                                        .neural_reporter_operator(&v.job_id, profile_id)
+                                        .ok_or(RejectReason::CapabilityDenied)?;
+                                    if !signed(&operator) {
+                                        return Err(RejectReason::CapabilityDenied);
+                                    }
+                                }
+                            }
+                            NeuralOracleStatus::NoQuorum => {
+                                let query = self
+                                    .get_neural_oracle_query(&v.job_id)
+                                    .ok_or(RejectReason::CapabilityDenied)?;
+                                if !signed(&query.requester) {
+                                    return Err(RejectReason::CapabilityDenied);
+                                }
+                            }
+                        }
+                    } else if !gov_ok() {
+                        return Err(RejectReason::GovernanceDenied);
+                    }
+                }
                 ActionV1::TransitionWwmControl(
                     TransitionWwmControlPayloadV1::EmergencyDisable(_),
                 ) if !emergency_ok() => return Err(RejectReason::GovernanceDenied),
@@ -1875,7 +2471,6 @@ impl LumenLedger {
                 | ActionV1::RegisterQueryPolicy(_)
                 | ActionV1::RegisterServiceDirectory(_)
                 | ActionV1::OpenWwmJob(_)
-                | ActionV1::RecordWwmReceipt(_)
                 | ActionV1::SettleWwmJob(_)
                 | ActionV1::TransitionServingAlias(_)
                 | ActionV1::TransitionWwmControl(_)
@@ -1899,6 +2494,42 @@ impl LumenLedger {
         let mut id = [0u8; 32];
         id.copy_from_slice(bytes);
         Some(id)
+    }
+
+    fn neural_reporter_operator(
+        &self,
+        query_id: &Hash32,
+        reporter_profile_id: &Hash32,
+    ) -> Option<Hash32> {
+        let query = self.get_neural_oracle_query(query_id)?;
+        let job = self
+            .objects
+            .get(&wwm_profile_key(WwmLeafKind::Job, &query.job_id))
+            .and_then(|bytes| WwmJobV1::decode_canonical(bytes).ok())?;
+        if !job
+            .selected_executor_ids
+            .iter()
+            .any(|profile_id| profile_id == reporter_profile_id)
+        {
+            return None;
+        }
+        let set = self
+            .objects
+            .get(&wwm_profile_key(
+                WwmLeafKind::ExecutorCapabilitySet,
+                &query.executor_set_id,
+            ))
+            .and_then(|bytes| CapabilitySetV1::decode_canonical(bytes).ok())?;
+        if set.epoch != query.executor_set_epoch {
+            return None;
+        }
+        set.entries
+            .iter()
+            .find(|profile| {
+                profile.profile_id == *reporter_profile_id
+                    && profile.status == CapabilityStatus::Active
+            })
+            .map(|profile| profile.operator_id)
     }
 
     /// Steps 6–7: execute all actions and enforce per-asset conservation in
@@ -4074,12 +4705,9 @@ impl LumenLedger {
                     )?;
                 }
                 ActionV1::RecordWwmReceipt(v) => {
-                    let job_bytes = overlay_object(
-                        &ov,
-                        self,
-                        &wwm_profile_key(WwmLeafKind::Job, &v.job_id),
-                    )
-                    .ok_or(FailCode::PostconditionFailed)?;
+                    let job_bytes =
+                        overlay_object(&ov, self, &wwm_profile_key(WwmLeafKind::Job, &v.job_id))
+                            .ok_or(FailCode::PostconditionFailed)?;
                     let job = WwmJobV1::decode_canonical(&job_bytes)
                         .map_err(|_| FailCode::PostconditionFailed)?;
                     let capsule_bytes = overlay_object(
@@ -4100,9 +4728,12 @@ impl LumenLedger {
                         || v.execution_profile_id != job.execution_profile_id
                         || v.input_tokens > job.max_input_tokens
                         || v.output_tokens > job.max_output_tokens
-                        || v.output_root == [0; 32]
-                        || v.token_history_root == [0; 32]
                     {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    if overlay_object(&ov, self, &neural_query_key(&job.job_id)).is_some() {
+                        validate_neural_wwm_receipt(&ov, self, &job, v, ctx.height)?;
+                    } else if v.output_root == [0; 32] || v.token_history_root == [0; 32] {
                         return Err(FailCode::PostconditionFailed);
                     }
                     wwm_insert_unique(
@@ -4113,12 +4744,9 @@ impl LumenLedger {
                     )?;
                 }
                 ActionV1::SettleWwmJob(v) => {
-                    let job_bytes = overlay_object(
-                        &ov,
-                        self,
-                        &wwm_profile_key(WwmLeafKind::Job, &v.job_id),
-                    )
-                    .ok_or(FailCode::PostconditionFailed)?;
+                    let job_bytes =
+                        overlay_object(&ov, self, &wwm_profile_key(WwmLeafKind::Job, &v.job_id))
+                            .ok_or(FailCode::PostconditionFailed)?;
                     let job = WwmJobV1::decode_canonical(&job_bytes)
                         .map_err(|_| FailCode::PostconditionFailed)?;
                     let receipt_bytes = overlay_object(
@@ -4153,6 +4781,260 @@ impl LumenLedger {
                         wwm_profile_key(WwmLeafKind::Settlement, &v.settlement_id),
                         v.encode_canonical(),
                     )?;
+                }
+                ActionV1::RegisterNeuralProgram(v) => {
+                    if validate_neural_program(v).is_err() {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    wwm_insert_unique(
+                        &mut ov,
+                        self,
+                        neural_program_key(&v.program_id),
+                        v.encode_canonical(),
+                    )?;
+                }
+                ActionV1::EvaluateNeuralProgram(v) => {
+                    let control = current_control(&ov, self)?;
+                    if !matches!(
+                        control.mode,
+                        WwmControlMode::Testnet
+                            | WwmControlMode::Canary
+                            | WwmControlMode::Production
+                    ) || v.query_id == [0; 32]
+                        || overlay_account(&ov, self, &v.requester).is_none()
+                        || overlay_object(&ov, self, &neural_query_key(&v.query_id)).is_some()
+                        || overlay_object(&ov, self, &neural_result_key(&v.query_id)).is_some()
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let program_raw = overlay_object(&ov, self, &neural_program_key(&v.program_id))
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let program = NeuralProgramV1::decode_canonical(&program_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let evaluation = evaluate_neural_program(&program, v.input.as_slice())
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    grain_steps = grain_steps
+                        .checked_add(evaluation.operations)
+                        .ok_or(FailCode::Overflow)?;
+                    let response = BoundedBytes::new(evaluation.output.as_slice().to_vec())
+                        .ok_or(FailCode::Overflow)?;
+                    let output_root = neural_output_root(response.as_slice());
+                    let transcript_root = neural_transcript_root(response.as_slice());
+                    let result = NeuralOracleResultV1 {
+                        result_id: neural_result_id(&v.query_id, &output_root, &transcript_root),
+                        query_id: v.query_id,
+                        mode: NeuralOracleMode::L1Deterministic,
+                        status: NeuralOracleStatus::Success,
+                        source_id: v.program_id,
+                        execution_profile_id: [0; 32],
+                        input_root: neural_input_root(v.input.as_slice()),
+                        response,
+                        output_root,
+                        transcript_root,
+                        signer_profile_ids: crate::objects::BoundedList::default(),
+                        finalized_height: ctx.height,
+                    };
+                    ov.objects.insert(
+                        neural_result_key(&v.query_id),
+                        Some(result.encode_canonical()),
+                    );
+                    ov.write_count()?;
+                }
+                ActionV1::OpenNeuralOracleQuery(v) => {
+                    let control = current_control(&ov, self)?;
+                    if !matches!(
+                        control.mode,
+                        WwmControlMode::Testnet
+                            | WwmControlMode::Canary
+                            | WwmControlMode::Production
+                    ) || v.query_id == [0; 32]
+                        || v.query_id != v.job_id
+                        || v.input_root == [0; 32]
+                        || v.max_response_bytes == 0
+                        || v.max_response_bytes > MAX_NEURAL_ORACLE_RESPONSE_BYTES
+                        || v.commit_deadline <= ctx.height
+                        || v.reveal_deadline <= v.commit_deadline
+                        || overlay_account(&ov, self, &v.requester).is_none()
+                        || overlay_object(&ov, self, &neural_query_key(&v.query_id)).is_some()
+                        || overlay_object(&ov, self, &neural_result_key(&v.query_id)).is_some()
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let job = neural_job_for_query(&ov, self, v)?;
+                    let selected = job.selected_executor_ids.as_slice();
+                    if selected.len() != MAX_NEURAL_ORACLE_REPORTERS as usize
+                        || !selected.windows(2).all(|window| window[0] < window[1])
+                        || v.threshold != NEURAL_ORACLE_QUORUM_THRESHOLD
+                        || v.reveal_deadline > job.deadline_height
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let registry = current_registry(&ov, self)?;
+                    if registry.executor_set_id != v.executor_set_id
+                        || registry.executor_epoch != v.executor_set_epoch
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let mut control_roots = BTreeSet::new();
+                    let mut operator_accounts = BTreeSet::new();
+                    for profile_id in selected {
+                        let profile = neural_reporter_profile(&ov, self, v, profile_id)?;
+                        if overlay_account(&ov, self, &profile.operator_id).is_none()
+                            || !control_roots.insert(profile.beneficial_control_root)
+                            || !operator_accounts.insert(profile.operator_id)
+                        {
+                            return Err(FailCode::PostconditionFailed);
+                        }
+                    }
+                    ov.objects
+                        .insert(neural_query_key(&v.query_id), Some(v.encode_canonical()));
+                    ov.write_count()?;
+                }
+                ActionV1::CommitNeuralOracleReply(v) => {
+                    let query_raw = overlay_object(&ov, self, &neural_query_key(&v.query_id))
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let query = NeuralOracleQueryV1::decode_canonical(&query_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    neural_reporter_profile(&ov, self, &query, &v.reporter_profile_id)?;
+                    let key = neural_commit_key(&v.query_id, &v.reporter_profile_id);
+                    if v.commitment == [0; 32]
+                        || ctx.height > query.commit_deadline
+                        || overlay_object(&ov, self, &key).is_some()
+                        || overlay_object(&ov, self, &neural_result_key(&v.query_id)).is_some()
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let record = NeuralOracleCommitRecordV1 {
+                        query_id: v.query_id,
+                        reporter_profile_id: v.reporter_profile_id,
+                        commitment: v.commitment,
+                        committed_height: ctx.height,
+                    };
+                    ov.objects.insert(key, Some(record.encode_canonical()));
+                    ov.write_count()?;
+                }
+                ActionV1::RevealNeuralOracleReply(v) => {
+                    let query_raw = overlay_object(&ov, self, &neural_query_key(&v.query_id))
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let query = NeuralOracleQueryV1::decode_canonical(&query_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let job = neural_job_for_query(&ov, self, &query)?;
+                    neural_reporter_profile(&ov, self, &query, &v.reporter_profile_id)?;
+                    let output_root = neural_output_root(v.response.as_slice());
+                    let transcript_root = neural_transcript_root(v.response.as_slice());
+                    let commit_key = neural_commit_key(&v.query_id, &v.reporter_profile_id);
+                    let commit_raw = overlay_object(&ov, self, &commit_key)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let commit = NeuralOracleCommitRecordV1::decode_canonical(&commit_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let reveal_key = neural_reveal_key(&v.query_id, &v.reporter_profile_id);
+                    if ctx.height <= query.commit_deadline
+                        || ctx.height > query.reveal_deadline
+                        || v.response.is_empty()
+                        || v.response.len() > query.max_response_bytes as usize
+                        || v.nonce == [0; 32]
+                        || v.transcript_root != transcript_root
+                        || commit.query_id != v.query_id
+                        || commit.reporter_profile_id != v.reporter_profile_id
+                        || commit.commitment
+                            != neural_reply_commitment(
+                                &v.query_id,
+                                &v.reporter_profile_id,
+                                &output_root,
+                                &transcript_root,
+                                &v.nonce,
+                            )
+                        || overlay_object(&ov, self, &reveal_key).is_some()
+                        || overlay_object(&ov, self, &neural_result_key(&v.query_id)).is_some()
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let reveal = NeuralOracleRevealRecordV1 {
+                        query_id: v.query_id,
+                        reporter_profile_id: v.reporter_profile_id,
+                        response: v.response.clone(),
+                        output_root,
+                        transcript_root,
+                        revealed_height: ctx.height,
+                    };
+                    ov.objects
+                        .insert(reveal_key, Some(reveal.encode_canonical()));
+                    ov.write_count()?;
+
+                    let mut signers = Vec::new();
+                    for profile_id in job.selected_executor_ids.iter() {
+                        let Some(raw) =
+                            overlay_object(&ov, self, &neural_reveal_key(&v.query_id, profile_id))
+                        else {
+                            continue;
+                        };
+                        let candidate = NeuralOracleRevealRecordV1::decode_canonical(&raw)
+                            .map_err(|_| FailCode::PostconditionFailed)?;
+                        if candidate.output_root == output_root
+                            && candidate.transcript_root == transcript_root
+                            && candidate.response == v.response
+                        {
+                            signers.push(*profile_id);
+                        }
+                    }
+                    if signers.len() >= usize::from(query.threshold) {
+                        let signer_profile_ids = crate::objects::BoundedList::new(signers)
+                            .ok_or(FailCode::PostconditionFailed)?;
+                        let result = NeuralOracleResultV1 {
+                            result_id: neural_result_id(
+                                &v.query_id,
+                                &output_root,
+                                &transcript_root,
+                            ),
+                            query_id: v.query_id,
+                            mode: NeuralOracleMode::WwmQuorum,
+                            status: NeuralOracleStatus::Success,
+                            source_id: job.capsule_id,
+                            execution_profile_id: job.execution_profile_id,
+                            input_root: query.input_root,
+                            response: v.response.clone(),
+                            output_root,
+                            transcript_root,
+                            signer_profile_ids,
+                            finalized_height: ctx.height,
+                        };
+                        ov.objects.insert(
+                            neural_result_key(&v.query_id),
+                            Some(result.encode_canonical()),
+                        );
+                        ov.write_count()?;
+                    }
+                }
+                ActionV1::FinalizeNeuralOracleQuery(v) => {
+                    let query_raw = overlay_object(&ov, self, &neural_query_key(&v.query_id))
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let query = NeuralOracleQueryV1::decode_canonical(&query_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let job = neural_job_for_query(&ov, self, &query)?;
+                    if ctx.height <= query.reveal_deadline
+                        || overlay_object(&ov, self, &neural_result_key(&v.query_id)).is_some()
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let result = NeuralOracleResultV1 {
+                        result_id: neural_result_id(&v.query_id, &[0; 32], &[0; 32]),
+                        query_id: v.query_id,
+                        mode: NeuralOracleMode::WwmQuorum,
+                        status: NeuralOracleStatus::NoQuorum,
+                        source_id: job.capsule_id,
+                        execution_profile_id: job.execution_profile_id,
+                        input_root: query.input_root,
+                        response: BoundedBytes::default(),
+                        output_root: [0; 32],
+                        transcript_root: [0; 32],
+                        signer_profile_ids: crate::objects::BoundedList::default(),
+                        finalized_height: ctx.height,
+                    };
+                    ov.objects.insert(
+                        neural_result_key(&v.query_id),
+                        Some(result.encode_canonical()),
+                    );
+                    ov.write_count()?;
                 }
                 ActionV1::TransitionServingAlias(v) => {
                     let control = current_control(&ov, self)?;
@@ -4217,6 +5099,7 @@ impl LumenLedger {
         tx: &TransactionV1,
         receipt: ReceiptV1,
         code: FailCode,
+        height: u64,
     ) -> ApplyOutcome {
         let mut delta = BTreeMap::new();
         let balance = self.balance(&tx.fee_payer, &NOOS_ASSET);
@@ -4229,7 +5112,35 @@ impl LumenLedger {
             delta.insert((TreeId::Accounts, tx.fee_payer, None), Some(bytes));
         }
         let receipt_bytes = receipt.encode_canonical();
-        self.receipts.insert(receipt.txid, receipt_bytes.clone());
+        self.receipts.insert(receipt.txid, receipt.clone(), height);
+        delta.insert((TreeId::Receipts, receipt.txid, None), Some(receipt_bytes));
+        ApplyOutcome::Failed {
+            receipt,
+            delta: StateDelta::from_map(delta),
+            code,
+        }
+    }
+
+    fn commit_failure_receipt_deferred(
+        &mut self,
+        tx: &TransactionV1,
+        receipt: ReceiptV1,
+        code: FailCode,
+        deferred: &mut DeferredBalanceRoots,
+        height: u64,
+    ) -> ApplyOutcome {
+        let mut delta = BTreeMap::new();
+        let balance = self.balance(&tx.fee_payer, &NOOS_ASSET);
+        let after = balance.saturating_sub(receipt.fee_charged);
+        self.set_balance_deferred(&tx.fee_payer, &NOOS_ASSET, after, &mut delta, deferred);
+        if let Some(mut account) = self.get_account(&tx.fee_payer) {
+            account.nonce = account.nonce.saturating_add(1);
+            let bytes = account.encode_canonical();
+            self.accounts.insert(tx.fee_payer, bytes.clone());
+            delta.insert((TreeId::Accounts, tx.fee_payer, None), Some(bytes));
+        }
+        let receipt_bytes = receipt.encode_canonical();
+        self.receipts.insert(receipt.txid, receipt.clone(), height);
         delta.insert((TreeId::Receipts, receipt.txid, None), Some(receipt_bytes));
         ApplyOutcome::Failed {
             receipt,
@@ -4240,7 +5151,7 @@ impl LumenLedger {
 
     /// Atomic overlay commit: apply every staged write in canonical order
     /// and emit the ordered delta.
-    fn commit_overlay(&mut self, ov: Overlay) -> StateDelta {
+    fn commit_overlay(&mut self, ov: Overlay, height: u64) -> StateDelta {
         let mut delta = BTreeMap::new();
         for (key, value) in ov.notes {
             apply_write(&mut self.notes, TreeId::Notes, key, value, &mut delta);
@@ -4261,7 +5172,18 @@ impl LumenLedger {
             apply_write(&mut self.objects, TreeId::Objects, key, value, &mut delta);
         }
         for (key, value) in ov.receipts {
-            apply_write(&mut self.receipts, TreeId::Receipts, key, value, &mut delta);
+            let encoded = match value {
+                Some(receipt) => {
+                    let bytes = receipt.encode_canonical();
+                    self.receipts.insert(key, receipt, height);
+                    Some(bytes)
+                }
+                None => {
+                    self.receipts.remove(&key);
+                    None
+                }
+            };
+            delta.insert((TreeId::Receipts, key, None), encoded);
         }
         for (key, value) in ov.params {
             apply_write(&mut self.params, TreeId::Params, key, value, &mut delta);
@@ -4269,6 +5191,111 @@ impl LumenLedger {
         // Balances last: they refresh account records deterministically.
         for ((account, asset), amount) in ov.balances {
             self.set_balance_direct(&account, &asset, amount, &mut delta);
+        }
+        StateDelta::from_map(delta)
+    }
+
+    fn commit_overlay_deferred(
+        &mut self,
+        ov: Overlay,
+        deferred: &mut DeferredBalanceRoots,
+        height: u64,
+    ) -> StateDelta {
+        let capacity = ov
+            .notes
+            .len()
+            .saturating_add(ov.nullifiers.len())
+            .saturating_add(ov.accounts.len())
+            .saturating_add(ov.objects.len())
+            .saturating_add(ov.receipts.len())
+            .saturating_add(ov.params.len())
+            .saturating_add(ov.balances.len());
+        let mut entries = Vec::with_capacity(capacity);
+        for (key, value) in ov.notes {
+            apply_write_entry(&mut self.notes, TreeId::Notes, key, value, &mut entries);
+        }
+        for (key, value) in ov.nullifiers {
+            apply_write_entry(
+                &mut self.nullifiers,
+                TreeId::Nullifiers,
+                key,
+                value,
+                &mut entries,
+            );
+        }
+        for (key, value) in ov.accounts {
+            apply_write_entry(
+                &mut self.accounts,
+                TreeId::Accounts,
+                key,
+                value,
+                &mut entries,
+            );
+        }
+        for (key, value) in ov.objects {
+            apply_write_entry(&mut self.objects, TreeId::Objects, key, value, &mut entries);
+        }
+        for (key, value) in ov.receipts {
+            let encoded = match value {
+                Some(receipt) => {
+                    let bytes = receipt.encode_canonical();
+                    self.receipts.insert(key, receipt, height);
+                    Some(bytes)
+                }
+                None => {
+                    self.receipts.remove(&key);
+                    None
+                }
+            };
+            entries.push(DeltaEntry {
+                tree: TreeId::Receipts,
+                key,
+                sub_key: None,
+                value: encoded,
+            });
+        }
+        for (key, value) in ov.params {
+            apply_write_entry(&mut self.params, TreeId::Params, key, value, &mut entries);
+        }
+        for ((account, asset), amount) in ov.balances {
+            let tree = self.balances.entry(account).or_default();
+            let value = if amount == 0 {
+                tree.remove(&asset);
+                None
+            } else {
+                let encoded = encode_amount(amount);
+                tree.insert(asset, encoded.clone());
+                Some(encoded)
+            };
+            entries.push(DeltaEntry {
+                tree: TreeId::AccountBalances,
+                key: account,
+                sub_key: Some(asset),
+                value,
+            });
+            deferred.dirty_accounts.insert(account);
+        }
+        StateDelta {
+            entries: entries.into(),
+        }
+    }
+
+    fn materialize_deferred_balance_roots(
+        &mut self,
+        mut deferred: DeferredBalanceRoots,
+    ) -> StateDelta {
+        self.flush_deferred_accounts(&mut deferred);
+        let mut delta = BTreeMap::new();
+        for account in deferred.dirty_account_records {
+            if let Some(account_record) = self.get_account(&account) {
+                delta.insert(
+                    (TreeId::Accounts, account, None),
+                    Some(account_record.encode_canonical()),
+                );
+            }
+        }
+        for account in deferred.dirty_accounts {
+            self.refresh_balance_root_direct(&account, &mut delta);
         }
         StateDelta::from_map(delta)
     }
@@ -4320,6 +5347,128 @@ fn require_wwm(
     id: &Hash32,
 ) -> Result<Vec<u8>, FailCode> {
     overlay_object(ov, base, &wwm_profile_key(kind, id)).ok_or(FailCode::PostconditionFailed)
+}
+
+fn neural_job_for_query(
+    ov: &Overlay,
+    base: &LumenLedger,
+    query: &NeuralOracleQueryV1,
+) -> Result<WwmJobV1, FailCode> {
+    let raw = overlay_object(ov, base, &wwm_profile_key(WwmLeafKind::Job, &query.job_id))
+        .ok_or(FailCode::PostconditionFailed)?;
+    let job = WwmJobV1::decode_canonical(&raw).map_err(|_| FailCode::PostconditionFailed)?;
+    if job.job_id != query.job_id
+        || job.registry_epoch != query.executor_set_epoch
+        || job.offchain_envelope_root != query.input_root
+    {
+        return Err(FailCode::PostconditionFailed);
+    }
+    Ok(job)
+}
+
+fn neural_reporter_profile(
+    ov: &Overlay,
+    base: &LumenLedger,
+    query: &NeuralOracleQueryV1,
+    reporter_profile_id: &Hash32,
+) -> Result<crate::wwm::CapabilityProfileV1, FailCode> {
+    let job = neural_job_for_query(ov, base, query)?;
+    if !job
+        .selected_executor_ids
+        .iter()
+        .any(|profile_id| profile_id == reporter_profile_id)
+    {
+        return Err(FailCode::PostconditionFailed);
+    }
+    let raw = require_wwm(
+        ov,
+        base,
+        WwmLeafKind::ExecutorCapabilitySet,
+        &query.executor_set_id,
+    )?;
+    let set = CapabilitySetV1::decode_canonical(&raw).map_err(|_| FailCode::PostconditionFailed)?;
+    if set.set_id != query.executor_set_id || set.epoch != query.executor_set_epoch {
+        return Err(FailCode::PostconditionFailed);
+    }
+    let profile = set
+        .entries
+        .iter()
+        .find(|profile| profile.profile_id == *reporter_profile_id)
+        .cloned()
+        .ok_or(FailCode::PostconditionFailed)?;
+    if profile.status != CapabilityStatus::Active
+        || profile.attestation_expiry < query.reveal_deadline
+    {
+        return Err(FailCode::PostconditionFailed);
+    }
+    Ok(profile)
+}
+
+fn validate_neural_wwm_receipt(
+    ov: &Overlay,
+    base: &LumenLedger,
+    job: &WwmJobV1,
+    receipt: &WwmReceiptV1,
+    height: u64,
+) -> Result<(), FailCode> {
+    let result_raw = overlay_object(ov, base, &neural_result_key(&job.job_id))
+        .ok_or(FailCode::PostconditionFailed)?;
+    let result = NeuralOracleResultV1::decode_canonical(&result_raw)
+        .map_err(|_| FailCode::PostconditionFailed)?;
+    let query_raw = overlay_object(ov, base, &neural_query_key(&job.job_id))
+        .ok_or(FailCode::PostconditionFailed)?;
+    let query = NeuralOracleQueryV1::decode_canonical(&query_raw)
+        .map_err(|_| FailCode::PostconditionFailed)?;
+    if result.query_id != job.job_id
+        || result.mode != NeuralOracleMode::WwmQuorum
+        || result.source_id != job.capsule_id
+        || result.execution_profile_id != job.execution_profile_id
+        || result.input_root != query.input_root
+        || result.finalized_height > height
+        || receipt.anchor_height < result.finalized_height
+        || receipt.signer_ids.as_slice() != result.signer_profile_ids.as_slice()
+        || receipt.control_cluster_ids.len() != receipt.signer_ids.len()
+        || receipt.signatures.len() != receipt.signer_ids.len()
+        || !strict_hashes(receipt.signer_ids.as_slice())
+        || !strict_hashes(receipt.control_cluster_ids.as_slice())
+        || receipt
+            .signatures
+            .iter()
+            .zip(receipt.signer_ids.iter())
+            .any(|(signature, signer)| {
+                signature.signer_id != *signer || signature.signature.is_empty()
+            })
+    {
+        return Err(FailCode::PostconditionFailed);
+    }
+    match result.status {
+        NeuralOracleStatus::Success => {
+            if result.response.is_empty()
+                || result.signer_profile_ids.len() < usize::from(NEURAL_ORACLE_QUORUM_THRESHOLD)
+                || receipt.evidence_tier != WwmEvidenceTier::MatchedQuorum
+                || receipt.terminal_code != WwmTerminalCode::Complete
+                || receipt.output_root != result.output_root
+                || receipt.token_history_root != result.transcript_root
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+        }
+        NeuralOracleStatus::NoQuorum => {
+            if receipt.evidence_tier != WwmEvidenceTier::NoQuorum
+                || receipt.terminal_code != WwmTerminalCode::NoQuorum
+                || receipt.output_tokens != 0
+                || receipt.output_root != [0; 32]
+                || receipt.token_history_root != [0; 32]
+                || !receipt.signer_ids.is_empty()
+                || !receipt.control_cluster_ids.is_empty()
+                || !receipt.signatures.is_empty()
+                || receipt.paid_amount != 0
+            {
+                return Err(FailCode::PostconditionFailed);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn current_registry(ov: &Overlay, base: &LumenLedger) -> Result<RegistryEpochVectorV1, FailCode> {
@@ -5288,6 +6437,29 @@ fn apply_write(
         }
     }
     delta.insert((id, key, None), value);
+}
+
+fn apply_write_entry(
+    tree: &mut Smt,
+    id: TreeId,
+    key: Hash32,
+    value: Option<Vec<u8>>,
+    entries: &mut Vec<DeltaEntry>,
+) {
+    match &value {
+        Some(bytes) => {
+            tree.insert(key, bytes.clone());
+        }
+        None => {
+            tree.remove(&key);
+        }
+    }
+    entries.push(DeltaEntry {
+        tree: id,
+        key,
+        sub_key: None,
+        value,
+    });
 }
 
 fn add_flow(

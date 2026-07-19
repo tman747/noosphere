@@ -58,6 +58,16 @@ OPTIONS:
     --template-max-transactions <count>
                            Maximum transactions per proposal (default: 2048;
                            bounded by the consensus BlockBodyV1 maximum)
+    --mempool-max-transactions <count>
+                           Maximum pending transactions retained in memory
+                           (default: 4096; consensus maximum: 1048576)
+    --mempool-max-bytes <bytes>
+                           Maximum encoded transaction+witness bytes retained
+                           (default: 8388608; hard maximum: 536870912)
+    --mempool-per-source-pending <count>
+                           Per-RPC/peer admission cap (default: 256)
+    --mempool-per-account-pending <count>
+                           Per-fee-payer FIFO admission cap (default: 64)
     --devnet-account <account-id-hex>
                            Pre-provision a zero-balance account in genesis
                            (repeatable; TEST NETWORKS ONLY)
@@ -228,7 +238,7 @@ fn main() -> ExitCode {
                 }
             }
             "--template-byte-budget" => {
-                let maximum = noos_da::MAX_BLOCK_BODY_BYTES.saturating_sub(65_536);
+                let maximum = noos_node::roots::MAX_DA_FORM_RAW_BYTES.saturating_sub(65_536);
                 match take("--template-byte-budget").and_then(|v| v.parse().ok()) {
                     Some(value) if (1..=maximum).contains(&value) => {
                         mempool.template_byte_budget = value;
@@ -247,6 +257,54 @@ fn main() -> ExitCode {
                     }
                     _ => {
                         eprintln!("error: --template-max-transactions expects 1..={maximum}");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            "--mempool-max-transactions" => {
+                let maximum = noos_braid::MAX_TRANSACTIONS as usize;
+                match take("--mempool-max-transactions").and_then(|v| v.parse().ok()) {
+                    Some(value) if (1..=maximum).contains(&value) => {
+                        mempool.max_count = value;
+                    }
+                    _ => {
+                        eprintln!("error: --mempool-max-transactions expects 1..={maximum}");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            "--mempool-max-bytes" => {
+                let maximum = noos_node::roots::MAX_DA_FORM_RAW_BYTES;
+                match take("--mempool-max-bytes").and_then(|v| v.parse().ok()) {
+                    Some(value) if (1..=maximum).contains(&value) => {
+                        mempool.max_bytes = value;
+                    }
+                    _ => {
+                        eprintln!("error: --mempool-max-bytes expects 1..={maximum} bytes");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            "--mempool-per-source-pending" => {
+                let maximum = noos_braid::MAX_TRANSACTIONS as usize;
+                match take("--mempool-per-source-pending").and_then(|v| v.parse().ok()) {
+                    Some(value) if (1..=maximum).contains(&value) => {
+                        mempool.per_source_pending = value;
+                    }
+                    _ => {
+                        eprintln!("error: --mempool-per-source-pending expects 1..={maximum}");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            "--mempool-per-account-pending" => {
+                let maximum = noos_braid::MAX_TRANSACTIONS as usize;
+                match take("--mempool-per-account-pending").and_then(|v| v.parse().ok()) {
+                    Some(value) if (1..=maximum).contains(&value) => {
+                        mempool.per_account_pending = value;
+                    }
+                    _ => {
+                        eprintln!("error: --mempool-per-account-pending expects 1..={maximum}");
                         return ExitCode::from(2);
                     }
                 }
@@ -302,6 +360,16 @@ fn main() -> ExitCode {
                 return ExitCode::from(2);
             }
         }
+    }
+    if mempool.template_max_txs > mempool.max_count
+        || mempool.template_byte_budget > mempool.max_bytes
+        || mempool.per_source_pending > mempool.max_count
+        || mempool.per_account_pending > mempool.max_count
+    {
+        eprintln!(
+            "error: mempool template and per-origin limits must not exceed the configured pool"
+        );
+        return ExitCode::from(2);
     }
     if rpc_token.is_some() && rpc_token_file.is_some() {
         eprintln!("error: --rpc-token and --rpc-token-file are mutually exclusive");
@@ -482,6 +550,7 @@ fn main() -> ExitCode {
     let stop_ctrl = Arc::clone(&stop);
     let _ = ctrlc::set_handler(move || stop_ctrl.store(true, Ordering::SeqCst));
     let mut last_produce_ms: u64 = 0;
+    let mut last_witness_vote_ms: u64 = 0;
     while !stop.load(Ordering::SeqCst) {
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -505,8 +574,11 @@ fn main() -> ExitCode {
             }
         }
         if let Some(index) = devnet_witness {
-            if let Err(error) = handle.devnet_witness_vote_tick(index) {
-                eprintln!("witness vote: {error}");
+            if now_ms.saturating_sub(last_witness_vote_ms) >= 1000 {
+                last_witness_vote_ms = now_ms;
+                if let Err(error) = handle.devnet_witness_vote_tick(index) {
+                    eprintln!("witness vote: {error}");
+                }
             }
         }
         std::thread::sleep(std::time::Duration::from_millis(

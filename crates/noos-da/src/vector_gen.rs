@@ -33,8 +33,8 @@ use noos_lumen::objects::{BoundedBytes, OptionalHash32, OptionalObject};
 
 use crate::error::DaError;
 use crate::{
-    commit_shards, content_root, encode_body, encode_padded_region, BodyDaClaimV1, EncodedBodyV1,
-    MAX_BLOCK_BODY_BYTES,
+    body_shard_bytes, commit_shards, content_root, encode_body, encode_padded_region,
+    BodyDaClaimV1, EncodedBodyV1, BODY_DATA_SHARDS, MAX_BLOCK_DA_FORM_BYTES,
 };
 
 /// One conformance case.
@@ -144,7 +144,8 @@ pub fn inconsistent_parity_encoding(body: &[u8]) -> EncodedBodyV1 {
 /// carries a nonzero byte (offset 1,000).
 #[must_use]
 pub fn nonzero_padding_encoding(body: &[u8]) -> EncodedBodyV1 {
-    let mut region = vec![0_u8; MAX_BLOCK_BODY_BYTES];
+    let shard_bytes = body_shard_bytes(body.len() as u64).unwrap();
+    let mut region = vec![0_u8; shard_bytes * BODY_DATA_SHARDS];
     region[..body.len()].copy_from_slice(body);
     region[1_000] = 0xEE;
     encode_padded_region(claim_for(body), &region).unwrap()
@@ -160,7 +161,8 @@ pub fn forged_content_root() -> Hash32 {
 /// codeword and padding are otherwise honest.
 #[must_use]
 pub fn forged_content_encoding(body: &[u8]) -> EncodedBodyV1 {
-    let mut region = vec![0_u8; MAX_BLOCK_BODY_BYTES];
+    let shard_bytes = body_shard_bytes(body.len() as u64).unwrap();
+    let mut region = vec![0_u8; shard_bytes * BODY_DATA_SHARDS];
     region[..body.len()].copy_from_slice(body);
     let claim = BodyDaClaimV1 {
         content_root: forged_content_root(),
@@ -210,20 +212,22 @@ fn coding_file() -> VectorFile {
             "body exactly fills data shard 0; shards 1..16 all zero",
         ),
         coding_case(
-            "coding-exact-max",
-            1_048_576,
+            "coding-64mib-adaptive",
+            67_108_864,
             false,
-            "body exactly fills all 16 data shards; zero padding bytes",
+            "body fills 16 adaptive 4 MiB data shards below the 128 MiB cap",
         ),
         str_extra(
             negative(
                 "coding-max-plus-one",
                 Vec::new(),
-                DaError::BodyTooLarge { len: 1_048_577 },
-                "1,048,577 bytes exceed the 16 x 64 KiB data capacity",
+                DaError::BodyTooLarge {
+                    len: MAX_BLOCK_DA_FORM_BYTES as u64 + 1,
+                },
+                "one byte exceeds the adaptive 16 x 8 MiB data capacity",
             ),
             "body_len",
-            "1048577".to_string(),
+            MAX_BLOCK_DA_FORM_BYTES.saturating_add(1).to_string(),
         ),
     ];
     VectorFile {

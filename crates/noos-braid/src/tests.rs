@@ -810,6 +810,11 @@ fn checkpoint_advancement_rules() {
 fn body_roundtrip_and_loom_hard_zero() {
     let body = minimal_body();
     let bytes = body.encode_canonical();
+    assert_eq!(
+        body.encode_canonical_with_ground_ticket(body.ground_ticket.0),
+        bytes,
+        "ticket substitution encoder must preserve the canonical body wire law"
+    );
     let back = BlockBodyV1::decode_canonical(&bytes).unwrap();
     assert_eq!(back, body);
     assert_eq!(back.ground_ticket.0.nonce, fixture_ticket().nonce);

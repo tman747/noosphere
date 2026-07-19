@@ -62,7 +62,10 @@ fn rpc_token_file_failures_are_typed_before_node_boot() {
             .expect("system clock")
             .as_nanos()
     ));
-    let out = noosd(&["--rpc-token-file", missing.to_str().expect("UTF-8 temp path")]);
+    let out = noosd(&[
+        "--rpc-token-file",
+        missing.to_str().expect("UTF-8 temp path"),
+    ]);
     assert!(!out.status.success(), "missing token file must fail");
     assert!(
         String::from_utf8_lossy(&out.stderr).contains("read --rpc-token-file"),

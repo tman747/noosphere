@@ -28,9 +28,9 @@ use crate::{ctx_hash, FatalError, StoreError, CTX_WAL};
 /// Record header: length (4) + BLAKE3 checksum (32).
 pub const WAL_HEADER_LEN: u64 = 36;
 /// Hard bound on a single record payload.
-pub const MAX_WAL_RECORD: u32 = 64 * 1024 * 1024;
-/// Bound on ops per record.
-pub const MAX_OPS: u32 = 1_000_000;
+pub const MAX_WAL_RECORD: u32 = 512 * 1024 * 1024;
+/// Bound on operations in one atomic macroblock commit.
+pub const MAX_OPS: u32 = 4_000_000;
 /// Bound on a key.
 pub const MAX_KEY: u32 = 4096;
 /// Bound on a single value.
@@ -296,6 +296,35 @@ pub struct WalWriter {
     active_len: u64,
 }
 
+fn encoded_payload_len(record: &WalRecordV1) -> Result<usize, StoreError> {
+    if record.ops.len() > MAX_OPS as usize {
+        return Err(StoreError::InvalidWriteSet("write set exceeds MAX_OPS"));
+    }
+    record.ops.iter().try_fold(14_usize, |length, op| {
+        if op.key.len() > MAX_KEY as usize {
+            return Err(StoreError::InvalidWriteSet("operation key exceeds MAX_KEY"));
+        }
+        if op
+            .value
+            .as_ref()
+            .is_some_and(|value| value.len() > MAX_VALUE as usize)
+        {
+            return Err(StoreError::InvalidWriteSet(
+                "operation value exceeds MAX_VALUE",
+            ));
+        }
+        length
+            .checked_add(6)
+            .and_then(|next| next.checked_add(op.key.len()))
+            .and_then(|next| {
+                op.value
+                    .as_ref()
+                    .map_or(Some(next), |value| next.checked_add(4 + value.len()))
+            })
+            .ok_or(StoreError::Arithmetic("wal payload len"))
+    })
+}
+
 impl WalWriter {
     /// Resume on an already-scanned directory. `active_first_seq` is the
     /// last segment present (if any); its durable length must already have
@@ -332,8 +361,8 @@ impl WalWriter {
     /// Append one record durably (write boundary + fsync boundary; segment
     /// creation adds create + dir-flush boundaries).
     pub(crate) fn append(&mut self, record: &WalRecordV1) -> Result<(), StoreError> {
-        let payload = record.encode_canonical();
-        if payload.len() > MAX_WAL_RECORD as usize {
+        let payload_len = encoded_payload_len(record)?;
+        if payload_len > MAX_WAL_RECORD as usize {
             return Err(StoreError::InvalidWriteSet(
                 "wal record exceeds MAX_WAL_RECORD",
             ));
@@ -356,15 +385,19 @@ impl WalWriter {
                 .sync_dir(&self.dir)
                 .map_err(|e| StoreError::io("sync_dir", &self.dir, e))?;
         }
-        let mut framed = Vec::with_capacity(
-            payload
-                .len()
-                .checked_add(WAL_HEADER_LEN as usize)
-                .ok_or(StoreError::Arithmetic("wal frame len"))?,
-        );
-        framed.extend_from_slice(&(payload.len() as u32).to_le_bytes());
-        framed.extend_from_slice(&ctx_hash(CTX_WAL, &payload));
-        framed.extend_from_slice(&payload);
+        let frame_len = payload_len
+            .checked_add(WAL_HEADER_LEN as usize)
+            .ok_or(StoreError::Arithmetic("wal frame len"))?;
+        let mut writer = Writer::with_capacity(frame_len);
+        writer.put_raw(&[0_u8; WAL_HEADER_LEN as usize]);
+        record.encode(&mut writer);
+        let mut framed = writer.into_bytes();
+        if framed.len() != frame_len {
+            return Err(StoreError::Arithmetic("wal encoded frame len"));
+        }
+        let checksum = ctx_hash(CTX_WAL, &framed[WAL_HEADER_LEN as usize..]);
+        framed[..4].copy_from_slice(&(payload_len as u32).to_le_bytes());
+        framed[4..WAL_HEADER_LEN as usize].copy_from_slice(&checksum);
         let (_, file, path) = self.active.as_mut().ok_or(StoreError::InvalidWriteSet(
             "wal writer has no active segment",
         ))?;

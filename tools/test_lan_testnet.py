@@ -20,7 +20,15 @@ class ValidatorLaunchTests(unittest.TestCase):
     def run_command(self, standalone_finality: bool) -> list[str]:
         manifest = {
             "ports": {"p2p": 21701, "operator_rpc": 21632},
-            "produce_interval_ms": 1000,
+            "throughput": {
+                "produce_interval_ms": 1000,
+                "mempool_max_transactions": 65_536,
+                "mempool_max_bytes": 67_108_864,
+                "mempool_per_source_pending": 65_536,
+                "mempool_per_account_pending": 65_536,
+                "template_byte_budget": 33_554_432,
+                "template_max_transactions": 32_768,
+            },
         }
         with (
             patch.object(lan_testnet, "load_manifest", return_value=manifest),
@@ -47,6 +55,49 @@ class ValidatorLaunchTests(unittest.TestCase):
         witness = command.index("--devnet-witness")
         self.assertEqual(command[witness + 1], "0")
 
+    def test_validator_binds_manifest_throughput_profile(self) -> None:
+        command = self.run_command(False)
+        expected = {
+            "--produce-interval-ms": "1000",
+            "--mempool-max-transactions": "65536",
+            "--mempool-max-bytes": "67108864",
+            "--mempool-per-source-pending": "65536",
+            "--mempool-per-account-pending": "65536",
+            "--template-byte-budget": "33554432",
+            "--template-max-transactions": "32768",
+        }
+        for flag, value in expected.items():
+            index = command.index(flag)
+            self.assertEqual(command[index + 1], value)
+
+
+
+class ThroughputProfileTests(unittest.TestCase):
+    def profile(self) -> dict[str, int]:
+        return {
+            "produce_interval_ms": 1000,
+            "mempool_max_transactions": 65_536,
+            "mempool_max_bytes": 67_108_864,
+            "mempool_per_source_pending": 65_536,
+            "mempool_per_account_pending": 65_536,
+            "template_byte_budget": 33_554_432,
+            "template_max_transactions": 32_768,
+        }
+
+    def test_profile_accepts_bounded_high_capacity_values(self) -> None:
+        self.assertEqual(lan_testnet.validate_throughput(self.profile()), self.profile())
+
+    def test_profile_rejects_template_larger_than_pool(self) -> None:
+        profile = self.profile()
+        profile["template_max_transactions"] = 65_537
+        with self.assertRaisesRegex(SystemExit, "fit inside"):
+            lan_testnet.validate_throughput(profile)
+
+    def test_profile_rejects_unknown_fields(self) -> None:
+        profile = self.profile()
+        profile["unbounded"] = 1
+        with self.assertRaisesRegex(SystemExit, "wrong fields"):
+            lan_testnet.validate_throughput(profile)
 
 if __name__ == "__main__":
     unittest.main()

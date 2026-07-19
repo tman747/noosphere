@@ -24,6 +24,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 HEX32 = re.compile(r"^[0-9a-f]{64}$")
 DEFAULT_ROOT = Path(os.environ.get("NOOS_LAN_ROOT", str(Path.home() / ".mindchain-lan")))
+MAX_POOL_TRANSACTIONS = 1_048_576
+MAX_POOL_BYTES = 536_870_912
+MAX_TEMPLATE_BYTES = MAX_POOL_BYTES - 65_536
+DEFAULT_MEMPOOL_MAX_TRANSACTIONS = 65_536
+DEFAULT_MEMPOOL_MAX_BYTES = 64 * 1024 * 1024
+DEFAULT_MEMPOOL_PER_SOURCE = 65_536
+DEFAULT_MEMPOOL_PER_ACCOUNT = 65_536
+DEFAULT_TEMPLATE_BYTE_BUDGET = 32 * 1024 * 1024
+DEFAULT_TEMPLATE_MAX_TRANSACTIONS = 32_768
 
 
 def atomic_json(path: Path, value: dict, *, private: bool = False) -> None:
@@ -45,6 +54,40 @@ def local_ip() -> str:
     finally:
         sock.close()
 
+
+def validate_throughput(value: object) -> dict[str, int]:
+    required = {
+        "produce_interval_ms",
+        "mempool_max_transactions",
+        "mempool_max_bytes",
+        "mempool_per_source_pending",
+        "mempool_per_account_pending",
+        "template_byte_budget",
+        "template_max_transactions",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise SystemExit("LAN throughput profile has the wrong fields")
+    if any(isinstance(value[name], bool) or not isinstance(value[name], int) for name in required):
+        raise SystemExit("LAN throughput profile values must be integers")
+    profile = {name: int(value[name]) for name in required}
+    if not 1 <= profile["produce_interval_ms"] <= 60_000:
+        raise SystemExit("produce_interval_ms must be 1..=60000")
+    if not 1 <= profile["mempool_max_transactions"] <= MAX_POOL_TRANSACTIONS:
+        raise SystemExit("mempool_max_transactions is out of range")
+    if not 1 <= profile["mempool_max_bytes"] <= MAX_POOL_BYTES:
+        raise SystemExit("mempool_max_bytes is out of range")
+    if not 1 <= profile["template_byte_budget"] <= MAX_TEMPLATE_BYTES:
+        raise SystemExit("template_byte_budget is out of range")
+    if not 1 <= profile["template_max_transactions"] <= MAX_POOL_TRANSACTIONS:
+        raise SystemExit("template_max_transactions is out of range")
+    for name in ("mempool_per_source_pending", "mempool_per_account_pending"):
+        if not 1 <= profile[name] <= profile["mempool_max_transactions"]:
+            raise SystemExit(f"{name} must fit inside mempool_max_transactions")
+    if profile["template_max_transactions"] > profile["mempool_max_transactions"]:
+        raise SystemExit("template_max_transactions must fit inside mempool_max_transactions")
+    if profile["template_byte_budget"] > profile["mempool_max_bytes"]:
+        raise SystemExit("template_byte_budget must fit inside mempool_max_bytes")
+    return profile
 
 def binary(name: str) -> Path:
     suffix = ".exe" if os.name == "nt" else ""
@@ -71,7 +114,8 @@ def binary(name: str) -> Path:
 def load_manifest(path: str) -> dict:
     value = json.loads(Path(path).read_text(encoding="utf-8"))
     required = {"schema", "genesis_time_ms", "params", "params_sha256", "wallet_accounts", "ports"}
-    if not isinstance(value, dict) or value.get("schema") != "noos/lan-testnet/v1" or not required.issubset(value):
+    required.add("throughput")
+    if not isinstance(value, dict) or value.get("schema") != "noos/lan-testnet/v2" or not required.issubset(value):
         raise SystemExit("invalid LAN manifest")
     params = Path(value["params"])
     if not params.is_absolute():
@@ -81,6 +125,7 @@ def load_manifest(path: str) -> dict:
     for account in value["wallet_accounts"]:
         if HEX32.fullmatch(str(account)) is None:
             raise SystemExit("manifest contains malformed wallet account")
+    value["throughput"] = validate_throughput(value["throughput"])
     return value
 
 
@@ -93,15 +138,24 @@ def init(args: argparse.Namespace) -> None:
     if any(HEX32.fullmatch(item) is None for item in accounts):
         raise SystemExit("--wallet-account values must be lowercase 32-byte hex public keys")
     genesis_time = args.genesis_time_ms or int(time.time() * 1000) + 15_000
+    throughput = validate_throughput({
+        "produce_interval_ms": args.produce_interval_ms,
+        "mempool_max_transactions": args.mempool_max_transactions,
+        "mempool_max_bytes": args.mempool_max_bytes,
+        "mempool_per_source_pending": args.mempool_per_source_pending,
+        "mempool_per_account_pending": args.mempool_per_account_pending,
+        "template_byte_budget": args.template_byte_budget,
+        "template_max_transactions": args.template_max_transactions,
+    })
     manifest = {
-        "schema": "noos/lan-testnet/v1",
+        "schema": "noos/lan-testnet/v2",
         "created_unix_ms": int(time.time() * 1000),
         "genesis_time_ms": genesis_time,
         "params": str(params),
         "params_sha256": hashlib.sha256(params.read_bytes()).hexdigest(),
         "wallet_accounts": accounts,
         "ports": {"p2p": args.p2p_port, "operator_rpc": args.rpc_port, "indexer": args.indexer_port},
-        "produce_interval_ms": args.produce_interval_ms,
+        "throughput": throughput,
     }
     secret = {"schema": "noos/lan-operator-secret/v1", "rpc_token": secrets.token_urlsafe(32)}
     atomic_json(root / "lan-manifest.json", manifest)
@@ -143,7 +197,13 @@ def run_validator(args: argparse.Namespace) -> None:
         "--rpc", f"127.0.0.1:{rpc}", "--rpc-token", secret["rpc_token"],
         "--p2p-listen", f"/ip4/0.0.0.0/udp/{port}/quic-v1",
         *finality_role,
-        "--produce-interval-ms", str(manifest["produce_interval_ms"]),
+        "--produce-interval-ms", str(manifest["throughput"]["produce_interval_ms"]),
+        "--mempool-max-transactions", str(manifest["throughput"]["mempool_max_transactions"]),
+        "--mempool-max-bytes", str(manifest["throughput"]["mempool_max_bytes"]),
+        "--mempool-per-source-pending", str(manifest["throughput"]["mempool_per_source_pending"]),
+        "--mempool-per-account-pending", str(manifest["throughput"]["mempool_per_account_pending"]),
+        "--template-byte-budget", str(manifest["throughput"]["template_byte_budget"]),
+        "--template-max-transactions", str(manifest["throughput"]["template_max_transactions"]),
         "--devnet-contract-fixture",
     ]
     print(f"validator peer address: /ip4/{local_ip()}/udp/{port}/quic-v1", flush=True)
@@ -223,6 +283,32 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--rpc-port", type=int, default=18632)
     create.add_argument("--indexer-port", type=int, default=18080)
     create.add_argument("--produce-interval-ms", type=int, default=6000)
+    create.add_argument(
+        "--mempool-max-transactions",
+        type=int,
+        default=DEFAULT_MEMPOOL_MAX_TRANSACTIONS,
+    )
+    create.add_argument("--mempool-max-bytes", type=int, default=DEFAULT_MEMPOOL_MAX_BYTES)
+    create.add_argument(
+        "--mempool-per-source-pending",
+        type=int,
+        default=DEFAULT_MEMPOOL_PER_SOURCE,
+    )
+    create.add_argument(
+        "--mempool-per-account-pending",
+        type=int,
+        default=DEFAULT_MEMPOOL_PER_ACCOUNT,
+    )
+    create.add_argument(
+        "--template-byte-budget",
+        type=int,
+        default=DEFAULT_TEMPLATE_BYTE_BUDGET,
+    )
+    create.add_argument(
+        "--template-max-transactions",
+        type=int,
+        default=DEFAULT_TEMPLATE_MAX_TRANSACTIONS,
+    )
     validator = sub.add_parser("run-validator")
     validator.add_argument("--manifest", required=True)
     validator.add_argument("--operator-secret", required=True)

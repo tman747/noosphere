@@ -94,9 +94,9 @@ fn init_commit_readback_across_reopen() {
         assert!(s.open_report().initialized);
         assert_eq!(s.current_generation(), 1);
         assert_eq!(s.applied_seq(), 0);
-        assert_eq!(s.commit(&ws(1)).unwrap(), 1);
-        assert_eq!(s.commit(&ws(2)).unwrap(), 2);
-        assert_eq!(s.commit(&ws(4)).unwrap(), 3);
+        assert_eq!(s.commit(ws(1)).unwrap(), 1);
+        assert_eq!(s.commit(ws(2)).unwrap(), 2);
+        assert_eq!(s.commit(ws(4)).unwrap(), 3);
         // ws2 overwrote h(11) and deleted h(12).
         assert_eq!(
             s.get_state(TreeId::Notes, &h(11), None).unwrap(),
@@ -135,7 +135,7 @@ fn rejects_invalid_write_sets() {
     let mut s = must_open(td.store_root());
     // Empty.
     assert!(matches!(
-        s.commit(&WriteSet::default()),
+        s.commit(WriteSet::default()),
         Err(StoreError::InvalidWriteSet(_))
     ));
     // Unordered delta.
@@ -146,19 +146,13 @@ fn rejects_invalid_write_sets() {
         ]),
         ..WriteSet::default()
     };
-    assert!(matches!(
-        s.commit(&bad),
-        Err(StoreError::InvalidWriteSet(_))
-    ));
+    assert!(matches!(s.commit(bad), Err(StoreError::InvalidWriteSet(_))));
     // Duplicate section key.
     let bad = WriteSet {
         headers: vec![(b"k".to_vec(), Some(val(1))), (b"k".to_vec(), None)],
         ..WriteSet::default()
     };
-    assert!(matches!(
-        s.commit(&bad),
-        Err(StoreError::InvalidWriteSet(_))
-    ));
+    assert!(matches!(s.commit(bad), Err(StoreError::InvalidWriteSet(_))));
     // Oversized blob.
     let bad = WriteSet {
         blobs: vec![Blob {
@@ -167,14 +161,9 @@ fn rejects_invalid_write_sets() {
         }],
         ..WriteSet::default()
     };
-    assert!(matches!(
-        s.commit(&bad),
-        Err(StoreError::InvalidWriteSet(_))
-    ));
-    // Invalid write sets never poison (rejected before any IO).
-    // NOTE: blob append happens before validation for ordering reasons on
-    // size, so only the pre-IO rejections are checked here.
-    assert!(s.commit(&ws(1)).is_ok());
+    assert!(matches!(s.commit(bad), Err(StoreError::InvalidWriteSet(_))));
+    // Invalid write sets are rejected before IO and never poison the handle.
+    assert!(s.commit(ws(1)).is_ok());
 }
 
 #[test]
@@ -197,9 +186,9 @@ fn tail_replay_rebuilds_live_engine_from_snapshot() {
     let td = TestDir::new("replay");
     {
         let mut s = must_open(td.store_root());
-        s.commit(&ws(1)).unwrap();
-        s.commit(&ws(2)).unwrap();
-        s.commit(&ws(3)).unwrap();
+        s.commit(ws(1)).unwrap();
+        s.commit(ws(2)).unwrap();
+        s.commit(ws(3)).unwrap();
     }
     // Simulate a lost/corrupt live engine: recovery = snapshot + tail replay.
     std::fs::remove_dir_all(td.store_root().join("live")).unwrap();
@@ -226,8 +215,8 @@ fn truncated_final_record_is_dropped_earlier_corruption_is_fatal() {
     let td = TestDir::new("wal-eof");
     {
         let mut s = must_open(td.store_root());
-        s.commit(&ws(1)).unwrap();
-        s.commit(&ws(2)).unwrap();
+        s.commit(ws(1)).unwrap();
+        s.commit(ws(2)).unwrap();
     }
     // Append a torn record to the last segment: header + partial payload.
     let seg = wal_segments(&td.store_root()).pop().unwrap();
@@ -262,8 +251,8 @@ fn complete_final_record_corruption_is_fatal_not_truncated() {
     let td = TestDir::new("wal-final-corrupt");
     {
         let mut s = must_open(td.store_root());
-        s.commit(&ws(1)).unwrap();
-        s.commit(&ws(2)).unwrap();
+        s.commit(ws(1)).unwrap();
+        s.commit(ws(2)).unwrap();
     }
     let seg = wal_segments(&td.store_root()).pop().unwrap();
     let len = std::fs::metadata(&seg).unwrap().len();
@@ -278,9 +267,9 @@ fn missing_wal_history_is_a_gap() {
     let td = TestDir::new("wal-gap");
     {
         let mut s = must_open(td.store_root());
-        s.commit(&ws(1)).unwrap();
-        s.commit(&ws(2)).unwrap();
-        s.commit(&ws(3)).unwrap();
+        s.commit(ws(1)).unwrap();
+        s.commit(ws(2)).unwrap();
+        s.commit(ws(3)).unwrap();
     }
     // Deleting the retained WAL leaves the snapshot behind the durable
     // history it claims: gen-1 reflects seq 0 but nothing joins it, and
@@ -301,7 +290,7 @@ fn pointer_corruption_and_absence_are_typed_fatals() {
     let td = TestDir::new("pointer");
     {
         let mut s = must_open(td.store_root());
-        s.commit(&ws(1)).unwrap();
+        s.commit(ws(1)).unwrap();
     }
     let current = td.store_root().join("CURRENT");
     // Wrong length.
@@ -354,7 +343,7 @@ fn conflicting_pointers_stop_startup() {
     let td = TestDir::new("conflict");
     {
         let mut s = must_open(td.store_root());
-        s.commit(&ws(1)).unwrap();
+        s.commit(ws(1)).unwrap();
         s.create_snapshot().unwrap(); // gen 2
     }
     let root = td.store_root();
@@ -384,7 +373,7 @@ fn identity_mismatch_is_fatal() {
     let td = TestDir::new("identity");
     {
         let mut s = must_open(td.store_root());
-        s.commit(&ws(1)).unwrap();
+        s.commit(ws(1)).unwrap();
     }
     let mut cfg = test_cfg(td.store_root());
     cfg.identity = b"WRONG-CHAIN".to_vec();
@@ -400,9 +389,9 @@ fn fallback_to_previous_verified_generation() {
     let td = TestDir::new("fallback");
     {
         let mut s = must_open(td.store_root());
-        s.commit(&ws(1)).unwrap();
+        s.commit(ws(1)).unwrap();
         s.create_snapshot().unwrap(); // gen 2
-        s.commit(&ws(2)).unwrap();
+        s.commit(ws(2)).unwrap();
     }
     let root = td.store_root();
     // Corrupt gen-2's manifest: pointed generation invalid.
@@ -430,7 +419,7 @@ fn no_valid_generation_is_fatal() {
     let td = TestDir::new("no-valid");
     {
         let mut s = must_open(td.store_root());
-        s.commit(&ws(1)).unwrap();
+        s.commit(ws(1)).unwrap();
         s.create_snapshot().unwrap(); // gen 2
     }
     let root = td.store_root();
@@ -447,7 +436,7 @@ fn orphan_temp_generations_are_ignored() {
     let td = TestDir::new("orphan-tmp");
     {
         let mut s = must_open(td.store_root());
-        s.commit(&ws(1)).unwrap();
+        s.commit(ws(1)).unwrap();
     }
     let orphan = td
         .store_root()
@@ -469,10 +458,10 @@ fn snapshot_creates_verified_generation_and_flips_pointer() {
     let root = td.store_root();
     {
         let mut s = must_open(root.clone());
-        s.commit(&ws(1)).unwrap();
+        s.commit(ws(1)).unwrap();
         assert_eq!(s.create_snapshot().unwrap(), 2);
         assert_eq!(s.current_generation(), 2);
-        s.commit(&ws(2)).unwrap();
+        s.commit(ws(2)).unwrap();
     }
     assert!(root
         .join("gen-00000000000000000002")
@@ -503,9 +492,9 @@ fn retention_keeps_n_and_previous_until_fresh_process_proves_replay() {
     let gen_dir = |g: u64| root.join(format!("gen-{g:020}"));
     {
         let mut s = must_open(root.clone());
-        s.commit(&ws(1)).unwrap();
+        s.commit(ws(1)).unwrap();
         s.create_snapshot().unwrap(); // gen 2
-        s.commit(&ws(2)).unwrap();
+        s.commit(ws(2)).unwrap();
         s.create_snapshot().unwrap(); // gen 3
                                       // Same process: gens 2 and 3 are NOT yet proven by a fresh
                                       // process; only init-proven gen 1 is. Nothing may be pruned.
@@ -544,11 +533,11 @@ fn prune_respects_wal_needed_by_retained_generations() {
                 delta: delta(vec![(TreeId::Notes, h(100 + i), None, Some(val(i)))]),
                 ..WriteSet::default()
             };
-            s.commit(&w).unwrap();
+            s.commit(w).unwrap();
         }
         assert!(wal_segments(&root).len() >= 2, "expected wal rotation");
         s.create_snapshot().unwrap();
-        s.commit(&ws(1)).unwrap();
+        s.commit(ws(1)).unwrap();
     }
     {
         let mut s = must_open(root.clone());
@@ -586,7 +575,7 @@ fn blob_segments_rotate_and_verify() {
             }],
             ..WriteSet::default()
         };
-        s.commit(&w).unwrap();
+        s.commit(w).unwrap();
     }
     for i in 0..8u8 {
         assert_eq!(s.get_blob(&h(220 + i)).unwrap(), Some(vec![i; 100]));
@@ -624,7 +613,7 @@ fn blob_corruption_below_watermark_invalidates_generation() {
     let root = td.store_root();
     {
         let mut s = must_open(root.clone());
-        s.commit(&ws(1)).unwrap(); // includes blob h(201)
+        s.commit(ws(1)).unwrap(); // includes blob h(201)
         s.create_snapshot().unwrap(); // gen 2 pins the segment prefix
     }
     let seg = std::fs::read_dir(root.join("segments"))
@@ -650,7 +639,7 @@ fn safety_records_survive_snapshot_plus_tail_recovery() {
     let payload = b"beacon-commit epoch=7 validator=3".to_vec();
     {
         let mut s = must_open(root.clone());
-        s.commit(&ws(1)).unwrap();
+        s.commit(ws(1)).unwrap();
         let seq = s
             .persist_safety_record(SAFETY_KIND_WITNESS_BEACON, &payload)
             .unwrap();
@@ -678,11 +667,11 @@ fn failed_commit_poisons_the_handle() {
     let fp = Failpoints::new();
     let vfs: Arc<dyn Vfs> = Arc::new(FailpointVfs::new(Arc::new(RealVfs), Arc::clone(&fp)));
     let mut s = Store::open(test_cfg(root), vfs).unwrap();
-    s.commit(&ws(1)).unwrap();
+    s.commit(ws(1)).unwrap();
     // Arm the 2nd boundary from here: inside the next commit's WAL write.
     fp.arm(2);
-    let err = s.commit(&ws(2)).unwrap_err();
+    let err = s.commit(ws(2)).unwrap_err();
     assert!(err.is_injected(), "expected injected fault, got {err}");
-    assert!(matches!(s.commit(&ws(3)), Err(StoreError::Poisoned)));
+    assert!(matches!(s.commit(ws(3)), Err(StoreError::Poisoned)));
     assert!(matches!(s.barrier(), Err(StoreError::Poisoned)));
 }

@@ -374,10 +374,8 @@ fn wwm_devnet_operator_binds_open_receipt_and_settlement() {
     assert_eq!(encoded_open["kind"], "OpenWwmJob");
     assert_eq!(encoded_open["id"], h(1));
     assert!(matches!(
-        ActionV1::decode_canonical(
-            &from_hex(encoded_open["action"].as_str().unwrap()).unwrap()
-        )
-        .unwrap(),
+        ActionV1::decode_canonical(&from_hex(encoded_open["action"].as_str().unwrap()).unwrap())
+            .unwrap(),
         ActionV1::OpenWwmJob(_)
     ));
 
@@ -632,6 +630,44 @@ fn tx_build_encodes_transfers_and_private_payment_actions() {
             payment_kind: 1,
             ..
         }
+    ));
+}
+
+#[test]
+fn tx_build_encodes_neural_oracle_commit_and_reveal_actions() {
+    let mut spec = minimal_spec();
+    spec["actions"] = json!([
+        {
+            "type": "commit_neural_oracle_reply",
+            "query_id": h(0x61),
+            "reporter_profile_id": h(0x62),
+            "commitment": h(0x63)
+        },
+        {
+            "type": "reveal_neural_oracle_reply",
+            "query_id": h(0x61),
+            "reporter_profile_id": h(0x62),
+            "response": "0102",
+            "transcript_root": h(0x64),
+            "nonce": h(0x65)
+        }
+    ]);
+    let built = noos_cli::tx_build(&spec.to_string()).unwrap();
+    let tx =
+        TransactionV1::decode_canonical(&from_hex(built["tx"].as_str().unwrap()).unwrap()).unwrap();
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[0].as_slice()).unwrap(),
+        ActionV1::CommitNeuralOracleReply(commit)
+            if commit.query_id == [0x61; 32]
+                && commit.reporter_profile_id == [0x62; 32]
+                && commit.commitment == [0x63; 32]
+    ));
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[1].as_slice()).unwrap(),
+        ActionV1::RevealNeuralOracleReply(reveal)
+            if reveal.response.as_slice() == [1, 2]
+                && reveal.transcript_root == [0x64; 32]
+                && reveal.nonce == [0x65; 32]
     ));
 }
 

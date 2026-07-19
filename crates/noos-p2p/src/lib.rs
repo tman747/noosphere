@@ -6,7 +6,7 @@
 //!
 //! ```text
 //! /noos/braid/header/1     header announce / request        priority
-//! /noos/braid/body/1       body request / transfer          priority
+//! /noos/braid/body/2       chunked body request / transfer  priority
 //! /noos/braid/vote/1       checkpoint vote push             priority
 //! /noos/lumen/tx/1         transaction push                 normal
 //! /noos/sync/range/1       header range request             priority
@@ -56,8 +56,8 @@ pub use envelope::{
     MAX_LIGHT_HEADER_BYTES, MAX_LIGHT_ITEM_AUX_BYTES, MAX_LIGHT_MEMBERS,
     MAX_LIGHT_MEMBERSHIP_SNAPSHOT_BYTES, MAX_LIGHT_MEMBERSHIP_WITNESS_BYTES,
     MAX_LIGHT_UPDATE_ITEMS, MAX_LIGHT_UPDATE_ITEM_BYTES, MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES,
-    MAX_RANGE_HEADERS, MAX_RECEIPT_BYTES, MAX_SHARD_BYTES, MAX_SNAPSHOT_CHUNK_BYTES, MAX_TX_BYTES,
-    MAX_VOTE_BYTES, RANGE_REPLY_BYTE_BUDGET,
+    MAX_RANGE_HEADERS, MAX_REASSEMBLED_BODY_BYTES, MAX_RECEIPT_BYTES, MAX_SHARD_BYTES,
+    MAX_SNAPSHOT_CHUNK_BYTES, MAX_TX_BYTES, MAX_VOTE_BYTES, RANGE_REPLY_BYTE_BUDGET,
 };
 pub use fault::{
     Delivery, DropReason, WanCase, WAN_FAULT_BOUND, WAN_LATENCY_SWEEP_MS, WAN_LOSS_SWEEP_PERMILLE,

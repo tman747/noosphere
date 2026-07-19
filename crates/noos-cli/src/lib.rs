@@ -16,12 +16,17 @@
 mod invitation;
 mod manifest;
 pub mod wwm;
+#[cfg(feature = "wwm-client")]
 pub mod wwm_client;
 
 pub use invitation::invitation_verify;
 pub use manifest::manifest_verify;
 
 use noos_codec::{NoosDecode, NoosEncode};
+use noos_lumen::neural_oracle::{
+    EvaluateNeuralProgramV1, FinalizeNeuralOracleQueryV1, NeuralOracleCommitV1,
+    NeuralOracleQueryV1, NeuralOracleRevealV1, NeuralProgramV1,
+};
 use noos_lumen::objects::{
     asset_id as lumen_asset_id, compute_job_id as lumen_compute_job_id,
     lending_market_id as lumen_lending_market_id, object_id as lumen_object_id,
@@ -674,48 +679,89 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
             })
         }
         "record_artifact_repair_order" => {
-            ActionV1::RecordArtifactRepair(ArtifactRepairPayloadV1::Order(
-                ArtifactRepairOrderV1 {
-                    order_id: spec_hash(spec, "order_id")?,
-                    policy_id: spec_hash(spec, "policy_id")?,
-                    artifact_id: spec_hash(spec, "artifact_id")?,
-                    position: spec_u8(spec, "position")?,
-                    prior_commitment_id: spec_hash(spec, "prior_commitment_id")?,
-                    replacement_profile_id: spec_hash(spec, "replacement_profile_id")?,
-                    source_commitment_ids: spec_hash_list(spec, "source_commitment_ids")?,
-                    source_positions: spec_u8_list(spec, "source_positions")?,
-                    source_positions_root: spec_hash(spec, "source_positions_root")?,
-                    expected_position_root: spec_hash(spec, "expected_position_root")?,
-                    issued_height: spec_u64(spec, "issued_height")?,
-                    deadline_height: spec_u64(spec, "deadline_height")?,
-                    authority_epoch: spec_u64(spec, "authority_epoch")?,
-                    nonce: spec_u64(spec, "nonce")?,
-                    signature: spec_bytes(spec, "signature")?,
-                },
-            ))
+            ActionV1::RecordArtifactRepair(ArtifactRepairPayloadV1::Order(ArtifactRepairOrderV1 {
+                order_id: spec_hash(spec, "order_id")?,
+                policy_id: spec_hash(spec, "policy_id")?,
+                artifact_id: spec_hash(spec, "artifact_id")?,
+                position: spec_u8(spec, "position")?,
+                prior_commitment_id: spec_hash(spec, "prior_commitment_id")?,
+                replacement_profile_id: spec_hash(spec, "replacement_profile_id")?,
+                source_commitment_ids: spec_hash_list(spec, "source_commitment_ids")?,
+                source_positions: spec_u8_list(spec, "source_positions")?,
+                source_positions_root: spec_hash(spec, "source_positions_root")?,
+                expected_position_root: spec_hash(spec, "expected_position_root")?,
+                issued_height: spec_u64(spec, "issued_height")?,
+                deadline_height: spec_u64(spec, "deadline_height")?,
+                authority_epoch: spec_u64(spec, "authority_epoch")?,
+                nonce: spec_u64(spec, "nonce")?,
+                signature: spec_bytes(spec, "signature")?,
+            }))
         }
-        "record_artifact_repair_receipt" => {
-            ActionV1::RecordArtifactRepair(ArtifactRepairPayloadV1::Receipt(
-                ArtifactRepairReceiptV1 {
-                    repair_id: spec_hash(spec, "repair_id")?,
-                    order_id: spec_hash(spec, "order_id")?,
-                    policy_id: spec_hash(spec, "policy_id")?,
-                    artifact_id: spec_hash(spec, "artifact_id")?,
-                    position: spec_u8(spec, "position")?,
-                    prior_commitment_id: spec_hash(spec, "prior_commitment_id")?,
-                    new_commitment_id: spec_hash(spec, "new_commitment_id")?,
-                    source_positions_root: spec_hash(spec, "source_positions_root")?,
-                    new_position_root: spec_hash(spec, "new_position_root")?,
-                    durable_commit_root: spec_hash(spec, "durable_commit_root")?,
-                    certificate_id: spec_hash(spec, "certificate_id")?,
-                    bytes_read: spec_u64(spec, "bytes_read")?,
-                    bytes_written: spec_u64(spec, "bytes_written")?,
-                    evidence_root: spec_hash(spec, "evidence_root")?,
-                    signer_id: spec_hash(spec, "signer_id")?,
-                    completed_height: spec_u64(spec, "completed_height")?,
-                    signature: spec_bytes(spec, "signature")?,
-                },
-            ))
+        "record_artifact_repair_receipt" => ActionV1::RecordArtifactRepair(
+            ArtifactRepairPayloadV1::Receipt(ArtifactRepairReceiptV1 {
+                repair_id: spec_hash(spec, "repair_id")?,
+                order_id: spec_hash(spec, "order_id")?,
+                policy_id: spec_hash(spec, "policy_id")?,
+                artifact_id: spec_hash(spec, "artifact_id")?,
+                position: spec_u8(spec, "position")?,
+                prior_commitment_id: spec_hash(spec, "prior_commitment_id")?,
+                new_commitment_id: spec_hash(spec, "new_commitment_id")?,
+                source_positions_root: spec_hash(spec, "source_positions_root")?,
+                new_position_root: spec_hash(spec, "new_position_root")?,
+                durable_commit_root: spec_hash(spec, "durable_commit_root")?,
+                certificate_id: spec_hash(spec, "certificate_id")?,
+                bytes_read: spec_u64(spec, "bytes_read")?,
+                bytes_written: spec_u64(spec, "bytes_written")?,
+                evidence_root: spec_hash(spec, "evidence_root")?,
+                signer_id: spec_hash(spec, "signer_id")?,
+                completed_height: spec_u64(spec, "completed_height")?,
+                signature: spec_bytes(spec, "signature")?,
+            }),
+        ),
+        "register_neural_program" => ActionV1::RegisterNeuralProgram(NeuralProgramV1 {
+            program_id: spec_hash(spec, "program_id")?,
+            input_width: spec_u8(spec, "input_width")?,
+            hidden_width: spec_u8(spec, "hidden_width")?,
+            output_width: spec_u8(spec, "output_width")?,
+            hidden_weights: spec_bytes(spec, "hidden_weights")?,
+            hidden_biases: spec_bytes(spec, "hidden_biases")?,
+            output_weights: spec_bytes(spec, "output_weights")?,
+            output_biases: spec_bytes(spec, "output_biases")?,
+        }),
+        "evaluate_neural_program" => ActionV1::EvaluateNeuralProgram(EvaluateNeuralProgramV1 {
+            query_id: spec_hash(spec, "query_id")?,
+            program_id: spec_hash(spec, "program_id")?,
+            requester: spec_hash(spec, "requester")?,
+            input: spec_bytes(spec, "input")?,
+        }),
+        "open_neural_oracle_query" => ActionV1::OpenNeuralOracleQuery(NeuralOracleQueryV1 {
+            query_id: spec_hash(spec, "query_id")?,
+            job_id: spec_hash(spec, "job_id")?,
+            requester: spec_hash(spec, "requester")?,
+            executor_set_id: spec_hash(spec, "executor_set_id")?,
+            executor_set_epoch: spec_u64(spec, "executor_set_epoch")?,
+            input_root: spec_hash(spec, "input_root")?,
+            max_response_bytes: spec_u32(spec, "max_response_bytes")?,
+            threshold: spec_u8(spec, "threshold")?,
+            commit_deadline: spec_u64(spec, "commit_deadline")?,
+            reveal_deadline: spec_u64(spec, "reveal_deadline")?,
+        }),
+        "commit_neural_oracle_reply" => ActionV1::CommitNeuralOracleReply(NeuralOracleCommitV1 {
+            query_id: spec_hash(spec, "query_id")?,
+            reporter_profile_id: spec_hash(spec, "reporter_profile_id")?,
+            commitment: spec_hash(spec, "commitment")?,
+        }),
+        "reveal_neural_oracle_reply" => ActionV1::RevealNeuralOracleReply(NeuralOracleRevealV1 {
+            query_id: spec_hash(spec, "query_id")?,
+            reporter_profile_id: spec_hash(spec, "reporter_profile_id")?,
+            response: spec_bytes(spec, "response")?,
+            transcript_root: spec_hash(spec, "transcript_root")?,
+            nonce: spec_hash(spec, "nonce")?,
+        }),
+        "finalize_neural_oracle_query" => {
+            ActionV1::FinalizeNeuralOracleQuery(FinalizeNeuralOracleQueryV1 {
+                query_id: spec_hash(spec, "query_id")?,
+            })
         }
         other => {
             return Err(CliError::Malformed(format!(
@@ -1116,6 +1162,7 @@ pub fn tx_sign(
     let mut gate = IdentityGate::new(identity);
     gate.verify(identity)?;
     let seed = from_hex(seed_hex)?;
+    let seed = zeroize::Zeroizing::new(seed);
     let spending = derive_authority(&seed, Purpose::Sign, account, index)?.into_spending_key()?;
     let txid = lumen_txid(&tx);
     let signature = spending.sign_lumen_transaction(&gate, &txid)?;
@@ -1243,6 +1290,19 @@ pub fn query_tx(indexer: &str, txid: &str) -> Result<Value> {
     expect_json(status, body)
 }
 
+/// `GET /neural-oracle/{query_id}` on the node's finalized operator RPC.
+pub fn query_neural_oracle_result(node: &str, token: &str, query_id: &str) -> Result<Value> {
+    from_hex32(query_id)?;
+    let (status, body) = http_request(
+        node,
+        "GET",
+        &format!("/neural-oracle/{query_id}"),
+        Some(token),
+        None,
+    )?;
+    expect_json(status, body)
+}
+
 /// `GET /api/status` on the indexer public API (three separate heads).
 pub fn indexer_status(indexer: &str) -> Result<Value> {
     let (status, body) = http_request(indexer, "GET", "/api/status", None, None)?;
@@ -1292,11 +1352,7 @@ pub fn wwm_devnet_action(spec_json: &str) -> Result<Value> {
     let (kind, id, action) = match spec_str(&spec, "type")? {
         "open_wwm_job" => {
             let payload = spec_wwm_job(&spec)?;
-            (
-                "OpenWwmJob",
-                payload.job_id,
-                wwm::open_wwm_job(payload)?,
-            )
+            ("OpenWwmJob", payload.job_id, wwm::open_wwm_job(payload)?)
         }
         "record_wwm_receipt" => {
             let payload = spec_wwm_receipt(&spec)?;
@@ -1316,8 +1372,7 @@ pub fn wwm_devnet_action(spec_json: &str) -> Result<Value> {
         }
         _ => {
             return Err(CliError::Malformed(
-                "devnet operator accepts only OpenWwmJob, RecordWwmReceipt, or SettleWwmJob"
-                    .into(),
+                "devnet operator accepts only OpenWwmJob, RecordWwmReceipt, or SettleWwmJob".into(),
             ))
         }
     };
@@ -1373,7 +1428,7 @@ pub const USAGE: &str = "noos-cli <command>\n\
   tx build  --spec <json> | --spec-file <path>\n\
   tx sign   --tx <hex> --seed <hex> --account <n> --index <n> --chain-id <hex32> --genesis-hash <hex32> [--scope <n>] [--lock-reveal <hex>]...\n\
   tx submit --node <addr> --token <t> --chain-id <hex32> --genesis-hash <hex32> --tx <hex> --witnesses <hex>\n\
-  query     block <height|hash> --indexer <addr> | tx <txid> --indexer <addr>\n\
+  query     block <height|hash> --indexer <addr> | tx <txid> --indexer <addr> | neural-oracle <query-id> --node <addr> --token <t>\n\
   manifest  verify --file <path> --public-key <hex32> [--now-unix-ms <u64>]\n\
   invitation verify --file <path> --public-key <hex32> [--now-unix-ms <u64>]\n\
   wwm devnet capabilities | action|flow --spec <json> | --spec-file <path>\n\
@@ -1402,9 +1457,7 @@ pub fn run(args: &[String]) -> Result<String> {
         {
             pretty(wwm_devnet_action(&read_spec_arg(rest)?)?)
         }
-        [wwm, devnet, flow, rest @ ..]
-            if wwm == "wwm" && devnet == "devnet" && flow == "flow" =>
-        {
+        [wwm, devnet, flow, rest @ ..] if wwm == "wwm" && devnet == "devnet" && flow == "flow" => {
             pretty(wwm_devnet_flow(&read_spec_arg(rest)?)?)
         }
         [cmd, rest @ ..] if cmd == "keygen" => pretty(keygen(
@@ -1455,6 +1508,13 @@ pub fn run(args: &[String]) -> Result<String> {
         }
         [q, kind, id, rest @ ..] if q == "query" && kind == "tx" => {
             pretty(query_tx(&required(rest, "--indexer")?, id)?)
+        }
+        [q, kind, id, rest @ ..] if q == "query" && kind == "neural-oracle" => {
+            pretty(query_neural_oracle_result(
+                &required(rest, "--node")?,
+                &required(rest, "--token")?,
+                id,
+            )?)
         }
         [manifest, verify, rest @ ..] if manifest == "manifest" && verify == "verify" => {
             let path = required(rest, "--file")?;

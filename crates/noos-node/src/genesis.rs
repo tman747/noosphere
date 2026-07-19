@@ -458,7 +458,7 @@ pub struct BuiltGenesis {
     pub header: BlockHeaderV1,
     pub body: BlockBodyV1,
     pub ticket: GroundTicketV1,
-    /// Canonical body bytes (the DA-encoded content).
+    /// Ticket-independent compressed DA form persisted and served by hash.
     pub body_bytes: Vec<u8>,
 }
 
@@ -892,9 +892,9 @@ impl GenesisSpec {
         header.ground_ticket_root = body_ticket_root(&ticket)?;
         body.ground_ticket = GroundTicketWire(ticket);
 
-        // Served body bytes: the real ticket travels here; DA bytes stay
-        // derivable through roots::da_form_bytes.
-        let body_bytes = body.encode_canonical();
+        // Persist and serve the exact compressed, ticket-independent DA form;
+        // import substitutes the separately validated real ticket.
+        let body_bytes = da_bytes;
 
         // Devnet proposer signature: BLS over the proposal commitment under
         // the registered D-BLS-PROPOSER DST.
@@ -1139,7 +1139,7 @@ mod production_proposal_refusal_tests {
         );
         assert_eq!(
             super::hex32_for_test(built.genesis_hash),
-            "e4cf96ba6a65167f2def93429b23c91c1d4716a6a2ba9f15d598b9bea04f3b4c"
+            "4c6500d9dcfef3de56ac941797968de9d58c8fe2a21dc8aa6aa28be7742795d2"
         );
     }
 }

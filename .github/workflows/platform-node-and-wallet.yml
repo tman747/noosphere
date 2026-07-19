@@ -53,7 +53,7 @@ jobs:
           cargo test --locked -p noos-node --lib -- --test-threads=1
           cargo test --locked -p noos-lumen
           cargo test --locked -p noos-cli
-      - name: Enforce sustained transaction throughput
+      - name: Enforce transaction and internal accounting throughput
         if: runner.os == 'Windows'
         shell: bash
         run: |
@@ -67,6 +67,11 @@ jobs:
             --accounts 1024 \
             --minimum-validator-tps 7500 \
             --minimum-producer-tps 10000 \
+            --maximum-root-share 0.25 \
+            --internal-equivalents 4294967296 \
+            --internal-accounts 65536 \
+            --minimum-internal-equivalents-per-second 200000000 \
+            --minimum-internal-sample-seconds 0.5 \
             --out platform-evidence/windows/throughput.json
       - name: Run native node boot smoke
         shell: bash

@@ -92,6 +92,12 @@ fn rpc_status_reports_the_three_heads_separately_and_auth_gates_routes() {
     );
     assert!(body.contains(r#""justified""#), "justified present: {body}");
     assert!(body.contains(r#""finalized""#), "finalized present: {body}");
+    assert!(
+        body.contains(
+            r#""finality_gossip":{"pending_votes":0,"pending_certificates":0,"accepted":0,"rejected":0}"#
+        ),
+        "finality gossip diagnostics present: {body}"
+    );
     assert!(!body.contains(r#""latest""#), "merged latest is prohibited");
     assert!(body.contains(r#""observer":false"#));
 
@@ -99,6 +105,29 @@ fn rpc_status_reports_the_three_heads_separately_and_auth_gates_routes() {
     let (safety_status, safety_body) = http_request(addr, "GET", "/stable/safety", token, None);
     assert_eq!(safety_status, 200, "{safety_body}");
     assert!(safety_body.contains(r#""items":[]"#), "{safety_body}");
+
+    // Neural-oracle reads are finalized-state only. A missing result returns
+    // typed 404 after its local sparse-Merkle non-membership proof verifies.
+    let query_id = hex(&[0x6a; 32]);
+    let (neural_status, neural_body) = http_request(
+        addr,
+        "GET",
+        &format!("/neural-oracle/{query_id}"),
+        token,
+        None,
+    );
+    assert_eq!(neural_status, 404, "{neural_body}");
+    assert!(
+        neural_body.contains(r#""code":"not_found""#),
+        "{neural_body}"
+    );
+    let (malformed_status, malformed_body) =
+        http_request(addr, "GET", "/neural-oracle/not-hex", token, None);
+    assert_eq!(malformed_status, 400, "{malformed_body}");
+    assert!(
+        malformed_body.contains(r#""code":"malformed""#),
+        "{malformed_body}"
+    );
 
     // Wallets can resolve the authoritative nonce and authorization descriptor.
     let faucet = hex(&faucet_key().public_key().into_bytes());
@@ -207,6 +236,50 @@ fn rpc_submission_settles_and_receipts_are_served() {
     );
     assert_eq!(code, 404);
     assert!(body.contains(r#""code":"not_found""#));
+
+    rpc_handle.shutdown();
+    handle.shutdown();
+}
+
+#[test]
+fn rpc_batch_submission_returns_input_aligned_results() {
+    let (handle, rpc_handle) = start_node("rpc-submit-batch", false);
+    let addr = rpc_handle.addr;
+    let token = Some("operator-secret");
+    let chain_id = handle.status().expect("status").chain_id;
+    let (tx_a, wit_a, txid_a) =
+        signed_transfer(chain_id, 40, &faucet_key(), operator_account(1), 1_001);
+    let (tx_b, wit_b, txid_b) =
+        signed_transfer(chain_id, 40, &faucet_key(), operator_account(2), 1_002);
+    let payload = format!(
+        concat!(
+            r#"{{"transactions":["#,
+            r#"{{"tx":"{}","witnesses":"{}"}},"#,
+            r#"{{"tx":"{}","witnesses":"{}"}}"#,
+            r#"]}}"#
+        ),
+        hex(&tx_a),
+        hex(&wit_a),
+        hex(&tx_b),
+        hex(&wit_b),
+    );
+    let (code, body) = http_request(addr, "POST", "/submit_tx_batch", token, Some(&payload));
+    assert_eq!(code, 200, "{body}");
+    assert!(body.contains(r#""accepted":2"#), "{body}");
+    assert!(body.contains(r#""rejected":0"#), "{body}");
+    assert!(body.contains(&hex(&txid_a)), "{body}");
+    assert!(body.contains(&hex(&txid_b)), "{body}");
+    assert_eq!(handle.status().expect("status").mempool_txs, 2);
+
+    let (code, body) = http_request(
+        addr,
+        "POST",
+        "/submit_tx_batch",
+        token,
+        Some(r#"{"transactions":[]}"#),
+    );
+    assert_eq!(code, 400, "{body}");
+    assert!(body.contains(r#""code":"malformed""#), "{body}");
 
     rpc_handle.shutdown();
     handle.shutdown();

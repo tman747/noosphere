@@ -106,7 +106,7 @@
           "required": ["container", "first_discriminant", "last_discriminant", "variant_count"],
           "properties": {
             "container": {"const": "ActionV1"}, "first_discriminant": {"const": 40},
-            "last_discriminant": {"const": 59}, "variant_count": {"const": 60}
+            "last_discriminant": {"const": 65}, "variant_count": {"const": 66}
           }
         },
         "payload_tags": {
@@ -122,11 +122,12 @@
         },
         "resolver": {
           "type": "object", "additionalProperties": false,
-          "required": ["target", "max_bytes", "max_proofs", "authorized_target", "authorized_max_bytes", "normal_leaf_count"],
+          "required": ["target", "max_bytes", "max_proofs", "authorized_target", "authorized_max_bytes", "normal_leaf_count", "neural_target", "neural_response_max_bytes"],
           "properties": {
             "target": {"const": "/model-resolution/<selector>"}, "max_bytes": {"const": 262144},
             "max_proofs": {"const": 17}, "normal_leaf_count": {"const": 17},
-            "authorized_target": {"const": "/authorized-config/<config_id>"}, "authorized_max_bytes": {"const": 393216}
+            "authorized_target": {"const": "/authorized-config/<config_id>"}, "authorized_max_bytes": {"const": 393216},
+            "neural_target": {"const": "/neural-oracle/<query_id>"}, "neural_response_max_bytes": {"const": 16384}
           }
         },
         "light_update": {
@@ -146,7 +147,7 @@
           }
         },
         "v1_decode_policy": {"const": "REJECT_V1_WWM_BYTES"},
-        "model_execution": {"const": "OFF_CHAIN_ONLY"}
+        "model_execution": {"const": "LARGE_MODELS_OFF_CHAIN_BOUNDED_L1_NEURAL_ONLY"}
       }
     },
     "evidence": {

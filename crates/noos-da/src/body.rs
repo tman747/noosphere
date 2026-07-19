@@ -3,12 +3,13 @@
 //!
 //! ## Coding law
 //!
-//! The canonical `BlockBodyV1` byte string (at most [`MAX_BLOCK_BODY_BYTES`])
-//! is split into [`BODY_DATA_SHARDS`] fixed [`BODY_SHARD_BYTES`] data shards,
-//! the final data shard zero-padded; [`BODY_PARITY_SHARDS`] parity shards are
-//! computed with the registered `RS-GF8-V1` codec (GF(2^8) Reed-Solomon,
-//! rate 1/2). Any [`BODY_DATA_SHARDS`] of the [`BODY_TOTAL_SHARDS`] shards
-//! reconstruct the unique codeword.
+//! The ticket-independent compressed DA-form byte string (at most
+//! [`MAX_BLOCK_DA_FORM_BYTES`]) is split into [`BODY_DATA_SHARDS`] adaptive,
+//! power-of-two data shards. Shards stay at least [`BODY_SHARD_BYTES`] and
+//! grow deterministically up to [`MAX_BODY_SHARD_BYTES`]; the final data
+//! shard is zero-padded, then rate-1/2 `RS-GF8-V1` parity is computed. Any
+//! [`BODY_DATA_SHARDS`] of the [`BODY_TOTAL_SHARDS`] shards reconstruct the
+//! unique codeword.
 //!
 //! Commitments (crypto-domains-v1.csv):
 //! * `content_root = H(NOOS/DA/CONTENT/V1 || original_bytes_le_u64 || body)`
@@ -33,19 +34,45 @@ use reed_solomon_erasure::galois_8::ReedSolomon;
 use crate::error::DaError;
 use crate::merkle::{branch, build_levels, fold_branch, shard_leaf, ShardBranch};
 
-/// Fixed consensus-body shard size (PROPOSED-G0, da.md / ODR-DA-001).
+/// Minimum consensus-body shard size (64 KiB).
 pub const BODY_SHARD_BYTES: usize = 65_536;
-/// Data shards per body (PROPOSED-G0).
+/// Maximum adaptive consensus-body shard size (8 MiB).
+pub const MAX_BODY_SHARD_BYTES: usize = 8_388_608;
+/// Data shards per body (rate-1/2 RS-GF8-V1).
 pub const BODY_DATA_SHARDS: usize = 16;
-/// Parity shards per body (PROPOSED-G0; rate 1/2).
+/// Parity shards per body (rate-1/2 RS-GF8-V1).
 pub const BODY_PARITY_SHARDS: usize = 16;
 /// Total shards; any [`BODY_DATA_SHARDS`] of them reconstruct.
 pub const BODY_TOTAL_SHARDS: usize = BODY_DATA_SHARDS + BODY_PARITY_SHARDS;
 /// Depth of the perfect shard Merkle tree (`2^5 = 32` leaves).
 pub const BODY_SHARD_DEPTH: usize = 5;
-/// Maximum canonical body size: exactly the data capacity
-/// (PROPOSED-G0, da.md / ODR-DA-002; co-freezes with fee capacity).
-pub const MAX_BLOCK_BODY_BYTES: usize = BODY_DATA_SHARDS * BODY_SHARD_BYTES;
+/// Maximum compressed DA form size under adaptive 16 × 8 MiB geometry.
+pub const MAX_BLOCK_DA_FORM_BYTES: usize = BODY_DATA_SHARDS * MAX_BODY_SHARD_BYTES;
+const PARALLEL_ENCODING_MIN_SHARD_BYTES: usize = 1_048_576;
+const PARALLEL_ENCODING_MIN_STRIPE_BYTES: usize = 65_536;
+
+/// Canonical shard size for a claimed compressed DA-form length. The smallest
+/// fitting power of two is selected, clamped to 64 KiB..=8 MiB.
+pub fn body_shard_bytes(original_bytes: u64) -> Result<usize, DaError> {
+    if original_bytes > MAX_BLOCK_DA_FORM_BYTES as u64 {
+        return Err(DaError::BodyTooLarge {
+            len: original_bytes,
+        });
+    }
+    let original = usize::try_from(original_bytes).map_err(|_| DaError::BodyTooLarge {
+        len: original_bytes,
+    })?;
+    let required = original.div_ceil(BODY_DATA_SHARDS).max(BODY_SHARD_BYTES);
+    let shard_bytes = required
+        .checked_next_power_of_two()
+        .ok_or(DaError::ShardGeometry)?;
+    if shard_bytes > MAX_BODY_SHARD_BYTES {
+        return Err(DaError::BodyTooLarge {
+            len: original_bytes,
+        });
+    }
+    Ok(shard_bytes)
+}
 
 /// The proposer-claimed reconstruction context for one body. Both fields
 /// are **untrusted** wire inputs: `content_root` is validated against the
@@ -95,6 +122,29 @@ impl EncodedBodyV1 {
     #[must_use]
     pub fn shards(&self) -> &[Vec<u8>] {
         &self.shards
+    }
+
+    /// Consumes the encoded body into its 32 canonical shards without
+    /// duplicating their potentially large buffers.
+    #[must_use]
+    pub fn into_shards(self) -> Vec<Vec<u8>> {
+        self.shards
+    }
+
+    /// Consumes the encoded body into transport candidates without cloning
+    /// any shard buffer.
+    pub fn into_candidates(self) -> Result<Vec<ShardCandidateV1>, DaError> {
+        let EncodedBodyV1 { shards, levels, .. } = self;
+        let mut candidates = Vec::with_capacity(shards.len());
+        for (index, bytes) in shards.into_iter().enumerate() {
+            let index = u32::try_from(index).map_err(|_| DaError::ShardGeometry)?;
+            candidates.push(ShardCandidateV1 {
+                index,
+                bytes,
+                branch: branch(&levels, index)?,
+            });
+        }
+        Ok(candidates)
     }
 
     /// Merkle branch for shard `index`.
@@ -168,14 +218,70 @@ fn coder() -> Result<ReedSolomon, DaError> {
         .map_err(|_| DaError::ReconstructionFailed)
 }
 
-/// Splits `body` into 16 zero-padded data shards. Deterministic: the same
-/// body always yields the same shard bytes.
-fn data_shards(body: &[u8]) -> Vec<Vec<u8>> {
-    let mut shards = vec![vec![0_u8; BODY_SHARD_BYTES]; BODY_DATA_SHARDS];
-    for (i, chunk) in body.chunks(BODY_SHARD_BYTES).enumerate() {
+/// Splits `body` into 16 zero-padded data shards under its canonical adaptive
+/// geometry. Deterministic: the same body always yields the same shard bytes.
+fn data_shards(body: &[u8], shard_bytes: usize) -> Vec<Vec<u8>> {
+    let mut shards = vec![vec![0_u8; shard_bytes]; BODY_DATA_SHARDS];
+    for (i, chunk) in body.chunks(shard_bytes).enumerate() {
         shards[i][..chunk.len()].copy_from_slice(chunk);
     }
     shards
+}
+fn encode_parity(shards: &mut [Vec<u8>]) -> Result<(), DaError> {
+    let shard_bytes = shards.first().map(Vec::len).ok_or(DaError::ShardGeometry)?;
+    let available = std::thread::available_parallelism().map_or(1, usize::from);
+    let workers = available
+        .min(shard_bytes.div_ceil(PARALLEL_ENCODING_MIN_STRIPE_BYTES))
+        .max(1);
+    if workers == 1 || shard_bytes < PARALLEL_ENCODING_MIN_SHARD_BYTES {
+        return coder()?
+            .encode(shards)
+            .map_err(|_| DaError::ReconstructionFailed);
+    }
+    encode_parity_striped(shards, workers)
+}
+
+fn encode_parity_striped(shards: &mut [Vec<u8>], workers: usize) -> Result<(), DaError> {
+    if shards.len() != BODY_TOTAL_SHARDS || workers < 2 {
+        return Err(DaError::ShardGeometry);
+    }
+    let shard_bytes = shards.first().map(Vec::len).ok_or(DaError::ShardGeometry)?;
+    if shard_bytes == 0 || shards.iter().any(|shard| shard.len() != shard_bytes) {
+        return Err(DaError::ShardGeometry);
+    }
+    let stripe_bytes = shard_bytes.div_ceil(workers);
+    let stripe_count = shard_bytes.div_ceil(stripe_bytes);
+    let (data, parity) = shards.split_at_mut(BODY_DATA_SHARDS);
+    let data: &[Vec<u8>] = data;
+    let mut parity_stripes: Vec<Vec<&mut [u8]>> = (0..stripe_count)
+        .map(|_| Vec::with_capacity(BODY_PARITY_SHARDS))
+        .collect();
+    for parity_shard in parity {
+        for (stripe_index, stripe) in parity_shard.chunks_mut(stripe_bytes).enumerate() {
+            parity_stripes[stripe_index].push(stripe);
+        }
+    }
+    std::thread::scope(|scope| {
+        let mut handles = Vec::with_capacity(stripe_count);
+        for (stripe_index, mut parity_stripe) in parity_stripes.into_iter().enumerate() {
+            let start = stripe_index
+                .checked_mul(stripe_bytes)
+                .ok_or(DaError::ShardGeometry)?;
+            let end = start
+                .checked_add(parity_stripe[0].len())
+                .ok_or(DaError::ShardGeometry)?;
+            let data_stripe: Vec<&[u8]> = data.iter().map(|shard| &shard[start..end]).collect();
+            handles.push(scope.spawn(move || {
+                coder()?
+                    .encode_sep(&data_stripe, &mut parity_stripe)
+                    .map_err(|_| DaError::ReconstructionFailed)
+            }));
+        }
+        for handle in handles {
+            handle.join().map_err(|_| DaError::ReconstructionFailed)??;
+        }
+        Ok(())
+    })
 }
 
 fn commit(claim: BodyDaClaimV1, shards: Vec<Vec<u8>>) -> Result<EncodedBodyV1, DaError> {
@@ -199,42 +305,61 @@ fn commit(claim: BodyDaClaimV1, shards: Vec<Vec<u8>>) -> Result<EncodedBodyV1, D
 /// Proposer side: Reed-Solomon encode canonical body bytes into the 32
 /// committed shards.
 pub fn encode_body(body: &[u8]) -> Result<EncodedBodyV1, DaError> {
-    if body.len() > MAX_BLOCK_BODY_BYTES {
-        return Err(DaError::BodyTooLarge {
-            len: body.len() as u64,
-        });
-    }
+    let original_bytes =
+        u64::try_from(body.len()).map_err(|_| DaError::BodyTooLarge { len: u64::MAX })?;
+    let shard_bytes = body_shard_bytes(original_bytes)?;
     let claim = BodyDaClaimV1 {
         content_root: content_root(body)?,
-        original_bytes: body.len() as u64,
+        original_bytes,
     };
-    let mut shards = data_shards(body);
-    shards.extend(std::iter::repeat_with(|| vec![0_u8; BODY_SHARD_BYTES]).take(BODY_PARITY_SHARDS));
-    coder()?
-        .encode(&mut shards)
-        .map_err(|_| DaError::ReconstructionFailed)?;
+    let mut shards = data_shards(body, shard_bytes);
+    shards.extend(std::iter::repeat_with(|| vec![0_u8; shard_bytes]).take(BODY_PARITY_SHARDS));
+    encode_parity(&mut shards)?;
     commit(claim, shards)
 }
 
-/// Test/adversary-side constructor: commits to an **arbitrary padded data
-/// region** (16 x 64 KiB) without the padding-zero law, so tests and the
-/// vector generator can produce proposer misbehavior (nonzero padding)
-/// that honest [`encode_body`] never emits.
+#[cfg(test)]
+mod encoding_tests {
+    use super::*;
+
+    #[test]
+    fn striped_parity_is_byte_identical_to_sequential_encoding() {
+        let shard_bytes = 262_144;
+        let body = (0..(BODY_DATA_SHARDS * shard_bytes - 13))
+            .map(|index| (index.wrapping_mul(131) & 0xff) as u8)
+            .collect::<Vec<_>>();
+        let mut striped = data_shards(&body, shard_bytes);
+        striped.extend(std::iter::repeat_with(|| vec![0_u8; shard_bytes]).take(BODY_PARITY_SHARDS));
+        let mut sequential = striped.clone();
+
+        encode_parity_striped(&mut striped, 4).unwrap();
+        coder().unwrap().encode(&mut sequential).unwrap();
+
+        assert_eq!(striped, sequential);
+    }
+}
+
+/// Test/adversary-side constructor: commits to an arbitrary canonical-sized
+/// padded data region without the padding-zero law, so tests and the vector
+/// generator can produce proposer misbehavior that honest [`encode_body`]
+/// never emits.
 #[doc(hidden)]
 pub fn encode_padded_region(
     claim: BodyDaClaimV1,
     data_region: &[u8],
 ) -> Result<EncodedBodyV1, DaError> {
-    if data_region.len() != MAX_BLOCK_BODY_BYTES {
+    let shard_bytes = body_shard_bytes(claim.original_bytes)?;
+    let expected = shard_bytes
+        .checked_mul(BODY_DATA_SHARDS)
+        .ok_or(DaError::ShardGeometry)?;
+    if data_region.len() != expected {
         return Err(DaError::BodyTooLarge {
             len: data_region.len() as u64,
         });
     }
-    let mut shards = data_shards(data_region);
-    shards.extend(std::iter::repeat_with(|| vec![0_u8; BODY_SHARD_BYTES]).take(BODY_PARITY_SHARDS));
-    coder()?
-        .encode(&mut shards)
-        .map_err(|_| DaError::ReconstructionFailed)?;
+    let mut shards = data_shards(data_region, shard_bytes);
+    shards.extend(std::iter::repeat_with(|| vec![0_u8; shard_bytes]).take(BODY_PARITY_SHARDS));
+    encode_parity(&mut shards)?;
     commit(claim, shards)
 }
 
@@ -245,7 +370,8 @@ pub fn encode_padded_region(
 /// reject with [`DaError::CommitmentMismatch`].
 #[doc(hidden)]
 pub fn commit_shards(claim: BodyDaClaimV1, shards: Vec<Vec<u8>>) -> Result<EncodedBodyV1, DaError> {
-    if shards.len() != BODY_TOTAL_SHARDS || shards.iter().any(|s| s.len() != BODY_SHARD_BYTES) {
+    let shard_bytes = body_shard_bytes(claim.original_bytes)?;
+    if shards.len() != BODY_TOTAL_SHARDS || shards.iter().any(|s| s.len() != shard_bytes) {
         return Err(DaError::ShardGeometry);
     }
     commit(claim, shards)
@@ -254,6 +380,7 @@ pub fn commit_shards(claim: BodyDaClaimV1, shards: Vec<Vec<u8>>) -> Result<Encod
 fn verified_shard_leaf(
     shard_root: &Hash32,
     content_root: &Hash32,
+    expected_shard_bytes: usize,
     candidate: &ShardCandidateV1,
 ) -> Result<Hash32, DaError> {
     if candidate.index as usize >= BODY_TOTAL_SHARDS {
@@ -261,7 +388,7 @@ fn verified_shard_leaf(
             index: candidate.index,
         });
     }
-    if candidate.bytes.len() != BODY_SHARD_BYTES {
+    if candidate.bytes.len() != expected_shard_bytes {
         return Err(DaError::WrongShardLength {
             index: candidate.index,
             len: candidate.bytes.len() as u64,
@@ -277,15 +404,16 @@ fn verified_shard_leaf(
     Ok(leaf)
 }
 
-/// Verifies one shard candidate against the trusted root: index range,
-/// exact fixed length, and the Merkle branch. This is the *individual*
-/// rejection law: a failing shard never poisons its siblings.
+/// Verifies one shard candidate against the trusted root and body claim:
+/// index range, exact canonical adaptive length, and the Merkle branch. This
+/// is the individual rejection law; a failing shard never poisons siblings.
 pub fn verify_body_shard(
     shard_root: &Hash32,
-    content_root: &Hash32,
+    claim: &BodyDaClaimV1,
     candidate: &ShardCandidateV1,
 ) -> Result<(), DaError> {
-    verified_shard_leaf(shard_root, content_root, candidate).map(|_| ())
+    let shard_bytes = body_shard_bytes(claim.original_bytes)?;
+    verified_shard_leaf(shard_root, &claim.content_root, shard_bytes, candidate).map(|_| ())
 }
 
 /// Light-client sampling primitive (ch01 §10.1).
@@ -300,14 +428,14 @@ pub fn verify_body_shard(
 /// ancestor bodies they have not fully reconstructed.
 pub fn verify_shard_sample(
     shard_root: &Hash32,
-    content_root: &Hash32,
+    claim: &BodyDaClaimV1,
     index: u32,
     shard: &[u8],
     branch: &ShardBranch,
 ) -> Result<(), DaError> {
     verify_body_shard(
         shard_root,
-        content_root,
+        claim,
         &ShardCandidateV1 {
             index,
             bytes: shard.to_vec(),
@@ -335,25 +463,46 @@ pub fn reconstruct_and_verify(
     claim: &BodyDaClaimV1,
     candidates: &[ShardCandidateV1],
 ) -> Result<ReconstructedBodyV1, DaError> {
-    if claim.original_bytes > MAX_BLOCK_BODY_BYTES as u64 {
-        return Err(DaError::BodyTooLarge {
-            len: claim.original_bytes,
-        });
-    }
+    let mut owned = candidates.to_vec();
+    reconstruct_and_verify_in_place(shard_root, claim, &mut owned)
+}
+
+/// Ownership-preserving full-node acceptance path. Candidate buffers are
+/// moved into reconstruction instead of cloned.
+pub fn reconstruct_and_verify_owned(
+    shard_root: &Hash32,
+    claim: &BodyDaClaimV1,
+    mut candidates: Vec<ShardCandidateV1>,
+) -> Result<ReconstructedBodyV1, DaError> {
+    reconstruct_and_verify_in_place(shard_root, claim, &mut candidates)
+}
+
+/// Full-node acceptance over caller-owned candidates. If availability is
+/// insufficient, candidates remain byte-for-byte unchanged so the caller can
+/// retain them while fetching missing shards. Once enough valid shards exist,
+/// accepted buffers are consumed in place.
+pub fn reconstruct_and_verify_in_place(
+    shard_root: &Hash32,
+    claim: &BodyDaClaimV1,
+    candidates: &mut [ShardCandidateV1],
+) -> Result<ReconstructedBodyV1, DaError> {
+    let shard_bytes = body_shard_bytes(claim.original_bytes)?;
 
     // (1) individual shard law: first valid candidate per index wins; two
     // branch-valid candidates at one index are byte-identical by collision
-    // resistance of the leaf hash.
-    let mut slots: Vec<Option<Vec<u8>>> = vec![None; BODY_TOTAL_SHARDS];
+    // resistance of the leaf hash. Record positions before moving buffers so
+    // insufficient availability leaves every candidate untouched.
+    let mut chosen_positions: Vec<Option<usize>> = vec![None; BODY_TOTAL_SHARDS];
     let mut verified_leaves: Vec<Option<Hash32>> = vec![None; BODY_TOTAL_SHARDS];
     let mut valid: u32 = 0;
-    for candidate in candidates {
-        let Ok(leaf) = verified_shard_leaf(shard_root, &claim.content_root, candidate) else {
+    for (position, candidate) in candidates.iter().enumerate() {
+        let Ok(leaf) = verified_shard_leaf(shard_root, &claim.content_root, shard_bytes, candidate)
+        else {
             continue;
         };
-        let slot = &mut slots[candidate.index as usize];
-        if slot.is_none() {
-            *slot = Some(candidate.bytes.clone());
+        let chosen = &mut chosen_positions[candidate.index as usize];
+        if chosen.is_none() {
+            *chosen = Some(position);
             verified_leaves[candidate.index as usize] = Some(leaf);
             valid = valid.saturating_add(1);
         }
@@ -367,7 +516,14 @@ pub fn reconstruct_and_verify(
         });
     }
 
-    // (3) complete the unique codeword.
+    // (3) move accepted buffers into their canonical slots, then complete the
+    // unique codeword. Invalid and duplicate candidates remain untouched.
+    let mut slots: Vec<Option<Vec<u8>>> = vec![None; BODY_TOTAL_SHARDS];
+    for (index, position) in chosen_positions.into_iter().enumerate() {
+        if let Some(position) = position {
+            slots[index] = Some(std::mem::take(&mut candidates[position].bytes));
+        }
+    }
     coder()?
         .reconstruct(&mut slots)
         .map_err(|_| DaError::ReconstructionFailed)?;
@@ -377,8 +533,8 @@ pub fn reconstruct_and_verify(
     }
 
     // (4) reconstruction-before-acceptance: recompute the whole tree from
-    // the verified leaf hashes plus hashes of reconstructed missing shards.
-    // Reusing already verified leaves avoids hashing every 64 KiB shard twice.
+    // verified leaf hashes plus hashes of reconstructed missing shards.
+    // Reusing verified leaves avoids hashing every adaptive shard twice.
     let mut leaves = Vec::with_capacity(BODY_TOTAL_SHARDS);
     for (index, shard) in shards.iter().enumerate() {
         let leaf = match verified_leaves[index] {
@@ -398,7 +554,11 @@ pub fn reconstruct_and_verify(
 
     // (5) zero-padding law over the reconstructed data region.
     let original = claim.original_bytes as usize;
-    let mut data = Vec::with_capacity(MAX_BLOCK_BODY_BYTES);
+    let mut data = Vec::with_capacity(
+        shard_bytes
+            .checked_mul(BODY_DATA_SHARDS)
+            .ok_or(DaError::ShardGeometry)?,
+    );
     for shard in shards.iter().take(BODY_DATA_SHARDS) {
         data.extend_from_slice(shard);
     }
@@ -407,15 +567,15 @@ pub fn reconstruct_and_verify(
     }
 
     // (6) the body must be the exact committed content.
-    let body = &data[..original];
-    if content_root(body)? != claim.content_root {
+    if content_root(&data[..original])? != claim.content_root {
         return Err(DaError::ContentRootMismatch);
     }
+    data.truncate(original);
 
     Ok(ReconstructedBodyV1 {
         shard_root: *shard_root,
         content_root: claim.content_root,
-        bytes: body.to_vec(),
+        bytes: data,
     })
 }
 

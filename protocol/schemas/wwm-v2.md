@@ -1,6 +1,6 @@
 # World Wide Mind protocol identity v2
 
-Status: **FROZEN W0 CANDIDATE / BLOCKED**. This document defines the protocol/API-v2 application contract. It does not pass G0, enable a lane, authorize valuable traffic, move model execution on chain, or authorize DNS cutover.
+Status: **FROZEN WWM CORE + NEURAL-ORACLE EXTENSION CANDIDATE / BLOCKED**. Tags 0–59 retain their frozen meanings. Tags 60–65 define the additive neural-oracle extension. This document does not pass G0, enable a lane, authorize valuable traffic, authorize DNS cutover, or give neural results consensus-system weight.
 
 ## 1. Version boundary and canonical codec
 
@@ -8,7 +8,7 @@ Protocol identity is `noos-protocol-identity-v2`; API and peer identity are v2-o
 
 Every body below begins with its stated little-endian fixed-width version/tag. Integers are unsigned little-endian. `Hash32`, SHA-256 values, keys, signatures, IDs, and bitmaps have fixed widths. A bounded vector is `u32 length || elements`; length and aggregate byte ceilings are checked before allocation. Maps and sets encode in the stated ascending key order. Duplicate keys/IDs, noncanonical order, integer overflow, unknown version/tag/discriminant, trailing bytes, invalid UTF-8, overlong strings, inconsistent embedded roots, and domain substitution reject the whole input. Decoders consume the entire input. `ResolutionProofV1` reuses the Lumen depth-256 sparse-Merkle proof and `D-SMT-LEAF`/`D-SMT-NODE`; it does not introduce another Merkle format.
 
-Application model execution is always off chain. Consensus stores and validates only bounded immutable identities, policies, capability snapshots, custody/certificate records, controls, receipt/settlement commitments, and conservation state. Prompt, output, model weight, raw probe, execution trace, and full result bytes never enter consensus state.
+Large-model execution remains off chain. Consensus normally stores only bounded identities, policies, capability snapshots, custody/certificate records, controls, receipt/settlement commitments, and conservation state. The neural-oracle extension is the sole closed exception: it stores at most 16,384 exact raw response bytes after a 2-of-3 commit/reveal match, and it permits one bounded trinary network of at most 32 inputs, 32 hidden units, 32 outputs, and 1,024 weights to execute deterministically in L1 state transition. Prompts, model weights, raw probes, and large execution traces never enter consensus state.
 
 ## 2. Exact first capsule and artifact geometry
 
@@ -81,7 +81,27 @@ The genesis-only bootstrap installs exactly one threshold-signed `FundProfileV1`
 
 Coverage cache law is deterministic checked integer arithmetic: each row derives free coverage from its immutable signed piecewise curve at `coverage_origin_height`, rounding down at each division. `live_liability=reserved`; funded-through is absent when free does not cover the first required unit. Every mutation recomputes and compares the cache. There is no shared row nonce: permits are replay-protected by `(payer, payer_nonce)` and profile permit epoch.
 
-### 3.4 Control, alias, operational authorization, and recovery
+### 3.4 Neural-oracle extension
+
+| Canonical body | Exact ordered fields | Bound/invariant |
+|---|---|---|
+| `NeuralProgramV1` | version, program ID, input/hidden/output widths, hidden weights/biases, output weights/biases | one hidden layer; widths `1..32`; at most 1,024 weights; weights are trits `0=-1,1=0,2=+1`; biases are signed bytes in `[-32,32]`; ID recomputes under `D-NEURAL-ORACLE-PROGRAM-V1` |
+| `EvaluateNeuralProgramV1` | version, query ID, program ID, requester, input bytes | query ID nonzero and insert-once; requester signs; exact input width; only live `Testnet|Canary|Production` WWM control |
+| `NeuralOracleQueryV1` | version, query/job/requester IDs, executor set ID/epoch, input root, maximum response bytes, threshold, commit/reveal deadlines | query ID equals an existing WWM job ID; exactly three strictly sorted active executor profiles; threshold exactly two; profiles have distinct beneficial-control roots and distinct live operator accounts; response maximum `1..16,384`; reveal deadline does not exceed the WWM job deadline |
+| `NeuralOracleCommitV1` | version, query ID, reporter profile ID, commitment | reporter is selected and its operator signs; unique before/inclusive of commit deadline; commitment binds query, reporter, raw output root, transcript root, and nonzero nonce under `D-NEURAL-ORACLE-REPLY-COMMIT-V1` |
+| `NeuralOracleRevealV1` | version, query ID, reporter profile ID, exact response bytes, transcript root, nonce | after commit deadline and through reveal deadline; nonempty response within query bound; exact commitment opening; unique per reporter |
+| `FinalizeNeuralOracleQueryV1` | version, query ID | permissionless only after reveal deadline; writes `NoQuorum` only if no successful result exists |
+| `NeuralOracleResultV1` | version, result/query IDs, mode, status, source/profile/input IDs, exact response, output/transcript roots, signer profile IDs, transition height | `L1Deterministic|WwmQuorum`; `Success|NoQuorum`; insert-once; successful WWM result contains the byte-identical response from exactly matching reveals and at least two sorted signers; timeout has empty response/signers and zero roots |
+
+The L1 evaluator performs exact checked integer dot products, sign activation, and trit output encoding. Its charged operation count is `input_width*hidden_width + hidden_width*output_width + hidden_width + output_width`; floating point, nondeterministic kernels, dynamic allocation proportional to unbounded input, and hidden model lookup are forbidden. `input_root` and `transcript_root` use `D-NEURAL-ORACLE-INPUT-V1` and `D-NEURAL-ORACLE-TRANSCRIPT-V1`; the WWM-compatible `output_root` is raw BLAKE3-256 of the exact response bytes.
+
+The large-model path has no median, trimming, confidence haircut, TWAP, semantic normalization, or fallback value. Two of the three selected profiles must reveal identical response bytes, output root, and transcript root. A successful `WwmReceiptV1` must copy those roots and signer IDs, use `MatchedQuorum`, carry aligned nonempty reporter signatures, and be transaction-authorized by every result reporter's operator account. A timeout receipt uses `NoQuorum`, zero output/token-history roots, zero output tokens and paid amount, and no signers, clusters, or signatures.
+
+The authenticated executor sidecar advertises `noos/neural-oracle-worker-artifacts/v1`. An optional neural job context contains the on-chain query ID, reporter profile ID, nonzero nonce, and response byte ceiling; query ID must equal WWM job ID before admission. A successful terminal event contains the exact raw response plus canonical `CommitNeuralOracleReply` and `RevealNeuralOracleReply` action bytes. The coordinator submits those actions in their separate on-chain phases; the sidecar cannot bypass transaction authorization or deadlines.
+
+Both modes are application state only. A neural program, query, commit, reveal, result, or receipt MUST NOT affect proposer choice, validator membership or weight, witness snapshots, finality votes/certificates/quorum, issuance, emissions, rewards, stake, or fee-price policy. Node exposure is read-only from the exact finalized ledger snapshot.
+
+### 3.5 Control, alias, operational authorization, and recovery
 
 | Body | Ordered semantic fields | Maximum | Domain ID |
 |---|---|---:|---|
@@ -100,7 +120,7 @@ Coverage cache law is deterministic checked integer arithmetic: each row derives
 
 ## 4. Closed action registry
 
-The existing `ActionV1` envelope is retained. Discriminants 0–39 are historical. Exactly these 20 discriminants are appended and `ActionV1::VARIANT_COUNT` is exactly 60:
+The existing `ActionV1` envelope is retained. Discriminants 0–39 are historical, 40–59 are the frozen WWM core, and 60–65 are the additive neural-oracle extension. `ActionV1::VARIANT_COUNT` is exactly 66:
 
 | Tag | Action | Closed payload |
 |---:|---|---|
@@ -124,6 +144,12 @@ The existing `ActionV1` envelope is retained. Discriminants 0–39 are historica
 | 57 | `SettleWwmJob` | one complete `WwmSettlementV1` |
 | 58 | `TransitionServingAlias` | tag 0 only, below |
 | 59 | `TransitionWwmControl` | tags 0–4 below |
+| 60 | `RegisterNeuralProgram` | one complete `NeuralProgramV1` |
+| 61 | `EvaluateNeuralProgram` | one complete `EvaluateNeuralProgramV1` |
+| 62 | `OpenNeuralOracleQuery` | one complete `NeuralOracleQueryV1` |
+| 63 | `CommitNeuralOracleReply` | one complete `NeuralOracleCommitV1` |
+| 64 | `RevealNeuralOracleReply` | one complete `NeuralOracleRevealV1` |
+| 65 | `FinalizeNeuralOracleQuery` | one complete `FinalizeNeuralOracleQueryV1` |
 
 Actions 41 and 50 use exactly:
 
@@ -159,7 +185,7 @@ Every tag has its dedicated body/signature domain, exact source/target/CAS, auth
 
 ## 5. Finalized resolution contract
 
-`resolve_finalized_capsule(selector, freshness_bound) -> FinalizedModelResolutionV1` and `/model-resolution/<selector>` return at most 262,144 canonical bytes. The result binds chain/genesis, exact selector/freshness bound, resolution height, finalized `BlockHeaderV1`, checkpoint identity/material, terminal finality proof, and at most 17 strictly state-key-sorted duplicate-free `ResolutionProofV1` entries.
+`resolve_finalized_capsule(selector, freshness_bound) -> FinalizedModelResolutionV1` and `/model-resolution/<selector>` return at most 262,144 canonical bytes. The result binds chain/genesis, exact selector/freshness bound, resolution height, finalized `BlockHeaderV1`, checkpoint identity/material, terminal finality proof, and at most 17 strictly state-key-sorted duplicate-free `ResolutionProofV1` entries. `/neural-oracle/<query_id>` returns one decoded `NeuralOracleResultV1`, its canonical bytes, and its verified depth-256 object proof from the same exact finalized snapshot; absence returns a typed 404 only after non-membership proof verification.
 
 The alias path has exactly these possible leaves, in state-key order: (1) alias transition, (2) control, (3) config named by `resolution_config_id`, (4) capsule, (5) artifact descriptor, (6) availability policy, (7) current-certificate pointer, (8) certificate, (9) registry epoch vector, (10) executor capability set, (11) custodian capability set, (12) execution profile, (13) query policy, (14) fee policy, (15) fund profile, (16) ledger keyed by that exact fund profile, and (17) service directory. Each is `Absent` or `Present(bounded canonical value)` with the existing depth-256 proof to the terminal `objects_root`.
 
@@ -179,10 +205,10 @@ Each `LightUpdateItemV1` is at most 262,144 canonical bytes: `BlockHeaderV1` at 
 
 Existing `BoundedBytes<65536>` action/call arguments remain. A transaction is accepted only when `tx_bytes.len + witness_bytes.len <= 65,532`. `TxPushV1.tx` is exactly `u32 tx_len || tx_bytes || witness_bytes`, so the prefixed carrier is at most 65,536 bytes. No nested length, action wrapper, or signature is exempt.
 
-An operational-authorization transaction contains exactly one action 59. `OperationalReconfigurationV1 <= 47,104`; action/tag wrapper `<=2,048`; every remaining transaction/access/witness byte combined `<=16,380`; total `<=65,532`. Oversize rejects before allocation, hashing, signature work, mempool admission, relay, or state access. Unknown action 60+, unknown nested payload tag, trailing byte, mixed V1 body, and a v2 transaction announced by a v1 peer all reject.
+An operational-authorization transaction contains exactly one action 59. `OperationalReconfigurationV1 <= 47,104`; action/tag wrapper `<=2,048`; every remaining transaction/access/witness byte combined `<=16,380`; total `<=65,532`. Oversize rejects before allocation, hashing, signature work, mempool admission, relay, or state access. Unknown action 66+, unknown nested payload tag, trailing byte, mixed V1 body, and a v2 transaction announced by a v1 peer all reject.
 
 ## 8. Security and negative-vector requirements
 
-The mandatory cross-language negative suite covers missing/wrong/self/cyclic predecessor; V1/V2 protocol/API/peer/chain/genesis substitution; old WWM bytes; every unknown object/action/payload/tag; malformed lengths and every exact bound plus one; unordered/duplicate IDs and proofs; stale CAS/epoch/nonce/parent; illegal capability resurrection; fund cache/conservation/permit/lock races; candidate substitution into normal leaves; alias mutation after G4; authorize-only live mutation; generic-governance activation; wrong recovery tier/preimage; incomplete light history; and fabricated `PASS` without complete evidence, exact authorization record, pinned external keys, and valid signatures.
+The mandatory cross-language negative suite covers missing/wrong/self/cyclic predecessor; V1/V2 protocol/API/peer/chain/genesis substitution; old WWM bytes; every unknown object/action/payload/tag; malformed lengths and every exact bound plus one; unordered/duplicate IDs and proofs; stale CAS/epoch/nonce/parent; illegal capability resurrection; fund cache/conservation/permit/lock races; candidate substitution into normal leaves; alias mutation after G4; authorize-only live mutation; generic-governance activation; wrong recovery tier/preimage; incomplete light history; single-reporter neural queries, nonidentical reveals, zero nonce, reveal phase violations, oversized response, result/receipt root or signer mismatch, neural influence on membership/finality/issuance; and fabricated `PASS` without complete evidence, exact authorization record, pinned external keys, and valid signatures.
 
 Current real state is intentionally BLOCKED at G0 through G5. Evidence manifests keep `controls_enabled=false` and `promotion_effect=NONE`; only a separate exact signed G5 authorization may permit the later control and DNS ceremonies.

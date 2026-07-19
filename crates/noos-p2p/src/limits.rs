@@ -73,9 +73,9 @@ impl Default for LimitsConfig {
                     per_second: 32,
                 }, // braid/header
                 RateLimit {
-                    burst: 16,
-                    per_second: 8,
-                }, // braid/body
+                    burst: 32,
+                    per_second: 32,
+                }, // braid/body chunks: sustains one 128 MiB body per slot
                 RateLimit {
                     burst: 128,
                     per_second: 64,

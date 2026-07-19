@@ -10,10 +10,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use noos_p2p::{
-    write_raw_declared, BodyReplyV1, Bounded, ChainIdentity, HeaderReplyV1, InboundItem,
-    LightBytes48, LightMemberV1, LightMembershipSnapshotV1, LightMembershipWitnessV1,
-    LightUpdateItemV1, P2pConfig, P2pEvent, P2pHandle, P2pNode, PeerId, ProtocolStore, PushReplyV1,
-    RejectCode, SendError, ShardReplyV1, SnapshotReplyV1, Violation,
+    write_raw_declared, Bounded, ChainIdentity, HeaderReplyV1, InboundItem, LightBytes48,
+    LightMemberV1, LightMembershipSnapshotV1, LightMembershipWitnessV1, LightUpdateItemV1,
+    P2pConfig, P2pEvent, P2pHandle, P2pNode, PeerId, ProtocolStore, PushReplyV1, RejectCode,
+    SendError, ShardReplyV1, SnapshotReplyV1, Violation, MAX_BODY_BYTES,
 };
 use tokio::sync::mpsc;
 use tokio::time::timeout;
@@ -50,8 +50,20 @@ impl ProtocolStore for MemStore {
     fn header(&self, header_hash: &[u8; 32]) -> Option<Vec<u8>> {
         self.headers.get(header_hash).cloned()
     }
-    fn body(&self, block_hash: &[u8; 32]) -> Option<Vec<u8>> {
-        self.bodies.get(block_hash).cloned()
+    fn body_chunk(
+        &self,
+        block_hash: &[u8; 32],
+        offset: u64,
+        max_bytes: u32,
+    ) -> Option<(u64, Vec<u8>)> {
+        let body = self.bodies.get(block_hash)?;
+        let total = u64::try_from(body.len()).ok()?;
+        let start = usize::try_from(offset).ok()?;
+        if start > body.len() {
+            return None;
+        }
+        let end = start.saturating_add(max_bytes as usize).min(body.len());
+        Some((total, body[start..end].to_vec()))
     }
     fn header_range(&self, start_height: u64, max_headers: u32) -> (Vec<Vec<u8>>, bool) {
         let start = usize::try_from(start_height).unwrap_or(usize::MAX);
@@ -184,6 +196,39 @@ async fn handshake_accepts_matching_chain_and_binds_attestation() {
     assert_eq!(peer, a.local_peer_id());
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn bootstrap_dial_retries_when_listener_starts_late() {
+    let reservation = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    let port = reservation.local_addr().unwrap().port();
+    let addr: noos_p2p::Multiaddr = format!("/ip4/127.0.0.1/udp/{port}/quic-v1")
+        .parse()
+        .unwrap();
+    drop(reservation);
+
+    let (dialer, mut dialer_rx) = spawn(3, chain_a(), MemStore::default(), |_| {});
+    dialer.connect(addr.clone());
+    wait_for(&mut dialer_rx, "initial bootstrap failure", |event| {
+        matches!(event, P2pEvent::OutgoingConnectionFailed { peer: None })
+    })
+    .await;
+
+    let (listener, mut listener_rx) = spawn(4, chain_a(), MemStore::default(), |config| {
+        config.listen_addr = addr;
+    });
+    let _ = listener.listen_addr().await;
+    wait_for(&mut dialer_rx, "retried dialer PeerReady", |event| {
+        matches!(event, P2pEvent::PeerReady { .. })
+    })
+    .await;
+    wait_for(&mut listener_rx, "late listener PeerReady", |event| {
+        matches!(event, P2pEvent::PeerReady { .. })
+    })
+    .await;
+
+    listener.shutdown();
+    dialer.shutdown();
+}
+
 async fn assert_wrong_chain_rejects(
     dialer: &P2pHandle,
     dialer_rx: &mut mpsc::UnboundedReceiver<P2pEvent>,
@@ -252,7 +297,9 @@ async fn all_nine_protocols_round_trip_one_canonical_message() {
 
     let mut store = MemStore::default();
     let header = b"header-wire-object".to_vec();
-    let body = b"body-wire-object".to_vec();
+    let body: Vec<u8> = (0..MAX_BODY_BYTES.saturating_mul(2).saturating_add(123))
+        .map(|index| (index % 251) as u8)
+        .collect();
     store.headers.insert(header_hash, header.clone());
     store.bodies.insert([0x22; 32], body.clone());
     store.range = vec![b"h0".to_vec(), b"h1".to_vec(), b"h2".to_vec()];
@@ -308,15 +355,13 @@ async fn all_nine_protocols_round_trip_one_canonical_message() {
         .unwrap();
     assert_eq!(reply, HeaderReplyV1::NotFound);
 
-    // 2. /noos/braid/body/1 — request/transfer (targeted repair primitive).
-    let reply = timeout(WAIT, a.request_body(bp, [0x22; 32]))
+    // 2. /noos/braid/body/2 — chunked request/transfer (targeted repair primitive).
+    let got = timeout(WAIT, a.request_body(bp, [0x22; 32]))
         .await
         .unwrap()
-        .unwrap();
-    match reply {
-        BodyReplyV1::Body(got) => assert_eq!(got.0, body),
-        other => panic!("expected body, got {other:?}"),
-    }
+        .unwrap()
+        .expect("body");
+    assert_eq!(got, body);
 
     // 3. /noos/braid/vote/1 — push.
     let vote = b"checkpoint-vote".to_vec();

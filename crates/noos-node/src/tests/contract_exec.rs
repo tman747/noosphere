@@ -122,7 +122,7 @@ fn contract_call_reexecutes_identically_on_import() {
     a.submit_tx(&tx2, &wit2, 7).expect("admit call");
     let pb2 = produce_full(&mut a);
     assert_eq!(
-        a.view.tx_status(&call_txid),
+        a.tx_status(&call_txid),
         ViewLookup::Found(TxStatus::Settled {
             height: 2,
             status: 0
@@ -206,7 +206,7 @@ fn meter_exhaustion_surfaces_exact_trap_and_frozen_failure_charge() {
     let expected = FailCode::EngineTrap(u32::from(GrainTrap::MeterExhausted.code())).status();
     assert_eq!(expected, 2003);
     assert_eq!(
-        core.view.tx_status(&call_txid),
+        core.tx_status(&call_txid),
         ViewLookup::Found(TxStatus::Settled {
             height: 2,
             status: expected
@@ -265,7 +265,7 @@ fn undeclared_object_write_fails_closed() {
         .expect("admitted; execution law rejects");
     produce_next(&mut core);
     assert_eq!(
-        core.view.tx_status(&forged1),
+        core.tx_status(&forged1),
         ViewLookup::Found(TxStatus::Settled {
             height: 2,
             status: undeclared
@@ -289,7 +289,7 @@ fn undeclared_object_write_fails_closed() {
         .expect("admitted; execution law rejects");
     produce_next(&mut core);
     assert_eq!(
-        core.view.tx_status(&forged2),
+        core.tx_status(&forged2),
         ViewLookup::Found(TxStatus::Settled {
             height: 3,
             status: undeclared
@@ -327,7 +327,7 @@ fn failed_action_drops_all_contract_effects_atomically() {
         .expect("admit multi-action call");
     produce_next(&mut core);
     assert_eq!(
-        core.view.tx_status(&forged),
+        core.tx_status(&forged),
         ViewLookup::Found(TxStatus::Settled {
             height: 2,
             status: FailCode::UndeclaredAccess.status()
@@ -351,7 +351,7 @@ fn failed_action_drops_all_contract_effects_atomically() {
     core.submit_tx(&tx2, &wit2, 7).expect("admit call");
     produce_next(&mut core);
     assert_eq!(
-        core.view.tx_status(&ok),
+        core.tx_status(&ok),
         ViewLookup::Found(TxStatus::Settled {
             height: 3,
             status: 0

@@ -195,6 +195,11 @@ fn three_machine_fixture_witnesses_finalize_by_gossiped_quorum() {
         });
     }
     assert!(a.devnet_witness_vote_tick(0).expect("witness 0 vote"));
+    assert!(
+        a.devnet_witness_vote_tick(0)
+            .expect("witness 0 vote regossip"),
+        "an unfinalized durable vote must be re-gossiped"
+    );
     assert!(b.devnet_witness_vote_tick(1).expect("witness 1 vote"));
     assert!(c.devnet_witness_vote_tick(2).expect("witness 2 vote"));
 

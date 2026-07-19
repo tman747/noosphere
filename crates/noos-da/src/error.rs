@@ -12,11 +12,11 @@ use core::fmt;
 /// these errors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DaError {
-    /// Body content exceeds `MAX_BLOCK_BODY_BYTES` (16 x 64 KiB data).
+    /// Compressed DA form exceeds `MAX_BLOCK_DA_FORM_BYTES` (16 × 8 MiB).
     BodyTooLarge { len: u64 },
     /// A shard index is outside `0..BODY_TOTAL_SHARDS`.
     ShardIndexOutOfRange { index: u32 },
-    /// A shard is not exactly `BODY_SHARD_BYTES` long.
+    /// A shard does not match the adaptive size derived from the body claim.
     WrongShardLength { index: u32, len: u64 },
     /// A shard's Merkle branch does not connect its leaf to the trusted
     /// shard root. The shard is rejected **individually**; reconstruction

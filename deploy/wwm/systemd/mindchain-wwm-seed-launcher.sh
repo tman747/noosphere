@@ -36,10 +36,18 @@ arguments=(
   --p2p-listen "${P2P_LISTEN}"
   --data-dir "${DATA_DIR}"
 )
+throughput_arguments=(
+  --mempool-max-transactions 65536
+  --mempool-max-bytes 67108864
+  --mempool-per-source-pending 65536
+  --mempool-per-account-pending 65536
+  --template-byte-budget 33554432
+  --template-max-transactions 32768
+)
 if [[ "${NODE_ROLE}" == "validator" ]]; then
-  arguments+=(--validator --produce-interval-ms 1000)
+  arguments+=(--validator --produce-interval-ms 1000 "${throughput_arguments[@]}")
 elif [[ "${NODE_ROLE}" == "producer-witness" ]]; then
-  arguments+=(--devnet-producer --devnet-witness "${WITNESS_INDEX}" --produce-interval-ms 1000)
+  arguments+=(--devnet-producer --devnet-witness "${WITNESS_INDEX}" --produce-interval-ms 1000 "${throughput_arguments[@]}")
 else
   arguments+=(--devnet-witness "${WITNESS_INDEX}")
 fi

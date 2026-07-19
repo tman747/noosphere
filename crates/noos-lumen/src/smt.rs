@@ -22,16 +22,21 @@
 //! per-tree collection maxima frozen in `lumen-v1.md`, never by this
 //! structure.
 
+use crate::objects::ReceiptV1;
 use crate::{domain_hash, domains, Hash32};
 use noos_codec::{CodecError, NoosDecode, NoosEncode, Reader, Writer};
-use std::collections::BTreeMap;
-use std::sync::LazyLock;
+use smallvec::SmallVec;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 
 /// Tree depth in bits (= key bits).
 pub const DEPTH: usize = 256;
 const PARALLEL_ROOT_MIN_LEAVES: usize = 512;
 const ROOT_PREFIX_BITS: usize = 8;
 const ROOT_PREFIX_BUCKETS: usize = 1 << ROOT_PREFIX_BITS;
+const INCREMENTAL_PREFIX_BITS: usize = 24;
+const INCREMENTAL_PREFIX_HEIGHT: usize = DEPTH - INCREMENTAL_PREFIX_BITS;
+const PARALLEL_DIRTY_BUCKET_MIN: usize = 512;
 
 /// `EMPTY_ROOTS[h]` = root of an empty subtree of height `h` (`0..=256`).
 static EMPTY_ROOTS: LazyLock<[Hash32; DEPTH + 1]> = LazyLock::new(|| {
@@ -39,7 +44,7 @@ static EMPTY_ROOTS: LazyLock<[Hash32; DEPTH + 1]> = LazyLock::new(|| {
     table[0] = domain_hash(domains::SMT_LEAF, &[]);
     for h in 1..=DEPTH {
         let below = table[h - 1];
-        table[h] = domain_hash(domains::SMT_NODE, &[&below, &below]);
+        table[h] = node_hash(&below, &below);
     }
     table
 });
@@ -57,10 +62,19 @@ pub fn leaf_hash(key: &Hash32, value: &[u8]) -> Hash32 {
     domain_hash(domains::SMT_LEAF, &[key, value])
 }
 
-/// Domain-separated internal node hash.
+/// Domain-separated internal node hash. This is the byte-identical
+/// single-buffer form of `domain_hash(SMT_NODE, [left, right])`; avoiding
+/// three incremental hasher updates matters across millions of SMT nodes.
+#[inline]
 #[must_use]
 pub fn node_hash(left: &Hash32, right: &Hash32) -> Hash32 {
-    domain_hash(domains::SMT_NODE, &[left, right])
+    let mut input = [0_u8; domains::SMT_NODE.len() + 64];
+    let (context, hashes) = input.split_at_mut(domains::SMT_NODE.len());
+    context.copy_from_slice(domains::SMT_NODE.as_bytes());
+    let (left_bytes, right_bytes) = hashes.split_at_mut(32);
+    left_bytes.copy_from_slice(left);
+    right_bytes.copy_from_slice(right);
+    *blake3::hash(&input).as_bytes()
 }
 
 /// Bit `d` of `key`, depth-from-root order (MSB-first within each byte).
@@ -128,18 +142,265 @@ fn root_from_sorted_entries(entries: &[(&Hash32, &Vec<u8>)]) -> Hash32 {
     roots[0]
 }
 
+#[derive(Debug, Clone, Default)]
+struct IncrementalRootCache {
+    bucket_roots: Arc<Vec<(u32, Hash32)>>,
+    dirty_prefixes: Vec<u32>,
+}
+
+#[inline]
+fn incremental_prefix(key: &Hash32) -> u32 {
+    u32::from_be_bytes([0, key[0], key[1], key[2]])
+}
+
+fn incremental_prefix_bounds(prefix: u32) -> (Hash32, Hash32) {
+    let bytes = prefix.to_be_bytes();
+    let mut lower = [0_u8; 32];
+    lower[..3].copy_from_slice(&bytes[1..]);
+    let mut upper = [u8::MAX; 32];
+    upper[..3].copy_from_slice(&bytes[1..]);
+    (lower, upper)
+}
+
+#[allow(clippy::arithmetic_side_effects)]
+fn single_entry_subtree_root(key: &Hash32, value: &[u8], depth: usize) -> Hash32 {
+    let mut root = leaf_hash(key, value);
+    for current_depth in (depth..DEPTH).rev() {
+        let empty = empty_root(DEPTH - current_depth - 1);
+        root = if key_bit(key, current_depth) {
+            node_hash(&empty, &root)
+        } else {
+            node_hash(&root, &empty)
+        };
+    }
+    root
+}
+
+fn incremental_bucket_root(leaves: &BTreeMap<Hash32, Vec<u8>>, prefix: u32) -> Hash32 {
+    let (lower, upper) = incremental_prefix_bounds(prefix);
+    let mut entries = leaves.range(lower..=upper);
+    let Some(first) = entries.next() else {
+        return empty_root(INCREMENTAL_PREFIX_HEIGHT);
+    };
+    let Some(second) = entries.next() else {
+        return single_entry_subtree_root(first.0, first.1, INCREMENTAL_PREFIX_BITS);
+    };
+    let mut bucket = Vec::with_capacity(2);
+    bucket.push((first.0, first.1));
+    bucket.push((second.0, second.1));
+    bucket.extend(entries);
+    subtree_root(&bucket, INCREMENTAL_PREFIX_BITS)
+}
+
+#[allow(clippy::arithmetic_side_effects)]
+fn recompute_dirty_buckets(
+    leaves: &BTreeMap<Hash32, Vec<u8>>,
+    dirty_prefixes: &[u32],
+) -> Vec<(u32, Hash32)> {
+    let mut roots = dirty_prefixes
+        .iter()
+        .map(|prefix| (*prefix, [0_u8; 32]))
+        .collect::<Vec<_>>();
+    if roots.len() < PARALLEL_DIRTY_BUCKET_MIN {
+        for (prefix, root) in &mut roots {
+            *root = incremental_bucket_root(leaves, *prefix);
+        }
+        return roots;
+    }
+
+    let workers = std::thread::available_parallelism()
+        .map_or(1, usize::from)
+        .saturating_sub(2)
+        .max(1)
+        .min(roots.len());
+    let chunk_size = roots.len().div_ceil(workers);
+    std::thread::scope(|scope| {
+        for chunk in roots.chunks_mut(chunk_size) {
+            scope.spawn(move || {
+                for (prefix, root) in chunk {
+                    *root = incremental_bucket_root(leaves, *prefix);
+                }
+            });
+        }
+    });
+    roots
+}
+
+#[allow(clippy::arithmetic_side_effects)]
+fn incremental_prefix_bit(prefix: u32, depth: usize) -> bool {
+    debug_assert!(depth < INCREMENTAL_PREFIX_BITS);
+    (prefix >> (INCREMENTAL_PREFIX_BITS - depth - 1)) & 1 == 1
+}
+
+#[allow(clippy::arithmetic_side_effects)]
+fn incremental_prefix_subtree(entries: &[(u32, Hash32)], depth: usize) -> Hash32 {
+    if entries.is_empty() {
+        return empty_root(DEPTH - depth);
+    }
+    if depth == INCREMENTAL_PREFIX_BITS {
+        debug_assert_eq!(entries.len(), 1);
+        return entries[0].1;
+    }
+    let split = entries.partition_point(|(prefix, _)| !incremental_prefix_bit(*prefix, depth));
+    let left = incremental_prefix_subtree(&entries[..split], depth + 1);
+    let right = incremental_prefix_subtree(&entries[split..], depth + 1);
+    node_hash(&left, &right)
+}
+
+#[allow(clippy::arithmetic_side_effects)]
+fn root_from_incremental_buckets(bucket_roots: &[(u32, Hash32)]) -> Hash32 {
+    if bucket_roots.is_empty() {
+        return empty_root(DEPTH);
+    }
+    if bucket_roots.len() < PARALLEL_ROOT_MIN_LEAVES {
+        return incremental_prefix_subtree(bucket_roots, 0);
+    }
+
+    let mut ranges = [(0_usize, 0_usize); ROOT_PREFIX_BUCKETS];
+    let mut cursor = 0_usize;
+    for (prefix, range) in ranges.iter_mut().enumerate() {
+        let start = cursor;
+        while cursor < bucket_roots.len() && ((bucket_roots[cursor].0 >> 16) as usize) == prefix {
+            cursor += 1;
+        }
+        *range = (start, cursor);
+    }
+    debug_assert_eq!(cursor, bucket_roots.len());
+
+    let workers = std::thread::available_parallelism()
+        .map_or(1, usize::from)
+        .saturating_sub(2)
+        .max(1)
+        .min(ROOT_PREFIX_BUCKETS);
+    let chunk_size = ROOT_PREFIX_BUCKETS.div_ceil(workers);
+    let mut roots = [[0_u8; 32]; ROOT_PREFIX_BUCKETS];
+    std::thread::scope(|scope| {
+        for (chunk_index, root_chunk) in roots.chunks_mut(chunk_size).enumerate() {
+            let range_start = chunk_index * chunk_size;
+            let ranges = &ranges;
+            let bucket_roots = bucket_roots;
+            scope.spawn(move || {
+                for (offset, root) in root_chunk.iter_mut().enumerate() {
+                    let (lo, hi) = ranges[range_start + offset];
+                    *root = incremental_prefix_subtree(&bucket_roots[lo..hi], ROOT_PREFIX_BITS);
+                }
+            });
+        }
+    });
+    let mut width = ROOT_PREFIX_BUCKETS;
+    while width > 1 {
+        for index in 0..(width / 2) {
+            roots[index] = node_hash(&roots[index * 2], &roots[index * 2 + 1]);
+        }
+        width /= 2;
+    }
+    roots[0]
+}
+
+#[allow(clippy::arithmetic_side_effects)]
+fn merge_incremental_buckets(
+    current: &mut Vec<(u32, Hash32)>,
+    updates: Vec<(u32, Hash32)>,
+    empty_bucket: Hash32,
+) {
+    let existing = std::mem::take(current);
+    let mut merged = Vec::with_capacity(existing.len().saturating_add(updates.len()));
+    let mut old_index = 0_usize;
+    let mut update_index = 0_usize;
+    while old_index < existing.len() || update_index < updates.len() {
+        match (existing.get(old_index), updates.get(update_index)) {
+            (Some(old), Some(update)) if old.0 < update.0 => {
+                merged.push(*old);
+                old_index += 1;
+            }
+            (Some(old), Some(update)) if old.0 == update.0 => {
+                if update.1 != empty_bucket {
+                    merged.push(*update);
+                }
+                old_index += 1;
+                update_index += 1;
+            }
+            (_, Some(update)) => {
+                if update.1 != empty_bucket {
+                    merged.push(*update);
+                }
+                update_index += 1;
+            }
+            (Some(old), None) => {
+                merged.push(*old);
+                old_index += 1;
+            }
+            (None, None) => break,
+        }
+    }
+    *current = merged;
+}
+
+fn refresh_incremental_root(
+    leaves: &BTreeMap<Hash32, Vec<u8>>,
+    cache: &mut IncrementalRootCache,
+) -> Hash32 {
+    let mut dirty_prefixes = std::mem::take(&mut cache.dirty_prefixes);
+    dirty_prefixes.sort_unstable();
+    dirty_prefixes.dedup();
+    let updates = recompute_dirty_buckets(leaves, &dirty_prefixes);
+    let empty_bucket = empty_root(INCREMENTAL_PREFIX_HEIGHT);
+    merge_incremental_buckets(
+        Arc::make_mut(&mut cache.bucket_roots),
+        updates,
+        empty_bucket,
+    );
+    root_from_incremental_buckets(&cache.bucket_roots)
+}
+
 /// In-memory sparse Merkle tree. Deterministic: leaves live in a `BTreeMap`;
 /// the root is a pure function of the map.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Smt {
-    leaves: BTreeMap<Hash32, Vec<u8>>,
+    leaves: Arc<BTreeMap<Hash32, Vec<u8>>>,
+    cached_root: OnceLock<Hash32>,
+    incremental_root: Mutex<IncrementalRootCache>,
 }
+
+impl Clone for Smt {
+    fn clone(&self) -> Self {
+        let cached_root = OnceLock::new();
+        if let Some(root) = self.cached_root.get() {
+            let _ = cached_root.set(*root);
+        }
+        let incremental_root = match self.incremental_root.lock() {
+            Ok(cache) => cache.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        };
+        Self {
+            leaves: self.leaves.clone(),
+            cached_root,
+            incremental_root: Mutex::new(incremental_root),
+        }
+    }
+}
+
+impl Default for Smt {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PartialEq for Smt {
+    fn eq(&self, other: &Self) -> bool {
+        self.leaves == other.leaves
+    }
+}
+
+impl Eq for Smt {}
 
 impl Smt {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            leaves: BTreeMap::new(),
+            leaves: Arc::new(BTreeMap::new()),
+            cached_root: OnceLock::new(),
+            incremental_root: Mutex::new(IncrementalRootCache::default()),
         }
     }
 
@@ -166,12 +427,28 @@ impl Smt {
     /// Insert or update (duplicate-key update semantics). Returns the prior
     /// value when the key already existed.
     pub fn insert(&mut self, key: Hash32, value: Vec<u8>) -> Option<Vec<u8>> {
-        self.leaves.insert(key, value)
+        let previous = Arc::make_mut(&mut self.leaves).insert(key, value);
+        let _ = self.cached_root.take();
+        let cache = match self.incremental_root.get_mut() {
+            Ok(cache) => cache,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        cache.dirty_prefixes.push(incremental_prefix(&key));
+        previous
     }
 
     /// Remove a key. Returns the prior value when present.
     pub fn remove(&mut self, key: &Hash32) -> Option<Vec<u8>> {
-        self.leaves.remove(key)
+        let removed = Arc::make_mut(&mut self.leaves).remove(key);
+        if removed.is_some() {
+            let _ = self.cached_root.take();
+            let cache = match self.incremental_root.get_mut() {
+                Ok(cache) => cache,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            cache.dirty_prefixes.push(incremental_prefix(key));
+        }
+        removed
     }
 
     /// Deterministic iteration in key order.
@@ -179,13 +456,24 @@ impl Smt {
         self.leaves.iter()
     }
 
-    /// Current root. Pure function of the leaf map. Large trees divide at a
-    /// fixed prefix boundary and hash disjoint subtrees in parallel; the
-    /// canonical fold is byte-identical to the sequential definition.
+    /// Current root. Pure function of the leaf map. Changed 24-bit subtrees
+    /// are rehashed in parallel and unchanged subtree roots are reused; the
+    /// canonical top fold remains byte-identical to the sequential definition.
     #[must_use]
     pub fn root(&self) -> Hash32 {
-        let entries: Vec<(&Hash32, &Vec<u8>)> = self.leaves.iter().collect();
-        root_from_sorted_entries(&entries)
+        if let Some(root) = self.cached_root.get() {
+            return *root;
+        }
+        let mut cache = match self.incremental_root.lock() {
+            Ok(cache) => cache,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Some(root) = self.cached_root.get() {
+            return *root;
+        }
+        let root = refresh_incremental_root(&self.leaves, &mut cache);
+        let _ = self.cached_root.set(root);
+        root
     }
 
     /// Merkle proof for `key` (inclusion when present, non-inclusion when
@@ -225,6 +513,270 @@ impl Smt {
             }
         }
         SmtProof { bitmap, siblings }
+    }
+}
+
+const RECEIPT_VALUE_BYTES: usize = 108;
+
+fn encode_receipt_value(receipt: &ReceiptV1) -> [u8; RECEIPT_VALUE_BYTES] {
+    let mut bytes = [0_u8; RECEIPT_VALUE_BYTES];
+    bytes[0..2].copy_from_slice(&ReceiptV1::VERSION.to_le_bytes());
+    bytes[2..4].copy_from_slice(&1_u16.to_le_bytes());
+    bytes[4..36].copy_from_slice(&receipt.txid);
+    bytes[36..38].copy_from_slice(&2_u16.to_le_bytes());
+    bytes[38..40].copy_from_slice(&receipt.status.to_le_bytes());
+    bytes[40..42].copy_from_slice(&3_u16.to_le_bytes());
+    bytes[42..58].copy_from_slice(&receipt.fee_charged.to_le_bytes());
+    bytes[58..60].copy_from_slice(&4_u16.to_le_bytes());
+    bytes[60..68].copy_from_slice(&receipt.resources_used.bytes.to_le_bytes());
+    bytes[68..76].copy_from_slice(&receipt.resources_used.grain_steps.to_le_bytes());
+    bytes[76..84].copy_from_slice(&receipt.resources_used.proof_units.to_le_bytes());
+    bytes[84..92].copy_from_slice(&receipt.resources_used.state_reads.to_le_bytes());
+    bytes[92..100].copy_from_slice(&receipt.resources_used.state_writes.to_le_bytes());
+    bytes[100..108].copy_from_slice(&receipt.resources_used.blob_bytes.to_le_bytes());
+    bytes
+}
+
+fn receipt_subtree_root(entries: &[(&Hash32, [u8; RECEIPT_VALUE_BYTES])], depth: usize) -> Hash32 {
+    if entries.is_empty() {
+        return empty_root(DEPTH - depth);
+    }
+    if depth == DEPTH {
+        debug_assert_eq!(entries.len(), 1, "duplicate 256-bit key is impossible");
+        let (key, value) = &entries[0];
+        return leaf_hash(key, value);
+    }
+    let split = entries.partition_point(|(key, _)| !key_bit(key, depth));
+    let left = receipt_subtree_root(&entries[..split], depth + 1);
+    let right = receipt_subtree_root(&entries[split..], depth + 1);
+    node_hash(&left, &right)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SettledReceipt {
+    receipt: ReceiptV1,
+    height: u64,
+}
+
+type ReceiptBucket = SmallVec<[SettledReceipt; 1]>;
+
+fn receipt_bucket_root(bucket: Option<&ReceiptBucket>) -> Hash32 {
+    let Some(entries) = bucket else {
+        return empty_root(INCREMENTAL_PREFIX_HEIGHT);
+    };
+    let Some(first) = entries.first() else {
+        return empty_root(INCREMENTAL_PREFIX_HEIGHT);
+    };
+    if entries.len() == 1 {
+        let value = encode_receipt_value(&first.receipt);
+        return single_entry_subtree_root(&first.receipt.txid, &value, INCREMENTAL_PREFIX_BITS);
+    }
+    let encoded = entries
+        .iter()
+        .map(|entry| (&entry.receipt.txid, encode_receipt_value(&entry.receipt)))
+        .collect::<Vec<_>>();
+    receipt_subtree_root(&encoded, INCREMENTAL_PREFIX_BITS)
+}
+
+fn recompute_receipt_dirty_buckets(
+    buckets: &HashMap<u32, ReceiptBucket>,
+    dirty_prefixes: &[u32],
+) -> Vec<(u32, Hash32)> {
+    let mut roots = dirty_prefixes
+        .iter()
+        .map(|prefix| (*prefix, [0_u8; 32]))
+        .collect::<Vec<_>>();
+    if roots.len() < PARALLEL_DIRTY_BUCKET_MIN {
+        for (prefix, root) in &mut roots {
+            *root = receipt_bucket_root(buckets.get(prefix));
+        }
+        return roots;
+    }
+
+    let workers = std::thread::available_parallelism()
+        .map_or(1, usize::from)
+        .saturating_sub(2)
+        .max(1)
+        .min(roots.len());
+    let chunk_size = roots.len().div_ceil(workers);
+    std::thread::scope(|scope| {
+        for chunk in roots.chunks_mut(chunk_size) {
+            scope.spawn(move || {
+                for (prefix, root) in chunk {
+                    *root = receipt_bucket_root(buckets.get(prefix));
+                }
+            });
+        }
+    });
+    roots
+}
+
+fn refresh_receipt_incremental_root(
+    buckets: &HashMap<u32, ReceiptBucket>,
+    cache: &mut IncrementalRootCache,
+) -> Hash32 {
+    let mut dirty_prefixes = std::mem::take(&mut cache.dirty_prefixes);
+    dirty_prefixes.sort_unstable();
+    dirty_prefixes.dedup();
+    let updates = recompute_receipt_dirty_buckets(buckets, &dirty_prefixes);
+    merge_incremental_buckets(
+        Arc::make_mut(&mut cache.bucket_roots),
+        updates,
+        empty_root(INCREMENTAL_PREFIX_HEIGHT),
+    );
+    root_from_incremental_buckets(&cache.bucket_roots)
+}
+
+/// Settled-receipt SMT grouped by the same 24-bit prefixes used by its
+/// incremental Merkle cache. Txid lookup and insertion touch one hash bucket;
+/// canonical ordering is confined to the normally single-entry prefix.
+#[derive(Debug)]
+pub struct ReceiptSmt {
+    buckets: Arc<HashMap<u32, ReceiptBucket>>,
+    cached_root: OnceLock<Hash32>,
+    incremental_root: Mutex<IncrementalRootCache>,
+}
+
+impl Clone for ReceiptSmt {
+    fn clone(&self) -> Self {
+        let cached_root = OnceLock::new();
+        if let Some(root) = self.cached_root.get() {
+            let _ = cached_root.set(*root);
+        }
+        let incremental_root = match self.incremental_root.lock() {
+            Ok(cache) => cache.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        };
+        Self {
+            buckets: self.buckets.clone(),
+            cached_root,
+            incremental_root: Mutex::new(incremental_root),
+        }
+    }
+}
+
+impl Default for ReceiptSmt {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PartialEq for ReceiptSmt {
+    fn eq(&self, other: &Self) -> bool {
+        self.buckets == other.buckets
+    }
+}
+
+impl Eq for ReceiptSmt {}
+
+impl ReceiptSmt {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            buckets: Arc::new(HashMap::new()),
+            cached_root: OnceLock::new(),
+            incremental_root: Mutex::new(IncrementalRootCache::default()),
+        }
+    }
+
+    #[must_use]
+    pub fn get(&self, key: &Hash32) -> Option<&ReceiptV1> {
+        let bucket = self.buckets.get(&incremental_prefix(key))?;
+        let index = bucket
+            .binary_search_by(|entry| entry.receipt.txid.cmp(key))
+            .ok()?;
+        bucket.get(index).map(|entry| &entry.receipt)
+    }
+
+    #[must_use]
+    pub fn settlement(&self, key: &Hash32) -> Option<(u64, u16)> {
+        let bucket = self.buckets.get(&incremental_prefix(key))?;
+        let index = bucket
+            .binary_search_by(|entry| entry.receipt.txid.cmp(key))
+            .ok()?;
+        bucket
+            .get(index)
+            .map(|entry| (entry.height, entry.receipt.status))
+    }
+
+    #[must_use]
+    pub fn contains(&self, key: &Hash32) -> bool {
+        self.get(key).is_some()
+    }
+
+    pub fn insert(&mut self, key: Hash32, value: ReceiptV1, height: u64) -> Option<ReceiptV1> {
+        debug_assert_eq!(key, value.txid);
+        let prefix = incremental_prefix(&key);
+        let bucket = Arc::make_mut(&mut self.buckets).entry(prefix).or_default();
+        let value = SettledReceipt {
+            receipt: value,
+            height,
+        };
+        let previous = match bucket.binary_search_by(|entry| entry.receipt.txid.cmp(&key)) {
+            Ok(index) => Some(std::mem::replace(&mut bucket[index], value).receipt),
+            Err(index) => {
+                bucket.insert(index, value);
+                None
+            }
+        };
+        let _ = self.cached_root.take();
+        let cache = match self.incremental_root.get_mut() {
+            Ok(cache) => cache,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        cache.dirty_prefixes.push(prefix);
+        previous
+    }
+
+    pub fn remove(&mut self, key: &Hash32) -> Option<ReceiptV1> {
+        let prefix = incremental_prefix(key);
+        let buckets = Arc::make_mut(&mut self.buckets);
+        let (removed, empty) = {
+            let bucket = buckets.get_mut(&prefix)?;
+            let index = bucket
+                .binary_search_by(|entry| entry.receipt.txid.cmp(key))
+                .ok()?;
+            let removed = bucket.remove(index);
+            (removed, bucket.is_empty())
+        };
+        if empty {
+            buckets.remove(&prefix);
+        }
+        let _ = self.cached_root.take();
+        let cache = match self.incremental_root.get_mut() {
+            Ok(cache) => cache,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        cache.dirty_prefixes.push(prefix);
+        Some(removed.receipt)
+    }
+
+    pub(crate) fn remove_if_settled_after(
+        &mut self,
+        key: &Hash32,
+        settled_height: u64,
+    ) -> Option<ReceiptV1> {
+        self.settlement(key)
+            .is_some_and(|(height, _)| height > settled_height)
+            .then(|| self.remove(key))
+            .flatten()
+    }
+
+    #[must_use]
+    pub fn root(&self) -> Hash32 {
+        if let Some(root) = self.cached_root.get() {
+            return *root;
+        }
+        let mut cache = match self.incremental_root.lock() {
+            Ok(cache) => cache,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Some(root) = self.cached_root.get() {
+            return *root;
+        }
+        let root = refresh_receipt_incremental_root(&self.buckets, &mut cache);
+        let _ = self.cached_root.set(root);
+        root
     }
 }
 
@@ -394,6 +946,86 @@ mod tests {
             root_from_sorted_entries(&entries),
             subtree_root(&entries, 0)
         );
+    }
+
+    #[test]
+    fn incremental_cache_matches_full_rebuild_after_clone_updates_and_removals() {
+        fn sequential(tree: &Smt) -> Hash32 {
+            let entries = tree.leaves.iter().collect::<Vec<_>>();
+            subtree_root(&entries, 0)
+        }
+
+        let mut rng = SplitMix64(0x494E_4352_454D_454E);
+        let mut tree = Smt::new();
+        let mut keys = Vec::new();
+        for index in 0..2_048_u32 {
+            let mut key = rng.next_hash();
+            if index < 32 {
+                key[..3].copy_from_slice(&[0xAB, 0xCD, 0xEF]);
+            }
+            tree.insert(key, index.to_le_bytes().to_vec());
+            keys.push(key);
+        }
+        assert_eq!(tree.root(), sequential(&tree));
+
+        let mut cloned = tree.clone();
+        for index in 2_048..4_096_u32 {
+            let key = rng.next_hash();
+            tree.insert(key, index.to_le_bytes().to_vec());
+            keys.push(key);
+        }
+        for key in keys.iter().step_by(7) {
+            tree.remove(key);
+        }
+        assert_eq!(tree.root(), sequential(&tree));
+
+        cloned.insert(keys[3], b"clone-only-update".to_vec());
+        cloned.remove(&keys[5]);
+        assert_eq!(cloned.root(), sequential(&cloned));
+        assert_ne!(tree.root(), cloned.root());
+    }
+
+    #[test]
+    fn receipt_tree_matches_canonical_encoding_across_clones_and_removals() {
+        let mut rng = SplitMix64(0x5245_4345_4950_5453);
+        let mut canonical = Smt::new();
+        let mut receipts = ReceiptSmt::new();
+        let mut values = Vec::new();
+        for index in 0..4_096_u64 {
+            let receipt = ReceiptV1 {
+                txid: rng.next_hash(),
+                status: u16::try_from(index % 17).unwrap(),
+                fee_charged: u128::from(index),
+                resources_used: crate::objects::ResourceVector {
+                    bytes: index,
+                    grain_steps: index.saturating_add(1),
+                    proof_units: index.saturating_add(2),
+                    state_reads: index.saturating_add(3),
+                    state_writes: index.saturating_add(4),
+                    blob_bytes: index.saturating_add(5),
+                },
+            };
+            assert_eq!(
+                encode_receipt_value(&receipt).as_slice(),
+                receipt.encode_canonical()
+            );
+            canonical.insert(receipt.txid, receipt.encode_canonical());
+            receipts.insert(receipt.txid, receipt.clone(), index);
+            values.push(receipt);
+        }
+        assert_eq!(receipts.root(), canonical.root());
+
+        let receipts_clone = receipts.clone();
+        let canonical_clone = canonical.clone();
+        for receipt in values.iter().step_by(11) {
+            assert_eq!(
+                receipts.remove(&receipt.txid),
+                ReceiptV1::decode_canonical(&canonical.remove(&receipt.txid).unwrap()).ok()
+            );
+        }
+        assert_eq!(receipts.root(), canonical.root());
+        assert_eq!(receipts_clone.root(), canonical_clone.root());
+        assert_ne!(receipts.root(), receipts_clone.root());
     }
 
     #[test]

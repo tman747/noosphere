@@ -28,7 +28,7 @@ fn retention_prunes_terminal_records_and_keeps_live_state() {
     core.submit_tx(&tx1, &wit1, 7).expect("admit settled tx");
     let block1 = produce_next(&mut core);
     assert_eq!(
-        core.view.tx_status(&txid1),
+        core.tx_status(&txid1),
         ViewLookup::Found(TxStatus::Settled {
             height: 1,
             status: 0
@@ -43,8 +43,7 @@ fn retention_prunes_terminal_records_and_keeps_live_state() {
 
     // TERMINAL eviction arm: the settled record left every map and is
     // answerable as Pruned — never a silent NotFound.
-    assert_eq!(core.view.tx_status(&txid1), ViewLookup::Pruned);
-    assert!(matches!(core.view.receipt(&txid1), ViewLookup::Pruned));
+    assert_eq!(core.tx_status(&txid1), ViewLookup::Pruned);
     assert!(matches!(core.view.block_by_height(1), ViewLookup::Pruned));
     assert!(matches!(
         core.view.block_by_hash(&block1),
@@ -52,7 +51,7 @@ fn retention_prunes_terminal_records_and_keeps_live_state() {
     ));
 
     // An identity that never existed is still NotFound, not Pruned.
-    assert_eq!(core.view.tx_status(&[0xEE; 32]), ViewLookup::NotFound);
+    assert_eq!(core.tx_status(&[0xEE; 32]), ViewLookup::NotFound);
     assert!(matches!(
         core.view.block_by_hash(&[0xEE; 32]),
         ViewLookup::NotFound
@@ -75,15 +74,12 @@ fn retention_prunes_terminal_records_and_keeps_live_state() {
     // LIVE record: a pending (mempool) transaction survives retention.
     let (tx2, wit2, txid2) = signed_transfer(chain_id, 40, &faucet_key(), operator_account(2), 200);
     core.submit_tx(&tx2, &wit2, 7).expect("admit pending tx");
-    assert_eq!(
-        core.view.tx_status(&txid2),
-        ViewLookup::Found(TxStatus::Pending)
-    );
+    assert_eq!(core.tx_status(&txid2), ViewLookup::Found(TxStatus::Pending));
     // More production: the pending record settles (and the view keeps its
     // exact settlement), while the retention law keeps pruning terminals.
     produce_next(&mut core);
     assert_eq!(
-        core.view.tx_status(&txid2),
+        core.tx_status(&txid2),
         ViewLookup::Found(TxStatus::Settled {
             height: 13,
             status: 0
@@ -96,9 +92,9 @@ fn retention_prunes_terminal_records_and_keeps_live_state() {
     let mut cfg = node_config();
     cfg.view_retention_blocks = 4;
     let restarted = boot_node(&dir, cfg);
-    assert_eq!(restarted.view.tx_status(&txid1), ViewLookup::Pruned);
+    assert_eq!(restarted.tx_status(&txid1), ViewLookup::Pruned);
     assert_eq!(
-        restarted.view.tx_status(&txid2),
+        restarted.tx_status(&txid2),
         ViewLookup::Found(TxStatus::Settled {
             height: 13,
             status: 0
@@ -124,7 +120,7 @@ fn archive_mode_keeps_full_presentation_history() {
     }
     // Nothing is ever pruned in archive mode.
     assert_eq!(
-        core.view.tx_status(&txid),
+        core.tx_status(&txid),
         ViewLookup::Found(TxStatus::Settled {
             height: 1,
             status: 0

@@ -179,15 +179,20 @@ max_cell_depth = "UNRESOLVED_SOURCE"     # searched ch01/ch06 for: depth, nestin
 jet_registry_key = "(grain_version, formula_hash)"  # source: ch01 section 7.4; plan section 5.9
 
 [da]
-consensus_coding = "Reed-Solomon over the block body into fixed-size shards with a Merkle commitment; full reconstruction before acceptance; witnesses never vote an unreconstructed ancestor"  # source: ch01 section 10.1
+consensus_coding = "Reed-Solomon over the compressed DA form into a body-specific canonical shard size with a Merkle commitment; full reconstruction before acceptance; witnesses never vote an unreconstructed ancestor"  # source: ch01 section 10.1 plus PROPOSED-G0 high-throughput profile
 light_client_sampling = "probabilistic availability opinion only; never validity for a full node"  # source: ch01 section 10.1
 blob_descriptor_fields = ["namespace", "content_root", "original_bytes", "shard_bytes", "data_shards", "parity_shards", "retention_epochs", "codec_id", "encryption_descriptor?", "access_policy_root?"]  # source: ch01 section 10.2
-body_shard_bytes = 65536                 # adopted from schema-tables/da.md PROPOSED-G0 (ODR-DA-001), implemented in crates/noos-da; originally UNRESOLVED_SOURCE (ch01 section 10.1 fixes the shape but no byte size); still subject to G0 review
-body_data_shards = 16                    # adopted from schema-tables/da.md PROPOSED-G0 (ODR-DA-001), implemented in crates/noos-da (rate 1/2 with body_parity_shards; reconstruct from any 16 of 32); erasure rate never numbered in ch01 (the 8-of-12 figure in ch04 H-SEED is Hearth content distribution, not consensus DA); still subject to G0 review
-body_parity_shards = 16                  # adopted from schema-tables/da.md PROPOSED-G0 (ODR-DA-001), implemented in crates/noos-da; still subject to G0 review
-max_block_body_bytes = 1048576           # adopted from schema-tables/da.md PROPOSED-G0 (ODR-DA-002; 16 x 64 KiB data capacity), implemented in crates/noos-da; must co-freeze with fee capacity ODR-FEES-002; still subject to G0 review
-max_blob_bytes = 262144                  # adopted from schema-tables/da.md PROPOSED-G0 (ODR-DA-002; per consensus-aux descriptor), implemented in crates/noos-da namespace registry (artifact namespaces carry their own PROPOSED bounds); still subject to G0 review
-p2p_max_frame_bytes = 1048576            # source: plan section 7.4 ("1 MiB bounded frames", ported Ascent pattern); corpus states every message has a maximum decoded size (ch01 section 10.4) without a number
+body_min_shard_bytes = 65536             # PROPOSED-G0 high-throughput profile: canonical minimum (64 KiB)
+body_max_shard_bytes = 8388608           # PROPOSED-G0 high-throughput profile: canonical maximum (8 MiB)
+body_shard_selection = "smallest power of two >= ceil(compressed_da_form_bytes/16), clamped to 65536..8388608"  # deterministic adaptive geometry
+body_data_shards = 16                    # rate 1/2 with body_parity_shards; reconstruct from any 16 of 32
+body_parity_shards = 16                  # rate 1/2 RS-GF8-V1
+max_block_da_form_bytes = 134217728      # 16 x 8 MiB compressed DA-form capacity; PROPOSED-G0, must co-freeze with fee capacity ODR-FEES-002
+max_block_body_bytes = 536870912         # fail-closed canonical BlockBodyV1 decompression ceiling (512 MiB)
+body_da_form = "NOOSLZ41 || lz4_block_compress_prepend_size(canonical BlockBodyV1 with ground_ticket zeroed)"  # deterministic, ticket-independent proposal commitment form
+max_blob_bytes = 262144                  # per consensus-aux descriptor; artifact namespaces retain their own bounds
+p2p_max_frame_bytes = 1048576            # individual frame ceiling; body/2 transfers are chunked below this bound
+p2p_max_reassembled_body_bytes = 134217728 # requester-side fail-closed compressed-body assembly ceiling
 reconstruction_gate = "99.99% reconstruction in 10^6 randomized in-bound loss trials; zero finalization before the availability certificate"  # source: ch04 section 3.1 A-DA
 model_weight_shard_bytes = "4-16 MiB content-addressed weight shards (per-manifest, shard_erasure_params: shard_size u32, data_shards u16, parity_shards u16)"  # source: ch05 section 2.2 ModelManifest
 

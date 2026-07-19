@@ -48,14 +48,14 @@ fn e2e_happy_path_finality_and_restart_recovery() {
     // Transfers settled in block 1.
     assert!(core.mempool.is_empty());
     assert_eq!(
-        core.view.tx_status(&txid1),
+        core.tx_status(&txid1),
         ViewLookup::Found(TxStatus::Settled {
             height: 1,
             status: 0
         })
     );
     assert_eq!(
-        core.view.tx_status(&txid2),
+        core.tx_status(&txid2),
         ViewLookup::Found(TxStatus::Settled {
             height: 1,
             status: 0
@@ -149,7 +149,7 @@ fn e2e_happy_path_finality_and_restart_recovery() {
     );
     assert_eq!(restarted.ledger().emission_minted(), minted_before);
     assert_eq!(
-        restarted.view.tx_status(&txid1),
+        restarted.tx_status(&txid1),
         ViewLookup::Found(TxStatus::Settled {
             height: 1,
             status: 0

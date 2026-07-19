@@ -1,9 +1,9 @@
 //! The store: open decision tree, WAL-backed atomic commits, snapshot
 //! generations under the exact plan §7.3 law, retention, and pruning.
 
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Instant;
 
 use noos_codec::{NoosDecode, NoosEncode};
 use noos_lumen::state::{LumenRoots, StateDelta, TreeId};
@@ -576,93 +576,129 @@ impl Store {
     /// Commit one write set atomically through the protocol WAL:
     /// blob-append+fsync → WAL append+fsync → engine apply (which marks
     /// `applied_seq` in the same batch). Ok ⇒ crash-durable.
-    pub fn commit(&mut self, ws: &WriteSet) -> Result<u64, StoreError> {
+    pub fn commit(&mut self, ws: WriteSet) -> Result<u64, StoreError> {
         self.ensure_live()?;
         match self.commit_inner(ws) {
             Ok(seq) => Ok(seq),
-            Err(e) => {
+            Err(error) => {
                 // A rejected write set touches no referenced durable state
                 // (at worst it appended unreferenced blob bytes); only a
                 // failure past validation leaves this handle ambiguous.
-                if !matches!(e, StoreError::InvalidWriteSet(_)) {
+                if !matches!(error, StoreError::InvalidWriteSet(_)) {
                     self.poisoned = true;
                 }
-                Err(e)
+                Err(error)
             }
         }
     }
 
-    fn commit_inner(&mut self, ws: &WriteSet) -> Result<u64, StoreError> {
-        // 1. Blobs first: bytes must be durable before any record
-        //    references them.
-        let mut blob_ops: BTreeMap<Vec<u8>, Option<Vec<u8>>> = BTreeMap::new();
-        for blob in &ws.blobs {
-            if blob.bytes.len() > self.cfg.max_blob_bytes as usize {
-                return Err(StoreError::InvalidWriteSet("blob exceeds max_blob_bytes"));
-            }
-            let loc = self.blobs.append(&blob.hash, &blob.bytes)?;
-            if blob_ops
-                .insert(blob.hash.to_vec(), Some(loc.encode_canonical()))
-                .is_some()
-            {
-                return Err(StoreError::InvalidWriteSet("duplicate blob hash"));
-            }
-        }
-        if !ws.blobs.is_empty() {
-            self.blobs.fsync_active()?;
-        }
+    fn commit_inner(&mut self, ws: WriteSet) -> Result<u64, StoreError> {
+        let profile = std::env::var_os("NOOS_THROUGHPUT_PROFILE").is_some();
+        let operation_started = Instant::now();
+        let WriteSet {
+            delta,
+            roots,
+            headers,
+            indices,
+            receipts,
+            mut blobs,
+        } = ws;
+        let op_capacity = delta
+            .entries
+            .len()
+            .saturating_add(headers.len())
+            .saturating_add(indices.len())
+            .saturating_add(receipts.len())
+            .saturating_add(blobs.len())
+            .saturating_add(usize::from(roots.is_some()));
+        let mut ops: Vec<OpV1> = Vec::with_capacity(op_capacity);
 
-        // 2. Assemble the ordered op list.
-        let mut ops: Vec<OpV1> = Vec::new();
-        let mut last_state_key: Option<Vec<u8>> = None;
-        for e in &ws.delta.entries {
-            let key = state_key(e.tree, &e.key, e.sub_key.as_ref());
-            if let Some(prev) = &last_state_key {
-                if *prev >= key {
-                    return Err(StoreError::InvalidWriteSet(
-                        "state delta not canonically ordered",
-                    ));
-                }
+        // State deltas are already canonically ordered by the transition.
+        for entry in delta.entries {
+            let key = state_key(entry.tree, &entry.key, entry.sub_key.as_ref());
+            if ops
+                .last()
+                .is_some_and(|previous| previous.key.as_slice() >= key.as_slice())
+            {
+                return Err(StoreError::InvalidWriteSet(
+                    "state delta not canonically ordered",
+                ));
             }
-            last_state_key = Some(key.clone());
             ops.push(OpV1 {
                 cf: Cf::State,
                 key,
-                value: e.value.clone(),
+                value: entry.value,
             });
         }
-        for (cf, section) in [
-            (Cf::Headers, &ws.headers),
-            (Cf::Indices, &ws.indices),
-            (Cf::Receipts, &ws.receipts),
+
+        // Caller-keyed sections are sorted in place. Ownership avoids cloning
+        // every receipt and index value into the WAL operation vector.
+        for (cf, mut section) in [
+            (Cf::Headers, headers),
+            (Cf::Indices, indices),
+            (Cf::Receipts, receipts),
         ] {
-            let mut sorted: BTreeMap<Vec<u8>, Option<Vec<u8>>> = BTreeMap::new();
-            for (k, v) in section {
-                if k.is_empty() || k.len() > wal::MAX_KEY as usize {
-                    return Err(StoreError::InvalidWriteSet(
-                        "section key size out of bounds",
-                    ));
-                }
-                if sorted.insert(k.clone(), v.clone()).is_some() {
-                    return Err(StoreError::InvalidWriteSet("duplicate section key"));
-                }
+            if section
+                .iter()
+                .any(|(key, _)| key.is_empty() || key.len() > wal::MAX_KEY as usize)
+            {
+                return Err(StoreError::InvalidWriteSet(
+                    "section key size out of bounds",
+                ));
             }
-            for (key, value) in sorted {
-                ops.push(OpV1 { cf, key, value });
+            section.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+            if section.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+                return Err(StoreError::InvalidWriteSet("duplicate section key"));
             }
+            ops.extend(
+                section
+                    .into_iter()
+                    .map(|(key, value)| OpV1 { cf, key, value }),
+            );
         }
-        for (key, value) in blob_ops {
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE store_operation_build_seconds={:.9}",
+                operation_started.elapsed().as_secs_f64()
+            );
+        }
+        let blob_started = Instant::now();
+
+        // Validate and order blobs before any IO. Bytes are appended and
+        // fsynced before the WAL record can reference their locations.
+        blobs.sort_unstable_by_key(|blob| blob.hash);
+        if blobs.windows(2).any(|pair| pair[0].hash == pair[1].hash) {
+            return Err(StoreError::InvalidWriteSet("duplicate blob hash"));
+        }
+        if blobs
+            .iter()
+            .any(|blob| blob.bytes.len() > self.cfg.max_blob_bytes as usize)
+        {
+            return Err(StoreError::InvalidWriteSet("blob exceeds max_blob_bytes"));
+        }
+        for blob in &blobs {
+            let location = self.blobs.append(&blob.hash, &blob.bytes)?;
             ops.push(OpV1 {
                 cf: Cf::BlobIndex,
-                key,
-                value,
+                key: blob.hash.to_vec(),
+                value: Some(location.encode_canonical()),
             });
         }
-        if let Some(roots) = &ws.roots {
+        if !blobs.is_empty() {
+            self.blobs.fsync_active()?;
+        }
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE store_blob_commit_seconds={:.9}",
+                blob_started.elapsed().as_secs_f64()
+            );
+        }
+
+        if let Some(roots) = roots {
             ops.push(OpV1 {
                 cf: Cf::Meta,
                 key: META_ROOTS.to_vec(),
-                value: Some(encode_roots(roots)),
+                value: Some(encode_roots(&roots)),
             });
         }
         if ops.is_empty() {
@@ -673,14 +709,32 @@ impl Store {
 
     /// WAL record → fsync → engine apply → mark applied.
     fn commit_ops(&mut self, ops: Vec<OpV1>) -> Result<u64, StoreError> {
+        if ops.len() > wal::MAX_OPS as usize {
+            return Err(StoreError::InvalidWriteSet("write set exceeds MAX_OPS"));
+        }
         let seq = self
             .applied_seq
             .checked_add(1)
             .ok_or(StoreError::Arithmetic("seq successor"))?;
         let record = WalRecordV1 { seq, ops };
+        let profile = std::env::var_os("NOOS_THROUGHPUT_PROFILE").is_some();
+        let wal_started = Instant::now();
         self.wal.append(&record)?;
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE store_wal_commit_seconds={:.9}",
+                wal_started.elapsed().as_secs_f64()
+            );
+        }
+        let engine_started = Instant::now();
         fail_at(&self.vfs, "engine_apply")?;
         self.engine.apply(&record.ops, seq)?;
+        if profile {
+            eprintln!(
+                "NOOS_PROFILE store_engine_commit_seconds={:.9}",
+                engine_started.elapsed().as_secs_f64()
+            );
+        }
         self.applied_seq = seq;
         Ok(seq)
     }

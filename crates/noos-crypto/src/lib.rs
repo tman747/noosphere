@@ -50,7 +50,10 @@ pub use dkg::{
     DkgTranscriptSummary,
 };
 pub use domains::{DomainId, DomainKind, DOMAIN_COUNT};
-pub use ed25519::{verify_domain, Keypair, PublicKey, Signature};
+pub use ed25519::{
+    prepare_public_key, verify_domain, verify_domain_batch, verify_domain_batch_prepared, Keypair,
+    PreparedPublicKey, PublicKey, Signature,
+};
 pub use error::{BlsError, CryptoError, DkgError};
 pub use hash::{hash_domain, keyed_hash_domain, Hash32};
 pub use hkdf::{hkdf_derive, HKDF_OUTPUT_LEN};

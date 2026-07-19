@@ -4,9 +4,9 @@
 //!
 //! Architecture: one swarm task owns the [`libp2p::Swarm`]; one accept task
 //! per registered protocol serves inbound substreams; one worker task per
-//! peer drains the two-lane outbox with a single in-flight request (so lane
-//! order is wire order). All shared state lives in [`Shared`] behind
-//! non-async mutexes that are never held across an `.await`.
+//! peer drains the two-lane outbox with a single in-flight request, except
+//! bounded concurrent body-chunk streams. All shared state lives in [`Shared`]
+//! behind non-async mutexes that are never held across an `.await`.
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -19,7 +19,7 @@ use libp2p::swarm::SwarmEvent;
 use libp2p::{identity as p2p_identity, Multiaddr, PeerId, StreamProtocol};
 use libp2p_stream as stream;
 use noos_codec::{NoosDecode, NoosEncode};
-use tokio::sync::{mpsc, oneshot, watch, Notify};
+use tokio::sync::{mpsc, oneshot, watch, Notify, Semaphore};
 
 use crate::backoff::ReconnectBackoff;
 use crate::envelope::{
@@ -27,8 +27,9 @@ use crate::envelope::{
     HandshakeMsgV1, HeaderMsgV1, HeaderReplyV1, LightUpdateItemV1, LightUpdateReplyV1,
     LightUpdateRequestV1, LoomReceiptPushV1, Protocol, PushReplyV1, RangeReplyV1, RangeRequestV1,
     RejectCode, ShardReplyV1, ShardRequestV1, SnapshotChunkRequestV1, SnapshotReplyV1, TxPushV1,
-    VotePushV1, APP_PROTOCOLS, MAX_LIGHT_UPDATE_ITEMS, MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES,
-    MAX_RANGE_HEADERS, RANGE_REPLY_BYTE_BUDGET,
+    VotePushV1, APP_PROTOCOLS, MAX_BODY_BYTES, MAX_LIGHT_UPDATE_ITEMS,
+    MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES, MAX_RANGE_HEADERS, MAX_REASSEMBLED_BODY_BYTES,
+    RANGE_REPLY_BYTE_BUDGET,
 };
 use crate::frame::{
     read_frame, write_frame, FrameError, MAX_FRAME_BYTES, MAX_HANDSHAKE_FRAME_BYTES,
@@ -45,6 +46,9 @@ const READY_GRACE_MS: u64 = 3_000;
 
 /// Delivery attempts per queued request across reconnects.
 const SEND_ATTEMPTS: u8 = 2;
+/// Concurrent body chunks across this handle. Keeps RTT from serializing a
+/// macroblock while bounding per-peer memory and bandwidth pressure.
+const BODY_CHUNK_CONCURRENCY: usize = 8;
 
 // ---------------------------------------------------------------------------
 // Public configuration and surface types
@@ -100,7 +104,14 @@ pub trait ProtocolStore: Send + Sync + 'static {
     fn header(&self, _header_hash: &[u8; 32]) -> Option<Vec<u8>> {
         None
     }
-    fn body(&self, _block_hash: &[u8; 32]) -> Option<Vec<u8>> {
+    /// A bounded slice of one stored compressed DA form. Implementations
+    /// return `(total_bytes, bytes_at_offset)` without cloning the whole body.
+    fn body_chunk(
+        &self,
+        _block_hash: &[u8; 32],
+        _offset: u64,
+        _max_bytes: u32,
+    ) -> Option<(u64, Vec<u8>)> {
         None
     }
     /// Ascending encoded headers from `start_height`, plus a `more` flag.
@@ -252,17 +263,24 @@ const fn dup_lane(protocol: Protocol) -> Option<usize> {
     }
 }
 
+struct BootstrapDial {
+    backoff: ReconnectBackoff,
+    retry_scheduled: bool,
+}
+
 struct Shared {
     config: P2pConfig,
     local_attestation: ChainAttestationV1,
     local_peer_id: PeerId,
     control: stream::Control,
     peers: Mutex<HashMap<PeerId, PeerEntry>>,
+    bootstrap_dials: Mutex<HashMap<Multiaddr, BootstrapDial>>,
     cooldowns: Mutex<CooldownLedger>,
     dups: Mutex<[DupCache; DUP_LANES]>,
     events: mpsc::UnboundedSender<P2pEvent>,
     cmds: mpsc::UnboundedSender<SwarmCmd>,
     store: Arc<dyn ProtocolStore>,
+    body_streams: Semaphore,
     start: Instant,
     listen_tx: watch::Sender<Option<Multiaddr>>,
 }
@@ -283,6 +301,26 @@ impl Shared {
 
 fn sp(protocol: Protocol) -> StreamProtocol {
     StreamProtocol::new(protocol.id())
+}
+
+async fn exchange(
+    mut control: stream::Control,
+    peer: PeerId,
+    protocol: Protocol,
+    payload: &[u8],
+) -> Result<Vec<u8>, SendError> {
+    let mut stream = control
+        .open_stream(peer, sp(protocol))
+        .await
+        .map_err(|_| SendError::Disconnected)?;
+    write_frame(&mut stream, payload, MAX_FRAME_BYTES)
+        .await
+        .map_err(|_| SendError::Disconnected)?;
+    let reply = read_frame(&mut stream, MAX_FRAME_BYTES)
+        .await
+        .map_err(|_| SendError::Disconnected)?;
+    let _ = futures::io::AsyncWriteExt::close(&mut stream).await;
+    Ok(reply)
 }
 
 /// PeerId corresponding to an attested Ed25519 public key.
@@ -354,6 +392,7 @@ impl P2pNode {
             local_peer_id,
             control,
             peers: Mutex::new(HashMap::new()),
+            bootstrap_dials: Mutex::new(HashMap::new()),
             cooldowns: Mutex::new(CooldownLedger::new()),
             dups: Mutex::new([
                 DupCache::new(dup_cap),
@@ -364,6 +403,7 @@ impl P2pNode {
             events: event_tx,
             cmds: cmd_tx,
             store,
+            body_streams: Semaphore::new(BODY_CHUNK_CONCURRENCY),
             start: Instant::now(),
             listen_tx,
         });
@@ -397,6 +437,24 @@ impl P2pHandle {
 
     /// Dials a QUIC multiaddr (fire-and-forget; watch for `PeerReady`).
     pub fn connect(&self, addr: Multiaddr) {
+        let mut mix = self.shared.config.backoff_seed;
+        for (index, byte) in addr.to_vec().iter().enumerate() {
+            mix ^= u64::from(*byte) << ((index % 8).wrapping_mul(8));
+        }
+        let mut bootstrap_dials = lock(&self.shared.bootstrap_dials);
+        let std::collections::hash_map::Entry::Vacant(entry) = bootstrap_dials.entry(addr.clone())
+        else {
+            return;
+        };
+        entry.insert(BootstrapDial {
+            backoff: ReconnectBackoff::new(
+                ReconnectBackoff::DEFAULT_BASE_MS,
+                ReconnectBackoff::DEFAULT_MAX_MS,
+                mix,
+            ),
+            retry_scheduled: false,
+        });
+        drop(bootstrap_dials);
         self.shared.cmd(SwarmCmd::Dial(addr));
     }
 
@@ -449,19 +507,97 @@ impl P2pHandle {
         async move { decode_reply::<HeaderReplyV1>(rx.await) }
     }
 
-    /// Targeted repair: ask THIS peer for THIS body hash
-    /// (`/noos/braid/body/1`, priority lane).
-    pub fn request_body(
+    /// Targeted repair: assemble THIS body from bounded, concurrently fetched
+    /// priority-lane chunks.
+    pub async fn request_body(
         &self,
         peer: PeerId,
         block_hash: [u8; 32],
-    ) -> impl Future<Output = Result<BodyReplyV1, SendError>> {
-        let env = BodyRequestV1 {
+    ) -> Result<Option<Vec<u8>>, SendError> {
+        let first_reply = self.request_body_chunk(peer, block_hash, 0).await?;
+        let Some((total_bytes, first)) = validate_body_chunk(first_reply, None, 0)? else {
+            return Ok(None);
+        };
+        let total = usize::try_from(total_bytes).map_err(|_| SendError::BadReply)?;
+        let mut assembled = Vec::new();
+        assembled
+            .try_reserve_exact(total)
+            .map_err(|_| SendError::BadReply)?;
+        assembled.resize(total, 0);
+        assembled[..first.len()].copy_from_slice(&first);
+        if first.len() == total {
+            return Ok(Some(assembled));
+        }
+
+        let offsets = (first.len()..total).step_by(MAX_BODY_BYTES as usize);
+        let this = self.clone();
+        let chunks = futures::stream::iter(offsets)
+            .map(move |offset| {
+                let handle = this.clone();
+                async move {
+                    let reply = handle
+                        .request_body_chunk(peer, block_hash, offset as u64)
+                        .await?;
+                    validate_body_chunk(reply, Some(total_bytes), offset as u64)?
+                        .ok_or(SendError::BadReply)
+                        .map(|(_, bytes)| (offset, bytes))
+                }
+            })
+            .buffer_unordered(BODY_CHUNK_CONCURRENCY);
+        futures::pin_mut!(chunks);
+        while let Some(chunk) = chunks.next().await {
+            let (offset, bytes) = chunk?;
+            let end = offset.checked_add(bytes.len()).ok_or(SendError::BadReply)?;
+            assembled
+                .get_mut(offset..end)
+                .ok_or(SendError::BadReply)?
+                .copy_from_slice(&bytes);
+        }
+        Ok(Some(assembled))
+    }
+
+    async fn request_body_chunk(
+        &self,
+        peer: PeerId,
+        block_hash: [u8; 32],
+        offset: u64,
+    ) -> Result<BodyReplyV1, SendError> {
+        let _permit = self
+            .shared
+            .body_streams
+            .acquire()
+            .await
+            .map_err(|_| SendError::NodeShutdown)?;
+        if !wait_ready(&self.shared, peer).await {
+            return Err(SendError::Disconnected);
+        }
+        let request = BodyRequestV1 {
             chain_id: self.chain_id(),
             block_hash,
-        };
-        let rx = self.enqueue(peer, Protocol::BraidBody, env.encode_canonical());
-        async move { decode_reply::<BodyReplyV1>(rx.await) }
+            offset,
+            max_bytes: MAX_BODY_BYTES,
+        }
+        .encode_canonical();
+        let mut last_error = SendError::Disconnected;
+        for attempt in 0..SEND_ATTEMPTS {
+            match exchange(
+                self.shared.control.clone(),
+                peer,
+                Protocol::BraidBody,
+                &request,
+            )
+            .await
+            {
+                Ok(reply) => {
+                    return BodyReplyV1::decode_canonical(&reply).map_err(|_| SendError::BadReply)
+                }
+                Err(error) => last_error = error,
+            }
+            if attempt + 1 < SEND_ATTEMPTS {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        }
+        Err(last_error)
     }
 
     /// Push a checkpoint vote (priority lane).
@@ -633,6 +769,33 @@ impl P2pHandle {
     }
 }
 
+fn validate_body_chunk(
+    reply: BodyReplyV1,
+    expected_total: Option<u64>,
+    expected_offset: u64,
+) -> Result<Option<(u64, Vec<u8>)>, SendError> {
+    let BodyReplyV1::Chunk {
+        total_bytes,
+        offset,
+        bytes,
+    } = reply
+    else {
+        return Ok(None);
+    };
+    let remaining = total_bytes
+        .checked_sub(expected_offset)
+        .ok_or(SendError::BadReply)?;
+    let expected_len = remaining.min(u64::from(MAX_BODY_BYTES));
+    if offset != expected_offset
+        || total_bytes > MAX_REASSEMBLED_BODY_BYTES
+        || expected_total.is_some_and(|expected| expected != total_bytes)
+        || u64::try_from(bytes.0.len()).map_err(|_| SendError::BadReply)? != expected_len
+    {
+        return Err(SendError::BadReply);
+    }
+    Ok(Some((total_bytes, bytes.0)))
+}
+
 fn decode_reply<T: NoosDecode>(
     raw: Result<Result<Vec<u8>, SendError>, oneshot::error::RecvError>,
 ) -> Result<T, SendError> {
@@ -788,15 +951,25 @@ async fn swarm_loop(
             cmd = cmd_rx.recv() => match cmd {
                 None | Some(SwarmCmd::Shutdown) => break,
                 Some(SwarmCmd::Dial(addr)) => {
-                    let _ = swarm.dial(addr);
+                    if swarm.dial(addr.clone()).is_err() {
+                        schedule_bootstrap_retry(&shared, addr);
+                    }
                 }
                 Some(SwarmCmd::DialPeer(peer, addr)) => {
-                    let _ = swarm.dial(
-                        DialOpts::peer_id(peer)
-                            .addresses(vec![addr])
-                            .condition(PeerCondition::Disconnected)
-                            .build(),
-                    );
+                    if swarm
+                        .dial(
+                            DialOpts::peer_id(peer)
+                                .addresses(vec![addr])
+                                .condition(PeerCondition::Disconnected)
+                                .build(),
+                        )
+                        .is_err()
+                    {
+                        if let Some(entry) = lock(&shared.peers).get_mut(&peer) {
+                            entry.reconnecting = false;
+                        }
+                        schedule_reconnect(&shared, peer);
+                    }
                 }
                 Some(SwarmCmd::Disconnect(peer)) => {
                     let _ = swarm.disconnect_peer_id(peer);
@@ -826,14 +999,18 @@ fn handle_swarm_event(shared: &Arc<Shared>, event: SwarmEvent<()>) {
             }
             ensure_peer(shared, peer_id);
             let is_dialer = endpoint.is_dialer();
+            let dial_addr = is_dialer.then(|| endpoint.get_remote_address().clone());
+            if let Some(addr) = &dial_addr {
+                lock(&shared.bootstrap_dials).remove(addr);
+            }
             {
                 let mut peers = lock(&shared.peers);
                 if let Some(entry) = peers.get_mut(&peer_id) {
                     entry.connected = true;
                     entry.reconnecting = false;
                     entry.score = 0;
-                    if is_dialer {
-                        entry.dial_addr = Some(endpoint.get_remote_address().clone());
+                    if let Some(addr) = dial_addr {
+                        entry.dial_addr = Some(addr);
                     }
                     // A fresh connection gets a fresh handshake verdict.
                     if *entry.ready_tx.borrow() == ReadyState::Rejected {
@@ -883,9 +1060,43 @@ fn handle_swarm_event(shared: &Arc<Shared>, event: SwarmEvent<()>) {
                 }
                 schedule_reconnect(shared, peer);
             }
+            let pending: Vec<_> = lock(&shared.bootstrap_dials).keys().cloned().collect();
+            for addr in pending {
+                schedule_bootstrap_retry(shared, addr);
+            }
         }
         _ => {}
     }
+}
+
+fn schedule_bootstrap_retry(shared: &Arc<Shared>, addr: Multiaddr) {
+    let delay_ms = {
+        let mut bootstrap_dials = lock(&shared.bootstrap_dials);
+        let Some(entry) = bootstrap_dials.get_mut(&addr) else {
+            return;
+        };
+        if entry.retry_scheduled {
+            return;
+        }
+        entry.retry_scheduled = true;
+        entry.backoff.next_delay_ms()
+    };
+    let sh = Arc::clone(shared);
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+        let should_retry = {
+            let mut bootstrap_dials = lock(&sh.bootstrap_dials);
+            if let Some(entry) = bootstrap_dials.get_mut(&addr) {
+                entry.retry_scheduled = false;
+                true
+            } else {
+                false
+            }
+        };
+        if should_retry {
+            sh.cmd(SwarmCmd::Dial(addr));
+        }
+    });
 }
 
 /// Schedules a redial after a deterministic-jitter exponential delay.
@@ -1205,8 +1416,41 @@ fn dispatch(
             let req = BodyRequestV1::decode_canonical(payload)
                 .map_err(|_| Violation::MalformedEnvelope)?;
             check_chain(shared, &req.chain_id)?;
-            let reply = match shared.store.body(&req.block_hash) {
-                Some(bytes) => BodyReplyV1::Body(Bounded(bytes)),
+            if req.max_bytes == 0
+                || req.max_bytes > MAX_BODY_BYTES
+                || req.offset > MAX_REASSEMBLED_BODY_BYTES
+            {
+                return Err(Violation::MalformedEnvelope);
+            }
+            let reply = match shared
+                .store
+                .body_chunk(&req.block_hash, req.offset, req.max_bytes)
+            {
+                Some((total_bytes, bytes)) => {
+                    let chunk_len =
+                        u64::try_from(bytes.len()).map_err(|_| Violation::MalformedEnvelope)?;
+                    let expected_len = total_bytes
+                        .checked_sub(req.offset)
+                        .map(|remaining| remaining.min(u64::from(req.max_bytes)))
+                        .ok_or(Violation::MalformedEnvelope)?;
+                    if total_bytes > MAX_REASSEMBLED_BODY_BYTES
+                        || req.offset > total_bytes
+                        || bytes.len() > req.max_bytes as usize
+                        || chunk_len != expected_len
+                        || req
+                            .offset
+                            .checked_add(chunk_len)
+                            .is_none_or(|end| end > total_bytes)
+                        || (req.offset < total_bytes && bytes.is_empty())
+                    {
+                        return Err(Violation::MalformedEnvelope);
+                    }
+                    BodyReplyV1::Chunk {
+                        total_bytes,
+                        offset: req.offset,
+                        bytes: Bounded(bytes),
+                    }
+                }
                 None => BodyReplyV1::NotFound,
             };
             Ok(reply.encode_canonical())
@@ -1393,23 +1637,9 @@ async fn outbox_worker(
             }
             continue;
         };
-        // One in-flight request: open, write, await reply.
-        let mut control = shared.control.clone();
-        let outcome: Result<Vec<u8>, SendError> = async {
-            let mut s = control
-                .open_stream(peer, sp(item.protocol))
-                .await
-                .map_err(|_| SendError::Disconnected)?;
-            write_frame(&mut s, &item.payload, MAX_FRAME_BYTES)
-                .await
-                .map_err(|_| SendError::Disconnected)?;
-            let reply = read_frame(&mut s, MAX_FRAME_BYTES)
-                .await
-                .map_err(|_| SendError::Disconnected)?;
-            let _ = futures::io::AsyncWriteExt::close(&mut s).await;
-            Ok(reply)
-        }
-        .await;
+        // One in-flight queued request. Body chunk repair uses the same
+        // exchange primitive through its separately bounded semaphore.
+        let outcome = exchange(shared.control.clone(), peer, item.protocol, &item.payload).await;
         match outcome {
             Ok(reply) => {
                 let _ = item.reply.send(Ok(reply));

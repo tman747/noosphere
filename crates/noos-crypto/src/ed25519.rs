@@ -9,7 +9,8 @@ use crate::domains::{DomainId, DomainKind};
 use crate::error::CryptoError;
 use crate::hash::write_hex;
 use core::fmt;
-use ed25519_dalek::{Signature as DalekSignature, Signer, SigningKey, VerifyingKey};
+use curve25519_dalek::edwards::CompressedEdwardsY;
+use ed25519_dalek::{verify_batch, Signature as DalekSignature, Signer, SigningKey, VerifyingKey};
 
 /// A 32-byte Ed25519 public key.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -41,6 +42,29 @@ impl fmt::Debug for PublicKey {
         write_hex(f, &self.0)?;
         f.write_str(")")
     }
+}
+
+/// Canonical, non-weak Ed25519 key with its Edwards point decoded once.
+/// Construction is fallible and the inner verifier type is never exposed.
+#[derive(Clone)]
+pub struct PreparedPublicKey(VerifyingKey);
+
+impl fmt::Debug for PreparedPublicKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("PreparedPublicKey(")?;
+        write_hex(f, &self.0.to_bytes())?;
+        f.write_str(")")
+    }
+}
+
+/// Validates and decodes an Ed25519 public key for repeated verification.
+pub fn prepare_public_key(public_key: &PublicKey) -> Result<PreparedPublicKey, CryptoError> {
+    let key = VerifyingKey::from_bytes(public_key.as_bytes())
+        .map_err(|_| CryptoError::InvalidPublicKey)?;
+    if key.is_weak() || key.to_bytes() != *public_key.as_bytes() {
+        return Err(CryptoError::SignatureVerificationFailed);
+    }
+    Ok(PreparedPublicKey(key))
 }
 
 /// A 64-byte Ed25519 signature.
@@ -144,6 +168,82 @@ pub fn verify_domain(
     verify_raw(public_key, &domain_message(domain, parts), signature)
 }
 
+/// Strictly verifies a batch of domain-prefixed signatures where each entry
+/// signs one byte slice (`context_string || part`). The batch equation uses
+/// deterministic transcript-derived coefficients. Public keys and signature
+/// `R` points receive the same canonical/small-order rejection checks as
+/// [`verify_domain`].
+pub fn verify_domain_batch(
+    domain: DomainId,
+    public_keys: &[PublicKey],
+    parts: &[&[u8]],
+    signatures: &[Signature],
+) -> Result<(), CryptoError> {
+    let prepared = public_keys
+        .iter()
+        .map(prepare_public_key)
+        .collect::<Result<Vec<_>, _>>()?;
+    verify_domain_batch_prepared(domain, &prepared, parts, signatures)
+}
+
+/// Batch verification using public keys validated and decoded by
+/// [`prepare_public_key`]. This is byte-for-byte the same signature law as
+/// [`verify_domain_batch`] without repeating public-key decompression.
+pub fn verify_domain_batch_prepared(
+    domain: DomainId,
+    public_keys: &[PreparedPublicKey],
+    parts: &[&[u8]],
+    signatures: &[Signature],
+) -> Result<(), CryptoError> {
+    domain.require_kind(DomainKind::Ed25519Prefix)?;
+    if public_keys.len() != parts.len() || public_keys.len() != signatures.len() {
+        return Err(CryptoError::SignatureVerificationFailed);
+    }
+    if public_keys.is_empty() {
+        return Ok(());
+    }
+
+    let verifying_keys = public_keys
+        .iter()
+        .map(|public_key| public_key.0)
+        .collect::<Vec<_>>();
+    let mut dalek_signatures = Vec::with_capacity(signatures.len());
+    for signature in signatures {
+        let dalek_signature = DalekSignature::from_bytes(signature.as_bytes());
+        let mut r_bytes = [0_u8; 32];
+        r_bytes.copy_from_slice(&signature.as_bytes()[..32]);
+        let compressed_r = CompressedEdwardsY(r_bytes);
+        let r = compressed_r
+            .decompress()
+            .ok_or(CryptoError::SignatureVerificationFailed)?;
+        if r.is_small_order() || r.compress() != compressed_r {
+            return Err(CryptoError::SignatureVerificationFailed);
+        }
+        dalek_signatures.push(dalek_signature);
+    }
+
+    let context = domain.context().as_bytes();
+    let encoded_len = parts.iter().fold(0_usize, |total, part| {
+        total
+            .saturating_add(context.len())
+            .saturating_add(part.len())
+    });
+    let mut encoded_messages = Vec::with_capacity(encoded_len);
+    let mut ranges = Vec::with_capacity(parts.len());
+    for part in parts {
+        let start = encoded_messages.len();
+        encoded_messages.extend_from_slice(context);
+        encoded_messages.extend_from_slice(part);
+        ranges.push((start, encoded_messages.len()));
+    }
+    let messages = ranges
+        .iter()
+        .map(|(start, end)| &encoded_messages[*start..*end])
+        .collect::<Vec<_>>();
+    verify_batch(&messages, &dalek_signatures, &verifying_keys)
+        .map_err(|_| CryptoError::SignatureVerificationFailed)
+}
+
 /// Raw strict verification (no domain prefix); crate-internal so that every
 /// public verification path stays domain-bound.
 pub(crate) fn verify_raw(
@@ -199,6 +299,54 @@ mod tests {
         assert_eq!(
             verify_domain(DomainId::SigTx, &bad, &[b"x"], &sig).unwrap_err(),
             CryptoError::InvalidPublicKey
+        );
+    }
+
+    #[test]
+    fn strict_batch_verification_matches_individual_results() {
+        let keypairs = (0_u8..64)
+            .map(|seed| Keypair::from_seed([seed; 32]))
+            .collect::<Vec<_>>();
+        let messages = (0_u8..64).map(|value| [value; 32]).collect::<Vec<_>>();
+        let public_keys = keypairs.iter().map(Keypair::public_key).collect::<Vec<_>>();
+        let mut signatures = keypairs
+            .iter()
+            .zip(&messages)
+            .map(|(keypair, message)| keypair.sign_domain(DomainId::SigTx, &[message]).unwrap())
+            .collect::<Vec<_>>();
+        let parts = messages
+            .iter()
+            .map(<[u8; 32]>::as_slice)
+            .collect::<Vec<_>>();
+
+        verify_domain_batch(DomainId::SigTx, &public_keys, &parts, &signatures).unwrap();
+        let replacement = keypairs[0]
+            .sign_domain(DomainId::SigTx, &[&messages[1]])
+            .unwrap();
+        signatures[1] = replacement;
+        assert_eq!(
+            verify_domain_batch(DomainId::SigTx, &public_keys, &parts, &signatures).unwrap_err(),
+            CryptoError::SignatureVerificationFailed
+        );
+    }
+
+    #[test]
+    fn batch_verification_rejects_weak_signature_points() {
+        let keypair = Keypair::from_seed([9; 32]);
+        let public_key = keypair.public_key();
+        let message = [3_u8; 32];
+        let mut weak_signature = [0_u8; 64];
+        weak_signature[0] = 1;
+        let signature = Signature::from_bytes(weak_signature);
+        assert_eq!(
+            verify_domain_batch(
+                DomainId::SigTx,
+                &[public_key],
+                &[message.as_slice()],
+                &[signature],
+            )
+            .unwrap_err(),
+            CryptoError::SignatureVerificationFailed
         );
     }
 }

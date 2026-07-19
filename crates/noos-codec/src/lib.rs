@@ -110,6 +110,11 @@ impl Writer {
         self.buf.is_empty()
     }
 
+    /// Reuses this encoder's allocation for another canonical object.
+    pub fn clear(&mut self) {
+        self.buf.clear();
+    }
+
     pub fn put_u8(&mut self, v: u8) {
         self.buf.push(v);
     }

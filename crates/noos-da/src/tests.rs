@@ -20,7 +20,7 @@ use crate::{
     encode_body, reconstruct_and_verify, validate_blob_descriptor,
     validate_consensus_blob_descriptor, verify_body_shard, verify_shard_sample, AvailabilityLedger,
     DaError, EncodedBodyV1, ShardCandidateV1, StorageDomain, BODY_DATA_SHARDS, BODY_SHARD_BYTES,
-    BODY_TOTAL_SHARDS, MAX_BLOCK_BODY_BYTES,
+    BODY_TOTAL_SHARDS, MAX_BLOCK_DA_FORM_BYTES,
 };
 
 fn candidates(enc: &EncodedBodyV1, indices: &[u32]) -> Vec<ShardCandidateV1> {
@@ -70,8 +70,8 @@ fn roundtrip_padding_edges() {
         BODY_SHARD_BYTES - 1,
         BODY_SHARD_BYTES,
         BODY_SHARD_BYTES + 1,
-        MAX_BLOCK_BODY_BYTES - 1,
-        MAX_BLOCK_BODY_BYTES,
+        MAX_BLOCK_DA_FORM_BYTES - 1,
+        MAX_BLOCK_DA_FORM_BYTES,
     ] {
         let body = pattern_body(len);
         let all_parity: Vec<u32> = (16..32).collect();
@@ -83,11 +83,11 @@ fn roundtrip_padding_edges() {
 
 #[test]
 fn oversized_body_rejects() {
-    let body = pattern_body(MAX_BLOCK_BODY_BYTES + 1);
+    let body = pattern_body(MAX_BLOCK_DA_FORM_BYTES + 1);
     assert_eq!(
         encode_body(&body).unwrap_err(),
         DaError::BodyTooLarge {
-            len: MAX_BLOCK_BODY_BYTES as u64 + 1
+            len: MAX_BLOCK_DA_FORM_BYTES as u64 + 1
         }
     );
 }
@@ -104,7 +104,7 @@ fn corrupt_shard_rejects_individually() {
     let mut corrupt = enc.candidate(2).unwrap();
     corrupt.bytes[100] ^= 0xFF;
     assert_eq!(
-        verify_body_shard(enc.shard_root(), &enc.claim().content_root, &corrupt),
+        verify_body_shard(enc.shard_root(), enc.claim(), &corrupt),
         Err(DaError::ShardProofMismatch { index: 2 })
     );
 
@@ -131,12 +131,12 @@ fn short_and_misindexed_shards_reject() {
     let body = pattern_body(10);
     let enc = encode_body(&body).unwrap();
     let root = enc.shard_root();
-    let content = &enc.claim().content_root;
+    let claim = enc.claim();
 
     let mut short = enc.candidate(0).unwrap();
     short.bytes.truncate(BODY_SHARD_BYTES - 1);
     assert_eq!(
-        verify_body_shard(root, content, &short),
+        verify_body_shard(root, claim, &short),
         Err(DaError::WrongShardLength {
             index: 0,
             len: BODY_SHARD_BYTES as u64 - 1
@@ -146,7 +146,7 @@ fn short_and_misindexed_shards_reject() {
     let mut oob = enc.candidate(0).unwrap();
     oob.index = 32;
     assert_eq!(
-        verify_body_shard(root, content, &oob),
+        verify_body_shard(root, claim, &oob),
         Err(DaError::ShardIndexOutOfRange { index: 32 })
     );
 
@@ -154,7 +154,7 @@ fn short_and_misindexed_shards_reject() {
     let mut swapped = enc.candidate(4).unwrap();
     swapped.index = 5;
     assert_eq!(
-        verify_body_shard(root, content, &swapped),
+        verify_body_shard(root, claim, &swapped),
         Err(DaError::ShardProofMismatch { index: 5 })
     );
 }
@@ -190,7 +190,7 @@ fn inconsistent_committed_codeword_rejects_whole_body() {
     // All 16 provided branches are VALID against the adversarial root...
     let cands = candidates(&adv, &(0..16).collect::<Vec<_>>());
     for c in &cands {
-        verify_body_shard(adv.shard_root(), &adv.claim().content_root, c).unwrap();
+        verify_body_shard(adv.shard_root(), adv.claim(), c).unwrap();
     }
     // ...and the body still rejects as a whole at the recomputed-root check.
     assert_eq!(
@@ -263,11 +263,11 @@ fn wrong_original_bytes_claim_rejects() {
 
     // Oversize claim rejects before any decode.
     let mut oversize = *enc.claim();
-    oversize.original_bytes = MAX_BLOCK_BODY_BYTES as u64 + 1;
+    oversize.original_bytes = MAX_BLOCK_DA_FORM_BYTES as u64 + 1;
     assert_eq!(
         reconstruct_and_verify(enc.shard_root(), &oversize, &cands).unwrap_err(),
         DaError::BodyTooLarge {
-            len: MAX_BLOCK_BODY_BYTES as u64 + 1
+            len: MAX_BLOCK_DA_FORM_BYTES as u64 + 1
         }
     );
 }
@@ -316,11 +316,11 @@ fn shard_sample_verifies_and_rejects() {
     let body = pattern_body(65_537);
     let enc = encode_body(&body).unwrap();
     let root = enc.shard_root();
-    let content = &enc.claim().content_root;
+    let claim = enc.claim();
 
     for index in [0_u32, 1, 15, 16, 31] {
         let branch = enc.branch(index).unwrap();
-        verify_shard_sample(root, content, index, &enc.shards()[index as usize], &branch)
+        verify_shard_sample(root, claim, index, &enc.shards()[index as usize], &branch)
             .unwrap_or_else(|e| panic!("index {index}: {e}"));
     }
 
@@ -332,7 +332,7 @@ fn shard_sample_verifies_and_rejects() {
     tampered[0] ^= 0x80;
     let branch = enc.branch(3).unwrap();
     assert_eq!(
-        verify_shard_sample(root, content, 3, &tampered, &branch),
+        verify_shard_sample(root, claim, 3, &tampered, &branch),
         Err(DaError::ShardProofMismatch { index: 3 })
     );
 }

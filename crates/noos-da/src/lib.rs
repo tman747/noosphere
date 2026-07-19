@@ -66,10 +66,11 @@ pub use artifact::{
     BONSAI_POSITION_BYTES, BONSAI_SOURCE_BYTES, BONSAI_STRIPES,
 };
 pub use body::{
-    commit_shards, content_root, encode_body, encode_padded_region, reconstruct_and_verify,
+    body_shard_bytes, commit_shards, content_root, encode_body, encode_padded_region,
+    reconstruct_and_verify, reconstruct_and_verify_in_place, reconstruct_and_verify_owned,
     verify_body_shard, verify_shard_sample, AvailabilityLedger, BodyDaClaimV1, EncodedBodyV1,
     ReconstructedBodyV1, ShardCandidateV1, BODY_DATA_SHARDS, BODY_PARITY_SHARDS, BODY_SHARD_BYTES,
-    BODY_SHARD_DEPTH, BODY_TOTAL_SHARDS, MAX_BLOCK_BODY_BYTES,
+    BODY_SHARD_DEPTH, BODY_TOTAL_SHARDS, MAX_BLOCK_DA_FORM_BYTES, MAX_BODY_SHARD_BYTES,
 };
 pub use descriptor::{
     codec_by_id, namespace_by_id, validate_blob_descriptor, validate_consensus_blob_descriptor,
