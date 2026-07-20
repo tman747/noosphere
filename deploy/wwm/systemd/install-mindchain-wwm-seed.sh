@@ -77,7 +77,7 @@ if [[ "${BOOTSTRAP_PEERS_ARG}" != "-" ]]; then
   BOOTSTRAP_VALUE="${BOOTSTRAP_PEERS_ARG}"
 fi
 NODE_ENV_TMP="$(mktemp /etc/mindchain-wwm/node.env.XXXXXX)"
-printf 'NODE_ROLE=%s\nWITNESS_INDEX=%s\nP2P_LISTEN=/ip4/0.0.0.0/udp/%s/quic-v1\nBOOTSTRAP_PEERS=%s\n' \
+printf 'NODE_ROLE=%s\nWITNESS_INDEX=%s\nP2P_LISTEN=/ip4/0.0.0.0/udp/%s/quic-v1\nBOOTSTRAP_PEERS=%s\nPRODUCE_INTERVAL_MS=6000\n' \
   "${NODE_ROLE}" "${WITNESS_INDEX}" "${P2P_PORT}" "${BOOTSTRAP_VALUE}" > "${NODE_ENV_TMP}"
 chown root:mindchain-wwm "${NODE_ENV_TMP}"
 chmod 0640 "${NODE_ENV_TMP}"

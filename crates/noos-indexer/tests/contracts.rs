@@ -80,6 +80,7 @@ async fn independent_heads_never_infer_finality() {
     assert_eq!(body["readiness"], "starting");
     assert_eq!(body["ready"], false);
     assert_eq!(body["indexed_generation"], "0");
+    assert_eq!(body["freshness_ms"], u64::MAX.to_string());
 }
 
 #[tokio::test]

@@ -35,7 +35,17 @@ function lineChart(rows,key){
 
 function averageCadence(history){
   const changes=[];
-  for(let i=1;i<history.length;i++){const delta=history[i].height-history[i-1].height;if(delta>0)changes.push((history[i].observed_ms-history[i-1].observed_ms)/delta)}
+  let previous=history[0];
+  for(let i=1;i<history.length;i++){
+    const current=history[i];
+    if(!previous||current.height<previous.height){previous=current;continue}
+    const delta=current.height-previous.height;
+    if(delta>0){
+      const elapsed=current.observed_ms-previous.observed_ms;
+      if(elapsed>0)changes.push(elapsed/delta);
+      previous=current;
+    }
+  }
   if(!changes.length)return null;
   changes.sort((a,b)=>a-b);return changes[Math.floor(changes.length/2)];
 }

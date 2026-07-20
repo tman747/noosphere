@@ -175,6 +175,7 @@ impl PersistedState {
             telemetry: TelemetryParser::default(),
             readiness: IndexReadiness::Starting,
             generation: 0,
+            last_sync_unix_ms: None,
         }
     }
 }
@@ -289,6 +290,11 @@ fn durable_store_generation(root: &Path, payload: GenerationPayload) -> Result<(
     let sequence = envelope.payload.sequence;
     let final_path = root.join(format!("{GENERATION_PREFIX}{sequence:020}.json"));
     let stage_path = root.join(format!("{GENERATION_PREFIX}{sequence:020}.stage"));
+    match fs::remove_file(&stage_path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(IndexerError::Io(error.to_string())),
+    }
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -338,12 +344,18 @@ impl Indexer {
             return Err(IndexerError::WrongProtocolIdentity);
         }
         let mut cp = self.load_checkpoint()?;
+        let mut next = parse_u64(&cp.next_height)?;
         {
             let mut state = self.inner.write().await;
-            state.readiness = IndexReadiness::CatchingUp;
             state.generation = cp.generation;
+            // A ready index remains available while one bounded tail pass runs.
+            // Otherwise every ordinary block briefly flaps public readiness.
+            if next <= status.head_height
+                && status.head_height.saturating_sub(next).saturating_add(1) > max_blocks
+            {
+                state.readiness = IndexReadiness::CatchingUp;
+            }
         }
-        let mut next = parse_u64(&cp.next_height)?;
         let mut ingested = 0u64;
         let mut rolled_back = 0u64;
         'fetch: while next <= status.head_height && ingested < max_blocks {
@@ -444,6 +456,7 @@ impl Indexer {
         {
             let mut state = self.inner.write().await;
             state.generation = cp.generation;
+            state.last_sync_unix_ms = crate::unix_time_ms();
             state.readiness = if next > status.head_height {
                 IndexReadiness::Ready
             } else {

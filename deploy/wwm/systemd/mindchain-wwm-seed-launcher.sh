@@ -8,12 +8,14 @@ BOOTSTRAP_PEERS="${BOOTSTRAP_PEERS:-}"
 RPC_LISTEN="${RPC_LISTEN:-127.0.0.1:29652}"
 RPC_TOKEN_FILE="${RPC_TOKEN_FILE:-/etc/mindchain-wwm/rpc-token}"
 DATA_DIR="${DATA_DIR:-/var/lib/mindchain-wwm}"
+PRODUCE_INTERVAL_MS="${PRODUCE_INTERVAL_MS:-6000}"
 [[ "${NODE_ROLE}" =~ ^(validator|producer-witness|witness)$ ]] || { echo "invalid node role" >&2; exit 1; }
 [[ "${WITNESS_INDEX}" =~ ^[0-3]$ ]] || { echo "invalid witness index" >&2; exit 1; }
 [[ "${P2P_LISTEN}" =~ ^/ip4/0\.0\.0\.0/udp/[0-9]{4,5}/quic-v1$ ]] || { echo "invalid P2P listen multiaddr" >&2; exit 1; }
 [[ "${RPC_LISTEN}" =~ ^127\.0\.0\.1:[0-9]{4,5}$ ]] || { echo "invalid loopback RPC listen address" >&2; exit 1; }
 [[ "${RPC_TOKEN_FILE}" =~ ^/etc/mindchain-wwm/[a-zA-Z0-9._-]+$ ]] || { echo "invalid RPC token path" >&2; exit 1; }
 [[ "${DATA_DIR}" =~ ^/var/lib/mindchain-wwm(-witness-[0-3])?$ ]] || { echo "invalid node data path" >&2; exit 1; }
+[[ "${PRODUCE_INTERVAL_MS}" =~ ^[1-9][0-9]{2,5}$ ]] || { echo "invalid production interval" >&2; exit 1; }
 bootstrap_peers=()
 if [[ -n "${BOOTSTRAP_PEERS}" ]]; then
   IFS=',' read -r -a bootstrap_peers <<< "${BOOTSTRAP_PEERS}"
@@ -45,9 +47,9 @@ throughput_arguments=(
   --template-max-transactions 32768
 )
 if [[ "${NODE_ROLE}" == "validator" ]]; then
-  arguments+=(--validator --produce-interval-ms 1000 "${throughput_arguments[@]}")
+  arguments+=(--validator --produce-interval-ms "${PRODUCE_INTERVAL_MS}" "${throughput_arguments[@]}")
 elif [[ "${NODE_ROLE}" == "producer-witness" ]]; then
-  arguments+=(--devnet-producer --devnet-witness "${WITNESS_INDEX}" --produce-interval-ms 1000 "${throughput_arguments[@]}")
+  arguments+=(--devnet-producer --devnet-witness "${WITNESS_INDEX}" --produce-interval-ms "${PRODUCE_INTERVAL_MS}" "${throughput_arguments[@]}")
 else
   arguments+=(--devnet-witness "${WITNESS_INDEX}")
 fi

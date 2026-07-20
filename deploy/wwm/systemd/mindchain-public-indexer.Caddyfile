@@ -22,8 +22,9 @@
 	handle {
 		header {
 			Cache-Control "no-store"
+			Access-Control-Allow-Origin "*"
 			Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
-			Cross-Origin-Resource-Policy "same-site"
+			Cross-Origin-Resource-Policy "cross-origin"
 			Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 			Referrer-Policy "no-referrer"
 			X-Content-Type-Options "nosniff"
