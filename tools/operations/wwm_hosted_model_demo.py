@@ -28,7 +28,7 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from blake3 import blake3
 from cryptography.hazmat.primitives import serialization
@@ -452,7 +452,7 @@ def wait_receipt(network: Network, txid: str, timeout: float = 60) -> dict[str, 
     raise DemoError(f"transaction did not settle: {txid}")
 
 
-def wait_finalized(network: Network, height: int, timeout: float = 180) -> dict[str, Any]:
+def wait_finalized(network: Network, height: int, timeout: float = 3_600) -> dict[str, Any]:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         status = http_json(f"{network.node_rpc}/status", network.node_token)
@@ -470,6 +470,7 @@ def build_and_submit(
     status: Mapping[str, Any],
     spec: Mapping[str, Any],
     signers: Sequence[tuple[bytes, Ed25519PrivateKey]],
+    on_submitted: Callable[[str], None] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     spec_path = paths.disposable_root / "transactions" / f"{time.time_ns()}.json"
     atomic_write(spec_path, json.dumps(spec, separators=(",", ":")).encode())
@@ -502,7 +503,27 @@ def build_and_submit(
     )
     if submitted.get("accepted") is not True or submitted.get("txid") != txid:
         raise DemoError("node did not accept the exact built transaction")
+    if on_submitted is not None:
+        on_submitted(txid)
     return txid, wait_receipt(network, txid)
+
+
+def finalize_wwm_submission(
+    network: Network,
+    txid: str,
+    *,
+    receipt_timeout: float = 600,
+) -> dict[str, Any]:
+    if not isinstance(txid, str) or HEX32.fullmatch(txid) is None:
+        raise DemoError("submitted transaction id must be canonical hex32")
+    receipt = wait_receipt(network, txid, timeout=receipt_timeout)
+    settled_height = required_int(required_object(receipt, "state"), "settled_height")
+    return {
+        "txid": txid,
+        "receipt": receipt,
+        "finalized_height": settled_height,
+        "finalized_status": wait_finalized(network, settled_height),
+    }
 
 
 def submit_transfer(paths: Paths, network: Network, label: str) -> dict[str, Any]:
@@ -544,12 +565,15 @@ def submit_transfer(paths: Paths, network: Network, label: str) -> dict[str, Any
 def deterministic_id(run_id: str, label: str) -> str:
     return hashlib.sha256(f"{run_id}:{label}".encode()).hexdigest()
 
-def submit_wwm_action(
+def submit_wwm_actions(
     config: Mapping[str, Any],
     paths: Paths,
     network: Network,
-    action: Mapping[str, Any],
+    actions: Sequence[Mapping[str, Any]],
+    on_submitted: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
+    if not actions or len(actions) > 8:
+        raise DemoError("WWM action batch must contain 1..8 actions")
     status = http_json(f"{network.node_rpc}/status", network.node_token)
     head = required_object(status, "unsafe_head")
     governance = required_object(config, "governance")
@@ -557,41 +581,53 @@ def submit_wwm_action(
         bytes.fromhex(required_text(governance, "seed_hex"))
     )
     governance_account = bytes.fromhex(required_text(governance, "account_id"))
-    action_path = (
-        paths.disposable_root / "transactions" / f"{time.time_ns()}-wwm-action.json"
-    )
-    atomic_write(action_path, json.dumps(action, separators=(",", ":")).encode())
-    encoded_action = run_json(
-        paths.cli,
-        ("wwm", "devnet", "action", "--spec-file", str(action_path)),
-    )
-    id_field = {
-        "open_wwm_job": "job_id",
-        "record_wwm_receipt": "receipt_id",
-        "settle_wwm_job": "settlement_id",
-    }.get(action.get("type"))
-    expected_id = action.get(id_field) if id_field is not None else None
-    if (
-        encoded_action.get("schema") != "noos/wwm-devnet-operator-action/v1"
-        or encoded_action.get("production_capable") is not False
-        or encoded_action.get("id") != expected_id
-        or not isinstance(encoded_action.get("action"), str)
-    ):
-        raise DemoError("typed WWM devnet action builder is unavailable")
+    encoded_actions: list[str] = []
+    action_ids: list[str] = []
+    for index, action in enumerate(actions):
+        action_path = (
+            paths.disposable_root
+            / "transactions"
+            / f"{time.time_ns()}-{index}-wwm-action.json"
+        )
+        atomic_write(action_path, json.dumps(action, separators=(",", ":")).encode())
+        encoded_action = run_json(
+            paths.cli,
+            ("wwm", "devnet", "action", "--spec-file", str(action_path)),
+        )
+        id_field = {
+            "open_wwm_job": "job_id",
+            "record_wwm_receipt": "receipt_id",
+            "settle_wwm_job": "settlement_id",
+        }.get(action.get("type"))
+        if id_field is None:
+            raise DemoError("WWM action batch contains an unsupported action")
+        expected_id = action.get(id_field)
+        if (
+            not isinstance(expected_id, str)
+            or not HEX32.fullmatch(expected_id)
+            or encoded_action.get("schema") != "noos/wwm-devnet-operator-action/v1"
+            or encoded_action.get("production_capable") is not False
+            or encoded_action.get("id") != expected_id
+            or not isinstance(encoded_action.get("action"), str)
+        ):
+            raise DemoError("typed WWM devnet action builder is unavailable")
+        encoded_actions.append(encoded_action["action"])
+        action_ids.append(expected_id)
+    action_count = len(encoded_actions)
     spec = {
         "chain_id": required_text(status, "chain_id"),
         "expiry_height": required_int(head, "height") + 5_000,
         "fee_payer": FAUCET_PUB.hex(),
         "resource_limits": {
-            "bytes": 65_536,
+            "bytes": 65_536 * action_count,
             "grain_steps": 0,
-            "proof_units": 64,
+            "proof_units": 64 * action_count,
             "blob_bytes": 0,
-            "state_reads": 128,
-            "state_writes": 128,
+            "state_reads": 128 * action_count,
+            "state_writes": 128 * action_count,
         },
         "account_inputs": sorted([governance_account.hex(), FAUCET_PUB.hex()]),
-        "actions": [encoded_action["action"]],
+        "actions": encoded_actions,
     }
     txid, receipt = build_and_submit(
         paths,
@@ -599,15 +635,27 @@ def submit_wwm_action(
         status,
         spec,
         ((governance_account, governance_key), (FAUCET_PUB, FAUCET_KEY)),
+        on_submitted,
     )
     settled_height = required_int(required_object(receipt, "state"), "settled_height")
     finalized_status = wait_finalized(network, settled_height)
     return {
         "txid": txid,
         "receipt": receipt,
+        "action_ids": action_ids,
         "finalized_height": settled_height,
         "finalized_status": finalized_status,
     }
+
+
+def submit_wwm_action(
+    config: Mapping[str, Any],
+    paths: Paths,
+    network: Network,
+    action: Mapping[str, Any],
+    on_submitted: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
+    return submit_wwm_actions(config, paths, network, (action,), on_submitted)
 
 
 def finalized_wwm_record(
@@ -1274,14 +1322,14 @@ def run_inference(
         "terminal": terminal,
     }
 
-def run_chain_bound_inference(
-    config: Mapping[str, Any],
-    paths: Paths,
+def prepare_chain_bound_inference(
     network: Network,
     resolution: Mapping[str, Any],
     run_id: str,
     capacity_quote: Mapping[str, Any],
 ) -> dict[str, Any]:
+    if not isinstance(run_id, str) or re.fullmatch(r"[0-9a-f]{24}", run_id) is None:
+        raise DemoError("chain-bound inference run id must be lowercase hex24")
     active = required_object(resolution, "active")
     status = http_json(f"{network.node_rpc}/status", network.node_token)
     head_height = required_int(required_object(status, "unsafe_head"), "height")
@@ -1297,7 +1345,22 @@ def run_chain_bound_inference(
         raise DemoError("finalized resolution lacks canonical executor identities")
     executor_ids = all_executor_ids[:3]
     job_id = deterministic_id(run_id, "repaired-inference")
+    receipt_id = deterministic_id(run_id, "repaired-inference-receipt")
+    settlement_id = deterministic_id(run_id, "repaired-inference-settlement")
     prompt_commitment = hashlib.sha256(b"Answer with one word: resilient").hexdigest()
+    bindings = {
+        "capsule_id": required_text(active, "capsule_id"),
+        "artifact_id": required_text(active, "artifact_id"),
+        "tokenizer_root": required_text(active, "tokenizer_root"),
+        "template_root": required_text(active, "template_root"),
+        "runtime_root": required_text(active, "runtime_root"),
+        "sbom_root": required_text(active, "sbom_root"),
+        "execution_profile_id": required_text(active, "execution_profile_id"),
+        "query_policy_id": required_text(active, "query_policy_id"),
+        "availability_certificate_id": required_text(active, "availability_certificate_id"),
+        "fund_profile_id": required_text(active, "fund_profile_id"),
+        "certificate_valid_until": required_int(active, "certificate_valid_until"),
+    }
     job = {
         "job_id": job_id,
         "chain_id": required_text(status, "chain_id"),
@@ -1305,91 +1368,157 @@ def run_chain_bound_inference(
         "quote_id": hashlib.sha256(
             json.dumps(capacity_quote, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest(),
-        "registry_epoch": active["executor_set_epoch"],
+        "registry_epoch": required_int(active, "executor_set_epoch"),
         "client_commitment": prompt_commitment,
-        "capsule_id": active["capsule_id"],
-        "execution_profile_id": active["execution_profile_id"],
-        "query_policy_id": active["query_policy_id"],
+        "capsule_id": bindings["capsule_id"],
+        "execution_profile_id": bindings["execution_profile_id"],
+        "query_policy_id": bindings["query_policy_id"],
         "max_input_tokens": 4,
         "max_output_tokens": INFERENCE_MAX_OUTPUT_TOKENS,
         "deadline_height": head_height + 5_000,
         "selected_executor_ids": executor_ids,
-        "availability_certificate_id": active["availability_certificate_id"],
-        "fund_profile_id": active["fund_profile_id"],
+        "availability_certificate_id": bindings["availability_certificate_id"],
+        "fund_profile_id": bindings["fund_profile_id"],
         "reserved_amount": "0",
         "offchain_envelope_root": hashlib.sha256(
             f"{run_id}:{prompt_commitment}:no-attachments".encode()
         ).hexdigest(),
     }
-    opened = submit_wwm_action(
-        config,
-        paths,
-        network,
-        {"type": "open_wwm_job", **job},
-    )
-    job_record = finalized_wwm_record(
+    return {
+        "schema": "noos/wwm-chain-bound-inference-plan/v1",
+        "run_id": run_id,
+        "job_id": job_id,
+        "receipt_id": receipt_id,
+        "settlement_id": settlement_id,
+        "prompt_commitment": prompt_commitment,
+        "executor_ids": executor_ids,
+        "bindings": bindings,
+        "job": job,
+    }
+
+
+def verify_chain_bound_job(
+    network: Network,
+    plan: Mapping[str, Any],
+) -> dict[str, Any]:
+    bindings = required_object(plan, "bindings")
+    job_id = required_text(plan, "job_id")
+    return finalized_wwm_record(
         network,
         "job",
         job_id,
         {
             "job_id": job_id,
-            "capsule_id": active["capsule_id"],
-            "execution_profile_id": active["execution_profile_id"],
-            "availability_certificate_id": active["availability_certificate_id"],
-            "fund_profile_id": active["fund_profile_id"],
+            "capsule_id": required_text(bindings, "capsule_id"),
+            "execution_profile_id": required_text(bindings, "execution_profile_id"),
+            "availability_certificate_id": required_text(
+                bindings, "availability_certificate_id"
+            ),
+            "fund_profile_id": required_text(bindings, "fund_profile_id"),
         },
     )
 
-    inference = run_inference(
+
+def submit_chain_bound_job(
+    config: Mapping[str, Any],
+    paths: Paths,
+    network: Network,
+    plan: Mapping[str, Any],
+    on_submitted: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
+    if plan.get("schema") != "noos/wwm-chain-bound-inference-plan/v1":
+        raise DemoError("unsupported chain-bound inference plan")
+    opened = submit_wwm_action(
+        config,
         paths,
         network,
-        job_id,
-        required_text(config, "tokenizer_executable_sha256"),
+        {"type": "open_wwm_job", **required_object(plan, "job")},
+        on_submitted,
     )
-    receipt_id = deterministic_id(run_id, "repaired-inference-receipt")
+    return {"submission": opened, "record": verify_chain_bound_job(network, plan)}
+
+
+def prepare_chain_bound_close(
+    plan: Mapping[str, Any],
+    job_record: Mapping[str, Any],
+    inference: Mapping[str, Any],
+) -> dict[str, Any]:
+    if plan.get("schema") != "noos/wwm-chain-bound-inference-plan/v1":
+        raise DemoError("unsupported chain-bound inference plan")
+    bindings = required_object(plan, "bindings")
+    executor_ids = plan.get("executor_ids")
+    if (
+        not isinstance(executor_ids, list)
+        or not executor_ids
+        or not all(isinstance(value, str) and HEX32.fullmatch(value) for value in executor_ids)
+    ):
+        raise DemoError("chain-bound inference plan lacks canonical executor identities")
+    job_id = required_text(plan, "job_id")
+    receipt_id = required_text(plan, "receipt_id")
+    settlement_id = required_text(plan, "settlement_id")
     receipt = {
         "receipt_id": receipt_id,
         "job_id": job_id,
-        "capsule_id": active["capsule_id"],
-        "artifact_id": active["artifact_id"],
-        "tokenizer_root": active["tokenizer_root"],
-        "template_root": active["template_root"],
-        "runtime_root": active["runtime_root"],
-        "sbom_root": active["sbom_root"],
-        "execution_profile_id": active["execution_profile_id"],
+        "capsule_id": required_text(bindings, "capsule_id"),
+        "artifact_id": required_text(bindings, "artifact_id"),
+        "tokenizer_root": required_text(bindings, "tokenizer_root"),
+        "template_root": required_text(bindings, "template_root"),
+        "runtime_root": required_text(bindings, "runtime_root"),
+        "sbom_root": required_text(bindings, "sbom_root"),
+        "execution_profile_id": required_text(bindings, "execution_profile_id"),
         "input_tokens": 4,
-        "output_tokens": inference["output_tokens"],
-        "token_history_root": inference["token_history_root"],
-        "output_root": inference["output_root"],
+        "output_tokens": required_int(inference, "output_tokens"),
+        "token_history_root": required_text(inference, "token_history_root"),
+        "output_root": required_text(inference, "output_root"),
         "signer_ids": executor_ids,
         "control_cluster_ids": executor_ids,
         "evidence_tier": "local_verified",
-        "availability_until": active["certificate_valid_until"],
-        "evidence_until": active["certificate_valid_until"],
-        "anchor_height": job_record["finalized_height"],
-        "anchor_block": job_record["finalized_hash"],
+        "availability_until": required_int(bindings, "certificate_valid_until"),
+        "evidence_until": required_int(bindings, "certificate_valid_until"),
+        "anchor_height": required_int(job_record, "finalized_height"),
+        "anchor_block": required_text(job_record, "finalized_hash"),
         "metered_amount": "0",
         "paid_amount": "0",
         "refunded_amount": "0",
         "terminal_code": "complete",
         "signatures": [],
     }
-    settlement_id = deterministic_id(run_id, "repaired-inference-settlement")
     settlement = {
         "settlement_id": settlement_id,
         "job_id": job_id,
         "receipt_id": receipt_id,
-        "fund_profile_id": active["fund_profile_id"],
+        "fund_profile_id": required_text(bindings, "fund_profile_id"),
         "bucket": "job",
         "prior_settlement_index": 0,
         "paid_amount": "0",
         "refunded_amount": "0",
         "released_amount": "0",
-        "settled_height": job_record["finalized_height"],
+        "settled_height": required_int(job_record, "finalized_height"),
         "authority_epoch": 1,
         "signature": MARKER_SIGNATURE_HEX,
     }
-    flow_path = paths.disposable_root / "transactions" / f"{run_id}-wwm-flow.json"
+    return {
+        "schema": "noos/wwm-chain-bound-close-plan/v1",
+        "receipt": receipt,
+        "settlement": settlement,
+    }
+
+
+def validate_chain_bound_flow(
+    paths: Paths,
+    plan: Mapping[str, Any],
+    close_plan: Mapping[str, Any],
+) -> None:
+    if close_plan.get("schema") != "noos/wwm-chain-bound-close-plan/v1":
+        raise DemoError("unsupported chain-bound close plan")
+    job = required_object(plan, "job")
+    receipt = required_object(close_plan, "receipt")
+    settlement = required_object(close_plan, "settlement")
+    flow_path = (
+        paths.disposable_root
+        / "transactions"
+        / f"{required_text(plan, 'run_id')}-wwm-flow.json"
+    )
     atomic_write(
         flow_path,
         json.dumps(
@@ -1404,19 +1533,26 @@ def run_chain_bound_inference(
     if (
         checked_flow.get("schema") != "noos/wwm-devnet-operator-flow/v1"
         or checked_flow.get("production_capable") is not False
-        or checked_flow.get("job_id") != job_id
-        or checked_flow.get("capsule_id") != active["capsule_id"]
-        or checked_flow.get("receipt_id") != receipt_id
-        or checked_flow.get("settlement_id") != settlement_id
+        or checked_flow.get("job_id") != required_text(plan, "job_id")
+        or checked_flow.get("capsule_id")
+        != required_text(required_object(plan, "bindings"), "capsule_id")
+        or checked_flow.get("receipt_id") != required_text(plan, "receipt_id")
+        or checked_flow.get("settlement_id") != required_text(plan, "settlement_id")
     ):
         raise DemoError("typed WWM operator rejected or changed the exact lifecycle identities")
 
-    recorded = submit_wwm_action(
-        config,
-        paths,
-        network,
-        {"type": "record_wwm_receipt", **receipt},
-    )
+
+def verify_chain_bound_close(
+    network: Network,
+    plan: Mapping[str, Any],
+    close_plan: Mapping[str, Any],
+    job_record: Mapping[str, Any],
+    inference: Mapping[str, Any],
+) -> dict[str, Any]:
+    bindings = required_object(plan, "bindings")
+    job_id = required_text(plan, "job_id")
+    receipt_id = required_text(plan, "receipt_id")
+    settlement_id = required_text(plan, "settlement_id")
     receipt_record = finalized_wwm_record(
         network,
         "receipt",
@@ -1424,18 +1560,12 @@ def run_chain_bound_inference(
         {
             "receipt_id": receipt_id,
             "job_id": job_id,
-            "capsule_id": active["capsule_id"],
-            "artifact_id": active["artifact_id"],
-            "execution_profile_id": active["execution_profile_id"],
-            "output_root": inference["output_root"],
-            "token_history_root": inference["token_history_root"],
+            "capsule_id": required_text(bindings, "capsule_id"),
+            "artifact_id": required_text(bindings, "artifact_id"),
+            "execution_profile_id": required_text(bindings, "execution_profile_id"),
+            "output_root": required_text(inference, "output_root"),
+            "token_history_root": required_text(inference, "token_history_root"),
         },
-    )
-    settled = submit_wwm_action(
-        config,
-        paths,
-        network,
-        {"type": "settle_wwm_job", **settlement},
     )
     settlement_record = finalized_wwm_record(
         network,
@@ -1445,28 +1575,92 @@ def run_chain_bound_inference(
             "settlement_id": settlement_id,
             "job_id": job_id,
             "receipt_id": receipt_id,
-            "fund_profile_id": active["fund_profile_id"],
+            "fund_profile_id": required_text(bindings, "fund_profile_id"),
         },
     )
     if not (
-        job_record["finalized_height"]
-        <= receipt_record["finalized_height"]
-        <= settlement_record["finalized_height"]
+        required_int(job_record, "finalized_height")
+        <= required_int(receipt_record, "finalized_height")
+        <= required_int(settlement_record, "finalized_height")
     ):
         raise DemoError("WWM lifecycle records did not finalize monotonically")
+    if (
+        required_object(close_plan, "receipt").get("receipt_id") != receipt_id
+        or required_object(close_plan, "settlement").get("settlement_id") != settlement_id
+    ):
+        raise DemoError("chain-bound close plan identities changed")
+    return {"receipt": receipt_record, "settlement": settlement_record}
+
+
+def submit_chain_bound_close(
+    config: Mapping[str, Any],
+    paths: Paths,
+    network: Network,
+    plan: Mapping[str, Any],
+    close_plan: Mapping[str, Any],
+    job_record: Mapping[str, Any],
+    inference: Mapping[str, Any],
+    on_submitted: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
+    validate_chain_bound_flow(paths, plan, close_plan)
+    closed = submit_wwm_actions(
+        config,
+        paths,
+        network,
+        (
+            {"type": "record_wwm_receipt", **required_object(close_plan, "receipt")},
+            {"type": "settle_wwm_job", **required_object(close_plan, "settlement")},
+        ),
+        on_submitted,
+    )
+    records = verify_chain_bound_close(
+        network,
+        plan,
+        close_plan,
+        job_record,
+        inference,
+    )
+    return {"submission": closed, **records}
+
+
+def run_chain_bound_inference(
+    config: Mapping[str, Any],
+    paths: Paths,
+    network: Network,
+    resolution: Mapping[str, Any],
+    run_id: str,
+    capacity_quote: Mapping[str, Any],
+) -> dict[str, Any]:
+    plan = prepare_chain_bound_inference(network, resolution, run_id, capacity_quote)
+    opened = submit_chain_bound_job(config, paths, network, plan)
+    inference = run_inference(
+        paths,
+        network,
+        required_text(plan, "job_id"),
+        required_text(config, "tokenizer_executable_sha256"),
+    )
+    close_plan = prepare_chain_bound_close(plan, opened["record"], inference)
+    closed = submit_chain_bound_close(
+        config,
+        paths,
+        network,
+        plan,
+        close_plan,
+        opened["record"],
+        inference,
+    )
     return {
-        "job_id": job_id,
-        "receipt_id": receipt_id,
-        "settlement_id": settlement_id,
-        "capsule_id": active["capsule_id"],
-        "output_root": inference["output_root"],
-        "token_history_root": inference["token_history_root"],
-        "open": opened,
-        "record_receipt": recorded,
-        "settle": settled,
-        "finalized_job": job_record,
-        "finalized_receipt": receipt_record,
-        "finalized_settlement": settlement_record,
+        "job_id": required_text(plan, "job_id"),
+        "receipt_id": required_text(plan, "receipt_id"),
+        "settlement_id": required_text(plan, "settlement_id"),
+        "capsule_id": required_text(required_object(plan, "bindings"), "capsule_id"),
+        "output_root": required_text(inference, "output_root"),
+        "token_history_root": required_text(inference, "token_history_root"),
+        "open": opened["submission"],
+        "close": closed["submission"],
+        "finalized_job": opened["record"],
+        "finalized_receipt": closed["receipt"],
+        "finalized_settlement": closed["settlement"],
         "inference": inference,
         "production_capable": False,
     }
