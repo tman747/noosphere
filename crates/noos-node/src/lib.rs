@@ -74,6 +74,22 @@ mod tests;
 
 use std::fmt;
 
+/// Exact source revision embedded by controlled release builds.
+///
+/// Ordinary developer builds remain visibly unbound rather than claiming a
+/// revision they cannot prove.
+pub const SOURCE_REVISION: &str = match option_env!("NOOS_SOURCE_REVISION") {
+    Some(revision) => revision,
+    None => "UNBOUND",
+};
+
+/// SemVer release identity. Controlled builds bind it to the exact Git
+/// revision while ordinary builds retain the package version.
+pub const RELEASE_VERSION: &str = match option_env!("NOOS_RELEASE_VERSION") {
+    Some(version) => version,
+    None => env!("CARGO_PKG_VERSION"),
+};
+
 /// 32-byte digest alias matching `noos_lumen::Hash32` (plain array).
 pub type Hash32 = [u8; 32];
 

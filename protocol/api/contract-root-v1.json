@@ -3,10 +3,10 @@
   "hash_algorithm": "sha256",
   "root_law": "SHA-256 over each lexicographically sorted UTF-8 relative path, NUL, then its 32-byte SHA-256 digest",
   "files": {
-    "protocol/api/openapi-v1.yaml": "618c46d0dc0d2b6ba9af86c518bf0ec80ea27d9258d3a1fc9efcfebdbc0e0dbf",
-    "protocol/api/vectors/negative.json": "d36fbb815e68bbac57c2ac51ab4c0abf27c98cd6889e1fead0402621445bdd16",
-    "protocol/api/vectors/positive.json": "654eb5824c4de2d921cbee3155ffc9d4c5f78ee3a3f16566b4b62e8a5eb2417d"
+    "protocol/api/openapi-v1.yaml": "c62100d19dff9ff2e27cc1647822df1c2456664d82bc110d95d2c0884f895798",
+    "protocol/api/vectors/negative.json": "9c026b19b1fc70ffdfd2d51d8efdd95b2d9dd980b4849bb31ced0f6f8b68d8af",
+    "protocol/api/vectors/positive.json": "76b96e52a2a850a5d99c8202824653a61a923ef7911077b3999ae65d1e4d3a63"
   },
-  "vector_root": "72e21e7a3285788dec0881c73b8d0818a8b4fc7a3499c6705ca4b831b0adbae3",
-  "contract_root": "a63622b162a7147b8c2aad7e4e6a9cf0dd7462f559bf9d980b1891d117a4275e"
+  "vector_root": "37de702b06fad2c99964b886c5fa45aff6207440a181638bfb97f70c2ef0bad3",
+  "contract_root": "837881136908e0139a7794d3eb8625fcaa07a4ec474bbb75f9e4b67c37725745"
 }

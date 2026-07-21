@@ -28,6 +28,14 @@ pub mod wwm;
 pub const API_VERSION: &str = "v1";
 pub const MEDIA_TYPE: &str = "application/vnd.noos.v1+json";
 pub const MAX_SUBMISSION_REQUEST_BYTES: usize = 1_048_576;
+pub const SOURCE_REVISION: &str = match option_env!("NOOS_SOURCE_REVISION") {
+    Some(revision) => revision,
+    None => "UNBOUND",
+};
+pub const RELEASE_VERSION: &str = match option_env!("NOOS_RELEASE_VERSION") {
+    Some(version) => version,
+    None => env!("CARGO_PKG_VERSION"),
+};
 const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
 pub(crate) fn unix_time_ms() -> Option<u64> {
@@ -459,7 +467,7 @@ async fn status(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Resp
         "readiness":st.readiness,"ready":st.readiness == IndexReadiness::Ready,
         "indexed_generation":st.generation.to_string(),
         "chain_id":s.indexer.identity.chain_id,"genesis_hash":s.indexer.identity.genesis_hash,
-        "protocol_version":"v1","api_version":"v1","release_version":env!("CARGO_PKG_VERSION"),
+        "protocol_version":"v1","api_version":"v1","release_version":RELEASE_VERSION,
         "unsafe_head":st.unsafe_head,"justified":st.justified,"finalized":st.finalized,
         "freshness_ms":freshness_ms.to_string(),"evidence_registry_root":ZERO_HASH
     })))

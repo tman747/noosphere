@@ -32,6 +32,14 @@ SAMPLE_DOMAIN: Final[bytes] = b"NOOS/SIG/WWM/V1\0PUBLIC-TESTNET-MONITOR-SAMPLE\0
 SUMMARY_DOMAIN: Final[bytes] = b"NOOS/SIG/WWM/V1\0PUBLIC-TESTNET-MONITOR-DAILY\0"
 LOOPBACK_NAMES: Final[set[str]] = {"127.0.0.1", "::1", "localhost"}
 HEX40: Final[re.Pattern[str]] = re.compile(r"^[0-9a-f]{40}$")
+SEMVER_BASE: Final[str] = (
+    r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
+    r"(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
+    r"(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?"
+)
+REVISION_RELEASE: Final[re.Pattern[str]] = re.compile(
+    rf"^{SEMVER_BASE}\+git\.([0-9a-f]{{40}})$"
+)
 MAX_JSON_BYTES: Final[int] = 2 * 1024 * 1024
 MAX_DAY_BYTES: Final[int] = 16 * 1024 * 1024
 SHARE_BYTES: Final[int] = 1_047_552
@@ -62,6 +70,7 @@ class MonitorConfig:
     r2_report_path: Path
     worker_bearer_token: str
     source_revision: str
+    release_version: str
     interval_seconds: int
     request_timeout_seconds: float
     seed_rpc_port: int
@@ -191,6 +200,11 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
     listen_host, listen_port = parse_listen(args.listen)
     if not HEX40.fullmatch(args.source_revision):
         raise MonitorError("source revision must be a lowercase 40-character Git commit")
+    release_match = REVISION_RELEASE.fullmatch(args.release_version)
+    if release_match is None or release_match.group(1) != args.source_revision:
+        raise MonitorError(
+            "release version must be canonical SemVer bound to the source revision"
+        )
     if not 30 <= args.interval_seconds <= 3_600:
         raise MonitorError("interval seconds must be within 30..3600")
     if not 1 <= args.request_timeout_seconds <= 30:
@@ -319,6 +333,7 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
         r2_report_path=r2_report,
         worker_bearer_token=load_worker_bearer_token(args.worker_config),
         source_revision=args.source_revision,
+        release_version=args.release_version,
         interval_seconds=args.interval_seconds,
         request_timeout_seconds=args.request_timeout_seconds,
         seed_rpc_port=args.seed_rpc_port,
@@ -504,6 +519,14 @@ def network_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
                 state = entry.get("state")
                 if state != "online":
                     raise MonitorError(f"validator {witness_index} is {state or 'unreported'}")
+                if (
+                    entry.get("source_revision") != config.source_revision
+                    or entry.get("release_version") != config.release_version
+                ):
+                    raise MonitorError(
+                        f"validator {witness_index} release identity is not exact"
+                    )
+                release_version = config.release_version
                 unsafe_head = entry.get("unsafe_head")
                 justified = entry.get("justified")
                 finalized = entry.get("finalized")
@@ -515,6 +538,7 @@ def network_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
                     "justified_hash": require_hex32(justified.get("hash"), "justified hash"),
                     "finalized_epoch": canonical_uint(finalized.get("epoch"), "finalized epoch"),
                     "finalized_hash": require_hex32(finalized.get("hash"), "finalized hash"),
+                    "release_version": release_version,
                 }
             except Exception as error:
                 issues.append(f"validator status entry: {error}")
@@ -522,6 +546,11 @@ def network_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
     complete_validator_fleet = set(validators) == set(REQUIRED_WITNESS_INDEXES)
     if not complete_validator_fleet:
         issues.append("validator status does not cover the complete 4-validator fleet")
+    validator_release_versions = {
+        str(value["release_version"]) for value in validators.values()
+    }
+    if validator_release_versions != {config.release_version}:
+        issues.append("validators do not report the exact release version")
 
     minimum_height: int | None = None
     maximum_height: int | None = None
@@ -552,16 +581,22 @@ def network_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
             justified_epoch, _ = next(iter(justified))
 
     indexer_heights: dict[str, int] = {}
+    indexer_release_versions: set[str] = set()
     for origin in config.indexer_origins:
         try:
             status, _, body = request_json(origin + "/api/status", timeout)
+            release_version = body.get("release_version")
             if (
                 status != 200
                 or body.get("chain_id") != config.chain_id
                 or body.get("genesis_hash") != config.genesis_hash
                 or body.get("ready") is not True
+                or release_version != config.release_version
             ):
-                raise MonitorError("public indexer identity, availability, or readiness mismatch")
+                raise MonitorError(
+                    "public indexer identity, availability, readiness, or release mismatch"
+                )
+            indexer_release_versions.add(config.release_version)
             indexer_finalized = body.get("finalized")
             if not isinstance(indexer_finalized, dict):
                 raise MonitorError("public indexer finalized checkpoint is malformed")
@@ -583,6 +618,9 @@ def network_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
         except Exception as error:
             issues.append(f"indexer endpoint {origin}: {error}")
 
+    if indexer_release_versions != {config.release_version}:
+        issues.append("indexers do not report the exact release version")
+
     if issues:
         raise MonitorError("; ".join(issues))
     if (
@@ -598,6 +636,8 @@ def network_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
         "validator_max_height": maximum_height,
         "justified_epoch": justified_epoch,
         "finalized_epoch": finalized_epoch,
+        "release_version": config.release_version,
+        "source_revision": config.source_revision,
         "indexer_heights": indexer_heights,
     }
 
@@ -617,6 +657,12 @@ def collect_checks(config: MonitorConfig) -> list[CheckResult]:
             raise MonitorError("gateway is not healthy and fail-closed")
         if body.get("chain_id") != config.chain_id or body.get("genesis_hash") != config.genesis_hash:
             raise MonitorError("gateway chain identity mismatch")
+        if (
+            body.get("source_revision") != config.source_revision
+            or body.get("release_version") != config.release_version
+        ):
+            raise MonitorError("gateway release identity is not exact")
+        release_version = config.release_version
         head = body.get("unsafe_head") if isinstance(body.get("unsafe_head"), dict) else {}
         finalized = body.get("finalized") if isinstance(body.get("finalized"), dict) else {}
         return {
@@ -624,6 +670,8 @@ def collect_checks(config: MonitorConfig) -> list[CheckResult]:
             "unsafe_height": head.get("height"),
             "finalized_epoch": finalized.get("epoch"),
             "node_source": body.get("node_source"),
+            "release_version": release_version,
+            "source_revision": config.source_revision,
         }
 
     def model() -> dict[str, object]:
@@ -774,10 +822,18 @@ def verify_envelope(envelope: dict[str, object], domain: bytes, id_field: str) -
 
 
 class EvidenceStore:
-    def __init__(self, root: Path, key: Ed25519PrivateKey, source_revision: str, deployment_sha256: str):
+    def __init__(
+        self,
+        root: Path,
+        key: Ed25519PrivateKey,
+        source_revision: str,
+        release_version: str,
+        deployment_sha256: str,
+    ):
         self.root = root
         self.key = key
         self.source_revision = source_revision
+        self.release_version = release_version
         self.deployment_sha256 = deployment_sha256
         self.samples = root / "samples"
         self.summaries = root / "daily"
@@ -819,6 +875,7 @@ class EvidenceStore:
                 "production_authorized": False,
                 "promotion_effect": "NONE",
                 "source_revision": self.source_revision,
+                "release_version": self.release_version,
                 "deployment_sha256": self.deployment_sha256,
                 "observed_at_utc": observed_at,
                 "previous_sample_id": self._last_id(path),
@@ -863,6 +920,7 @@ class EvidenceStore:
             "production_authorized": False,
             "promotion_effect": "NONE",
             "source_revision": self.source_revision,
+            "release_version": self.release_version,
             "deployment_sha256": self.deployment_sha256,
             "day_utc": day,
             "observed_start_utc": timestamps[0],
@@ -894,7 +952,13 @@ class MonitorState:
         self.config = config
         self.key = load_signing_key(config.signing_key_path)
         deployment_sha256 = hashlib.sha256(config.deployment_path.read_bytes()).hexdigest()
-        self.store = EvidenceStore(config.evidence_dir, self.key, config.source_revision, deployment_sha256)
+        self.store = EvidenceStore(
+            config.evidence_dir,
+            self.key,
+            config.source_revision,
+            config.release_version,
+            deployment_sha256,
+        )
         self.lock = threading.Lock()
         self.latest: dict[str, object] | None = None
         self.previous_day: str | None = None
@@ -1036,6 +1100,7 @@ def serve(config: MonitorConfig) -> None:
                 "production": False,
                 "production_authorized": False,
                 "source_revision": config.source_revision,
+                "release_version": config.release_version,
             },
             sort_keys=True,
         ),
@@ -1063,6 +1128,7 @@ def parse_args() -> argparse.Namespace:
     monitor.add_argument("--r2-report", type=Path, required=True)
     monitor.add_argument("--worker-config", type=Path, required=True)
     monitor.add_argument("--source-revision", required=True)
+    monitor.add_argument("--release-version", required=True)
     monitor.add_argument("--interval-seconds", type=int, default=60)
     monitor.add_argument("--request-timeout-seconds", type=float, default=10.0)
     monitor.add_argument("--seed-hostname", default="wwm-seed.mindchain.network")

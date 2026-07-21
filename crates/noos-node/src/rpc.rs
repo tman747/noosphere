@@ -328,7 +328,7 @@ fn status_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
     // The three heads are SEPARATE fields by law; no merged "latest".
     let body = format!(
         concat!(
-            r#"{{"chain_id":"{}","genesis_hash":"{}","#,
+            r#"{{"chain_id":"{}","genesis_hash":"{}","release_version":"{}","source_revision":"{}","#,
             r#""unsafe_head":{{"height":{},"hash":"{}"}},"#,
             r#""justified":{{"epoch":{},"hash":"{}"}},"#,
             r#""finalized":{{"epoch":{},"hash":"{}"}},"#,
@@ -337,6 +337,8 @@ fn status_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
         ),
         hex(&s.chain_id),
         hex(&s.genesis_hash),
+        crate::RELEASE_VERSION,
+        crate::SOURCE_REVISION,
         s.head_height,
         hex(&s.head_hash),
         s.justified.epoch,

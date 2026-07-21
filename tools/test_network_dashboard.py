@@ -14,6 +14,8 @@ import network_dashboard
 STATUS = {
     "chain_id": "chain-1",
     "genesis_hash": "aa" * 32,
+    "release_version": "0.1.0",
+    "source_revision": "55" * 20,
     "unsafe_head": {"height": 520, "hash": "bb" * 32},
     "justified": {"epoch": 1, "hash": "cc" * 32},
     "finalized": {"epoch": 1, "hash": "dd" * 32},
@@ -176,6 +178,8 @@ class DashboardDataTests(unittest.TestCase):
                     "role": "witness",
                     "state": "online",
                     "observed_ms": 9_000,
+                    "release_version": "0.1.0",
+                    "source_revision": "55" * 20,
                     "unsafe_head": {"height": 100 if index == 3 else 520, "hash": f"{index + 1:064x}"},
                     "justified": {"epoch": 1},
                     "finalized": {"epoch": 1},
@@ -246,6 +250,7 @@ class DashboardDataTests(unittest.TestCase):
                 nodes = deployed.node_fleet()
                 local_status = deployed.local_validator_status()
             self.assertEqual([item["witness_index"] for item in overview["validators"]], [0, 1, 2, 3])
+            self.assertEqual(local_status["validators"][0]["source_revision"], "55" * 20)
             self.assertEqual([item["state"] for item in overview["validators"]], ["online", "online", "online", "catching_up"])
             self.assertEqual(sum(item["ready"] for item in overview["indexers"]), 3)
             self.assertEqual(overview["indexers"][0]["freshness_ms"], -1)

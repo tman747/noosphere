@@ -226,7 +226,11 @@ async fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     if raw.as_slice() == ["--version"] {
-        println!("noos-workerd {}", env!("CARGO_PKG_VERSION"));
+        println!(
+            "noos-workerd {} source_revision={}",
+            option_env!("NOOS_RELEASE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")),
+            option_env!("NOOS_SOURCE_REVISION").unwrap_or("UNBOUND")
+        );
         return ExitCode::SUCCESS;
     }
     let args = match parse_args(&raw) {

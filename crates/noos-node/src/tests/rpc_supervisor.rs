@@ -96,6 +96,14 @@ fn rpc_status_reports_the_three_heads_separately_and_auth_gates_routes() {
     assert!(body.contains(r#""justified""#), "justified present: {body}");
     assert!(body.contains(r#""finalized""#), "finalized present: {body}");
     assert!(
+        body.contains(&format!(
+            r#""release_version":"{}","source_revision":"{}""#,
+            crate::RELEASE_VERSION,
+            crate::SOURCE_REVISION
+        )),
+        "release identity present: {body}"
+    );
+    assert!(
         body.contains(
             r#""finality_gossip":{"pending_votes":0,"pending_certificates":0,"accepted":0,"rejected":0}"#
         ),

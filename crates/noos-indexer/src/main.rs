@@ -21,6 +21,20 @@ fn bounded_env(name: &str, default: u64, minimum: u64, maximum: u64) -> std::io:
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    let arguments = std::env::args_os().skip(1).collect::<Vec<_>>();
+    if arguments.as_slice() == ["--version"] {
+        println!(
+            "noos-indexer {} source_revision={}",
+            noos_indexer::RELEASE_VERSION,
+            noos_indexer::SOURCE_REVISION
+        );
+        return Ok(());
+    }
+    if !arguments.is_empty() {
+        return Err(std::io::Error::other(
+            "noos-indexer accepts only --version; runtime configuration uses NOOS_* environment variables",
+        ));
+    }
     let root = std::env::var_os("NOOS_INDEXER_ROOT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| std::path::PathBuf::from("./noos-index"));

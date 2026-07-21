@@ -106,6 +106,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
             r2_report=self.r2_report,
             worker_config=self.workerd_config,
             source_revision="55" * 20,
+            release_version=f"0.1.0+git.{'55' * 20}",
             interval_seconds=60,
             request_timeout_seconds=5.0,
             seed_hostname="seed.example",
@@ -128,6 +129,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
     def test_config_requires_fail_closed_exact_bindings(self) -> None:
         config = monitor.load_config(self.arguments())
         self.assertEqual(config.chain_id, "11" * 32)
+        self.assertEqual(config.release_version, f"0.1.0+git.{'55' * 20}")
         self.assertEqual(config.artifact_origin, "https://artifacts.example")
         self.assertEqual(config.worker_bearer_token, self.worker_token)
         self.assertEqual(len(config.validator_status_urls), 3)
@@ -140,6 +142,11 @@ class PublicTestnetMonitorTests(unittest.TestCase):
                 ("seed-3.example", "203.0.113.11", (29652, 29653)),
             ],
         )
+
+        wrong_release = self.arguments()
+        wrong_release.release_version = f"0.1.0+git.{'66' * 20}"
+        with self.assertRaisesRegex(monitor.MonitorError, "bound to the source revision"):
+            monitor.load_config(wrong_release)
 
         validator_urls = self.deployment_document["monitoring"]["validator_status_endpoints"]
         validator_urls[2] = "https://unbound.example/validator-status.json"
@@ -175,6 +182,8 @@ class PublicTestnetMonitorTests(unittest.TestCase):
             return {
                 "witness_index": witness_index,
                 "state": "online",
+                "release_version": config.release_version,
+                "source_revision": config.source_revision,
                 "unsafe_head": {"height": height},
                 "justified": {"epoch": 4, "hash": "aa" * 32},
                 "finalized": {"epoch": 3, "hash": "bb" * 32},
@@ -204,6 +213,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
                 "chain_id": config.chain_id,
                 "genesis_hash": config.genesis_hash,
                 "ready": True,
+                "release_version": config.release_version,
                 "unsafe_head": {"height": str(1_000 - offset)},
                 "finalized": {"height": "768", "hash": "bb" * 32},
             }
@@ -215,7 +225,21 @@ class PublicTestnetMonitorTests(unittest.TestCase):
             detail = monitor.network_probe(config, 5.0)
             self.assertEqual(detail["validator_count"], 4)
             self.assertEqual(detail["finalized_epoch"], 3)
+            self.assertEqual(detail["source_revision"], config.source_revision)
+            self.assertEqual(detail["release_version"], config.release_version)
+            validator_entries[3]["source_revision"] = "66" * 20
+            with self.assertRaisesRegex(monitor.MonitorError, "release identity is not exact"):
+                monitor.network_probe(config, 5.0)
+            validator_entries[3]["source_revision"] = config.source_revision
+            validator_entries[3]["release_version"] = "0.1.0+git." + "66" * 20
+            with self.assertRaisesRegex(monitor.MonitorError, "release identity is not exact"):
+                monitor.network_probe(config, 5.0)
+            validator_entries[3]["release_version"] = config.release_version
             first_indexer = responses[config.indexer_origins[0] + "/api/status"]
+            first_indexer["release_version"] = "0.1.0+git." + "66" * 20
+            with self.assertRaisesRegex(monitor.MonitorError, "release mismatch"):
+                monitor.network_probe(config, 5.0)
+            first_indexer["release_version"] = config.release_version
             first_indexer["finalized"] = {"height": "768", "hash": "cc" * 32}
             with self.assertRaisesRegex(monitor.MonitorError, "finalized checkpoint disagrees"):
                 monitor.network_probe(config, 5.0)
@@ -241,13 +265,20 @@ class PublicTestnetMonitorTests(unittest.TestCase):
 
     def test_sample_ledger_is_signed_chained_and_summarized_immutably(self) -> None:
         key = monitor.load_signing_key(self.private_key)
-        store = monitor.EvidenceStore(self.root / "ledger", key, "55" * 20, "66" * 32)
+        store = monitor.EvidenceStore(
+            self.root / "ledger",
+            key,
+            "55" * 20,
+            f"0.1.0+git.{'55' * 20}",
+            "66" * 32,
+        )
         checks = [monitor.CheckResult("gateway", True, 12, {"status": 200})]
         first = store.append(checks, "2026-07-15T00:00:00Z")
         second = store.append(checks, "2026-07-15T00:01:00Z")
         monitor.verify_envelope(first, monitor.SAMPLE_DOMAIN, "sample_id")
         monitor.verify_envelope(second, monitor.SAMPLE_DOMAIN, "sample_id")
         self.assertEqual(second["previous_sample_id"], first["sample_id"])
+        self.assertEqual(first["release_version"], f"0.1.0+git.{'55' * 20}")
 
         summary = store.summarize("2026-07-15")
         monitor.verify_envelope(summary, monitor.SUMMARY_DOMAIN, "summary_id")
@@ -272,6 +303,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
             "production_authorized": False,
             "promotion_effect": "NONE",
             "source_revision": config.source_revision,
+            "release_version": config.release_version,
             "deployment_sha256": "66" * 32,
             "observed_at_utc": "2026-07-15T00:00:00Z",
             "previous_sample_id": None,

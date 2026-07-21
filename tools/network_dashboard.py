@@ -194,7 +194,16 @@ class DashboardData:
                 "observed_ms": observed_ms,
             }
             if valid and status:
-                for key in ("unsafe_head", "justified", "finalized", "mempool", "finality_gossip", "observer"):
+                for key in (
+                    "unsafe_head",
+                    "justified",
+                    "finalized",
+                    "mempool",
+                    "finality_gossip",
+                    "observer",
+                    "release_version",
+                    "source_revision",
+                ):
                     validator[key] = status.get(key)
             elif error:
                 validator["error"] = "operator status unavailable"

@@ -124,6 +124,22 @@ $SourceRevision = (& git.exe -C $RepoRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $SourceRevision -notmatch '^[0-9a-f]{40}$') {
     throw 'Repository source revision could not be resolved to a canonical Git commit.'
 }
+$NodeVersionOutput = (& $NodeBinary '--version' | Out-String).Trim()
+if ($LASTEXITCODE -ne 0) {
+    throw 'Node binary version probe failed.'
+}
+$NodeVersionMatch = [regex]::Match(
+    $NodeVersionOutput,
+    '^noosd (?<release>(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?\+git\.(?<releaseRevision>[0-9a-f]{40})) source_revision=(?<sourceRevision>[0-9a-f]{40})$'
+)
+if (
+    -not $NodeVersionMatch.Success -or
+    $NodeVersionMatch.Groups['releaseRevision'].Value -ne $SourceRevision -or
+    $NodeVersionMatch.Groups['sourceRevision'].Value -ne $SourceRevision
+) {
+    throw 'Node binary is not bound to the exact repository source revision.'
+}
+$ReleaseVersion = $NodeVersionMatch.Groups['release'].Value
 
 $GovernanceAccount = '17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce'
 $Specs = @(
@@ -199,6 +215,7 @@ $Specs = @(
             '--r2-report', $R2Report,
             '--worker-config', $WorkerdConfig,
             '--source-revision', $SourceRevision,
+            '--release-version', $ReleaseVersion,
             '--interval-seconds', '60',
             '--seed-hostname', $SeedHostname,
             '--seed-ip', $SeedIp

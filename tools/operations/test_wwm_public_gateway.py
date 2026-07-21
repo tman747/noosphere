@@ -22,6 +22,8 @@ class UpstreamHandler(http.server.BaseHTTPRequestHandler):
     unsafe_height = 513
     finalized_epoch = 1
     finalized_hash = "55" * 32
+    source_revision = "55" * 20
+    release_version = f"0.1.0+git.{source_revision}"
 
     def log_message(self, format: str, *args: object) -> None:
         return
@@ -54,6 +56,8 @@ class UpstreamHandler(http.server.BaseHTTPRequestHandler):
                 {
                     "chain_id": "11" * 32,
                     "genesis_hash": "22" * 32,
+                    "release_version": type(self).release_version,
+                    "source_revision": type(self).source_revision,
                     "unsafe_head": {"height": type(self).unsafe_height, "hash": "33" * 32},
                     "justified": {"epoch": 2, "hash": "44" * 32},
                     "finalized": {
@@ -190,6 +194,8 @@ class FakeInferenceService:
 class PublicGatewayTests(unittest.TestCase):
     def setUp(self) -> None:
         UpstreamHandler.seen = []
+        UpstreamHandler.source_revision = "55" * 20
+        UpstreamHandler.release_version = f"0.1.0+git.{UpstreamHandler.source_revision}"
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -271,8 +277,21 @@ class PublicGatewayTests(unittest.TestCase):
         self.assertEqual(health["promotion_effect"], "NONE")
         self.assertEqual(health["finalized"]["epoch"], 1)
         self.assertEqual(health["node_source"], "primary")
+        self.assertEqual(health["release_version"], f"0.1.0+git.{'55' * 20}")
+        self.assertEqual(health["source_revision"], "55" * 20)
         self.assertEqual(headers["X-Frame-Options"], "DENY")
         self.assertNotIn(UpstreamHandler.expected_token.encode(), body)
+        UpstreamHandler.source_revision = "UNBOUND"
+        status, _, body = self.request("/healthz")
+        self.assertEqual(status, 503)
+        self.assertEqual(json.loads(body)["error"]["code"], "NODE_UNAVAILABLE")
+        UpstreamHandler.source_revision = "55" * 20
+        UpstreamHandler.release_version = "0.1.0+git." + "66" * 20
+        status, _, body = self.request("/healthz")
+        self.assertEqual(status, 503)
+        self.assertEqual(json.loads(body)["error"]["code"], "NODE_UNAVAILABLE")
+        UpstreamHandler.release_version = f"0.1.0+git.{UpstreamHandler.source_revision}"
+
 
         status, _, model = self.request("/api/model-resolution/bonsai-q1")
         self.assertEqual(status, 200)

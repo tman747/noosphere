@@ -41,6 +41,14 @@ MAX_STATIC_BYTES: Final[int] = 8 * 1024 * 1024
 UPSTREAM_SELECTION_TTL_SECONDS: Final[float] = 5.0
 RECORD_ROUTE = re.compile(r"^/api/wwm-record/([a-z0-9-]{1,64})/([0-9a-f]{64})$")
 LOOPBACK_NAMES: Final[set[str]] = {"127.0.0.1", "::1", "localhost"}
+SEMVER_BASE: Final[str] = (
+    r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
+    r"(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
+    r"(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?"
+)
+REVISION_RELEASE: Final[re.Pattern[str]] = re.compile(
+    rf"^{SEMVER_BASE}\+git\.([0-9a-f]{{40}})$"
+)
 NEURAL_EXPLORER_BROWSER_ORIGINS: Final[frozenset[str]] = frozenset({
     "https://wwm-rpc.mindchain.network",
 })
@@ -762,6 +770,20 @@ class PublicGatewayHandler(http.server.BaseHTTPRequestHandler):
             parsed = json.loads(upstream)
             if status != 200 or not isinstance(parsed, dict):
                 raise GatewayError("node status response is invalid")
+            release_version = parsed.get("release_version")
+            source_revision = parsed.get("source_revision")
+            release_match = (
+                REVISION_RELEASE.fullmatch(release_version)
+                if isinstance(release_version, str)
+                else None
+            )
+            if (
+                not isinstance(source_revision, str)
+                or re.fullmatch(r"[0-9a-f]{40}", source_revision) is None
+                or release_match is None
+                or release_match.group(1) != source_revision
+            ):
+                raise GatewayError("node release identity is not exact")
             body = canonical_json(
                 {
                     "schema": SCHEMA,
@@ -771,6 +793,8 @@ class PublicGatewayHandler(http.server.BaseHTTPRequestHandler):
                     "promotion_effect": "NONE",
                     "chain_id": parsed.get("chain_id"),
                     "genesis_hash": parsed.get("genesis_hash"),
+                    "release_version": release_version,
+                    "source_revision": source_revision,
                     "unsafe_head": parsed.get("unsafe_head"),
                     "finalized": parsed.get("finalized"),
                     "node_source": node_source,
