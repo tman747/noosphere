@@ -1,6 +1,6 @@
 # World Wide Mind: Chain-Coordinated AI, Private Inference, and Decentralized Browser
 
-**Architecture and R&D plan — protocol core and loopback pilot implemented; production rollout remains proposed**
+**Architecture and R&D plan — protocol core, valueless public testnet, signed inference, and native wallet clients implemented; production and independent-operation gates remain blocked**
 
 **Repository:** NOOSPHERE protocol / MindChain product  
 **Date:** 2026-07-14  
@@ -108,34 +108,59 @@ As of this document’s date:
 
 A World Wide Mind pilot may run on a local devnet or explicitly valueless public testnet, but it cannot be described as production, mainnet, or generally available while those base release gates remain blocked.
 
-#### Implemented loopback pilot boundary
+#### Published public-testnet boundary — observed 2026-07-21
 
-`crates/noos-mind-gateway` now contains the replaceable public-query protocol
-core and a runnable HTTP service. The service pins declared model and policy
-identities to a live finalized test-network checkpoint, issues bounded signed
-quotes, streams a local model response, settles the test sponsor accounting,
-and persists a signed gateway receipt. `site/query.html` consumes that contract.
+The implementation baseline published at `a7081a14154d9dad951204965612ef5e0ec9512f`
+extends the earlier loopback pilot into a bounded, valueless public-testnet
+surface:
 
-This implementation is deliberately narrower than the production architecture:
+- `wwm.mindchain.network`, the read gateway, signed status service, artifact
+  host, neural explorer, and browser query client are publicly addressable.
+- Four fixture-witness processes run across three Azure virtual machines in two
+  regions with 3-of-4 finality. Three sanitized indexer/read endpoints form a
+  distinct-VM quorum, but every endpoint is explicitly marked
+  `independent=false` and remains under one operator.
+- The registered 3,803,452,480-byte Bonsai model is bound to 12 erasure-coded
+  positions with reconstruction threshold 8. R2 and browser capacity are
+  experimental mirrors/caches, not production custody or availability
+  certificates.
+- Interactive inference is off-chain, sponsored-only, and deliberately small:
+  three jobs per client per hour, 24 globally, one running, and two queued.
+  Quotes, SSE events, cancellation, and receipts are signed and fail closed,
+  but `interactive_chain_settlement=false`; evidence is
+  `PROVISIONAL_SIGNED` and settlement is `PENDING_CHAIN`.
+- The neural publisher records resumable finalized open/close activity, and
+  node RPC can return finalized bounded neural-program evaluations with program
+  and result proofs. Large-model execution still occurs off-chain.
+- The shared Rust wallet core, Tauri desktop shell, Android client, and iOS
+  client enforce canonical review/signing and finalized-state checks. Hardware
+  device, store-distribution, and independently reproducible release gates are
+  not yet satisfied.
 
-- the supplied launcher requires `test_network=true`, binds to loopback, and
-  uses a disclosed `TEST_SINGLE_NODE` pin rather than independent quorum;
-- only the public `P0_OPEN` / `SOFT` request shape is accepted; one local model
-  executes without an executor committee match, so the wire contract reports
-  `soft_committee_quorum_met=false` and the browser labels it `LOCAL TEST`;
-- the model runs off-chain through a loopback Ollama-native or
-  OpenAI-compatible API;
-- the raw prompt exists transiently for inference, while persistent storage
-  contains its commitment and bounded receipt metadata, not the prompt text;
-- the receipt is signed by the local gateway and bound to finalized state, but
-  it is not submitted as a chain transaction;
-- `WWM_PUBLIC_GATEWAY_ENABLED` remains false and
-  `WWM_GATEWAY_CONSENSUS_WEIGHT` remains zero.
+A live signed monitor sample observed at `2026-07-21T13:20:15Z` reported
+`status=ok`: all 20 checks passed, all four validators reported height 232,985,
+and finalized epoch 909 was coherent across the three public indexers. This is
+an operational observation, not formal E-WWM-23 evidence.
 
-This is an executable engineering pilot, not production activation, independent
-execution evidence, or proof that an answer is true. See the
-[loopback pilot guide](v1/developer-guides.md#world-wide-mind-loopback-pilot)
-for the launcher and end-to-end smoke commands.
+Published and deployed revisions are not yet uniform. The live monitor sample
+identifies source revision `b88b4ea1862ec59e04d2a51c2580c9308776e543`,
+while `deploy/wwm/public-testnet.json` pins node source revision
+`50a674a16fcf0cecf9c97d213771d183231e35a6` plus one witness-specific runtime
+patch. Both precede the published implementation baseline. The replay/DAG
+memory fix, current indexer behavior, and signed inference release therefore
+require an exact-revision rolling deployment and fresh binary attestations.
+
+Pre-publication verification covered 111 `noos-node`/`noos-braid` tests, 177
+tests across the other changed Rust crates, 23 desktop wallet-core tests, 170
+Python WWM operation tests, 37 browser-module tests, a successful Tauri UI
+build, and a successful 107-task Android Gradle test graph. These are local
+implementation checks, not independent evidence.
+
+The production boundary is unchanged: all base `G0`–`G5` gates remain
+`BLOCKED`; the WWM registry contains 12 `IMPLEMENTED` and 11 `PARTIAL` claims,
+with 22 `UNMEASURED` and only E-WWM-23 carrying `MEASURED_LAB` evidence. No
+control is enabled, no pilot evidence authorizes promotion, and no answer is
+made true by a signature or chain record.
 
 ### 3.2 Existing primitives to preserve
 
@@ -157,8 +182,8 @@ for the launcher and end-to-end smoke commands.
 | `crates/noos-lumen` | Canonical application state and escrow primitives | Model, job, activation, knowledge, and settlement state transitions |
 | `crates/noos-node` | Consensus, RPC, network, sync, state roots | Bounded state transitions and query APIs; never direct large-model execution |
 | `crates/noos-indexer` | Durable derived read model | Model, job, knowledge, evaluation, and activation query surfaces |
-| `site/` and `tools/world_wide_mind_server.py` | No-wallet MindLink v0 prototype and local SQLite API | Product research surface only; not chain durability, a production index, or a privacy browser |
-| `wallet/app` | Tauri desktop wallet with secure-store boundary and dev-signed Windows artifacts | Local vault and initial native Public/Private/Contribute shell; not a hardened arbitrary-web browser |
+| `site/`, `crates/noos-mind-gateway`, and public gateway tools | Live valueless query, neural, MindLink, status, and browser-capacity surfaces with bounded signed same-origin APIs; legacy local prototype paths remain non-authoritative | Product and experiment surfaces only; provisional inference receipts, advisory browser cache, and single-operator service must not be described as production or independent |
+| `wallet/app`, `crates/noos-wallet-sdk`, and `wallet/mobile` | Shared Rust wallet core; Tauri desktop, Android, and iOS clients; OS/hardware-backed seed-wrapping boundaries; finalized multi-endpoint light state | Local vault and native client foundation; release only after platform device tests, reproducible binding/package evidence, recovery drills, and store review |
 
 ### 3.3 Frozen boundaries
 
@@ -1272,6 +1297,40 @@ Every experiment produces: preregistration, exact source revision, fixtures, env
 - **Kill:** private data is included by default or activation relies on an unmeasured “the model probably forgot” claim.
 - **Artifacts:** dataset audit, canary registry under controlled disclosure, attack code, candidate reports.
 
+### E-WWM-23 — Opt-in web capacity, churn, consent, and repair
+
+- **Hypothesis:** explicitly consenting browsers can retain advisory
+  erasure-coded cache copies through ordinary churn without hidden work,
+  cross-origin identity, quota/deletion failure, coordinator correctness
+  dependency, or measurable base-chain harm.
+- **Setup:** 30 real days; at least 30 authorized static origins, five
+  providers, three regions, five control clusters, 300 explicit opt-ins, three
+  copies of every coordinate, and 16,344 admitted share files. Cover Chromium,
+  Firefox, and WebKit; desktop and mobile; OPFS and IndexedDB; and every outage,
+  deletion, storage-pressure, poison, replay, redirect, SSRF, quota, and
+  interrupted-write drill registered in
+  `experiments/wwm-web-capacity/experiment.json`.
+- **Metrics:** consent and pre-opt-in traffic, coordinate coverage, casual
+  availability, churn/repair, deletion and revocation, quota and egress,
+  invalid-share rejection, reconstruction after largest-provider loss,
+  provider/origin/control-cluster concentration, telemetry retention, queue
+  bounds, and base-chain p95 degradation.
+- **Pass:** all registered gates pass on independently reviewable raw evidence;
+  casual availability is at least 30%; provider and control-cluster
+  concentration are at most 25%; origin concentration is at most 5%; base-chain
+  p95 degradation stays below 5%; and browser copies remain non-custodial,
+  unrewarded, non-schedulable advisory caches.
+- **Kill:** any covert consent, incomplete deletion, quota bypass, hidden work,
+  cross-site identity, unauthorized hosting, corrupt admitted share,
+  reconstruction failure, unbounded state/queue, coordinator correctness
+  dependency, false production claim, or failed legal, privacy, accessibility,
+  or security review.
+- **Artifacts:** signed daily pilot ledger, authorized-origin and participant
+  inventories, coordinate coverage and reconstruction reports, browser/device
+  matrix, drill traces, concentration and base-isolation measurements,
+  independent build attestations, review approvals, and an immutable
+  non-promoting evidence bundle.
+
 ## 20. Implementation work packages
 
 Each package lists exact existing targets or explicitly named new targets. New files are proposals; their names must be reconciled in WP0 before implementation. Packages do not bypass the base promotion ledger.
@@ -1505,29 +1564,119 @@ Rejected: activations and deterministic commitments can leak prompt-derived info
 
 Rejected: no deterministic referee can prove that an answer is helpful or true across arbitrary prompts. Use evaluation, reputation, challengeable knowledge, and governance.
 
-## 24. Immediate execution instructions
+## 24. Immediate execution plan
 
-1. Register this plan as a proposed design artifact; do not flip any current enable flag.
-2. Execute WP0 and add explicit WWM claim rows for every gate and experiment, including non-claims and kill thresholds.
-3. Decide whether WWM application objects use a Species v2 extension or a separate WWM v1 domain; freeze one path before code.
-4. Preserve p2p v1. Prototype query/private-route transport as sidecars until a signed identity/protocol amendment exists.
-5. Produce a real `ModelCapsuleV1` for the registered 494M fixture and import the actual weight/tokenizer/calibration artifacts.
-6. Finish the second CPU reference and AMD/NVIDIA integer kernels before building product latency around an unverified runtime.
-7. Stand up five candidate custodians and three independent executor clusters on a valueless testnet; verify control clusters rather than counting keys.
-8. Build the public gateway and UI only against pinned capsule/job/receipt APIs. Show `SOFT`, `ANCHORED`, and `ASSURED` exactly.
-9. Run E-WWM-01 through E-WWM-04. Do not activate NEL until every existing E-NEL blocker also passes.
-10. Migrate MindLink v0 to a canonical rights-aware v1 object with explicit import semantics; retain v0 only as a prototype format.
-11. Build immutable knowledge snapshots and citation receipts; keep Chorus advisory and outside consensus.
-12. Implement local-only inference and local vault before claiming network private inference.
-13. Implement P1 composite attestation, private retrieval, log/cache wiping, and fail-closed route selection; run E-WWM-05, 07, 08, 19, and 20.
-14. Keep P2, P3, malicious 3PC, and HFHE behind independent suite IDs and evidence. Publish negative performance/security results.
-15. Train the first adapter only from a rights-clean snapshot, register it as a proposed revision, and keep it shadow-only.
-16. Run independent evaluation, canary, rollback, governance-capture, poisoning, memorization, and secure-aggregation experiments before alias activation.
-17. Ship the initial AI/knowledge client in the existing signed desktop shell; route high-risk arbitrary web use to Tor Browser until a reproducible maintained engine exists.
-18. Add fast-private and deep-private routing only with measured observer models and no direct fallback.
-19. Run long-duration public operations, complete AI blackout, browser update compromise, private forensic, and incident drills.
-20. Request external cryptography, confidential-computing, browser, distributed-systems, ML-safety, economics, and rights reviews for the exact candidate revision.
-21. Promote only through the base release ledger plus the matching WWM gate. Never convert a local fixture or self-authored report into external evidence.
+**Decision:** the next action is to seal and roll out one exact revision across
+the live valueless testnet. Do not add a new privacy, training, or economic lane
+while published source and deployed binaries disagree.
+
+### P0-1 — Seal and roll out one exact network revision
+
+- Build node, indexer, gateway, monitor, publisher, and worker artifacts from
+  one exact `main` revision with locked toolchains. Record source revision,
+  binary SHA-256, configuration SHA-256, and rollback artifact before touching
+  a live host.
+- Exercise the replay/DAG pruning change against a copied durable state. Record
+  checkpoint height, replay duration, peak resident memory, final height, and
+  state root; reject any build that needs database deletion or loses finalized
+  state.
+- Deploy observer/read-gateway first, then one witness at a time. Preserve
+  3-of-4 finality during each step; stop on chain/genesis mismatch, height
+  regression, quorum loss, divergent state root, or memory growth beyond the
+  preregistered host envelope.
+- Update `deploy/wwm/public-testnet.json` only from observed artifacts after all
+  hosts run the same intended revision. Remove the witness-specific runtime
+  override only after its replacement passes the same replay and sync checks.
+- **Exit:** public deployment metadata and signed status identify the exact
+  revision and hashes; all four validators and three indexers remain coherent;
+  a controlled rolling-restart drill needs no manual repair; all 20 monitor
+  checks remain passing for a 24-hour burn-in; rollback to the preserved build
+  is demonstrated once.
+
+### P0-2 — Close native-client and release evidence gaps
+
+- Extend the main-branch workflow to test `noos-wallet-sdk`, regenerate UniFFI
+  bindings and require a clean diff, build Android on Linux/Windows, and run
+  Swift package and iOS app compilation on macOS. Retain the existing Tauri
+  Windows/macOS bundle jobs.
+- Produce checksum manifests for SDK libraries, generated bindings, desktop
+  installers, Android packages, and iOS build outputs from pinned toolchains.
+- Run StrongBox and non-StrongBox behavior on physical Android devices and
+  Secure Enclave, biometric fallback, backup exclusion, recovery, deletion,
+  and device-migration behavior on physical iOS devices. CI simulator results
+  must not substitute for hardware evidence.
+- **Exit:** the exact release revision has green GitHub workflows and retained
+  artifacts on every supported build platform; independent rebuild comparison,
+  signing/recovery negative tests, and platform limitations are recorded.
+
+### P1-1 — Finalize the interactive inference lifecycle
+
+- Replace `PROVISIONAL_SIGNED` / `PENDING_CHAIN` with bounded open and close
+  transactions that bind model, policy, salted prompt commitment, quote,
+  executor, output root, usage, refund/charge, and cancellation outcome. Never
+  put prompt or output plaintext on chain.
+- Make submission, SSE resume, close, and receipt lookup idempotent across
+  gateway/worker restarts. A resumed browser must not rerun a terminal job.
+- Require the browser to verify finalized inclusion and exact program/result or
+  job/receipt proofs before displaying `ANCHORED`; retain `SOFT` for signed
+  off-chain evidence and fail closed on chain, model, key, or event mismatch.
+- **Exit:** success, cancel, timeout, worker crash, gateway restart, duplicate
+  submission, bad signature, wrong finality proof, and refund paths pass against
+  the live valueless testnet with no plaintext persistence.
+
+### P1-2 — Replace key count with real operator and custody diversity
+
+- Onboard at least three independently controlled executor clusters and five
+  custodians across at least three providers, regions, and beneficial owners.
+  A second key, process, VM, or Azure subscription controlled by the same owner
+  does not count as independence.
+- Give each operator bounded signed enrollment, rotation, revocation, health,
+  and incident procedures without exposing operator RPC tokens.
+- Run one-provider and one-region loss, custodian poison/replay, executor crash,
+  index rebuild, and complete AI-blackout drills. Preserve base finality and
+  reconstruct the model from admitted independent custody.
+- Fund two independent challengers before counting public inference dispute
+  evidence.
+- **Exit:** topology and status declare truthful control clusters and beneficial
+  ownership; required failures preserve quorum and model reconstruction; no
+  single operator can satisfy an executor, indexer, or custody diversity gate.
+
+### P1-3 — Complete formal public-pilot evidence without promotion
+
+- Freeze the exact revision and participant cohort before starting the
+  qualifying E-WWM-23 window. Current uptime and signed monitor samples remain
+  operational observations while
+  `formal_e_wwm_23_evidence=false`.
+- Complete the registered 30-day, 30-origin, 300-opt-in,
+  cross-browser/device/storage matrix and every required failure drill. Keep
+  rewards, production custody, schedulability effect, and availability
+  certificate effect disabled.
+- Add privacy-safe queue/rate-limit saturation, key rotation, restore, backup,
+  telemetry retention/deletion, and incident recovery evidence for the public
+  inference and browser-capacity services.
+- **Exit:** the generic WWM evidence validator accepts an immutable candidate
+  bundle with independent build and review artifacts; promotion remains
+  `NONE`, and any kill result demotes browser copies to personal local cache.
+
+### P2 — Advance knowledge and improvement only after P0/P1
+
+- Promote MindLink import semantics to a canonical rights-aware object, then
+  build immutable retrieval snapshots, reproducible indexes, citation spans,
+  and retrieval receipts. Preserve corrections, disagreement, revocation, and
+  contributor text.
+- Only after rights/retrieval evidence passes, create one bounded adapter
+  candidate from a committed clean snapshot. Keep it shadow-only, independently
+  evaluate it, run poisoning/memorization/canary/rollback drills, and prohibit
+  automatic alias activation.
+- Keep P1 attested-private, P2/P3 proof, malicious-MPC, deep-mix, and custom
+  browser-engine work behind their existing independent gates; none is on the
+  critical path for the current public-testnet hardening.
+
+Execution order is `P0-1` first. `P0-2` may proceed without changing the live
+runtime. Start `P1-1` and operator onboarding only after the exact deployment is
+stable; start the formal P1-3 duration only after its revision and cohort are
+frozen. Begin P2 only after P1 produces non-promoting evidence. Promotion still
+requires the base release ledger plus the matching WWM gate.
 
 ## 25. What the product may say after each milestone
 
