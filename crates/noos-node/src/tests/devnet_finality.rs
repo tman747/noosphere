@@ -1,6 +1,6 @@
 //! Focused coverage for the live-devnet fixture finality driver.
 
-use noos_braid::{CheckpointRef, EPOCH_LENGTH};
+use noos_braid::{CheckpointRef, EPOCH_LENGTH, MAX_FINALITY_CERTIFICATES};
 use noos_witness::vote::FinalityVoteV1;
 
 use super::util::*;
@@ -40,6 +40,55 @@ fn devnet_finality_tick_advances_two_epoch_ladder_only_when_enabled() {
         .expect("disabled fixture finality is inert"));
     assert_eq!(disabled.justified(), justified_before);
     assert_eq!(disabled.finalized(), finalized_before);
+}
+
+#[test]
+fn restart_replays_durable_certificate_newer_than_full_block_evidence() {
+    let dir = test_dir("devnet-finality-restart-standalone");
+    let cfg = node_config();
+    let mut producer = boot_node(&dir, cfg.clone());
+    let certificate_count = u64::from(MAX_FINALITY_CERTIFICATES) + 1;
+    let mut checkpoints = Vec::with_capacity(certificate_count as usize + 1);
+    checkpoints.push(CheckpointRef {
+        epoch: 0,
+        checkpoint_hash: producer.genesis_block_hash(),
+    });
+
+    for epoch in 1..=certificate_count {
+        let mut checkpoint_hash = [0_u8; 32];
+        for _ in 0..EPOCH_LENGTH {
+            checkpoint_hash = produce_next(&mut producer);
+        }
+        checkpoints.push(CheckpointRef {
+            epoch,
+            checkpoint_hash,
+        });
+    }
+
+    for window in checkpoints.windows(2) {
+        let certificate = quorum_certificate(&mut producer, window[0], window[1]);
+        producer
+            .queue_certificate(certificate)
+            .expect("ingest sequential certificate");
+    }
+    assert_eq!(
+        producer.pending_certificate_count(),
+        MAX_FINALITY_CERTIFICATES as usize,
+        "the newest durable certificate does not fit in the next block"
+    );
+    assert_eq!(producer.justified().epoch, certificate_count);
+
+    let next = produce_full(&mut producer);
+    assert_eq!(
+        next.body.finality_certificates.as_slice().len(),
+        MAX_FINALITY_CERTIFICATES as usize
+    );
+    assert_eq!(next.header.justified_checkpoint.epoch, certificate_count);
+    drop(producer);
+
+    let restarted = boot_node(&dir, cfg);
+    assert_eq!(restarted.head(), (next.header.height, next.hash));
+    assert_eq!(restarted.justified().epoch, certificate_count);
 }
 
 #[test]

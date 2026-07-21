@@ -1182,7 +1182,10 @@ pub fn start(
                     Arc::clone(&task_metrics),
                 ) {
                     Ok(c) => c,
-                    Err(_) => return, // typed fatal: store refused startup
+                    Err(error) => {
+                        eprintln!("fatal consensus boot error: {error}");
+                        return; // typed fatal: store refused startup
+                    }
                 };
                 let done = catch_unwind(AssertUnwindSafe(|| {
                     core_loop(&mut core, observer, &consensus_rx, gossip_tx.as_ref())

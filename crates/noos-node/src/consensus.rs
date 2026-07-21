@@ -2508,6 +2508,19 @@ impl<P: StorePort> NodeCore<P> {
         };
         let finalized_height = recorded_finalized.epoch.saturating_mul(EPOCH_LENGTH);
 
+        // A live node can verify and persist a standalone certificate before
+        // importing a later canonical header that reflects it. The canonical
+        // body need not repeat that evidence (and a bounded body cannot repeat
+        // an arbitrarily large verified backlog), so replay must make durable
+        // certificate evidence available at the same historical checkpoint.
+        let durable_certificates: Vec<FinalityCertificateV1> = self
+            .port
+            .scan_indices(b"c/")?
+            .into_iter()
+            .map(|(_, value)| FinalityCertificateV1::decode_canonical(&value))
+            .collect::<Result<_, _>>()?;
+        let mut durable_certificate_cursor = 0_usize;
+
         // Canonical chain replay through the height index.
         let entries = self.port.scan_indices(b"n/")?;
         for (key, value) in entries {
@@ -2536,14 +2549,37 @@ impl<P: StorePort> NodeCore<P> {
             // rule compares against adjusted time, which for a durable
             // block is at least its own timestamp.
             self.now_ms = self.now_ms.max(header.timestamp_ms);
-            // Trusted-store replay still re-validates: structure, ticket,
-            // execution, roots, and the same-block certificate/checkpoint
-            // ordering used during live import.
-            self.replay_header_stages_in_place(
-                &header,
-                &ticket,
-                body.finality_certificates.as_slice(),
-            )?;
+            // Trusted-store replay still re-validates structure, ticket,
+            // execution, roots, and checkpoint binding. Merge the body's wire
+            // evidence with any independently persisted transitions needed by
+            // this header. Body commitments remain checked against the actual
+            // body by `execute_and_verify`.
+            let durable_start = durable_certificate_cursor;
+            while durable_certificates
+                .get(durable_certificate_cursor)
+                .is_some_and(|certificate| {
+                    certificate.target.epoch <= header.justified_checkpoint.epoch
+                })
+            {
+                durable_certificate_cursor = durable_certificate_cursor.saturating_add(1);
+            }
+            let durable_evidence = &durable_certificates[durable_start..durable_certificate_cursor];
+            if durable_evidence.is_empty() {
+                self.replay_header_stages_in_place(
+                    &header,
+                    &ticket,
+                    body.finality_certificates.as_slice(),
+                )?;
+            } else {
+                let mut replay_evidence = Vec::with_capacity(
+                    durable_evidence
+                        .len()
+                        .saturating_add(body.finality_certificates.as_slice().len()),
+                );
+                replay_evidence.extend_from_slice(durable_evidence);
+                replay_evidence.extend_from_slice(body.finality_certificates.as_slice());
+                self.replay_header_stages_in_place(&header, &ticket, &replay_evidence)?;
+            }
             let exec = self.execute_and_verify(&header, &body).inspect_err(|_| {
                 // A replay failure is a corrupt/foreign store: startup stops.
             })?;
@@ -2566,10 +2602,9 @@ impl<P: StorePort> NodeCore<P> {
         // not receive the standalone certificate.
         let embedded_justified_epoch = self.tracker.justified_head().epoch;
 
-        // Certificates in epoch order.
-        let certs = self.port.scan_indices(b"c/")?;
-        for (_, value) in certs {
-            let cert = FinalityCertificateV1::decode_canonical(&value)?;
+        // Re-apply all durable certificates to recover any transition newer
+        // than the last canonical header and queue that tail for re-embedding.
+        for cert in durable_certificates {
             self.ensure_snapshot(cert.target.epoch)?;
             let ancestry = DagAncestry { dag: &self.dag };
             let outcome = self
