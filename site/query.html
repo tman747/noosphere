@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f2e5">
-  <meta name="description" content="Verify the active MindChain model, request a bounded paid or sponsored remote job, and retain its signed receipt.">
-  <meta property="og:title" content="MindChain Query — Verify the active capsule">
-  <meta property="og:description" content="A proof-carrying browser-remote client for Bonsai Q1. The browser never downloads the 3.8 GB model.">
+  <meta name="description" content="Validate the pinned MindChain model, run a bounded sponsored testnet query, and verify its off-chain signed receipt.">
+  <meta property="og:title" content="MindChain Query — Ask the pinned capsule">
+  <meta property="og:description" content="A bounded browser-remote client for Bonsai Q1 with signed monitor, stream, output, and receipt checks.">
   <meta property="og:type" content="website">
   <title>MindChain Query — Verify the active capsule</title>
   <link rel="stylesheet" href="styles.css">
@@ -23,6 +23,7 @@
       </a>
       <ul class="nav-links">
         <li><a aria-current="page" href="query.html">Ask</a></li>
+        <li><a href="neural.html">Neural</a></li>
         <li><a href="index.html#contribute">Contribute</a></li>
         <li><a href="mindlinks.html">Verify MindLinks</a></li>
         <li><a href="connect.html">Connect</a></li>
@@ -37,7 +38,7 @@
       <div class="query-heading">
         <p class="eyebrow">Browser-remote / protocol v2</p>
         <h1 id="query-title">Ask remotely.<br>Verify the receipt.</h1>
-        <p class="lede">This browser verifies finalized model resolution before quoting. It never downloads or runs the 3.8&nbsp;GB model, and an execution receipt never certifies that an answer is true.</p>
+        <p class="lede">Before quoting, this browser validates a pinned local full-node model-resolution response and a signed operator monitor. It never downloads the 3.8&nbsp;GB model, and a signed execution receipt never certifies that an answer is true.</p>
       </div>
 
       <aside class="query-trust-rail" aria-labelledby="trust-title">
@@ -63,22 +64,22 @@
             <dd id="pin-candidate">None published</dd>
           </div>
           <div>
-            <dt>Resolution proof</dt>
-            <dd id="pin-proof">Not verified</dd>
+            <dt>Resolution source</dt>
+            <dd id="pin-proof">Not validated</dd>
           </div>
         </dl>
-        <p id="pin-disclosure" class="trust-disclosure">No prompt leaves this page until the installed light client verifies the active finalized resolution. Gateway claims are not proof.</p>
+        <p id="pin-disclosure" class="trust-disclosure">No prompt leaves this page until the pinned browser verifier accepts the full-node projection and signed worker monitor. The browser does not recompute the chain proof.</p>
       </aside>
     </section>
 
     <section id="hosted-proof-panel" class="hosted-proof reveal" aria-labelledby="hosted-proof-title" aria-busy="true">
       <header class="hosted-proof-head">
         <div>
-          <p class="eyebrow">Independent network proof</p>
+          <p class="eyebrow">Pinned state + signed readiness</p>
           <h2 id="hosted-proof-title">Hosted by MindChain</h2>
-          <p>Finalized identity and custody on-chain. Model bytes and Prism execution stay off-chain, served by the certified custodian set.</p>
+          <p>Finalized identity and custody positions are on-chain. Model bytes and interactive Prism execution remain off-chain on the bounded operator worker.</p>
         </div>
-        <span id="hosted-panel-state" class="state-flag state-pending">Checking 17 leaves</span>
+        <span id="hosted-panel-state" class="state-flag state-pending">Checking 17 objects</span>
       </header>
 
       <div class="hosted-proof-ledger">
@@ -114,10 +115,10 @@
             <span>02</span>
           </div>
           <div class="hosted-custody-title">
-            <h3 id="hosted-custody-title">Twelve independent positions</h3>
+            <h3 id="hosted-custody-title">Twelve chain positions</h3>
             <strong id="hosted-schedulability">— / 12</strong>
           </div>
-          <p class="hosted-section-copy">Nine live positions admit a new job; any eight can reconstruct. Rows come from the verified finalized certificate, not gateway labels.</p>
+          <p class="hosted-section-copy">Nine live positions admit a job; any eight can reconstruct. This testnet topology remains under one operator and is not independent custody.</p>
           <ol id="hosted-custodian-map" class="custodian-map" aria-label="Finalized custodian positions">
             <li class="custodian-pending">Awaiting verified custodian map</li>
           </ol>
@@ -125,20 +126,20 @@
 
         <section class="hosted-runtime" aria-labelledby="hosted-runtime-title">
           <div class="hosted-section-head">
-            <p class="panel-label">Cold reconstruction</p>
+            <p class="panel-label">Operator worker</p>
             <span>03</span>
           </div>
           <div class="hosted-runtime-title">
-            <h3 id="hosted-runtime-title">Custodians → decoder → Prism</h3>
+            <h3 id="hosted-runtime-title">Pinned bytes → Prism</h3>
             <strong id="hosted-reconstruction-state">Waiting</strong>
           </div>
-          <progress id="hosted-reconstruction-progress" max="3803452480" value="0">0%</progress>
-          <p id="hosted-reconstruction-copy" class="hosted-section-copy">No unverified progress is shown.</p>
+          <progress id="hosted-reconstruction-progress" max="1" value="0">Unavailable</progress>
+          <p id="hosted-reconstruction-copy" class="hosted-section-copy">Awaiting a valid signed worker-readiness sample.</p>
           <dl class="hosted-facts">
             <div><dt>Prism runtime root</dt><dd id="hosted-runtime-root">Not verified</dd></div>
             <div><dt>Availability certificate</dt><dd id="hosted-certificate">Not verified</dd></div>
             <div><dt>Certificate horizon</dt><dd id="hosted-certificate-horizon">Not verified</dd></div>
-            <div><dt>Publisher / gateway fallback</dt><dd id="hosted-fallback">Not verified</dd></div>
+            <div><dt>Alternate execution route</dt><dd id="hosted-fallback">Not validated</dd></div>
           </dl>
         </section>
       </div>
@@ -146,15 +147,15 @@
       <footer class="hosted-proof-trail" aria-labelledby="hosted-trail-title">
         <div>
           <p class="panel-label">Proof trail</p>
-          <h3 id="hosted-trail-title">Job → receipt → settlement</h3>
+          <h3 id="hosted-trail-title">Interactive job → signed receipt → chain pending</h3>
         </div>
         <dl>
           <div><dt>Job</dt><dd id="hosted-job-link">No job submitted</dd></div>
           <div><dt>Receipt</dt><dd id="hosted-receipt-link">Awaiting terminal receipt</dd></div>
-          <div><dt>Settlement</dt><dd id="hosted-settlement-link">Awaiting chain settlement</dd></div>
+          <div><dt>Settlement</dt><dd id="hosted-settlement-link">Not submitted on-chain</dd></div>
         </dl>
       </footer>
-      <p id="hosted-proof-disclosure" class="hosted-proof-disclosure">Verification pending. The panel remains unproved and query admission stays closed until an independent light client accepts the finalized graph and reconstruction evidence.</p>
+      <p id="hosted-proof-disclosure" class="hosted-proof-disclosure">Validation pending. Admission stays closed until the pinned browser verifier accepts the local full-node model projection and signed operator readiness.</p>
     </section>
 
     <section class="query-workspace reveal" aria-label="World Wide Mind query">
@@ -169,10 +170,10 @@
 
         <div class="field-block query-field">
           <label for="query-input">Question</label>
-          <textarea id="query-input" rows="7" maxlength="12000" required aria-describedby="query-helper query-error" placeholder="Ask one specific question after the gateway declares who will see it."></textarea>
+          <textarea id="query-input" rows="7" maxlength="12000" required aria-describedby="query-helper query-error" placeholder="Ask one specific question after the page identifies the off-chain execution boundary."></textarea>
           <div class="field-meta">
-            <p id="query-helper" class="helper">The configured open execution path can see this prompt. The chain receives bounded commitments, not this text.</p>
-            <span id="query-count" class="query-count">0 / 12,000</span>
+            <p id="query-helper" class="helper">The operator executor can see this prompt. Maximum 12,000 UTF-8 bytes; three jobs per client and 24 globally per hour; one running and two queued.</p>
+            <span id="query-count" class="query-count">0 / 12,000 bytes</span>
           </div>
           <p id="query-error" class="inline-error" role="alert" hidden></p>
         </div>
@@ -181,10 +182,10 @@
           <fieldset>
             <legend>Execution boundary</legend>
             <div class="mode-choice selected">
-              <span><strong>Remote open execution</strong><small>Only the finalized active capsule can dispatch. Selected executors can see the prompt.</small></span>
+              <span><strong>Remote operator execution</strong><small>Only the pinned finalized active capsule can dispatch. The operator executor can see the prompt.</small></span>
             </div>
             <div class="mode-choice unavailable" aria-disabled="true">
-              <span><strong>Browser-local execution</strong><small>Not in this release. This page will not download the model.</small></span>
+              <span><strong>Browser-local execution</strong><small>Unavailable. This page will not download the model.</small></span>
             </div>
           </fieldset>
 
@@ -192,11 +193,11 @@
             <legend>Payment</legend>
             <label class="finality-choice selected">
               <input type="radio" name="payment-mode" value="SPONSORED" checked>
-              <span><strong>Sponsored</strong><small>Uses a bounded sponsor grant. No wallet secret enters this page.</small></span>
+              <span><strong>Sponsored testnet</strong><small>Zero-fee, rate-limited pilot. No wallet secret enters this page.</small></span>
             </label>
-            <label class="finality-choice">
-              <input type="radio" name="payment-mode" value="PAID">
-              <span><strong>Paid escrow</strong><small>Provide a public escrow authorization signed by the native wallet.</small></span>
+            <label class="finality-choice unavailable" aria-disabled="true">
+              <input type="radio" name="payment-mode" value="PAID" disabled>
+              <span><strong>Paid escrow</strong><small>Unavailable for interactive public inference.</small></span>
             </label>
             <label id="escrow-label" for="escrow-authorization" hidden>Escrow authorization JSON
               <textarea id="escrow-authorization" rows="4" spellcheck="false" autocomplete="off" aria-describedby="escrow-help"></textarea>
@@ -210,9 +211,8 @@
             <span>Maximum output</span>
             <label for="output-limit" class="visually-hidden">Maximum output tokens</label>
             <select id="output-limit">
-              <option value="128">128 tokens</option>
-              <option value="256" selected>256 tokens</option>
-              <option value="512">512 tokens</option>
+              <option value="8">8 tokens</option>
+              <option value="16" selected>16 tokens</option>
             </select>
           </div>
           <div>
@@ -238,7 +238,7 @@
           <div>
             <p class="panel-label">Remote answer stream</p>
             <h2 id="answer-title">Nothing has been sent.</h2>
-            <p>Tokens begin as <strong>PROVISIONAL_SIGNED</strong> and upgrade only when the signed primary stream matches a selected backup. No evidence label certifies factual truth.</p>
+            <p>Every displayed token is covered by an Ed25519 gateway event and an incremental BLAKE3 output commitment. Evidence remains <strong>PROVISIONAL_SIGNED</strong>; no backup quorum or factual truth is claimed.</p>
           </div>
         </div>
 
@@ -254,7 +254,7 @@
           <header class="answer-result-head">
             <div>
               <p class="panel-label">Bounded remote answer</p>
-              <h2>Verified executor stream</h2>
+              <h2>Signed operator stream</h2>
             </div>
             <span id="answer-finality" class="finality-badge finality-soft">PROVISIONAL_SIGNED</span>
           </header>
@@ -372,22 +372,22 @@
 
     <section class="query-boundaries reveal" aria-labelledby="boundaries-title">
       <p class="eyebrow">Keep the axes separate</p>
-      <h2 id="boundaries-title">Execution, chain anchor, and settlement are different claims.</h2>
+      <h2 id="boundaries-title">Execution, output commitment, and chain settlement are different claims.</h2>
       <div class="boundary-ledger">
         <article>
           <span>PROVISIONAL_SIGNED</span>
-          <h3>Primary executor claim</h3>
-          <p>The designated primary signed this ordered token history. It has not matched a backup yet.</p>
+          <h3>Operator execution claim</h3>
+          <p>The gateway signed each ordered stream event after verifying the worker's incremental output commitment. No backup matched it.</p>
         </article>
         <article>
-          <span>MATCHED_QUORUM</span>
-          <h3>Observed token match</h3>
-          <p>The primary and one selected backup signed the same ordered token IDs and history root. This is not a truth or determinism claim.</p>
+          <span>BLAKE3 + TOKEN ROOT</span>
+          <h3>Bounded output bytes</h3>
+          <p>The terminal receipt binds exact output bytes and independently tokenized history. This is not a truth or safety claim.</p>
         </article>
         <article>
-          <span>SETTLED / REFUNDED</span>
-          <h3>Separate money state</h3>
-          <p>The terminal receipt proves its own anchor and payment outcome. Local inference has no chain-settlement claim.</p>
+          <span>PENDING_CHAIN</span>
+          <h3>No interactive settlement</h3>
+          <p>The interactive receipt is off-chain and unanchored. Scheduled neural pulses are separate finalized chain records.</p>
         </article>
       </div>
     </section>
@@ -400,6 +400,7 @@
     </div>
   </footer>
 
+  <script type="module" src="wwm/verifier-v1.mjs"></script>
   <script type="module" src="query.js"></script>
 </body>
 </html>

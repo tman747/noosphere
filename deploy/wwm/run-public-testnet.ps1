@@ -5,6 +5,9 @@ param(
     [string]$WalletCliBinary = 'C:\mindchain\wwm-testnet\bin\noos-cli.exe',
     [string]$WalletApiBase = 'https://wwm-seed-2.mindchain.network',
     [string]$WalletFaucetDb = 'C:\mindchain\wwm-testnet\wallet\faucet.sqlite3',
+    [string]$Seed2RpcTokenFile = 'C:\mindchain\wwm-testnet\secrets\seed2-rpc-token.txt',
+    [string]$SshBinary = 'C:\Windows\System32\OpenSSH\ssh.exe',
+    [string]$Seed2SshTarget = 'azureuser@172.202.41.123',
     [string]$PythonBinary = 'python.exe',
     [string]$CloudflaredBinary = 'C:\mindchain\wwm-testnet\bin\cloudflared-2026.7.2.exe',
     [string]$StaticBundleRoot = 'D:\noosphere-artifacts\public-testnet-web-bundle',
@@ -22,6 +25,15 @@ param(
     [string]$MonitorSigningKey = 'C:\mindchain\wwm-testnet\secrets\monitor-ed25519.seed',
     [string]$MonitorEvidenceDir = 'C:\mindchain\wwm-testnet\evidence',
     [string]$R2Report = 'C:\mindchain\wwm-testnet\web-capacity\r2-sync-20260715.json',
+    [string]$NeuralPublisherHostedConfig = 'C:\mindchain\wwm-testnet\secrets\hosted-model-publisher.json',
+    [string]$NeuralPublisherStateRoot = 'C:\mindchain\wwm-testnet\neural-publisher',
+    [int]$NeuralPublisherMinimumSeconds = 21600,
+    [string]$InferenceSecrets = 'C:\mindchain\wwm-testnet\secrets\public-inference.json',
+    [string]$InferenceDatabase = 'C:\mindchain\wwm-testnet\inference\public-inference.sqlite3',
+    [string]$InferenceWorkerOrigin = 'http://127.0.0.1:29807',
+    [string]$InferenceTokenizer = 'D:\noosphere-artifacts\runtime\hip-run\llama-tokenize.exe',
+    [string]$InferenceModel = 'D:\noosphere-artifacts\demo-disposable\model\Bonsai-27B-Q1_0.gguf',
+    [string]$InferenceTokenizerSha256 = '2685f72d8b2c27c72c116d2c6af9bb180adb4bf2f4fc9adee052dbcfe7f266f4',
     [string]$SeedHostname = 'wwm-seed.mindchain.network',
     [string]$SeedIp = '20.15.164.29',
     [switch]$SkipTunnel
@@ -41,6 +53,7 @@ if (-not $CreatedSupervisorMutex) {
 $RuntimeRoot = [IO.Path]::GetFullPath($RuntimeRoot)
 $RepoRoot = [IO.Path]::GetFullPath($RepoRoot)
 $TokenFile = Join-Path $RuntimeRoot 'secrets\rpc-token.txt'
+$Seed2RpcTokenFile = [IO.Path]::GetFullPath($Seed2RpcTokenFile)
 $DataDir = Join-Path $RuntimeRoot 'node'
 $LogDir = Join-Path $RuntimeRoot 'logs'
 $SiteRoot = Join-Path $RepoRoot 'site'
@@ -48,13 +61,16 @@ $GatewayScript = Join-Path $RepoRoot 'tools\operations\wwm_public_gateway.py'
 $StaticHostScript = Join-Path $RepoRoot 'tools\operations\wwm_static_bundle_server.py'
 $MonitorScript = Join-Path $RepoRoot 'tools\operations\wwm_public_testnet_monitor.py'
 $DeploymentManifest = Join-Path $RepoRoot 'deploy\wwm\public-testnet.json'
+$NeuralPublisherScript = Join-Path $RepoRoot 'tools\operations\wwm_neural_publisher.py'
 
-foreach ($directory in @($DataDir, $LogDir, $MonitorEvidenceDir)) {
+foreach ($directory in @($DataDir, $LogDir, $MonitorEvidenceDir, $NeuralPublisherStateRoot, (Join-Path $NeuralPublisherStateRoot 'evidence'), (Split-Path -Parent $InferenceDatabase))) {
     New-Item -ItemType Directory -Force -Path $directory | Out-Null
 }
 foreach ($file in @(
     $NodeBinary,
     $TokenFile,
+    $Seed2RpcTokenFile,
+    $SshBinary,
     $GatewayScript,
     $StaticHostScript,
     $CoordinatorBinary,
@@ -66,7 +82,12 @@ foreach ($file in @(
     $MonitorScript,
     $DeploymentManifest,
     $MonitorSigningKey,
-    $R2Report
+    $R2Report,
+    $NeuralPublisherScript,
+    $NeuralPublisherHostedConfig,
+    $InferenceSecrets,
+    $InferenceTokenizer,
+    $InferenceModel
 )) {
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
         throw "Required public-testnet file is missing: $file"
@@ -184,21 +205,64 @@ $Specs = @(
         )
     },
     [pscustomobject]@{
+        Name = 'neural-publisher'
+        Exe = $PythonBinary
+        Args = @(
+            $NeuralPublisherScript,
+            '--hosted-config', $NeuralPublisherHostedConfig,
+            '--manifest', (Join-Path $SiteRoot 'neural-manifest.json'),
+            '--state', (Join-Path $NeuralPublisherStateRoot 'state.json'),
+            '--evidence-dir', (Join-Path $NeuralPublisherStateRoot 'evidence'),
+            '--minimum-seconds', [string]$NeuralPublisherMinimumSeconds,
+            '--minimum-finalized-advance', '256',
+            '--poll-seconds', '60'
+        )
+    },
+    [pscustomobject]@{
+        Name = 'seed2-rpc-fallback-tunnel'
+        Exe = $SshBinary
+        Args = @(
+            '-NT',
+            '-o', 'BatchMode=yes',
+            '-o', 'ExitOnForwardFailure=yes',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'ServerAliveInterval=30',
+            '-o', 'ServerAliveCountMax=3',
+            '-o', 'ConnectTimeout=10',
+            '-L', '127.0.0.1:39652:127.0.0.1:29652',
+            $Seed2SshTarget
+        )
+    },
+    [pscustomobject]@{
         Name = 'gateway'
         Exe = $PythonBinary
         Args = @(
             $GatewayScript,
             '--listen', '127.0.0.1:29680',
+            '--monitor-url', 'http://127.0.0.1:29901',
             '--node-rpc', 'http://127.0.0.1:29652',
             '--node-token-file', $TokenFile,
+            '--fallback-node-rpc', 'http://127.0.0.1:39652',
+            '--fallback-node-token-file', $Seed2RpcTokenFile,
             '--site-root', $SiteRoot,
             '--wallet-api-base', $WalletApiBase,
             '--wallet-cli', $WalletCliBinary,
             '--wallet-root', (Join-Path $RepoRoot 'apps\mind-market\wallet'),
             '--wallet-faucet-db', $WalletFaucetDb,
+            '--inference-secrets', $InferenceSecrets,
+            '--inference-database', $InferenceDatabase,
+            '--inference-worker-origin', $InferenceWorkerOrigin,
+            '--inference-tokenizer', $InferenceTokenizer,
+            '--inference-model', $InferenceModel,
+            '--inference-tokenizer-sha256', $InferenceTokenizerSha256,
             '--allow-origin', 'https://mindchain.network',
             '--allow-origin', 'https://wwm.mindchain.network',
-            '--connect-origin', $StaticBundleOrigin
+            '--allow-origin', 'https://wwm-rpc.mindchain.network',
+            '--connect-origin', $StaticBundleOrigin,
+            '--connect-origin', 'https://wwm-rpc.mindchain.network',
+            '--connect-origin', 'https://wwm-seed.mindchain.network',
+            '--connect-origin', 'https://wwm-seed-2.mindchain.network',
+            '--connect-origin', 'https://mindchain-seed-3.eastus.cloudapp.azure.com'
         )
     }
 )
@@ -218,7 +282,9 @@ $ProcessMarkers = @{
     'static-host' = $StaticHostScript
     'web-capacity' = $CoordinatorConfig
     'monitor' = $MonitorScript
+    'neural-publisher' = $NeuralPublisherScript
     'gateway' = $GatewayScript
+    'seed2-rpc-fallback-tunnel' = '127.0.0.1:39652:127.0.0.1:29652'
     'cloudflared' = $TunnelConfig
 }
 $RunningProcesses = @(Get-CimInstance Win32_Process)

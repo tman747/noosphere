@@ -1922,6 +1922,14 @@ select:focus {
 @media (max-width: 43.75rem) {
   .query-shell { padding-block: 2.5rem; }
   .query-heading h1 { font-size: clamp(3rem, 17vw, 5.1rem); }
+  .composer-topline,
+  .answer-result-head,
+  .receipt-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .activation-label { align-self: flex-start; }
   .pin-list div,
   .query-controls,
   .quote-strip,
@@ -1950,9 +1958,6 @@ select:focus {
   .query-composer,
   .answer-panel,
   .receipt-drawer { padding: 1rem; }
-  .composer-topline,
-  .answer-result-head,
-  .receipt-heading { align-items: stretch; flex-direction: column; gap: 0.75rem; }
   .answer-actions .control-button { width: 100%; }
 }
 

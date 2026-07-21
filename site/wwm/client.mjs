@@ -1,6 +1,6 @@
 const PROMPT_DOMAIN = "NOOS/WWM/PROMPT-COMMITMENT/V2\0";
-const MAX_PROMPT_BYTES = 48_000;
-const MAX_OUTPUT_TOKENS = 512;
+const MAX_PROMPT_BYTES = 12_000;
+const MAX_OUTPUT_TOKENS = 16;
 const PAYMENT_MODES = new Set(["SPONSORED", "PAID"]);
 const TERMINAL_EVENT_TYPES = new Set(["receipt.completed"]);
 export const BONSAI_HOSTING = Object.freeze({
@@ -198,7 +198,7 @@ export function validateHostedModelProof(resolution, verified) {
     || objectsRoot !== resolution.objects_root) {
     fail("hosted_resolution_state_mismatch");
   }
-  const capsuleId = hash32(hosted.capsule_id, "invalid_hosted_capsule");
+  const capsuleId = hash32(hosted.capsule_id ?? verified.capsule_id, "invalid_hosted_capsule");
   const artifactId = hash32(hosted.artifact_id, "invalid_hosted_artifact");
   const manifestRoot = hash32(hosted.manifest_root, "invalid_hosted_manifest");
   const runtimeRoot = hash32(hosted.runtime_root, "invalid_hosted_runtime");
@@ -217,8 +217,7 @@ export function validateHostedModelProof(resolution, verified) {
     || hosted.data_shards !== BONSAI_HOSTING.dataShards
     || hosted.parity_shards !== BONSAI_HOSTING.parityShards
     || hosted.reconstruction_threshold !== BONSAI_HOSTING.reconstructionThreshold
-    || hosted.schedulable_minimum !== BONSAI_HOSTING.schedulableMinimum
-    || hosted.publisher_or_gateway_fallback !== false) {
+    || hosted.schedulable_minimum !== BONSAI_HOSTING.schedulableMinimum) {
     fail("wrong_bonsai_hosting_proof");
   }
   if (artifactSha256 !== resolution.active.artifact_sha256
@@ -236,47 +235,35 @@ export function validateHostedModelProof(resolution, verified) {
   const profiles = new Set();
   const endpoints = new Set();
   const custodians = hosted.custodians.map((row, position) => {
-    if (!isRecord(row) || row.position !== position || row.live_at_certificate !== true) {
+    if (!isRecord(row) || row.position !== position || row.status !== 0) {
       fail("invalid_custodian_position");
     }
     const profileId = hash32(row.profile_id, "invalid_custodian_profile");
     const endpointRoot = hash32(row.endpoint_root, "invalid_custodian_endpoint");
-    const regionId = hash32(row.region_id, "invalid_custodian_region");
-    const providerRoot = hash32(row.provider_root, "invalid_custodian_provider");
-    const operatorId = hash32(row.operator_id, "invalid_custodian_operator");
-    const asn = wholeNumber(row.asn, "invalid_custodian_asn");
-    if (asn === 0 || asn > 4_294_967_295 || profiles.has(profileId) || endpoints.has(endpointRoot)) {
-      fail("duplicate_or_invalid_custodian");
-    }
+    if (profiles.has(profileId) || endpoints.has(endpointRoot)) fail("duplicate_custodian");
     profiles.add(profileId);
     endpoints.add(endpointRoot);
     return Object.freeze({
       position,
       profile_id: profileId,
       endpoint_root: endpointRoot,
-      region_id: regionId,
-      provider_root: providerRoot,
-      operator_id: operatorId,
-      asn,
-      live_at_certificate: true,
+      status: 0,
     });
   });
-  const reconstruction = hosted.reconstruction;
-  if (!isRecord(reconstruction)
-    || !RECONSTRUCTION_STATES.has(reconstruction.state)
-    || reconstruction.source !== "FINALIZED_CUSTODIANS"
-    || reconstruction.evidence_verified !== true
-    || reconstruction.fallback_used !== false
-    || reconstruction.total_bytes !== BONSAI_HOSTING.sourceBytes) {
-    fail("invalid_reconstruction_evidence");
+  if (!Array.isArray(hosted.executor_profile_ids) || hosted.executor_profile_ids.length !== 8) {
+    fail("invalid_executor_map");
   }
-  const verifiedBytes = wholeNumber(reconstruction.verified_bytes, "invalid_reconstruction_progress");
-  if (verifiedBytes > reconstruction.total_bytes) fail("invalid_reconstruction_progress");
-  if (reconstruction.state === "READY"
-    && (verifiedBytes !== reconstruction.total_bytes
-      || reconstruction.installed_sha256 !== BONSAI_HOSTING.artifactSha256)) {
-    fail("invalid_ready_artifact");
+  const executorProfileIds = hosted.executor_profile_ids.map((value) =>
+    hash32(value, "invalid_executor_profile"));
+  if (new Set(executorProfileIds).size !== executorProfileIds.length) fail("duplicate_executor_profile");
+  const worker = hosted.worker;
+  if (!isRecord(worker)
+    || !["READY", "FAILED"].includes(worker.state)
+    || worker.source !== "SIGNED_OPERATOR_MONITOR") {
+    fail("invalid_worker_evidence");
   }
+  const monitorSampleId = hash32(worker.monitor_sample_id, "invalid_worker_monitor_sample");
+  const monitorSignerKeyId = hash32(worker.monitor_signer_key_id, "invalid_worker_monitor_signer");
   return Object.freeze({
     chain_id: chainId,
     genesis_hash: genesisHash,
@@ -301,9 +288,14 @@ export function validateHostedModelProof(resolution, verified) {
     certificate_issued_height: issuedHeight,
     certificate_valid_until_height: validUntilHeight,
     custodians: Object.freeze(custodians),
-    reconstruction: Object.freeze({ ...reconstruction, verified_bytes: verifiedBytes }),
-    publisher_or_gateway_fallback: false,
-    ready: reconstruction.state === "READY",
+    executor_profile_ids: Object.freeze(executorProfileIds),
+    worker: Object.freeze({
+      state: worker.state,
+      source: worker.source,
+      monitor_sample_id: monitorSampleId,
+      monitor_signer_key_id: monitorSignerKeyId,
+    }),
+    ready: worker.state === "READY",
   });
 }
 
@@ -390,7 +382,7 @@ export class WwmV2Client {
     this.baseUrl = baseUrl.replace(/\/$/, "");
     this.expectedIdentity = expectedIdentity ?? null;
     this.verifier = verifier;
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = fetchImpl.bind(globalThis);
     this.cryptoImpl = cryptoImpl;
     this.state = null;
     this.active = null;
@@ -399,7 +391,7 @@ export class WwmV2Client {
 
   async loadState() {
     const payload = await jsonResponse(this.fetchImpl, `${this.baseUrl}/state`);
-    const verified = await this.verifier.verifyResolution(payload.resolution);
+    const verified = await this.verifier.verifyResolution(payload.resolution, payload);
     if (!verified) fail("invalid_resolution_proof");
     const active = validateActiveState(payload, verified, this.expectedIdentity);
     this.hosted = validateHostedModelProof(payload.resolution, verified);
@@ -416,7 +408,7 @@ export class WwmV2Client {
   async quote(prompt, {
     paymentMode = "SPONSORED",
     paymentAuthorization,
-    maximumOutputTokens = 256,
+    maximumOutputTokens = 16,
     inputTokens,
     requestId,
     clientNonce,
@@ -526,7 +518,8 @@ export class WwmV2Client {
           }
         }
         if (terminal) {
-          await reader.cancel().catch(() => {});
+          const trailing = await reader.read();
+          if (!trailing.done || (trailing.value?.byteLength ?? 0) !== 0) fail("post_terminal_stream_data");
           return lastEventId;
         }
       }

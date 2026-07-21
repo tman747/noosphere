@@ -24,8 +24,9 @@
     "node_rpc": "127.0.0.1:29652",
     "node_p2p": "/ip4/0.0.0.0/udp/29650/quic-v1",
     "node_role": "observer-read-gateway-source",
-    "node_binary_sha256": "11b35071189d0cd157828f9b91e194767fd1658862604d270931887b4bcc33c4",
-    "node_source_revision": "785c0f65fa52dcc192d8531d227df7af32fbe309",
+    "node_binary_sha256": "3246b5d1c5f75e29b9f66c62cda6ea8b5c113c8387b7020caf4bc8e3426e0940",
+    "node_source_revision": "50a674a16fcf0cecf9c97d213771d183231e35a6",
+    "node_replay_repair": "durable-certificate-evidence-v1",
     "bootstrap_peers": [
       "/ip4/20.15.164.29/udp/31004/quic-v1",
       "/ip4/172.202.41.123/udp/31005/quic-v1",
@@ -43,7 +44,46 @@
     "site": "https://wwm.mindchain.network",
     "read_gateway": "https://wwm-rpc.mindchain.network",
     "status": "https://wwm-status.mindchain.network",
-    "artifacts": "https://wwm-artifacts.mindchain.network"
+    "artifacts": "https://wwm-artifacts.mindchain.network",
+    "neural_explorer": "https://wwm.mindchain.network/neural.html",
+    "neural_manifest": "https://wwm.mindchain.network/neural-manifest.json"
+  },
+  "neural_publisher": {
+    "schema": "noos/wwm-neural-publisher-state/v1",
+    "mode": "resumable-finalized-pulse",
+    "poll_seconds": 60,
+    "minimum_seconds_between_pulses": 21600,
+    "minimum_finalized_advance": 256,
+    "activity_limit": 32,
+    "close_transaction": "receipt-and-settlement-atomic",
+    "state_storage": "operator-local",
+    "evidence_storage": "operator-local",
+    "production": false,
+    "promotion_effect": "NONE"
+  },
+  "public_inference": {
+    "schema": "noos/wwm-public-inference/v1",
+    "mode": "off-chain-interactive-testnet",
+    "model": "bonsai-q1",
+    "signing_algorithm": "Ed25519",
+    "signing_key_id": "1ad4d182db7efffd0e4435fdb748c793f38c2b0062150d00d05c3dda336ed1c6",
+    "prompt_bytes": 12000,
+    "output_token_limits": [
+      8,
+      16
+    ],
+    "jobs_per_client_per_hour": 3,
+    "jobs_per_hour_global": 24,
+    "maximum_running": 1,
+    "maximum_queued": 2,
+    "payment_modes": [
+      "SPONSORED"
+    ],
+    "interactive_chain_settlement": false,
+    "evidence_state": "PROVISIONAL_SIGNED",
+    "settlement_state": "PENDING_CHAIN",
+    "production": false,
+    "promotion_effect": "NONE"
   },
   "public_seeds": [
     {
@@ -112,7 +152,17 @@
     "single_operator_control": true,
     "production_eligible": false,
     "node_source_revision": "50a674a16fcf0cecf9c97d213771d183231e35a6",
-    "node_binary_sha256": "e2b623c3161aa943a41502c51a1d316ab9d3ee75e065ceef7061ab6e7bc00d36"
+    "node_binary_sha256": "800eb140fdbb3057efaf6f377a2de06f571b6efeb8ad4ea3d3539b3ee9aa4111",
+    "node_replay_repair": "durable-certificate-evidence-v1",
+    "runtime_overrides": [
+      {
+        "witness_index": 2,
+        "machine": "mindchain-seed-3",
+        "node_binary_sha256": "dea6b62dd80dc6b2adf1fb54dd9862d142f4729952540abdbc1ea1f0c78e6075",
+        "source_patch": "sync-ready-peer-advanced-cursor-v1",
+        "deployed_at_utc": "2026-07-21T00:39:05Z"
+      }
+    ]
   },
   "host_memory_safety": {
     "mindchain-seed-1_swap_gib": 8,
@@ -128,7 +178,7 @@
     "minimum_control_cluster_quorum": 2,
     "quorum_basis": "distinct-virtual-machine-failure-domains",
     "operator_independent": false,
-    "indexer_binary_sha256": "cd989df9db2fb83007abbe5394573348ad58069012e671ddb26602b191fa32ea",
+    "indexer_binary_sha256": "7de37626fdad7f9814b933f7e3f7dbe45429f9e800d66b23bf7152e3704cc9d9",
     "endpoints": [
       {
         "base_url": "https://wwm-seed.mindchain.network",
@@ -149,6 +199,7 @@
         "endpoint_id": "470d9754cc1f9541ef3578213dfb46a0f4243b3fe694452c3a756c05cb38e1f6",
         "control_cluster": "f439120c0cffb07e9ceae0d4fc9d5d4cb540fdf818b007ff4f7e844db4341a0e",
         "failure_domain": "azure-eastus-zone-1-mindchain-seed-3",
+        "node_source_witness_index": 3,
         "independent": false
       }
     ]
@@ -179,7 +230,8 @@
   },
   "authorized_browser_origins": [
     "https://mindchain.network",
-    "https://wwm.mindchain.network"
+    "https://wwm.mindchain.network",
+    "https://wwm-rpc.mindchain.network"
   ],
   "cloudflare": {
     "tunnel_name": "mindchain-wwm-testnet",
