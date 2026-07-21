@@ -385,6 +385,15 @@ impl<P: StorePort> NodeCore<P> {
         self.mempool = staged.mempool;
     }
 
+    fn prune_staged_finalized_history(staged: &mut StagedConsensus) {
+        let finalized = staged.tracker.finalized_head();
+        if finalized.expected_height().is_some_and(|height| {
+            staged.anchor.0 == finalized.checkpoint_hash && staged.anchor.1 == height
+        }) {
+            staged.dag.prune_finalized_history();
+        }
+    }
+
     /// Boots a node: installs genesis when the store is fresh, otherwise
     /// replays the durable chain and recovers the exact state.
     pub fn boot(
@@ -672,6 +681,49 @@ impl<P: StorePort> NodeCore<P> {
             header.height,
             finalized.checkpoint_hash,
             ledger.finalized_object_proof(key),
+        ))
+    }
+    /// Returns one L1 neural result proof and, when the result names a
+    /// deterministic program, that program's proof from the same finalized
+    /// ledger snapshot. The paired roots prevent mixed-checkpoint explorer
+    /// views.
+    pub fn finalized_neural_evaluation(
+        &self,
+        query_id: Hash32,
+    ) -> Result<
+        (
+            u64,
+            Hash32,
+            noos_lumen::wwm::ResolutionProofV1,
+            Option<noos_lumen::wwm::ResolutionProofV1>,
+        ),
+        NodeError,
+    > {
+        let (ledger, header, finalized) = self.finalized_ledger_snapshot()?;
+        let result_proof =
+            ledger.finalized_object_proof(noos_lumen::neural_oracle::neural_result_key(&query_id));
+        let program_proof = match &result_proof.value {
+            noos_lumen::wwm::ResolutionValueV1::Present(value) => {
+                noos_lumen::neural_oracle::NeuralOracleResultV1::decode_canonical(value.as_slice())
+                    .ok()
+                    .filter(|result| {
+                        result.query_id == query_id
+                            && result.mode
+                                == noos_lumen::neural_oracle::NeuralOracleMode::L1Deterministic
+                    })
+                    .map(|result| {
+                        ledger.finalized_object_proof(
+                            noos_lumen::neural_oracle::neural_program_key(&result.source_id),
+                        )
+                    })
+            }
+            noos_lumen::wwm::ResolutionValueV1::Absent => None,
+        };
+        Ok((
+            header.height,
+            finalized.checkpoint_hash,
+            result_proof,
+            program_proof,
         ))
     }
 
@@ -1051,6 +1103,52 @@ impl<P: StorePort> NodeCore<P> {
         Ok(outcome)
     }
 
+    /// Restart-only header replay. A failed boot drops the whole core, so
+    /// durable canonical records can be revalidated in place instead of
+    /// cloning the growing DAG before every historical header.
+    fn replay_header_stages_in_place(
+        &mut self,
+        header: &BlockHeaderV1,
+        ticket: &GroundTicketV1,
+        certificates: &[FinalityCertificateV1],
+    ) -> Result<InsertOutcome, NodeError> {
+        self.validate_header_non_context(header, ticket)?;
+        if !self.dag.contains(&header.parent_hash) {
+            return self
+                .dag
+                .insert(header.clone(), ticket)
+                .map_err(NodeError::Dag);
+        }
+        self.validate_ticket_in_context_for(&self.dag, header, ticket)?;
+        let outcome = self.dag.insert(header.clone(), ticket)?;
+        let hash = match outcome {
+            InsertOutcome::Inserted { hash } => hash,
+            InsertOutcome::Orphaned { .. } => {
+                return Err(NodeError::Dag(noos_braid::DagError::UnknownBlock));
+            }
+        };
+        for certificate in certificates {
+            self.ensure_snapshot(certificate.target.epoch)?;
+            let ancestry = DagAncestry { dag: &self.dag };
+            let outcome =
+                self.tracker
+                    .ingest_certificate(certificate, &self.registry, &ancestry)?;
+            noos_witness::finality::certificate_digest(certificate).map_err(NodeError::Witness)?;
+            match outcome {
+                IngestOutcome::Duplicate => {}
+                IngestOutcome::Justified => {
+                    self.dag.set_justified(self.tracker.justified_head())?;
+                }
+                IngestOutcome::Finalized(checkpoint) => {
+                    self.dag.set_finalized(checkpoint)?;
+                    self.dag.set_justified(self.tracker.justified_head())?;
+                }
+            }
+        }
+        Self::validate_checkpoint_binding(&self.dag, &self.tracker, header, &hash)?;
+        Ok(outcome)
+    }
+
     fn validate_header_non_context(
         &self,
         header: &BlockHeaderV1,
@@ -1083,6 +1181,17 @@ impl<P: StorePort> NodeCore<P> {
         header: &BlockHeaderV1,
         ticket: &GroundTicketV1,
     ) -> Result<(), NodeError> {
+        let hash = header.block_hash().map_err(|_| NodeError::Crypto)?;
+        if dag.contains(hash.as_bytes()) {
+            return Err(NodeError::Dag(noos_braid::DagError::DuplicateBlock));
+        }
+        if dag
+            .finalized()
+            .expected_height()
+            .is_some_and(|height| header.height <= height)
+        {
+            return Err(NodeError::Dag(noos_braid::DagError::ConflictsWithFinality));
+        }
         let parent = dag
             .get(&header.parent_hash)
             .ok_or(NodeError::Dag(noos_braid::DagError::UnknownBlock))?;
@@ -1189,6 +1298,7 @@ impl<P: StorePort> NodeCore<P> {
             InsertOutcome::Orphaned { hash, .. } => return Ok(ImportOutcome::Orphaned { hash }),
         };
         self.promote_light_orphans(hash);
+        self.dag.prune_finalized_history();
         Ok(ImportOutcome::HeaderAccepted { hash })
     }
     /// Slice-oriented light import used by bounded light-update batches.
@@ -1536,6 +1646,7 @@ impl<P: StorePort> NodeCore<P> {
             let (reorged, connected_blocks, settled_txs, view_plan) =
                 self.stage_fork_choice(&mut staged, &mut writes, &bodies)?;
             self.stage_refresh_anchor(&mut staged, &bodies)?;
+            Self::prune_staged_finalized_history(&mut staged);
 
             let justified = staged.tracker.justified_head();
             let finalized = staged.tracker.finalized_head();
@@ -2538,6 +2649,7 @@ impl<P: StorePort> NodeCore<P> {
             return Ok(());
         }
         self.stage_refresh_anchor(&mut staged, &BTreeMap::new())?;
+        Self::prune_staged_finalized_history(&mut staged);
         let justified = staged.tracker.justified_head();
         let finalized = staged.tracker.finalized_head();
         ws.indices
@@ -2583,10 +2695,10 @@ impl<P: StorePort> NodeCore<P> {
 
     // -- restart recovery ----------------------------------------------------------
 
-    /// Replays the durable chain: headers/tickets/bodies from the store
-    /// through the ordinary execution pipeline, certificates afterwards,
-    /// the anchor snapshotted at the recorded finalized height. Recovered
-    /// state is EXACT: every block's roots re-verify or startup fails.
+    /// Replays the durable chain: headers/tickets/bodies and independently
+    /// persisted certificates from the store through the ordinary execution
+    /// pipeline, then snapshots the anchor at the recorded finalized height.
+    /// Recovered state is EXACT: every block's roots re-verify or startup fails.
     fn replay_from_store(&mut self) -> Result<(), NodeError> {
         // Recorded finalized checkpoint (for the anchor snapshot).
         let recorded_finalized = match self.port.get_index(KEY_FINALIZED)? {
@@ -2597,6 +2709,19 @@ impl<P: StorePort> NodeCore<P> {
             },
         };
         let finalized_height = recorded_finalized.epoch.saturating_mul(EPOCH_LENGTH);
+
+        // A live node can verify and persist a standalone certificate before
+        // importing a later canonical header that reflects it. The canonical
+        // body need not repeat that evidence (and a bounded body cannot repeat
+        // an arbitrarily large verified backlog), so replay must make durable
+        // certificate evidence available at the same historical checkpoint.
+        let durable_certificates: Vec<FinalityCertificateV1> = self
+            .port
+            .scan_indices(b"c/")?
+            .into_iter()
+            .map(|(_, value)| FinalityCertificateV1::decode_canonical(&value))
+            .collect::<Result<_, _>>()?;
+        let mut durable_certificate_cursor = 0_usize;
 
         // Canonical chain replay through the height index.
         let entries = self.port.scan_indices(b"n/")?;
@@ -2626,14 +2751,37 @@ impl<P: StorePort> NodeCore<P> {
             // rule compares against adjusted time, which for a durable
             // block is at least its own timestamp.
             self.now_ms = self.now_ms.max(header.timestamp_ms);
-            // Trusted-store replay still re-validates: structure, ticket,
-            // execution, roots, and the same-block certificate/checkpoint
-            // ordering used during live import.
-            self.import_header_stages(
-                &header,
-                &ticket,
-                Some(body.finality_certificates.as_slice()),
-            )?;
+            // Trusted-store replay still re-validates structure, ticket,
+            // execution, roots, and checkpoint binding. Merge the body's wire
+            // evidence with any independently persisted transitions needed by
+            // this header. Body commitments remain checked against the actual
+            // body by `execute_and_verify`.
+            let durable_start = durable_certificate_cursor;
+            while durable_certificates
+                .get(durable_certificate_cursor)
+                .is_some_and(|certificate| {
+                    certificate.target.epoch <= header.justified_checkpoint.epoch
+                })
+            {
+                durable_certificate_cursor = durable_certificate_cursor.saturating_add(1);
+            }
+            let durable_evidence = &durable_certificates[durable_start..durable_certificate_cursor];
+            if durable_evidence.is_empty() {
+                self.replay_header_stages_in_place(
+                    &header,
+                    &ticket,
+                    body.finality_certificates.as_slice(),
+                )?;
+            } else {
+                let mut replay_evidence = Vec::with_capacity(
+                    durable_evidence
+                        .len()
+                        .saturating_add(body.finality_certificates.as_slice().len()),
+                );
+                replay_evidence.extend_from_slice(durable_evidence);
+                replay_evidence.extend_from_slice(body.finality_certificates.as_slice());
+                self.replay_header_stages_in_place(&header, &ticket, &replay_evidence)?;
+            }
             let exec = self.execute_and_verify(&header, &body).inspect_err(|_| {
                 // A replay failure is a corrupt/foreign store: startup stops.
             })?;
@@ -2656,10 +2804,9 @@ impl<P: StorePort> NodeCore<P> {
         // not receive the standalone certificate.
         let embedded_justified_epoch = self.tracker.justified_head().epoch;
 
-        // Certificates in epoch order.
-        let certs = self.port.scan_indices(b"c/")?;
-        for (_, value) in certs {
-            let cert = FinalityCertificateV1::decode_canonical(&value)?;
+        // Re-apply all durable certificates to recover any transition newer
+        // than the last canonical header and queue that tail for re-embedding.
+        for cert in durable_certificates {
             self.ensure_snapshot(cert.target.epoch)?;
             let ancestry = DagAncestry { dag: &self.dag };
             let outcome = self
@@ -2693,6 +2840,12 @@ impl<P: StorePort> NodeCore<P> {
         // SOCIAL INPUT check against recovered local finality.
         if let Some(social) = self.cfg.social_checkpoint {
             self.apply_social_checkpoint(social)?;
+        }
+        let finalized = self.tracker.finalized_head();
+        if finalized.expected_height().is_some_and(|height| {
+            self.anchor.0 == finalized.checkpoint_hash && self.anchor.1 == height
+        }) {
+            self.dag.prune_finalized_history();
         }
         Ok(())
     }

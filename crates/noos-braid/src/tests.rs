@@ -724,6 +724,23 @@ fn reorgs_never_cross_the_finalized_checkpoint() {
         checkpoint_hash: tip_a,
     })
     .unwrap();
+    dag.prune_finalized_history();
+    assert!(
+        dag.contains(&ghash),
+        "the older Ground anchor still named by live headers was pruned"
+    );
+    assert_eq!(
+        dag.ancestors(&tip_a).count(),
+        noos_ground::MEDIAN_TIME_PAST_BLOCKS,
+        "the exact Ground median-time-past context remains available"
+    );
+    assert!(
+        dag.len()
+            <= noos_ground::MEDIAN_TIME_PAST_BLOCKS
+                .saturating_mul(2)
+                .saturating_add(1),
+        "two epoch-length branches were not reduced to bounded finality and anchor context"
+    );
     assert_eq!(
         dag.plan_reorg(&tip_a, &tip_b).unwrap_err(),
         DagError::ReorgAcrossFinality

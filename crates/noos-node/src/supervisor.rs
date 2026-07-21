@@ -297,6 +297,20 @@ pub enum ConsensusMsg {
         query_id: Hash32,
         reply: Reply<Result<(u64, Hash32, noos_lumen::wwm::ResolutionProofV1), String>>,
     },
+    GetNeuralEvaluation {
+        query_id: Hash32,
+        reply: Reply<
+            Result<
+                (
+                    u64,
+                    Hash32,
+                    noos_lumen::wwm::ResolutionProofV1,
+                    Option<noos_lumen::wwm::ResolutionProofV1>,
+                ),
+                String,
+            >,
+        >,
+    },
     Status {
         reply: Reply<StatusSnapshot>,
     },
@@ -551,6 +565,12 @@ fn core_loop<P: StorePort>(
                         .map_err(|error| error.to_string()),
                 );
             }
+            ConsensusMsg::GetNeuralEvaluation { query_id, reply } => {
+                let _ = reply.send(
+                    core.finalized_neural_evaluation(query_id)
+                        .map_err(|error| error.to_string()),
+                );
+            }
             ConsensusMsg::Status { reply } => {
                 let _ = reply.send(status_of(
                     core,
@@ -742,7 +762,7 @@ async fn sync_ready_peer(
     let Some(mode) = consensus_mode(consensus) else {
         return;
     };
-    loop {
+    'sync: loop {
         let Some(before) = consensus_sync_head(consensus) else {
             return;
         };
@@ -764,14 +784,19 @@ async fn sync_ready_peer(
             } else {
                 import_wire_block(consensus, p2p, peer, &header.0).await
             };
-            if let Err(_error) = result {
-                #[cfg(test)]
+            if let Err(error) = result {
+                // A gossip push can execute this height while the range body is
+                // in flight. If the sync head advanced, restart from the new
+                // cursor instead of permanently abandoning this ready peer.
+                if consensus_sync_head(consensus)
+                    .is_some_and(|after_error| after_error.0 > before.0)
                 {
-                    let height = decode_header_announce(&header.0)
-                        .ok()
-                        .map(|(decoded, _)| decoded.height);
-                    eprintln!("range-sync import stopped at {height:?}: {_error}");
+                    continue 'sync;
                 }
+                let height = decode_header_announce(&header.0)
+                    .ok()
+                    .map(|(decoded, _)| decoded.height);
+                eprintln!("range-sync import stopped at {height:?}: {error}");
                 return;
             }
         }
@@ -1145,7 +1170,10 @@ pub fn start(
                     Arc::clone(&task_metrics),
                 ) {
                     Ok(c) => c,
-                    Err(_) => return, // typed fatal: store refused startup
+                    Err(error) => {
+                        eprintln!("fatal consensus boot error: {error}");
+                        return; // typed fatal: store refused startup
+                    }
                 };
                 let done = catch_unwind(AssertUnwindSafe(|| {
                     core_loop(&mut core, observer, &consensus_rx, gossip_tx.as_ref())

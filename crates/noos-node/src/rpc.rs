@@ -21,6 +21,8 @@
 //!                   one canonical lifecycle record and its finalized object proof
 //! GET  /neural-oracle/<query-id>
 //!                   finalized raw neural result and its object proof
+//! GET  /neural-evaluation/<query-id>/<input-hex>
+//!                   finalized L1 program + result proofs and deterministic replay
 //! GET  /blocks/<start-height>/<limit> (authenticated, limit 1..64)
 //! GET  /receipt/<txid-hex>
 //! GET  /assets      fixed-supply user asset registry
@@ -51,7 +53,9 @@ use crate::Hash32;
 use noos_braid::EPOCH_LENGTH;
 use noos_codec::{NoosDecode, NoosEncode};
 use noos_lumen::neural_oracle::{
-    neural_result_key, NeuralOracleMode, NeuralOracleResultV1, NeuralOracleStatus,
+    evaluate_neural_program, neural_input_root, neural_output_root, neural_program_key,
+    neural_result_id, neural_result_key, neural_transcript_root, validate_neural_program,
+    NeuralOracleMode, NeuralOracleResultV1, NeuralOracleStatus, NeuralProgramV1,
 };
 use noos_lumen::objects::BoundedBytes;
 use noos_lumen::wwm::{
@@ -243,6 +247,9 @@ fn handle_connection(
         }
         _ if method == "GET" && path.starts_with("/wwm-record/") => {
             wwm_record_route(consensus_tx, &path["/wwm-record/".len()..])
+        }
+        _ if method == "GET" && path.starts_with("/neural-evaluation/") => {
+            neural_evaluation_route(consensus_tx, &path["/neural-evaluation/".len()..])
         }
         _ if method == "GET" && path.starts_with("/neural-oracle/") => {
             neural_oracle_result_route(consensus_tx, &path["/neural-oracle/".len()..])
@@ -777,6 +784,259 @@ fn neural_oracle_result_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str
             "500 Internal Server Error",
             "serialization_failed",
             "neural-oracle result serialization failed",
+        ),
+    }
+}
+
+fn neural_evaluation_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> String {
+    let Some((raw_query_id, raw_input)) = raw.split_once('/') else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "expected /neural-evaluation/<hex32>/<input-hex>",
+        );
+    };
+    if raw_input.is_empty()
+        || raw_input.len() > 64
+        || raw_input.contains('/')
+        || !raw_input
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "input must be 1..32 lowercase hexadecimal bytes",
+        );
+    }
+    let Some(query_id) = unhex32(raw_query_id) else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "query id must be lowercase hex32",
+        );
+    };
+    let Some(input) = unhex(raw_input) else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "input must contain complete hexadecimal bytes",
+        );
+    };
+    let Some(result) = round_trip(consensus_tx, |reply| ConsensusMsg::GetNeuralEvaluation {
+        query_id,
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "consensus task did not answer",
+        );
+    };
+    let Ok((height, finalized_hash, result_proof, program_proof)) = result else {
+        return json_error(
+            "409 Conflict",
+            "finalized_state_unavailable",
+            "finalized neural evaluation lookup failed",
+        );
+    };
+    if !result_proof.verify() || result_proof.state_key != neural_result_key(&query_id) {
+        return json_error(
+            "500 Internal Server Error",
+            "invalid_local_proof",
+            "local finalized neural result proof failed verification",
+        );
+    }
+    let ResolutionValueV1::Present(result_value) = &result_proof.value else {
+        return json_error(
+            "404 Not Found",
+            "not_found",
+            "neural evaluation result is not finalized",
+        );
+    };
+    let result = match NeuralOracleResultV1::decode_canonical(result_value.as_slice()) {
+        Ok(result) if result.query_id == query_id => result,
+        _ => {
+            return json_error(
+                "500 Internal Server Error",
+                "invalid_local_record",
+                "neural evaluation result failed canonical decoding",
+            )
+        }
+    };
+    if result.mode != NeuralOracleMode::L1Deterministic
+        || result.status != NeuralOracleStatus::Success
+    {
+        return json_error(
+            "409 Conflict",
+            "not_l1_deterministic",
+            "query is not a successful deterministic L1 neural evaluation",
+        );
+    }
+    let Some(program_proof) = program_proof else {
+        return json_error(
+            "500 Internal Server Error",
+            "invalid_local_record",
+            "deterministic result has no finalized program proof",
+        );
+    };
+    if !program_proof.verify()
+        || program_proof.objects_root != result_proof.objects_root
+        || program_proof.state_key != neural_program_key(&result.source_id)
+    {
+        return json_error(
+            "500 Internal Server Error",
+            "invalid_local_proof",
+            "local finalized neural program proof failed verification",
+        );
+    }
+    let ResolutionValueV1::Present(program_value) = &program_proof.value else {
+        return json_error(
+            "500 Internal Server Error",
+            "invalid_local_record",
+            "deterministic result names an absent neural program",
+        );
+    };
+    let program = match NeuralProgramV1::decode_canonical(program_value.as_slice()) {
+        Ok(program)
+            if program.program_id == result.source_id
+                && validate_neural_program(&program).is_ok() =>
+        {
+            program
+        }
+        _ => {
+            return json_error(
+                "500 Internal Server Error",
+                "invalid_local_record",
+                "finalized neural program failed validation",
+            )
+        }
+    };
+    if neural_input_root(&input) != result.input_root {
+        return json_error(
+            "422 Unprocessable Entity",
+            "input_commitment_mismatch",
+            "supplied input does not match the finalized input root",
+        );
+    }
+    let evaluation = match evaluate_neural_program(&program, &input) {
+        Ok(evaluation) => evaluation,
+        Err(_) => {
+            return json_error(
+                "422 Unprocessable Entity",
+                "invalid_input",
+                "supplied input does not satisfy the finalized program shape",
+            )
+        }
+    };
+    if evaluation.output.as_slice() != result.response.as_slice()
+        || neural_output_root(result.response.as_slice()) != result.output_root
+        || neural_transcript_root(result.response.as_slice()) != result.transcript_root
+        || neural_result_id(&query_id, &result.output_root, &result.transcript_root)
+            != result.result_id
+    {
+        return json_error(
+            "500 Internal Server Error",
+            "replay_mismatch",
+            "finalized neural result did not reproduce exactly",
+        );
+    }
+
+    let mut weight_counts = [0_u32; 3];
+    for weight in program
+        .hidden_weights
+        .as_slice()
+        .iter()
+        .chain(program.output_weights.as_slice())
+    {
+        let Some(count) = weight_counts.get_mut(usize::from(*weight)) else {
+            return json_error(
+                "500 Internal Server Error",
+                "invalid_local_record",
+                "finalized neural program contains an invalid trit",
+            );
+        };
+        *count = count.saturating_add(1);
+    }
+    let hidden_biases = program
+        .hidden_biases
+        .as_slice()
+        .iter()
+        .map(|value| i16::from(*value as i8))
+        .collect::<Vec<_>>();
+    let output_biases = program
+        .output_biases
+        .as_slice()
+        .iter()
+        .map(|value| i16::from(*value as i8))
+        .collect::<Vec<_>>();
+    let input_trits = input
+        .iter()
+        .map(|value| i16::from(*value) - 1)
+        .collect::<Vec<_>>();
+    let output_trits = result
+        .response
+        .as_slice()
+        .iter()
+        .map(|value| i16::from(*value) - 1)
+        .collect::<Vec<_>>();
+    let body = serde_json::json!({
+        "schema": "noos/finalized-neural-evaluation/v1",
+        "trust_scope": "LOCAL_FULL_NODE_FINALIZED_STATE",
+        "mode": "L1_DETERMINISTIC",
+        "status": "SUCCESS",
+        "query_id": hex(&result.query_id),
+        "result_id": hex(&result.result_id),
+        "program_id": hex(&program.program_id),
+        "shape": {
+            "input": program.input_width,
+            "hidden": program.hidden_width,
+            "output": program.output_width,
+        },
+        "program": {
+            "hidden_weights_hex": hex(program.hidden_weights.as_slice()),
+            "hidden_biases": hidden_biases,
+            "output_weights_hex": hex(program.output_weights.as_slice()),
+            "output_biases": output_biases,
+            "weight_counts": {
+                "negative": weight_counts[0],
+                "zero": weight_counts[1],
+                "positive": weight_counts[2],
+            },
+            "trit_encoding": {"0": -1, "1": 0, "2": 1},
+        },
+        "evaluation": {
+            "input_encoded": input,
+            "input_trits": input_trits,
+            "output_encoded": result.response.as_slice(),
+            "output_trits": output_trits,
+            "operations": evaluation.operations,
+            "replay_verified": true,
+            "input_verified": true,
+        },
+        "commitments": {
+            "input_root": hex(&result.input_root),
+            "output_root": hex(&result.output_root),
+            "transcript_root": hex(&result.transcript_root),
+        },
+        "evaluation_height": result.finalized_height,
+        "finalized_height": height,
+        "finalized_hash": hex(&finalized_hash),
+        "objects_root": hex(&result_proof.objects_root),
+        "proofs_verified": true,
+        "weights_on_chain": true,
+        "consensus_effect": "NONE",
+        "canonical_program_hex": hex(program_value.as_slice()),
+        "canonical_result_hex": hex(result_value.as_slice()),
+        "program_proof_hex": hex(&program_proof.encode_canonical()),
+        "result_proof_hex": hex(&result_proof.encode_canonical()),
+    });
+    match serde_json::to_string(&body) {
+        Ok(body) => http("200 OK", "application/json", &body),
+        Err(_) => json_error(
+            "500 Internal Server Error",
+            "serialization_failed",
+            "neural evaluation serialization failed",
         ),
     }
 }

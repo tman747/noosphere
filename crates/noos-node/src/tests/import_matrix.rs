@@ -617,7 +617,10 @@ fn finalized_checkpoint_is_never_reverted_by_work() {
                 panic!("work reverted a finalized checkpoint")
             }
             Ok(_) | Err(NodeError::Dag(_)) => {}
-            Err(e) => panic!("unexpected import failure class: {e}"),
+            Err(e) => panic!(
+                "unexpected import failure class at height {}: {e}",
+                pb.header.height
+            ),
         }
     }
     assert_eq!(a.head(), head_before, "head unmoved by conflicting work");

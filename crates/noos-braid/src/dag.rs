@@ -24,7 +24,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use noos_ground::{
-    ground_work, DuplicateSet, GroundTicketV1, EXTRA_NONCE_BYTES, PROPOSER_PUBKEY_BYTES, U256,
+    ground_work, DuplicateSet, GroundTicketV1, EXTRA_NONCE_BYTES, MEDIAN_TIME_PAST_BLOCKS,
+    PROPOSER_PUBKEY_BYTES, U256,
 };
 
 use crate::fork::{u256_saturating_add, ForkScore};
@@ -600,6 +601,99 @@ impl HeaderDag {
         Ok(())
     }
 
+    /// Drops connected history that finality makes unreachable while retaining
+    /// the current checkpoint's median-time-past window and every older Ground
+    /// anchor context still named by a live post-finality header. Durable block
+    /// history is owned by the store; this only bounds the cloned in-memory
+    /// fork-choice graph.
+    pub fn prune_finalized_history(&mut self) {
+        let lookback = u64::try_from(MEDIAN_TIME_PAST_BLOCKS)
+            .unwrap_or(u64::MAX)
+            .saturating_sub(1);
+        let finalized_height = self.finalized_height();
+        let retain_from = finalized_height.saturating_sub(lookback);
+        if retain_from == 0 {
+            return;
+        }
+
+        let mut retained = self
+            .headers
+            .values()
+            .filter(|stored| stored.header.height >= retain_from)
+            .map(|stored| stored.hash)
+            .collect::<BTreeSet<_>>();
+        let anchor_hashes = retained
+            .iter()
+            .filter_map(|hash| self.headers.get(hash))
+            .map(|stored| {
+                let named = stored.header.finalized_checkpoint.checkpoint_hash;
+                if stored.header.finalized_checkpoint.epoch == 0 || named == ZERO_ROOT {
+                    self.genesis_hash
+                } else {
+                    named
+                }
+            })
+            .collect::<BTreeSet<_>>();
+        if anchor_hashes
+            .iter()
+            .any(|anchor| !self.headers.contains_key(anchor))
+        {
+            return;
+        }
+        for anchor in anchor_hashes {
+            retained.extend(
+                self.ancestors(&anchor)
+                    .take(MEDIAN_TIME_PAST_BLOCKS)
+                    .map(|stored| stored.hash),
+            );
+        }
+
+        let connected_prunable = retained.len() < self.headers.len();
+        let orphan_prunable = self
+            .orphans
+            .values()
+            .any(|orphan| orphan.header.height <= finalized_height);
+        if !connected_prunable && !orphan_prunable {
+            return;
+        }
+
+        self.headers.retain(|hash, _| retained.contains(hash));
+        self.orphans
+            .retain(|_, orphan| orphan.header.height > finalized_height);
+
+        let mut children = BTreeMap::<[u8; 32], BTreeSet<[u8; 32]>>::new();
+        let mut by_height = BTreeMap::<u64, BTreeSet<[u8; 32]>>::new();
+        let mut by_slot = BTreeMap::<u64, BTreeSet<[u8; 32]>>::new();
+        for stored in self.headers.values() {
+            by_height
+                .entry(stored.header.height)
+                .or_default()
+                .insert(stored.hash);
+            by_slot
+                .entry(stored.header.slot)
+                .or_default()
+                .insert(stored.hash);
+            if self.headers.contains_key(&stored.header.parent_hash) {
+                children
+                    .entry(stored.header.parent_hash)
+                    .or_default()
+                    .insert(stored.hash);
+            }
+        }
+        self.children = children;
+        self.by_height = by_height;
+        self.by_slot = by_slot;
+
+        let mut orphans_by_parent = BTreeMap::<[u8; 32], BTreeSet<[u8; 32]>>::new();
+        for orphan in self.orphans.values() {
+            orphans_by_parent
+                .entry(orphan.header.parent_hash)
+                .or_default()
+                .insert(orphan.hash);
+        }
+        self.orphans_by_parent = orphans_by_parent;
+    }
+
     fn check_checkpoint(&self, checkpoint: &CheckpointRef) -> Result<(), DagError> {
         let stored = self
             .headers
@@ -687,6 +781,9 @@ impl HeaderDag {
     pub fn plan_reorg(&self, from: &[u8; 32], to: &[u8; 32]) -> Result<ReorgPlan, DagError> {
         let mut a = self.headers.get(from).ok_or(DagError::UnknownBlock)?;
         let mut b = self.headers.get(to).ok_or(DagError::UnknownBlock)?;
+        if !self.descends_from_finalized(from) || !self.descends_from_finalized(to) {
+            return Err(DagError::ReorgAcrossFinality);
+        }
         let mut disconnect = Vec::new();
         let mut connect_rev = Vec::new();
         while a.header.height > b.header.height {
