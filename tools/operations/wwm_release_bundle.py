@@ -39,6 +39,32 @@ BOUNDARY: Final[dict[str, object]] = {
     "evidence_class": "OWNER_CONTROLLED_TESTNET_RELEASE",
     "independent_reproduction": False,
 }
+ROLLOUT: Final[dict[str, object]] = {
+    "order": [
+        "observer-read-gateway",
+        "witness-3",
+        "witness-2",
+        "witness-1",
+        "producer-witness-0",
+    ],
+    "minimum_finality_quorum": 3,
+    "rollback_artifact_required": True,
+    "durable_state_deletion_permitted": False,
+    "process_rss_limit_bytes": {
+        "observer-read-gateway": 6 * 1024**3,
+        "witness-3": 5 * 1024**3,
+        "witness-2": 5 * 1024**3,
+        "witness-1": 6 * 1024**3,
+        "producer-witness-0": 14 * 1024**3,
+    },
+    "stop_conditions": [
+        "chain_or_genesis_mismatch",
+        "height_regression",
+        "finality_quorum_loss",
+        "finalized_checkpoint_divergence",
+        "host_memory_envelope_exceeded",
+    ],
+}
 
 
 class ReleaseBundleError(RuntimeError):
@@ -460,25 +486,7 @@ def build_bundle(
         },
         "files": sorted(entries, key=lambda entry: str(entry["path"])),
         "version_probes": probes,
-        "rollout": {
-            "order": [
-                "observer-read-gateway",
-                "witness-3",
-                "witness-2",
-                "witness-1",
-                "producer-witness-0",
-            ],
-            "minimum_finality_quorum": 3,
-            "rollback_artifact_required": True,
-            "durable_state_deletion_permitted": False,
-            "stop_conditions": [
-                "chain_or_genesis_mismatch",
-                "height_regression",
-                "finality_quorum_loss",
-                "finalized_checkpoint_divergence",
-                "host_memory_envelope_exceeded",
-            ],
-        },
+        "rollout": ROLLOUT,
     }
     manifest["bundle_id"] = manifest_bundle_id(manifest)
     (output / MANIFEST_NAME).write_bytes(canonical_json(manifest) + b"\n")
@@ -505,6 +513,8 @@ def verify_bundle(bundle_root: Path) -> dict[str, Any]:
         raise ReleaseBundleError("release manifest schema or fields are invalid")
     if manifest.get("boundary") != BOUNDARY:
         raise ReleaseBundleError("release boundary is not fail-closed testnet evidence")
+    if manifest.get("rollout") != ROLLOUT:
+        raise ReleaseBundleError("release rollout policy is not exact")
     source = manifest.get("source")
     if (
         not isinstance(source, dict)

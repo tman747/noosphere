@@ -109,13 +109,7 @@ class PublicTestnetReleaseBundleTests(unittest.TestCase):
                 )
                 for relative in sorted(release.REVISION_PROBE_PATHS)
             },
-            "rollout": {
-                "order": ["observer-read-gateway", "witness-3", "witness-2", "witness-1", "producer-witness-0"],
-                "minimum_finality_quorum": 3,
-                "rollback_artifact_required": True,
-                "durable_state_deletion_permitted": False,
-                "stop_conditions": ["chain_or_genesis_mismatch"],
-            },
+            "rollout": json.loads(json.dumps(release.ROLLOUT)),
         }
         self.write_manifest()
 
@@ -155,6 +149,12 @@ class PublicTestnetReleaseBundleTests(unittest.TestCase):
         self.manifest["version_probes"]["bin/noosd"] = "noosd 0.1.0 source_revision=UNBOUND"
         self.write_manifest()
         with self.assertRaisesRegex(release.ReleaseBundleError, "not exact"):
+            release.verify_bundle(self.root)
+
+    def test_rollout_policy_cannot_be_weakened(self) -> None:
+        self.manifest["rollout"]["minimum_finality_quorum"] = 2
+        self.write_manifest()
+        with self.assertRaisesRegex(release.ReleaseBundleError, "rollout policy"):
             release.verify_bundle(self.root)
 
     def test_manifest_cannot_escape_bundle_root(self) -> None:
