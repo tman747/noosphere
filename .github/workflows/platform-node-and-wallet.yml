@@ -53,6 +53,12 @@ jobs:
           cargo test --locked -p noos-node --lib -- --test-threads=1
           cargo test --locked -p noos-lumen
           cargo test --locked -p noos-cli
+      - name: Test mobile wallet SDK boundary
+        shell: bash
+        run: cargo test --locked -p noos-wallet-sdk
+      - name: Reject stale mobile wallet bindings
+        shell: bash
+        run: python wallet/mobile/build_bindings.py verify --profile release
       - name: Exercise deterministic throughput report contract
         if: runner.os == 'Windows'
         shell: bash

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import hashlib
 import json
 import os
@@ -11,6 +12,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Final
 
@@ -55,7 +57,7 @@ def output(argv: list[str]) -> str:
 
 
 def cargo_metadata() -> dict[str, object]:
-    return json.loads(output(["cargo", "metadata", "--format-version", "1", "--no-deps"]))
+    return json.loads(output(["cargo", "metadata", "--locked", "--format-version", "1", "--no-deps"]))
 
 
 def target_directory() -> Path:
@@ -81,7 +83,7 @@ def host_library(profile: str) -> Path:
 
 
 def build_host(profile: str) -> Path:
-    argv = ["cargo", "build", "-p", SDK_CRATE]
+    argv = ["cargo", "build", "--locked", "-p", SDK_CRATE]
     if profile == "release":
         argv.append("--release")
     run(argv)
@@ -94,6 +96,7 @@ def generate_bindings(library: Path, language: str, destination: Path) -> None:
         [
             "cargo",
             "run",
+            "--locked",
             "-p",
             SDK_CRATE,
             "--features",
@@ -111,6 +114,90 @@ def generate_bindings(library: Path, language: str, destination: Path) -> None:
             "--no-format",
         ]
     )
+
+
+def normalized_generated_source(path: Path) -> list[str]:
+    if not path.is_file():
+        raise BuildError(f"generated binding is missing: {path}")
+    lines = [line.rstrip() for line in path.read_text(encoding="utf-8").splitlines()]
+    while lines and not lines[-1]:
+        lines.pop()
+    return lines
+
+
+def verify_bindings(profile: str) -> None:
+    library = build_host(profile)
+    bindings = (
+        (
+            "kotlin",
+            Path("org/noosphere/wallet/core/noos_wallet_sdk.kt"),
+            ROOT
+            / "wallet"
+            / "mobile"
+            / "android"
+            / "core"
+            / "src"
+            / "main"
+            / "java"
+            / "org"
+            / "noosphere"
+            / "wallet"
+            / "core"
+            / "noos_wallet_sdk.kt",
+        ),
+        (
+            "swift",
+            Path("MindChainWalletCore.swift"),
+            ROOT / "wallet" / "mobile" / "ios" / "CoreBindings" / "MindChainWalletCore.swift",
+        ),
+        (
+            "swift",
+            Path("MindChainWalletCoreFFI.h"),
+            ROOT / "wallet" / "mobile" / "ios" / "CoreBindings" / "MindChainWalletCoreFFI.h",
+        ),
+        (
+            "swift",
+            Path("MindChainWalletCoreFFI.modulemap"),
+            ROOT
+            / "wallet"
+            / "mobile"
+            / "ios"
+            / "CoreBindings"
+            / "MindChainWalletCoreFFI.modulemap",
+        ),
+    )
+    with tempfile.TemporaryDirectory(prefix="noos-wallet-bindings-") as temporary:
+        generated_roots = {
+            language: Path(temporary) / language for language in ("kotlin", "swift")
+        }
+        for language, destination in generated_roots.items():
+            generate_bindings(library, language, destination)
+
+        drifted: list[str] = []
+        for language, relative_path, committed_path in bindings:
+            generated_path = generated_roots[language] / relative_path
+            generated_lines = normalized_generated_source(generated_path)
+            committed_lines = normalized_generated_source(committed_path)
+            if generated_lines == committed_lines:
+                continue
+            display_path = committed_path.relative_to(ROOT).as_posix()
+            drifted.append(display_path)
+            difference = "\n".join(
+                difflib.unified_diff(
+                    committed_lines,
+                    generated_lines,
+                    fromfile=display_path,
+                    tofile=f"generated/{language}/{relative_path.as_posix()}",
+                    lineterm="",
+                )
+            )
+            print(difference, file=sys.stderr)
+
+    if drifted:
+        raise BuildError(
+            "generated bindings differ from committed sources: " + ", ".join(drifted)
+        )
+    print("verified committed Kotlin and Swift bindings")
 
 
 def sha256(path: Path) -> str:
@@ -328,7 +415,7 @@ def build_ios(profile: str) -> None:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("platform", choices=("android", "ios"))
+    parser.add_argument("platform", choices=("android", "ios", "verify"))
     parser.add_argument("--profile", choices=("debug", "release"), default="release")
     parser.add_argument(
         "--ndk-home",
@@ -343,8 +430,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.platform == "android":
             build_android(args.profile, args.ndk_home.expanduser().resolve())
-        else:
+        elif args.platform == "ios":
             build_ios(args.profile)
+        else:
+            verify_bindings(args.profile)
     except (BuildError, OSError, ValueError, json.JSONDecodeError) as error:
         print(f"mobile wallet binding build failed: {error}", file=sys.stderr)
         return 1
