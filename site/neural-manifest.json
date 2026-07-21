@@ -21,6 +21,24 @@
   },
   "activity": [
     {
+      "sequence": 4,
+      "label": "Neural pulse 04",
+      "transaction_id": "11153f8960a45599ddba829b71ca231e5bd6e92a76aa055555676900b7eab614",
+      "included_height": 232968,
+      "included_block": "c1ccda9b309b3f264b15830258948aae02cdfaeb5623f2446a5a151ae6832ea9",
+      "fee_charged": "1506",
+      "job_id": "bf48dda185531dae9cfae7978aa082536dd95ffaa733345cfa20afce0b8d23cd",
+      "receipt_id": "f784a9874d08771bc484bfc70fc7f57f8a91e79e53ab17a47a274fffe64ba7b0",
+      "settlement_id": "10e758d5d33487ba71a43294f325bc80c623b9d16d957bd92d5b8ae5cc642626",
+      "prompt_commitment": "eb06584686e59f077ac84defeabe9bee421c178fbd656313f2b36666d77495f1",
+      "input_tokens": 4,
+      "output_tokens": 16,
+      "output_bytes": 56,
+      "duration_milliseconds": 38563,
+      "output_root": "637612aba552e495617a4991015696f68d317a28888b34da2ea2c094d036f16b",
+      "token_history_root": "cfb3cbc65ce2a6b781ce06653e964a7a89a7729e1eabc2b872a9ee2ff018ed15"
+    },
+    {
       "sequence": 3,
       "label": "Neural pulse 03",
       "transaction_id": "7115c7f61b95a2e42dffd84e5e393f22248e260e74093640b6ba5970088d76c4",
