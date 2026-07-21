@@ -1,0 +1,41 @@
+[Unit]
+Description=MindChain public testnet live network dashboard
+Documentation=https://wwm-status.mindchain.network
+After=network-online.target mindchain-wwm-seed.service mindchain-public-indexer.service
+Wants=network-online.target mindchain-wwm-seed.service mindchain-public-indexer.service
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=mindchain-wwm
+Group=mindchain-wwm
+ExecStart=/usr/bin/python3 /opt/mindchain-wwm/dashboard/network_dashboard.py --operator-node http://127.0.0.1:29652 --operator-secret /etc/mindchain-wwm/rpc-token --indexer http://127.0.0.1:29670 --deployment /opt/mindchain-wwm/dashboard/public-testnet.json --validator-config /etc/mindchain-wwm/network-dashboard-validators.json --app-dir /opt/mindchain-wwm/dashboard/app --database /var/lib/mindchain-network-dashboard/samples.sqlite3 --listen 127.0.0.1:29911
+Restart=always
+RestartSec=5s
+TimeoutStopSec=15s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/mindchain-network-dashboard
+
+[Install]
+WantedBy=multi-user.target

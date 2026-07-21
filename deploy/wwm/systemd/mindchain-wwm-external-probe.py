@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -17,6 +18,12 @@ PUBLIC_URLS = (
     "https://wwm-artifacts.mindchain.network/healthz",
     "https://wwm-status.mindchain.network/status.json",
 )
+SEMVER_BASE = (
+    r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
+    r"(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
+    r"(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?"
+)
+REVISION_RELEASE = re.compile(rf"^{SEMVER_BASE}\+git\.([0-9a-f]{{40}})$")
 
 
 def probe(url: str, token: str | None = None, validator: object | None = None) -> dict[str, object]:
@@ -54,9 +61,31 @@ def probe(url: str, token: str | None = None, validator: object | None = None) -
 def validate_chain(document: dict[str, object]) -> dict[str, object]:
     if document.get("chain_id") != CHAIN_ID or document.get("genesis_hash") != GENESIS_HASH:
         raise RuntimeError("wrong_chain_identity")
+    source_revision = document.get("source_revision")
+    release_version = document.get("release_version")
+    release_match = (
+        REVISION_RELEASE.fullmatch(release_version)
+        if isinstance(release_version, str)
+        else None
+    )
+    if (
+        not isinstance(source_revision, str)
+        or len(source_revision) != 40
+        or any(character not in "0123456789abcdef" for character in source_revision)
+        or release_match is None
+        or release_match.group(1) != source_revision
+    ):
+        raise RuntimeError("unbound_release_identity")
     head = document.get("unsafe_head") if isinstance(document.get("unsafe_head"), dict) else {}
     finalized = document.get("finalized") if isinstance(document.get("finalized"), dict) else {}
-    return {"chain_id": CHAIN_ID, "genesis_hash": GENESIS_HASH, "unsafe_height": head.get("height"), "finalized_epoch": finalized.get("epoch")}
+    return {
+        "chain_id": CHAIN_ID,
+        "genesis_hash": GENESIS_HASH,
+        "unsafe_height": head.get("height"),
+        "finalized_epoch": finalized.get("epoch"),
+        "release_version": release_version,
+        "source_revision": source_revision,
+    }
 
 
 def validate_public(document: dict[str, object]) -> dict[str, object]:

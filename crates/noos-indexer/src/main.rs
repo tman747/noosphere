@@ -1,8 +1,40 @@
 use noos_indexer::ingest::LineProtocolSource;
 use noos_indexer::{router, router_with_operator, Identity, Indexer};
 
+fn bounded_env(name: &str, default: u64, minimum: u64, maximum: u64) -> std::io::Result<u64> {
+    let value = match std::env::var(name) {
+        Ok(raw) => raw
+            .parse::<u64>()
+            .map_err(|_| std::io::Error::other(format!("{name} must be an integer")))?,
+        Err(std::env::VarError::NotPresent) => default,
+        Err(std::env::VarError::NotUnicode(_)) => {
+            return Err(std::io::Error::other(format!("{name} must be UTF-8")));
+        }
+    };
+    if !(minimum..=maximum).contains(&value) {
+        return Err(std::io::Error::other(format!(
+            "{name} must be between {minimum} and {maximum}"
+        )));
+    }
+    Ok(value)
+}
+
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    let arguments = std::env::args_os().skip(1).collect::<Vec<_>>();
+    if arguments.as_slice() == ["--version"] {
+        println!(
+            "noos-indexer {} source_revision={}",
+            noos_indexer::RELEASE_VERSION,
+            noos_indexer::SOURCE_REVISION
+        );
+        return Ok(());
+    }
+    if !arguments.is_empty() {
+        return Err(std::io::Error::other(
+            "noos-indexer accepts only --version; runtime configuration uses NOOS_* environment variables",
+        ));
+    }
     let root = std::env::var_os("NOOS_INDEXER_ROOT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| std::path::PathBuf::from("./noos-index"));
@@ -29,17 +61,20 @@ async fn main() -> std::io::Result<()> {
         }
         _ => None,
     };
+    let sync_batch_size = bounded_env("NOOS_INDEXER_SYNC_BATCH_SIZE", 128, 1, 512)?;
+    let sync_interval_ms = bounded_env("NOOS_INDEXER_SYNC_INTERVAL_MS", 250, 50, 10_000)?;
     if let Some(mut source) = operator_source.clone() {
         let ingest_indexer = indexer.clone();
         let ingest_identity = identity.clone();
         tokio::spawn(async move {
-            let mut ticker = tokio::time::interval(std::time::Duration::from_millis(500));
+            let mut ticker =
+                tokio::time::interval(std::time::Duration::from_millis(sync_interval_ms));
             loop {
                 ticker.tick().await;
                 // Short blocking localhost round-trips; acceptable in this
                 // dedicated operator task.
                 if let Err(error) = ingest_indexer
-                    .sync_from_node(&ingest_identity, &mut source, 16)
+                    .sync_from_node(&ingest_identity, &mut source, sync_batch_size)
                     .await
                 {
                     eprintln!("ingest: {error}");

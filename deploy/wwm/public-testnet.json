@@ -23,7 +23,16 @@
   "local_services": {
     "node_rpc": "127.0.0.1:29652",
     "node_p2p": "/ip4/0.0.0.0/udp/29650/quic-v1",
-    "node_role": "witness-2-read-gateway-source",
+    "node_role": "observer-read-gateway-source",
+    "node_binary_sha256": "3246b5d1c5f75e29b9f66c62cda6ea8b5c113c8387b7020caf4bc8e3426e0940",
+    "node_source_revision": "50a674a16fcf0cecf9c97d213771d183231e35a6",
+    "node_replay_repair": "durable-certificate-evidence-v1",
+    "bootstrap_peers": [
+      "/ip4/20.15.164.29/udp/31004/quic-v1",
+      "/ip4/172.202.41.123/udp/31005/quic-v1",
+      "/ip4/48.217.51.122/udp/31006/quic-v1",
+      "/ip4/48.217.51.122/udp/31007/quic-v1"
+    ],
     "public_gateway": "127.0.0.1:29680",
     "static_artifact_host": "127.0.0.1:29681",
     "artifact_store_api": "127.0.0.1:29682",
@@ -35,7 +44,46 @@
     "site": "https://wwm.mindchain.network",
     "read_gateway": "https://wwm-rpc.mindchain.network",
     "status": "https://wwm-status.mindchain.network",
-    "artifacts": "https://wwm-artifacts.mindchain.network"
+    "artifacts": "https://wwm-artifacts.mindchain.network",
+    "neural_explorer": "https://wwm.mindchain.network/neural.html",
+    "neural_manifest": "https://wwm.mindchain.network/neural-manifest.json"
+  },
+  "neural_publisher": {
+    "schema": "noos/wwm-neural-publisher-state/v1",
+    "mode": "resumable-finalized-pulse",
+    "poll_seconds": 60,
+    "minimum_seconds_between_pulses": 21600,
+    "minimum_finalized_advance": 256,
+    "activity_limit": 32,
+    "close_transaction": "receipt-and-settlement-atomic",
+    "state_storage": "operator-local",
+    "evidence_storage": "operator-local",
+    "production": false,
+    "promotion_effect": "NONE"
+  },
+  "public_inference": {
+    "schema": "noos/wwm-public-inference/v1",
+    "mode": "off-chain-interactive-testnet",
+    "model": "bonsai-q1",
+    "signing_algorithm": "Ed25519",
+    "signing_key_id": "1ad4d182db7efffd0e4435fdb748c793f38c2b0062150d00d05c3dda336ed1c6",
+    "prompt_bytes": 12000,
+    "output_token_limits": [
+      8,
+      16
+    ],
+    "jobs_per_client_per_hour": 3,
+    "jobs_per_hour_global": 24,
+    "maximum_running": 1,
+    "maximum_queued": 2,
+    "payment_modes": [
+      "SPONSORED"
+    ],
+    "interactive_chain_settlement": false,
+    "evidence_state": "PROVISIONAL_SIGNED",
+    "settlement_state": "PENDING_CHAIN",
+    "production": false,
+    "promotion_effect": "NONE"
   },
   "public_seeds": [
     {
@@ -43,10 +91,12 @@
       "ipv4": "20.15.164.29",
       "multiaddr": "/ip4/20.15.164.29/udp/31004/quic-v1",
       "witness_index": 0,
-      "role": "validator-producer",
+      "role": "producer-witness",
       "provider": "azure",
+      "vm_size": "Standard_D4ads_v7",
       "region": "centralus",
       "machine": "mindchain-seed-1",
+      "service": "mindchain-wwm-seed.service",
       "operator_rpc": "loopback-only",
       "independent": false
     },
@@ -57,28 +107,131 @@
       "witness_index": 1,
       "role": "witness",
       "provider": "azure",
+      "vm_size": "Standard_D2ads_v7",
       "region": "centralus",
       "machine": "mindchain-seed-2",
+      "service": "mindchain-wwm-seed.service",
       "operator_rpc": "loopback-only",
+      "independent": false
+    },
+    {
+      "hostname": "mindchain-seed-3.eastus.cloudapp.azure.com",
+      "ipv4": "48.217.51.122",
+      "multiaddr": "/ip4/48.217.51.122/udp/31006/quic-v1",
+      "witness_index": 2,
+      "role": "witness",
+      "provider": "azure",
+      "vm_size": "Standard_D4ads_v7",
+      "region": "eastus",
+      "zone": "1",
+      "machine": "mindchain-seed-3",
+      "service": "mindchain-wwm-seed.service",
+      "operator_rpc": "loopback-only",
+      "independent": false
+    },
+    {
+      "hostname": "mindchain-seed-3.eastus.cloudapp.azure.com",
+      "ipv4": "48.217.51.122",
+      "multiaddr": "/ip4/48.217.51.122/udp/31007/quic-v1",
+      "witness_index": 3,
+      "role": "witness",
+      "provider": "azure",
+      "vm_size": "Standard_D4ads_v7",
+      "region": "eastus",
+      "zone": "1",
+      "machine": "mindchain-seed-3",
+      "service": "mindchain-wwm-witness@3.service",
+      "operator_rpc": "loopback-only:29653",
       "independent": false
     }
   ],
+  "validator_topology": {
+    "mode": "distributed-devnet-fixture",
+    "finality_quorum": "3-of-4",
+    "fixture_keys": true,
+    "single_operator_control": true,
+    "production_eligible": false,
+    "node_source_revision": "50a674a16fcf0cecf9c97d213771d183231e35a6",
+    "node_binary_sha256": "800eb140fdbb3057efaf6f377a2de06f571b6efeb8ad4ea3d3539b3ee9aa4111",
+    "node_replay_repair": "durable-certificate-evidence-v1",
+    "runtime_overrides": [
+      {
+        "witness_index": 2,
+        "machine": "mindchain-seed-3",
+        "node_binary_sha256": "dea6b62dd80dc6b2adf1fb54dd9862d142f4729952540abdbc1ea1f0c78e6075",
+        "source_patch": "sync-ready-peer-advanced-cursor-v1",
+        "deployed_at_utc": "2026-07-21T00:39:05Z"
+      }
+    ]
+  },
+  "host_memory_safety": {
+    "mindchain-seed-1_swap_gib": 8,
+    "mindchain-seed-2_swap_gib": 4,
+    "mindchain-seed-3_swap_gib": 8,
+    "swappiness": 10,
+    "vfs_cache_pressure": 50,
+    "purpose": "emergency replay and finality backpressure; not a substitute for RAM capacity"
+  },
+  "public_indexers": {
+    "api_version": "v1",
+    "maximum_freshness_ms": 15000,
+    "minimum_control_cluster_quorum": 2,
+    "quorum_basis": "distinct-virtual-machine-failure-domains",
+    "operator_independent": false,
+    "indexer_binary_sha256": "7de37626fdad7f9814b933f7e3f7dbe45429f9e800d66b23bf7152e3704cc9d9",
+    "endpoints": [
+      {
+        "base_url": "https://wwm-seed.mindchain.network",
+        "endpoint_id": "f0e54bf134bf677831de506b5e024008d6ffbdd20e6f942649655a879d715d63",
+        "control_cluster": "bd6512c9cf0b5ec30b6a291fed05f4f1a7bf5a934cc1178be07673c114a90e83",
+        "failure_domain": "azure-centralus-mindchain-seed-1",
+        "independent": false
+      },
+      {
+        "base_url": "https://wwm-seed-2.mindchain.network",
+        "endpoint_id": "d664ff01b08859aa05c11bcdc3aeca4658201fe004aceef61122a39d16ae54f7",
+        "control_cluster": "38e963246407e0752a3e95716076f9c13c511a0fecd6e1f34ce65b3733ccdf74",
+        "failure_domain": "azure-centralus-mindchain-seed-2",
+        "independent": false
+      },
+      {
+        "base_url": "https://mindchain-seed-3.eastus.cloudapp.azure.com",
+        "endpoint_id": "470d9754cc1f9541ef3578213dfb46a0f4243b3fe694452c3a756c05cb38e1f6",
+        "control_cluster": "f439120c0cffb07e9ceae0d4fc9d5d4cb540fdf818b007ff4f7e844db4341a0e",
+        "failure_domain": "azure-eastus-zone-1-mindchain-seed-3",
+        "node_source_witness_index": 3,
+        "independent": false
+      }
+    ]
+  },
   "monitoring": {
     "prometheus_endpoint": "https://wwm-status.mindchain.network/metrics",
     "status_endpoint": "https://wwm-status.mindchain.network/status.json",
+    "dashboard_endpoint": "https://wwm-status.mindchain.network",
+    "dashboard_refresh_seconds": 5,
+    "dashboard_bundle_sha256": "0fc3e2d8f12cfc4e69486eea7c8491612e691088f0b9fb36601563efaa79e1e0",
+    "validator_status_schema": "noos/network-dashboard-validator-status/v1",
+    "validator_status_endpoints": [
+      "https://wwm-seed.mindchain.network/validator-status.json",
+      "https://wwm-seed-2.mindchain.network/validator-status.json",
+      "https://mindchain-seed-3.eastus.cloudapp.azure.com/validator-status.json"
+    ],
+    "telemetry_boundary": "sanitized-status-only; operator RPCs remain loopback-only and bearer-token protected",
     "sample_interval_seconds": 60,
     "sample_schema": "noos/wwm-public-testnet-monitor-sample/v1",
     "daily_summary_schema": "noos/wwm-public-testnet-monitor-daily-summary/v1",
     "signer_key_id": "edaabc9658bdeb58dd093bb7992bd2862e39efb4953771113801bcf125e366d7",
     "external_probe_vms": [
       "mindchain-seed-1",
-      "mindchain-seed-2"
+      "mindchain-seed-2",
+      "mindchain-seed-3"
     ],
     "formal_e_wwm_23_evidence": false
   },
   "authorized_browser_origins": [
     "https://mindchain.network",
-    "https://wwm.mindchain.network"
+    "https://wwm.mindchain.network",
+    "https://wwm-rpc.mindchain.network"
   ],
   "cloudflare": {
     "tunnel_name": "mindchain-wwm-testnet",
@@ -108,7 +261,8 @@
     "artifact-service",
     "executor",
     "web-capacity-coordinator",
-    "monitor"
+    "monitor",
+    "dashboard"
   ],
   "public_pilot": {
     "browser_rewards": false,
@@ -124,15 +278,15 @@
   },
   "budget": {
     "currency": "USD",
-    "hard_cap": 100,
+    "hard_cap": 500,
     "r2_cap": 10,
-    "compute_cap": 60,
+    "compute_cap": 420,
     "monitoring_cap": 10,
-    "reserve": 20,
+    "reserve": 60,
     "spent": 0,
-    "new_monthly_compute_estimate": 44.17,
-    "pricing_observed_at": "2026-07-15",
+    "new_monthly_compute_estimate": 416.10,
+    "pricing_observed_at": "2026-07-17",
     "pricing_source": "Azure Retail Prices API",
-    "remaining_estimate": 55.83
+    "remaining_estimate": 83.90
   }
 }

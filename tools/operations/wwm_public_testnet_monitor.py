@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import concurrent.futures
 import hashlib
 import http.server
 import json
@@ -31,14 +32,32 @@ SAMPLE_DOMAIN: Final[bytes] = b"NOOS/SIG/WWM/V1\0PUBLIC-TESTNET-MONITOR-SAMPLE\0
 SUMMARY_DOMAIN: Final[bytes] = b"NOOS/SIG/WWM/V1\0PUBLIC-TESTNET-MONITOR-DAILY\0"
 LOOPBACK_NAMES: Final[set[str]] = {"127.0.0.1", "::1", "localhost"}
 HEX40: Final[re.Pattern[str]] = re.compile(r"^[0-9a-f]{40}$")
+SEMVER_BASE: Final[str] = (
+    r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
+    r"(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
+    r"(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?"
+)
+REVISION_RELEASE: Final[re.Pattern[str]] = re.compile(
+    rf"^{SEMVER_BASE}\+git\.([0-9a-f]{{40}})$"
+)
 MAX_JSON_BYTES: Final[int] = 2 * 1024 * 1024
 MAX_DAY_BYTES: Final[int] = 16 * 1024 * 1024
 SHARE_BYTES: Final[int] = 1_047_552
 EXPECTED_R2_BUCKET: Final[str] = "mindchain-wwm-artifacts-pilot"
+VALIDATOR_STATUS_SCHEMA: Final[str] = "noos/network-dashboard-validator-status/v1"
+REQUIRED_WITNESS_INDEXES: Final[frozenset[int]] = frozenset(range(4))
+MAX_NETWORK_HEAD_LAG: Final[int] = 256
 
 
 class MonitorError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class SeedHost:
+    hostname: str
+    ipv4: str
+    rpc_ports: tuple[int, ...]
 
 
 @dataclass(frozen=True)
@@ -51,13 +70,11 @@ class MonitorConfig:
     r2_report_path: Path
     worker_bearer_token: str
     source_revision: str
+    release_version: str
     interval_seconds: int
     request_timeout_seconds: float
-    seed_hostname: str
-    seed_ip: str
-    seed2_hostname: str
-    seed2_ip: str
     seed_rpc_port: int
+    seed_hosts: tuple[SeedHost, ...]
     chain_id: str
     genesis_hash: str
     artifact_id: str
@@ -66,6 +83,8 @@ class MonitorConfig:
     rpc_origin: str
     status_origin: str
     artifact_origin: str
+    validator_status_urls: tuple[str, ...]
+    indexer_origins: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -117,6 +136,23 @@ def exact_https_origin(value: object, label: str) -> str:
         raise MonitorError(f"{label} must be an exact HTTPS origin")
     return f"https://{parsed.hostname.lower()}"
 
+def exact_https_url(value: object, label: str, required_path: str) -> str:
+    if not isinstance(value, str):
+        raise MonitorError(f"{label} must be an HTTPS URL")
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname is None
+        or parsed.username
+        or parsed.password
+        or parsed.path != required_path
+        or parsed.query
+        or parsed.fragment
+        or parsed.port not in {None, 443}
+    ):
+        raise MonitorError(f"{label} must be an exact HTTPS URL ending in {required_path}")
+    return f"https://{parsed.hostname.lower()}{required_path}"
+
 
 def load_object(path: Path, maximum: int = MAX_JSON_BYTES) -> dict[str, object]:
     resolved = path.resolve(strict=True)
@@ -164,6 +200,11 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
     listen_host, listen_port = parse_listen(args.listen)
     if not HEX40.fullmatch(args.source_revision):
         raise MonitorError("source revision must be a lowercase 40-character Git commit")
+    release_match = REVISION_RELEASE.fullmatch(args.release_version)
+    if release_match is None or release_match.group(1) != args.source_revision:
+        raise MonitorError(
+            "release version must be canonical SemVer bound to the source revision"
+        )
     if not 30 <= args.interval_seconds <= 3_600:
         raise MonitorError("interval seconds must be within 30..3600")
     if not 1 <= args.request_timeout_seconds <= 30:
@@ -181,26 +222,108 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
     chain = deployment.get("chain_binding")
     model = deployment.get("model_binding")
     endpoints = deployment.get("public_endpoints")
-    if not isinstance(chain, dict) or not isinstance(model, dict) or not isinstance(endpoints, dict):
-        raise MonitorError("deployment is missing chain, model, or endpoint bindings")
+    monitoring = deployment.get("monitoring")
+    public_indexers = deployment.get("public_indexers")
+    raw_public_seeds = deployment.get("public_seeds")
+    if (
+        not isinstance(chain, dict)
+        or not isinstance(model, dict)
+        or not isinstance(endpoints, dict)
+        or not isinstance(monitoring, dict)
+        or not isinstance(public_indexers, dict)
+    ):
+        raise MonitorError("deployment is missing chain, model, endpoint, or network bindings")
+    raw_validator_urls = monitoring.get("validator_status_endpoints")
+    raw_indexers = public_indexers.get("endpoints")
+    if (
+        not isinstance(raw_validator_urls, list)
+        or not 1 <= len(raw_validator_urls) <= 8
+        or not isinstance(raw_indexers, list)
+        or not 1 <= len(raw_indexers) <= 8
+        or not isinstance(raw_public_seeds, list)
+        or not 1 <= len(raw_public_seeds) <= 8
+    ):
+        raise MonitorError("deployment network endpoints are missing or unbounded")
+    validator_status_urls = tuple(
+        exact_https_url(value, "validator status endpoint", "/validator-status.json")
+        for value in raw_validator_urls
+    )
+    indexer_origins = tuple(
+        exact_https_origin(endpoint.get("base_url"), "indexer endpoint")
+        for endpoint in raw_indexers
+        if isinstance(endpoint, dict)
+    )
+    if (
+        len(indexer_origins) != len(raw_indexers)
+        or len(set(validator_status_urls)) != len(validator_status_urls)
+        or len(set(indexer_origins)) != len(indexer_origins)
+    ):
+        raise MonitorError("deployment network endpoints must be unique objects")
+    if not 1 <= args.seed_rpc_port <= 65535:
+        raise MonitorError("seed RPC port is invalid")
+    pinned_seed_pairs = (
+        (args.seed_hostname, args.seed_ip),
+        (args.seed2_hostname, args.seed2_ip),
+    )
+    for hostname, ipv4 in pinned_seed_pairs:
+        if not re.fullmatch(r"[a-z0-9.-]{1,253}", hostname):
+            raise MonitorError("pinned seed hostname is invalid")
+        try:
+            packed_ip = socket.inet_pton(socket.AF_INET, ipv4)
+        except OSError as error:
+            raise MonitorError("pinned seed IP must be canonical IPv4") from error
+        if socket.inet_ntop(socket.AF_INET, packed_ip) != ipv4:
+            raise MonitorError("pinned seed IP must be canonical IPv4")
+
+    seed_ports_by_host: dict[tuple[str, str], set[int]] = {}
+    for raw_seed in raw_public_seeds:
+        if not isinstance(raw_seed, dict):
+            raise MonitorError("public seed entry must be an object")
+        hostname = raw_seed.get("hostname")
+        ipv4 = raw_seed.get("ipv4")
+        operator_rpc = raw_seed.get("operator_rpc")
+        if not isinstance(hostname, str) or not re.fullmatch(r"[a-z0-9.-]{1,253}", hostname):
+            raise MonitorError("public seed hostname is invalid")
+        if not isinstance(ipv4, str):
+            raise MonitorError("public seed IP must be canonical IPv4")
+        try:
+            packed_ip = socket.inet_pton(socket.AF_INET, ipv4)
+        except OSError as error:
+            raise MonitorError("public seed IP must be canonical IPv4") from error
+        if socket.inet_ntop(socket.AF_INET, packed_ip) != ipv4:
+            raise MonitorError("public seed IP must be canonical IPv4")
+        if operator_rpc == "loopback-only":
+            rpc_port = args.seed_rpc_port
+        else:
+            rpc_match = (
+                re.fullmatch(r"loopback-only:([1-9][0-9]{0,4})", operator_rpc)
+                if isinstance(operator_rpc, str)
+                else None
+            )
+            if rpc_match is None:
+                raise MonitorError("public seed operator RPC binding is invalid")
+            rpc_port = int(rpc_match.group(1))
+            if rpc_port > 65535:
+                raise MonitorError("public seed operator RPC port is invalid")
+        ports = seed_ports_by_host.setdefault((hostname, ipv4), set())
+        if rpc_port in ports:
+            raise MonitorError("public seed operator RPC binding is duplicated")
+        ports.add(rpc_port)
+    if not set(pinned_seed_pairs).issubset(seed_ports_by_host):
+        raise MonitorError("pinned seed identity is absent from the deployment")
+    seed_hosts = tuple(
+        SeedHost(hostname, ipv4, tuple(sorted(ports)))
+        for (hostname, ipv4), ports in seed_ports_by_host.items()
+    )
+    if {urlsplit(url).hostname for url in validator_status_urls} != {
+        seed.hostname for seed in seed_hosts
+    }:
+        raise MonitorError("validator status endpoints do not cover every public seed host")
+
     evidence_dir = args.evidence_dir.resolve()
     evidence_dir.mkdir(parents=True, exist_ok=True)
     signing_key = args.signing_key.resolve(strict=True)
     r2_report = args.r2_report.resolve(strict=True)
-    if not re.fullmatch(r"[a-z0-9.-]{1,253}", args.seed_hostname):
-        raise MonitorError("seed hostname is invalid")
-    try:
-        socket.inet_pton(socket.AF_INET, args.seed_ip)
-    except OSError as error:
-        raise MonitorError("seed IP must be canonical IPv4") from error
-    if not re.fullmatch(r"[a-z0-9.-]{1,253}", args.seed2_hostname):
-        raise MonitorError("second seed hostname is invalid")
-    try:
-        socket.inet_pton(socket.AF_INET, args.seed2_ip)
-    except OSError as error:
-        raise MonitorError("second seed IP must be canonical IPv4") from error
-    if not 1 <= args.seed_rpc_port <= 65535:
-        raise MonitorError("seed RPC port is invalid")
     return MonitorConfig(
         listen_host=listen_host,
         listen_port=listen_port,
@@ -210,13 +333,11 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
         r2_report_path=r2_report,
         worker_bearer_token=load_worker_bearer_token(args.worker_config),
         source_revision=args.source_revision,
+        release_version=args.release_version,
         interval_seconds=args.interval_seconds,
         request_timeout_seconds=args.request_timeout_seconds,
-        seed_hostname=args.seed_hostname,
-        seed_ip=args.seed_ip,
-        seed2_hostname=args.seed2_hostname,
-        seed2_ip=args.seed2_ip,
         seed_rpc_port=args.seed_rpc_port,
+        seed_hosts=seed_hosts,
         chain_id=require_hex32(chain.get("chain_id"), "chain ID"),
         genesis_hash=require_hex32(chain.get("genesis_hash"), "genesis hash"),
         artifact_id=require_hex32(model.get("artifact_id"), "artifact ID"),
@@ -225,6 +346,8 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
         rpc_origin=exact_https_origin(endpoints.get("read_gateway"), "RPC endpoint"),
         status_origin=exact_https_origin(endpoints.get("status"), "status endpoint"),
         artifact_origin=exact_https_origin(endpoints.get("artifacts"), "artifact endpoint"),
+        validator_status_urls=validator_status_urls,
+        indexer_origins=indexer_origins,
     )
 
 
@@ -350,6 +473,174 @@ def worker_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
         raise MonitorError("inference worker is not ready")
     return {"status": status, "ready": body.get("ready", True)}
 
+def canonical_uint(value: object, label: str) -> int:
+    if isinstance(value, bool):
+        raise MonitorError(f"{label} must be an unsigned integer")
+    if isinstance(value, int):
+        parsed = value
+    elif isinstance(value, str) and value.isascii() and value.isdigit():
+        parsed = int(value)
+    else:
+        raise MonitorError(f"{label} must be an unsigned integer")
+    if not 0 <= parsed <= (1 << 64) - 1:
+        raise MonitorError(f"{label} is outside uint64")
+    return parsed
+
+
+def network_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
+    issues: list[str] = []
+    validators: dict[int, dict[str, object]] = {}
+    for url in config.validator_status_urls:
+        try:
+            status, _, body = request_json(url, timeout)
+            if (
+                status != 200
+                or body.get("schema") != VALIDATOR_STATUS_SCHEMA
+                or body.get("environment") != "public-testnet"
+                or body.get("production") is not False
+                or body.get("chain_id") != config.chain_id
+                or body.get("genesis_hash") != config.genesis_hash
+            ):
+                raise MonitorError("validator status identity or availability mismatch")
+            entries = body.get("validators")
+            if not isinstance(entries, list) or not entries:
+                raise MonitorError("validator status has no validators")
+        except Exception as error:
+            issues.append(f"validator endpoint {url}: {error}")
+            continue
+
+        for entry in entries:
+            try:
+                if not isinstance(entry, dict):
+                    raise MonitorError("validator status entry is malformed")
+                witness_index = canonical_uint(entry.get("witness_index"), "witness index")
+                if witness_index not in REQUIRED_WITNESS_INDEXES or witness_index in validators:
+                    raise MonitorError("validator status has unexpected or duplicate witness")
+                state = entry.get("state")
+                if state != "online":
+                    raise MonitorError(f"validator {witness_index} is {state or 'unreported'}")
+                if (
+                    entry.get("source_revision") != config.source_revision
+                    or entry.get("release_version") != config.release_version
+                ):
+                    raise MonitorError(
+                        f"validator {witness_index} release identity is not exact"
+                    )
+                release_version = config.release_version
+                unsafe_head = entry.get("unsafe_head")
+                justified = entry.get("justified")
+                finalized = entry.get("finalized")
+                if not all(isinstance(value, dict) for value in (unsafe_head, justified, finalized)):
+                    raise MonitorError(f"validator {witness_index} checkpoints are malformed")
+                validators[witness_index] = {
+                    "height": canonical_uint(unsafe_head.get("height"), "validator head height"),
+                    "justified_epoch": canonical_uint(justified.get("epoch"), "justified epoch"),
+                    "justified_hash": require_hex32(justified.get("hash"), "justified hash"),
+                    "finalized_epoch": canonical_uint(finalized.get("epoch"), "finalized epoch"),
+                    "finalized_hash": require_hex32(finalized.get("hash"), "finalized hash"),
+                    "release_version": release_version,
+                }
+            except Exception as error:
+                issues.append(f"validator status entry: {error}")
+
+    complete_validator_fleet = set(validators) == set(REQUIRED_WITNESS_INDEXES)
+    if not complete_validator_fleet:
+        issues.append("validator status does not cover the complete 4-validator fleet")
+    validator_release_versions = {
+        str(value["release_version"]) for value in validators.values()
+    }
+    if validator_release_versions != {config.release_version}:
+        issues.append("validators do not report the exact release version")
+
+    minimum_height: int | None = None
+    maximum_height: int | None = None
+    finalized_epoch: int | None = None
+    finalized_hash: str | None = None
+    justified_epoch: int | None = None
+    if validators:
+        validator_heights = [int(value["height"]) for value in validators.values()]
+        minimum_height = min(validator_heights)
+        maximum_height = max(validator_heights)
+        if maximum_height - minimum_height > MAX_NETWORK_HEAD_LAG:
+            issues.append("validator unsafe heads exceed one epoch of lag")
+        finalized = {
+            (int(value["finalized_epoch"]), str(value["finalized_hash"]))
+            for value in validators.values()
+        }
+        justified = {
+            (int(value["justified_epoch"]), str(value["justified_hash"]))
+            for value in validators.values()
+        }
+        if len(finalized) != 1:
+            issues.append("validator finalized checkpoints disagree")
+        else:
+            finalized_epoch, finalized_hash = next(iter(finalized))
+        if len(justified) != 1:
+            issues.append("validator justified checkpoints disagree")
+        else:
+            justified_epoch, _ = next(iter(justified))
+
+    indexer_heights: dict[str, int] = {}
+    indexer_release_versions: set[str] = set()
+    for origin in config.indexer_origins:
+        try:
+            status, _, body = request_json(origin + "/api/status", timeout)
+            release_version = body.get("release_version")
+            if (
+                status != 200
+                or body.get("chain_id") != config.chain_id
+                or body.get("genesis_hash") != config.genesis_hash
+                or body.get("ready") is not True
+                or release_version != config.release_version
+            ):
+                raise MonitorError(
+                    "public indexer identity, availability, readiness, or release mismatch"
+                )
+            indexer_release_versions.add(config.release_version)
+            indexer_finalized = body.get("finalized")
+            if not isinstance(indexer_finalized, dict):
+                raise MonitorError("public indexer finalized checkpoint is malformed")
+            indexer_finalized_hash = require_hex32(
+                indexer_finalized.get("hash"),
+                "indexer finalized hash",
+            )
+            if finalized_hash is not None and indexer_finalized_hash != finalized_hash:
+                raise MonitorError("public indexer finalized checkpoint disagrees with validators")
+            height = canonical_uint(
+                (body.get("unsafe_head") or {}).get("height")
+                if isinstance(body.get("unsafe_head"), dict)
+                else None,
+                "indexer head height",
+            )
+            if maximum_height is not None and abs(maximum_height - height) > MAX_NETWORK_HEAD_LAG:
+                raise MonitorError("public indexer exceeds one epoch of validator head lag")
+            indexer_heights[origin] = height
+        except Exception as error:
+            issues.append(f"indexer endpoint {origin}: {error}")
+
+    if indexer_release_versions != {config.release_version}:
+        issues.append("indexers do not report the exact release version")
+
+    if issues:
+        raise MonitorError("; ".join(issues))
+    if (
+        minimum_height is None
+        or maximum_height is None
+        or justified_epoch is None
+        or finalized_epoch is None
+    ):
+        raise MonitorError("network coherence produced no complete validator reference")
+    return {
+        "validator_count": len(validators),
+        "validator_min_height": minimum_height,
+        "validator_max_height": maximum_height,
+        "justified_epoch": justified_epoch,
+        "finalized_epoch": finalized_epoch,
+        "release_version": config.release_version,
+        "source_revision": config.source_revision,
+        "indexer_heights": indexer_heights,
+    }
+
 
 def collect_checks(config: MonitorConfig) -> list[CheckResult]:
     timeout = config.request_timeout_seconds
@@ -366,9 +657,22 @@ def collect_checks(config: MonitorConfig) -> list[CheckResult]:
             raise MonitorError("gateway is not healthy and fail-closed")
         if body.get("chain_id") != config.chain_id or body.get("genesis_hash") != config.genesis_hash:
             raise MonitorError("gateway chain identity mismatch")
+        if (
+            body.get("source_revision") != config.source_revision
+            or body.get("release_version") != config.release_version
+        ):
+            raise MonitorError("gateway release identity is not exact")
+        release_version = config.release_version
         head = body.get("unsafe_head") if isinstance(body.get("unsafe_head"), dict) else {}
         finalized = body.get("finalized") if isinstance(body.get("finalized"), dict) else {}
-        return {"status": status, "unsafe_height": head.get("height"), "finalized_epoch": finalized.get("epoch")}
+        return {
+            "status": status,
+            "unsafe_height": head.get("height"),
+            "finalized_epoch": finalized.get("epoch"),
+            "node_source": body.get("node_source"),
+            "release_version": release_version,
+            "source_revision": config.source_revision,
+        }
 
     def model() -> dict[str, object]:
         status, _, body = request_json(config.rpc_origin + "/api/model-resolution/bonsai-q1", timeout)
@@ -434,33 +738,51 @@ def collect_checks(config: MonitorConfig) -> list[CheckResult]:
 
     def seed_dns(hostname: str, expected_ip: str) -> dict[str, object]:
         addresses = sorted({row[4][0] for row in socket.getaddrinfo(hostname, None, socket.AF_INET)})
-        if expected_ip not in addresses:
-            raise MonitorError("seed DNS does not resolve to the pinned public IP")
+        if addresses != [expected_ip]:
+            raise MonitorError("seed DNS does not exactly match the pinned public IP")
         return {"hostname": hostname, "addresses": addresses}
 
-    def seed_rpc_closed(public_ip: str) -> dict[str, object]:
+    def seed_rpc_closed(public_ip: str, port: int) -> dict[str, object]:
         try:
-            with socket.create_connection((public_ip, config.seed_rpc_port), timeout=timeout):
+            with socket.create_connection((public_ip, port), timeout=timeout):
                 raise MonitorError("seed operator RPC is publicly reachable")
         except MonitorError:
             raise
         except OSError:
-            return {"public_ip": public_ip, "port": config.seed_rpc_port, "closed": True}
+            return {"public_ip": public_ip, "port": port, "closed": True}
 
     checks = [
         run_check("site", site),
         run_check("gateway", gateway),
+        run_check("network_coherence", lambda: network_probe(config, timeout)),
         run_check("model_resolution", model),
         run_check("artifact_host", artifacts),
         run_check("artifact_range", range_probe),
         run_check("browser_coordinator", coordinator),
         run_check("inference_worker", worker),
         run_check("r2_private_mirror", r2),
-        run_check("seed_1_dns", lambda: seed_dns(config.seed_hostname, config.seed_ip)),
-        run_check("seed_2_dns", lambda: seed_dns(config.seed2_hostname, config.seed2_ip)),
-        run_check("seed_1_rpc_closed", lambda: seed_rpc_closed(config.seed_ip)),
-        run_check("seed_2_rpc_closed", lambda: seed_rpc_closed(config.seed2_ip)),
     ]
+    rpc_targets: list[tuple[str, SeedHost, int]] = []
+    default_rpc_port = config.seed_rpc_port
+    for index, seed in enumerate(config.seed_hosts, start=1):
+        checks.append(
+            run_check(
+                f"seed_{index}_dns",
+                lambda seed=seed: seed_dns(seed.hostname, seed.ipv4),
+            )
+        )
+        for port in seed.rpc_ports:
+            label = f"seed_{index}_rpc_closed"
+            if port != default_rpc_port:
+                label = f"seed_{index}_rpc_{port}_closed"
+            rpc_targets.append((label, seed, port))
+
+    def rpc_check(target: tuple[str, SeedHost, int]) -> CheckResult:
+        label, seed, port = target
+        return run_check(label, lambda: seed_rpc_closed(seed.ipv4, port))
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(rpc_targets)) as executor:
+        checks.extend(executor.map(rpc_check, rpc_targets))
     for label, origin in (
         ("site_tls", config.site_origin),
         ("rpc_tls", config.rpc_origin),
@@ -500,10 +822,18 @@ def verify_envelope(envelope: dict[str, object], domain: bytes, id_field: str) -
 
 
 class EvidenceStore:
-    def __init__(self, root: Path, key: Ed25519PrivateKey, source_revision: str, deployment_sha256: str):
+    def __init__(
+        self,
+        root: Path,
+        key: Ed25519PrivateKey,
+        source_revision: str,
+        release_version: str,
+        deployment_sha256: str,
+    ):
         self.root = root
         self.key = key
         self.source_revision = source_revision
+        self.release_version = release_version
         self.deployment_sha256 = deployment_sha256
         self.samples = root / "samples"
         self.summaries = root / "daily"
@@ -545,6 +875,7 @@ class EvidenceStore:
                 "production_authorized": False,
                 "promotion_effect": "NONE",
                 "source_revision": self.source_revision,
+                "release_version": self.release_version,
                 "deployment_sha256": self.deployment_sha256,
                 "observed_at_utc": observed_at,
                 "previous_sample_id": self._last_id(path),
@@ -589,6 +920,7 @@ class EvidenceStore:
             "production_authorized": False,
             "promotion_effect": "NONE",
             "source_revision": self.source_revision,
+            "release_version": self.release_version,
             "deployment_sha256": self.deployment_sha256,
             "day_utc": day,
             "observed_start_utc": timestamps[0],
@@ -620,7 +952,13 @@ class MonitorState:
         self.config = config
         self.key = load_signing_key(config.signing_key_path)
         deployment_sha256 = hashlib.sha256(config.deployment_path.read_bytes()).hexdigest()
-        self.store = EvidenceStore(config.evidence_dir, self.key, config.source_revision, deployment_sha256)
+        self.store = EvidenceStore(
+            config.evidence_dir,
+            self.key,
+            config.source_revision,
+            config.release_version,
+            deployment_sha256,
+        )
         self.lock = threading.Lock()
         self.latest: dict[str, object] | None = None
         self.previous_day: str | None = None
@@ -762,6 +1100,7 @@ def serve(config: MonitorConfig) -> None:
                 "production": False,
                 "production_authorized": False,
                 "source_revision": config.source_revision,
+                "release_version": config.release_version,
             },
             sort_keys=True,
         ),
@@ -789,6 +1128,7 @@ def parse_args() -> argparse.Namespace:
     monitor.add_argument("--r2-report", type=Path, required=True)
     monitor.add_argument("--worker-config", type=Path, required=True)
     monitor.add_argument("--source-revision", required=True)
+    monitor.add_argument("--release-version", required=True)
     monitor.add_argument("--interval-seconds", type=int, default=60)
     monitor.add_argument("--request-timeout-seconds", type=float, default=10.0)
     monitor.add_argument("--seed-hostname", default="wwm-seed.mindchain.network")

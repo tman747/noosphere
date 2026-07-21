@@ -14,6 +14,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
+use std::sync::{Arc, Barrier};
 
 fn hash(c: char) -> String {
     std::iter::repeat_n(c, 64).collect()
@@ -116,6 +117,28 @@ impl NodeSource for ScriptedSource {
     }
 }
 
+struct BlockingSource {
+    inner: ScriptedSource,
+    entered: Arc<Barrier>,
+    release: Arc<Barrier>,
+}
+
+impl NodeSource for BlockingSource {
+    fn status(&mut self) -> noos_indexer::Result<NodeStatus> {
+        self.inner.status()
+    }
+
+    fn block_by_height(&mut self, height: u64) -> noos_indexer::Result<Option<NodeBlock>> {
+        self.entered.wait();
+        self.release.wait();
+        self.inner.block_by_height(height)
+    }
+
+    fn receipt(&mut self, txid: &str) -> noos_indexer::Result<Option<NodeReceipt>> {
+        self.inner.receipt(txid)
+    }
+}
+
 async fn stored_block_hash(indexer: &Indexer, height: u64) -> Option<String> {
     use axum::body::{to_bytes, Body};
     use axum::http::Request;
@@ -215,12 +238,58 @@ async fn explicit_node_finality_heads_are_indexed_and_persisted() {
     assert_eq!(status["justified"]["hash"], hash('c'));
     assert_eq!(status["finalized"]["height"], "256");
     assert_eq!(status["finalized"]["hash"], hash('d'));
+    assert_eq!(status["readiness"], "ready");
+    assert_eq!(status["ready"], true);
+    assert!(
+        status["freshness_ms"]
+            .as_str()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap()
+            < 5_000
+    );
 
     drop(indexer);
     let restored = Indexer::open(dir.path(), id.clone(), id).unwrap();
     let status = status_json(&restored).await;
     assert_eq!(status["justified"]["height"], "512");
     assert_eq!(status["finalized"]["height"], "256");
+    assert_eq!(status["readiness"], "starting");
+    assert_eq!(status["ready"], false);
+    assert_eq!(status["freshness_ms"], u64::MAX.to_string());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn ready_indexer_stays_ready_during_bounded_tail_sync() {
+    let dir = tempfile::tempdir().unwrap();
+    let id = identity();
+    let indexer = Indexer::open(dir.path(), id.clone(), id.clone()).unwrap();
+    let mut initial =
+        ScriptedSource::new(&id, ScriptedSource::chain(0xaa, &id.genesis_hash, 1, 1, 0));
+    indexer.sync_from_node(&id, &mut initial, 16).await.unwrap();
+    assert_eq!(status_json(&indexer).await["readiness"], "ready");
+
+    let entered = Arc::new(Barrier::new(2));
+    let release = Arc::new(Barrier::new(2));
+    let mut source = BlockingSource {
+        inner: ScriptedSource::new(&id, ScriptedSource::chain(0xaa, &id.genesis_hash, 1, 2, 0)),
+        entered: Arc::clone(&entered),
+        release: Arc::clone(&release),
+    };
+    let sync_indexer = indexer.clone();
+    let sync_id = id.clone();
+    let sync =
+        tokio::spawn(async move { sync_indexer.sync_from_node(&sync_id, &mut source, 16).await });
+
+    entered.wait();
+    let during_sync = status_json(&indexer).await;
+    assert_eq!(during_sync["readiness"], "ready");
+    assert_eq!(during_sync["ready"], true);
+    release.wait();
+
+    let report = sync.await.unwrap().unwrap();
+    assert_eq!(report.ingested, 1);
+    assert_eq!(status_json(&indexer).await["unsafe_head"]["height"], "2");
 }
 
 #[tokio::test]
@@ -320,6 +389,10 @@ async fn resume_requests_exactly_the_next_height_after_restart() {
         stored_tx(&indexer, &txid_for(0xaa, 4, 0)).await.is_some(),
         "query transaction state survives with the cursor"
     );
+    let orphan_stage = dir
+        .path()
+        .join("index-generation-v2-00000000000000000002.stage");
+    fs::write(&orphan_stage, b"interrupted generation").unwrap();
     let mut src = ScriptedSource::new(&id, ScriptedSource::chain(0xaa, &id.genesis_hash, 1, 7, 1));
     let report = indexer
         .sync_from_node(&id, &mut src, u64::MAX)
@@ -335,6 +408,10 @@ async fn resume_requests_exactly_the_next_height_after_restart() {
     );
     // Falsifier: a restart that re-scans or skips would request != [5,6,7].
     assert_eq!(src.requested, vec![5, 6, 7]);
+    assert!(
+        !orphan_stage.exists(),
+        "a stale stage from an interrupted commit must not stall ingestion"
+    );
 }
 
 #[tokio::test]

@@ -98,12 +98,13 @@ def vector_accept(case):
  if k=="media": return case.get("content_type")=="application/json"
  if k=="accept": return case.get("accept") in {"application/json","application/vnd.noos.v1+json"}
  if k=="request_size": return case.get("bytes",10**9)<=1048576
- if k=="transaction_size": return case.get("bytes",10**9)<=524288
+ if k=="submission_envelope_size": return case.get("bytes",10**9)<=1048576
  if k=="submission_semantics":
-  inp=case.get("input",{})
-  if not inp.get("existing"): return case.get("expected_status")==202
-  if inp.get("same_bytes"): return case.get("expected_status")==200
-  return False
+  inp=case.get("input")
+  if not isinstance(inp,dict) or set(inp)!={"exact_node_envelope","fresh_node_identity","node_accepted"}: return False
+  if any(not isinstance(inp[key],bool) for key in inp) or not inp["exact_node_envelope"] or not inp["fresh_node_identity"]: return False
+  if inp["node_accepted"]: return case.get("expected_status")==202 and "expected_error" not in case
+  return case.get("expected_status")==409 and case.get("expected_error")=="node_refused"
  if k=="status":
   req={"chain_id","genesis_hash","protocol_version","api_version","release_version","unsafe_head","justified","finalized","freshness_ms","evidence_registry_root"}
   if not isinstance(v,dict) or set(v)!=req or v["protocol_version"]!="v1" or v["api_version"]!="v1": return False
@@ -151,7 +152,7 @@ def validate(root):
  if set(paths)!=REQUIRED_ROUTES: errors.append(f"route set mismatch missing={sorted(REQUIRED_ROUTES-set(paths))} extra={sorted(set(paths)-REQUIRED_ROUTES)}")
  contract=spec.get("x-noos-contract",{}); pagination=contract.get("pagination",{}); limits=contract.get("limits",{})
  if pagination.get("limit_default")!=50 or pagination.get("limit_min")!=1 or pagination.get("limit_max")!=200: errors.append("pagination bounds/default changed")
- if limits != {"max_request_bytes":1048576,"max_transaction_bytes":524288,"max_page_limit":200}: errors.append("size/page limits changed")
+ if limits != {"max_request_bytes":1048576,"max_submission_envelope_bytes":1048576,"max_operator_response_bytes":65536,"max_page_limit":200}: errors.append("size/page limits changed")
  neg=contract.get("negotiation",{})
  if neg.get("unsupported_request_status")!=415 or neg.get("unacceptable_response_status")!=406: errors.append("media negotiation status law missing")
  registry=contract.get("error_registry",{})
@@ -165,7 +166,7 @@ def validate(root):
  for route in FEATURE_ROUTES:
   if "409" not in paths.get(route,{}).get("get",{}).get("responses",{}): errors.append(f"{route}: feature 409 absent")
  post=paths.get("/api/v1/transactions",{}).get("post",{})
- if set(("200","202","409","413","415","422"))-set(post.get("responses",{})): errors.append("transaction status semantics incomplete")
+ if set(post.get("responses",{}))!={"202","400","409","413","415","422","429","503"}: errors.append("transaction status semantics incomplete")
  schemas=spec.get("components",{}).get("schemas",{})
  error_codes=set(schemas.get("Error",{}).get("properties",{}).get("code",{}).get("enum",[]))
  if set(registry)!=error_codes: errors.append(f"error registry/schema mismatch registry_only={sorted(set(registry)-error_codes)} schema_only={sorted(error_codes-set(registry))}")

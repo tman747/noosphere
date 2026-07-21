@@ -1,0 +1,113 @@
+{
+  "schema": "noos/neural-explorer-manifest/v3",
+  "environment": "public-testnet",
+  "production": false,
+  "promotion_effect": "NONE",
+  "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+  "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+  "title": "Bonsai Live / Finalized Activity",
+  "description": "Finalized Bonsai-27B inference activity with exact model identities, execution receipts, output commitments, and settlements on the MindChain public testnet.",
+  "model": {
+    "alias": "bonsai-q1",
+    "name": "Bonsai-27B-Q1_0.gguf",
+    "artifact_id": "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
+    "artifact_sha256": "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
+    "manifest_root": "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
+    "capsule_id": "e50b777f52cdb85aad7f7da4be3b705199357fa02c81fca811feae402f34235d",
+    "execution_profile_id": "780a01d1f41ab0f3aaee4a3cbc196f1ee211ca99cd5ec00a0e5ed17669daf182",
+    "query_policy_id": "98021a08b5fa7d364e8c4071d4544441c4c53150134102ae38a754207612688c",
+    "availability_certificate_id": "510db55c2d08e02f5aee28c0391a5d4159cc9157b4fa23e47adb45dce2ddd4d9",
+    "fund_profile_id": "eb5e9721cbe4372ddd3d5636a1acb1f98b19d2f57d8026c4b62924df26ace86c"
+  },
+  "activity": [
+    {
+      "sequence": 4,
+      "label": "Neural pulse 04",
+      "transaction_id": "11153f8960a45599ddba829b71ca231e5bd6e92a76aa055555676900b7eab614",
+      "included_height": 232968,
+      "included_block": "c1ccda9b309b3f264b15830258948aae02cdfaeb5623f2446a5a151ae6832ea9",
+      "fee_charged": "1506",
+      "job_id": "bf48dda185531dae9cfae7978aa082536dd95ffaa733345cfa20afce0b8d23cd",
+      "receipt_id": "f784a9874d08771bc484bfc70fc7f57f8a91e79e53ab17a47a274fffe64ba7b0",
+      "settlement_id": "10e758d5d33487ba71a43294f325bc80c623b9d16d957bd92d5b8ae5cc642626",
+      "prompt_commitment": "eb06584686e59f077ac84defeabe9bee421c178fbd656313f2b36666d77495f1",
+      "input_tokens": 4,
+      "output_tokens": 16,
+      "output_bytes": 56,
+      "duration_milliseconds": 38563,
+      "output_root": "637612aba552e495617a4991015696f68d317a28888b34da2ea2c094d036f16b",
+      "token_history_root": "cfb3cbc65ce2a6b781ce06653e964a7a89a7729e1eabc2b872a9ee2ff018ed15"
+    },
+    {
+      "sequence": 3,
+      "label": "Neural pulse 03",
+      "transaction_id": "7115c7f61b95a2e42dffd84e5e393f22248e260e74093640b6ba5970088d76c4",
+      "included_height": 229751,
+      "included_block": "1ff8bcaa1e3d428942b78b260fa54e108687873c42195a3927103d65adaf1a14",
+      "fee_charged": "1506",
+      "job_id": "f783cace475d31b48388963b190335d3f1a563030e658810cf36fafa106b5f13",
+      "receipt_id": "85ee68d4cb340ed391f889ab264f6d8e08e3bfd9cf6f6243189e07c393f9ab7d",
+      "settlement_id": "7a8f748059a82461586bc61ba5e261bde65c846551ab3866a394f54d208718d7",
+      "prompt_commitment": "eb06584686e59f077ac84defeabe9bee421c178fbd656313f2b36666d77495f1",
+      "input_tokens": 4,
+      "output_tokens": 16,
+      "output_bytes": 64,
+      "duration_milliseconds": 8765,
+      "output_root": "86fc8d12f8561a3d2da9317a1cbf2b8edb1c558bad0b3a9d911678983ef4fa6e",
+      "token_history_root": "1b8ad9e9c53073be3cd5d1b5d8d13bf436ebe55aede95c113068f34a80fac52f"
+    },
+    {
+      "sequence": 2,
+      "label": "Neural pulse 02",
+      "transaction_id": "4d4171038039f3754f18ae7992b6f6d6394a17ccf295bfcc597f0b50ff01d32d",
+      "included_height": 228463,
+      "included_block": "c0e4601c1f250098e0338d10834ad48b41ac5588e2e79b642fe1f45b99f8c0df",
+      "fee_charged": "1506",
+      "job_id": "b340a092793b8e3a3ded6dd91792affcf98bed8ce46bc64beb30f037182aaaff",
+      "receipt_id": "e396a9be9cd8c3e8f52e5791d465a6b22ecfc7a3aaebb8173080442afd0d61c3",
+      "settlement_id": "d83f9ceac18fa31c82d9ead05003ae6eb7f41761e86a9efa0fbede34506fffa4",
+      "prompt_commitment": "eb06584686e59f077ac84defeabe9bee421c178fbd656313f2b36666d77495f1",
+      "input_tokens": 4,
+      "output_tokens": 16,
+      "output_bytes": 69,
+      "duration_milliseconds": 7657,
+      "output_root": "bd3862018f8d2dc5debcb413ed4af5fc14b1a366d695580c8f7f3e3c689a8eac",
+      "token_history_root": "39ca29114b1003e1fc13a1d3f5084ad0d54d3705a808caceeb0c47cf899380cf"
+    },
+    {
+      "sequence": 1,
+      "label": "Neural pulse 01",
+      "transaction_id": "f3fe3e64b8d24ab00c22e90946076e871ca0b76d68c49586915abcf04b0c87f2",
+      "included_height": 226103,
+      "included_block": "63ac84fb35a6429fa9bf4592c15832ea3792fee01618f464874995e149b2ca17",
+      "fee_charged": "2041",
+      "job_id": "2be302a8f9fc8286544f0f4f156bbf2eb619f5da17b86debecf35e8b0c229a11",
+      "receipt_id": "f8e8e782ae91d36da4437d4380d435b0e1d13d4478484c18de64b8ab1887d073",
+      "settlement_id": "94cf0722aecf8434c4af7391776db026a1a06ecb64a7353dcacffdf2666719fa",
+      "prompt_commitment": "64d3aa9d7c97de12df13244f11bf0776d98c07e315c698fa997b1e38642ba683",
+      "input_tokens": 4,
+      "output_tokens": 16,
+      "output_bytes": 57,
+      "duration_milliseconds": 7625,
+      "output_root": "84408432b597428b7f72798dc79da60d2453c04cf02e7da85a9329310ddaa7c1",
+      "token_history_root": "92a6d621a201b14070eae374065a9492416568310db9bc8be84c434e175c8a1a"
+    }
+  ],
+  "topology": {
+    "custody_positions": 12,
+    "executor_profiles": 8,
+    "selected_executors": 3,
+    "reconstruction_threshold": 8
+  },
+  "monitor_signer_key_id": "edaabc9658bdeb58dd093bb7992bd2862e39efb4953771113801bcf125e366d7",
+  "indexer_origins": [
+    "https://wwm-seed.mindchain.network",
+    "https://wwm-seed-2.mindchain.network",
+    "https://mindchain-seed-3.eastus.cloudapp.azure.com"
+  ],
+  "disclosures": [
+    "Bonsai-27B inference executes off chain. The finalized chain stores the exact model capsule, bounded job, output commitments, receipt, and settlement\u2014not raw weights, prompts, or token text.",
+    "The animated topology is a proof-aware view of custody, execution, and inference flow. It is not a rendering of all 27 billion model parameters.",
+    "This public testnet uses fixture governance and operators. Neural jobs have no proposer, validator, issuance, reward, or finality weight."
+  ]
+}

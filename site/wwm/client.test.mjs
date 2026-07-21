@@ -30,25 +30,18 @@ function hostedModel(overrides = {}) {
     schedulable_minimum: 9,
     certificate_issued_height: 40,
     certificate_valid_until_height: "18446744073709551615",
-    publisher_or_gateway_fallback: false,
     custodians: Array.from({ length: 12 }, (_, position) => ({
       position,
       profile_id: hashIndex(position + 1),
       endpoint_root: hashIndex(position + 21),
-      region_id: hashIndex(50 + (position % 3)),
-      asn: 65_000 + position,
-      provider_root: hashIndex(60 + (position % 4)),
-      operator_id: hashIndex(position + 81),
-      live_at_certificate: true,
+      status: 0,
     })),
-    reconstruction: {
+    executor_profile_ids: Array.from({ length: 8 }, (_, position) => hashIndex(position + 81)),
+    worker: {
       state: "READY",
-      source: "FINALIZED_CUSTODIANS",
-      verified_bytes: 3_803_452_480,
-      total_bytes: 3_803_452_480,
-      installed_sha256: "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0",
-      evidence_verified: true,
-      fallback_used: false,
+      source: "SIGNED_OPERATOR_MONITOR",
+      monitor_sample_id: hashIndex(200),
+      monitor_signer_key_id: hashIndex(201),
     },
     ...overrides,
   };
@@ -155,7 +148,7 @@ test("salted prompt commitments are fresh, exact, and bounded", async () => {
   assert.equal(first.commitment, replay.commitment);
   assert.notEqual(first.commitment, fresh.commitment);
   assert.equal(first.salt, "01".repeat(32));
-  await assert.rejects(() => createPromptCommitment("x".repeat(48_001), webcrypto), { code: "prompt_too_large" });
+  await assert.rejects(() => createPromptCommitment("x".repeat(12_001), webcrypto), { code: "prompt_too_large" });
 });
 
 test("wrong identity and failed finalized proof stop before quote", async () => {
@@ -172,24 +165,25 @@ test("wrong identity and failed finalized proof stop before quote", async () => 
   await assert.rejects(() => badProof.loadState(), { code: "invalid_resolution_proof" });
 });
 
-test("hosted model proof binds exact geometry, custodians, reconstruction, and no fallback", async () => {
+test("hosted model proof binds exact geometry, chain positions, executors, and signed worker state", async () => {
   const verified = await verifier().verifyResolution();
   const hosted = validateHostedModelProof(resolution(), verified);
   assert.equal(hosted.source_bytes, 3_803_452_480);
   assert.equal(hosted.encoded_bytes, 5_707_063_296);
   assert.equal(hosted.custodians.length, 12);
+  assert.equal(hosted.executor_profile_ids.length, 8);
   assert.equal(hosted.reconstruction_threshold, 8);
   assert.equal(hosted.schedulable_minimum, 9);
-  assert.equal(hosted.reconstruction.state, "READY");
-  assert.equal(hosted.publisher_or_gateway_fallback, false);
+  assert.equal(hosted.worker.state, "READY");
+  assert.equal(hosted.worker.source, "SIGNED_OPERATOR_MONITOR");
 
   await assert.rejects(
     () => clientWithRouter(async () => json(state()), verifier({
       async verifyResolution() {
-        return { ...verified, hosted_model: hostedModel({ publisher_or_gateway_fallback: true }) };
+        return { ...verified, hosted_model: hostedModel({ worker: { ...hostedModel().worker, source: "GATEWAY_LABEL" } }) };
       },
     })),
-    { code: "wrong_bonsai_hosting_proof" },
+    { code: "invalid_worker_evidence" },
   );
   const duplicate = hostedModel();
   duplicate.custodians[1].profile_id = duplicate.custodians[0].profile_id;
@@ -197,7 +191,7 @@ test("hosted model proof binds exact geometry, custodians, reconstruction, and n
     () => clientWithRouter(async () => json(state()), verifier({
       async verifyResolution() { return { ...verified, hosted_model: duplicate }; },
     })),
-    { code: "duplicate_or_invalid_custodian" },
+    { code: "duplicate_custodian" },
   );
 });
 
@@ -276,6 +270,42 @@ test("canonical SSE resumes with Last-Event-ID and never reruns job", async () =
   assert.deepEqual(observed.map((item) => item.payload.type), ["output.delta", "receipt.completed"]);
   assert.equal(calls.filter(({ path }) => path.endsWith("/stream")).length, 2);
   assert.equal(calls.filter(({ path }) => path.endsWith("/jobs")).length, 0);
+});
+
+test("browser-native fetch keeps its receiver and drains a terminal stream", async () => {
+  const terminal = { id: 1, type: "receipt.completed", data: { job_id: IDS.job, capsule_id: IDS.capsule, evidence_state: "PROVISIONAL_SIGNED", terminal_status: "COMPLETED", settlement_state: "PENDING_CHAIN", signature: "valid" } };
+  const bytes = new TextEncoder().encode(`id: 1\nevent: receipt.completed\ndata: ${JSON.stringify(terminal)}\n\n`);
+  let reads = 0;
+  let cancelled = false;
+  function browserFetch(url) {
+    assert.equal(this, globalThis);
+    const path = new URL(String(url)).pathname;
+    if (path.endsWith("/state")) return Promise.resolve(json(state()));
+    if (path.endsWith("/stream")) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        body: {
+          getReader() {
+            return {
+              async read() {
+                reads += 1;
+                return reads === 1 ? { value: bytes, done: false } : { value: undefined, done: true };
+              },
+              async cancel() {
+                cancelled = true;
+              },
+            };
+          },
+        },
+      });
+    }
+    throw new Error(`unexpected ${path}`);
+  }
+  const client = await clientWithRouter(browserFetch);
+  assert.equal(await client.stream(IDS.job, () => {}), "1");
+  assert.equal(reads, 2);
+  assert.equal(cancelled, false);
 });
 
 test("wrong event signature, cancel, and receipt proof fail closed without fallback", async () => {

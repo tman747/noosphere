@@ -1,17 +1,25 @@
 {
   "schema": "mindchain/connect-manifest/v0",
-  "generated_at": "2026-07-14T00:00:00.000Z",
+  "generated_at": "2026-07-17T07:38:07Z",
   "name": "MindChain connection surface map",
-  "status": "local_prototype",
+  "status": "live_public_testnet",
   "purpose": "One machine-readable map of every current MindChain surface, platform artifact, trust boundary, and next connection path.",
   "network_identity": {
-    "channel": "devnet",
-    "chain_id": "EXTERNAL_BLOCKED_QUIET_WEEK",
-    "genesis_hash": "EXTERNAL_BLOCKED_CEREMONY",
-    "source": "release/manifest.json"
+    "channel": "public-testnet",
+    "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+    "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+    "source": "../deploy/wwm/public-testnet.json"
   },
   "api": {
     "local_origin": "http://127.0.0.1:8766",
+    "public_site": "https://wwm.mindchain.network",
+    "public_read_gateway": "https://wwm-rpc.mindchain.network",
+    "public_dashboard": "https://wwm-status.mindchain.network",
+    "public_indexers": [
+      "https://wwm-seed.mindchain.network",
+      "https://wwm-seed-2.mindchain.network",
+      "https://mindchain-seed-3.eastus.cloudapp.azure.com"
+    ],
     "health": "/api/health",
     "mindlinks": "/api/mindlinks",
     "connect_manifest": "/api/connect",
@@ -64,10 +72,10 @@
     {
       "id": "network-dashboard",
       "label": "Network dashboard",
-      "kind": "operator_dashboard",
-      "href": "../apps/network-dashboard/",
-      "status": "local_app_surface",
-      "trust_boundary": "operator RPC and secrets must remain private; dashboard data must be sanitized"
+      "kind": "public_network_dashboard",
+      "href": "https://wwm-status.mindchain.network",
+      "status": "live_public_testnet",
+      "trust_boundary": "only sanitized validator, indexer, observer, consensus, and compute telemetry is public; operator RPC and bearer credentials remain private"
     },
     {
       "id": "compute-market",
@@ -89,10 +97,10 @@
   "platforms": [
     {
       "id": "web-local",
-      "label": "Web / local API",
-      "status": "working_local_prototype",
-      "entry": "./connect.html",
-      "next": "Deploy public TLS edge after bootstrap nodes and rate limits exist."
+      "label": "Web / public testnet",
+      "status": "live_public_testnet",
+      "entry": "https://wwm.mindchain.network",
+      "next": "Retain the valueless testnet boundary until independent operators and production validator keys exist."
     },
     {
       "id": "windows-wallet",
@@ -132,17 +140,17 @@
     },
     {
       "id": "android-security-module",
-      "label": "Android wallet security module",
-      "status": "source_present_no_user_app",
+      "label": "Android wallet app",
+      "status": "source_complete_not_store_signed",
       "entry": null,
-      "next": "Turn security module into a user-installable app after profile and API connection flows exist."
+      "next": "Produce a release-signed Android artifact and complete independent device testing."
     },
     {
       "id": "ios-security-module",
-      "label": "iOS wallet security module",
-      "status": "source_present_no_user_app",
+      "label": "iOS wallet app",
+      "status": "source_complete_not_store_signed",
       "entry": null,
-      "next": "Turn Swift package into a TestFlight-ready app after key recovery and profile binding are defined."
+      "next": "Produce a TestFlight-signed iOS artifact and complete independent device testing."
     }
   ],
   "connection_ladder": [
@@ -153,11 +161,9 @@
     "For private data, prefer private backup or encrypted backup once available; never use public MindLinks as control authority."
   ],
   "blocked_before_public_everywhere": [
-    "production-trusted installers",
-    "public TLS/API edge with rate limits",
-    "bootstrap node rotation manifest",
-    "durable indexer readiness",
-    "mobile app packaging",
+    "production-trusted desktop installers",
+    "release-signed mobile store artifacts",
+    "independent validator operators and production keys",
     "operator secret isolation audit",
     "signed update flow",
     "independent release evidence"

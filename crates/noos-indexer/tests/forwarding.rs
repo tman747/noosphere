@@ -206,7 +206,10 @@ async fn forwards_exact_envelope_and_waits_for_ingestion_to_create_truth() {
     let response = post(app.clone(), envelope.clone()).await;
     assert_eq!(response.status(), StatusCode::ACCEPTED);
     let body = response_json(response).await;
-    assert_eq!(body, serde_json::json!({"txid": hash('9')}));
+    assert_eq!(
+        body,
+        serde_json::json!({"txid": hash('9'), "state": "MEMPOOL"})
+    );
     assert_not_indexed(app, &hash('9')).await;
 
     let requests = node.requests();

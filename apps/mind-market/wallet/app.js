@@ -9,6 +9,8 @@ const VAULT_KEY = "primary";
 const RECOVERY_KEY = "passkey-recovery";
 const PBKDF2_ROUNDS = 310000;
 const NOOS = "00".repeat(32);
+const CHAIN_ID = "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b";
+const GENESIS_HASH = "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e";
 const state = { privateKey: null, account: null, vault: null, config: null, assets: [], defi: null, psmMarkets: [], installPrompt: null, busy: false };
 
 function bytesToHex(bytes) { return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join(""); }
@@ -58,7 +60,9 @@ async function decryptVault(vault, password) {
 }
 async function createWallet(password) {
   if (!crypto.subtle) throw new Error("WebCrypto is unavailable in this browser");
-  const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+  let pair;
+  try { pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]); }
+  catch { throw new Error("Ed25519 wallet keys require Safari 17 or newer on iPhone."); }
   const [pkcs8, spki] = await Promise.all([crypto.subtle.exportKey("pkcs8", pair.privateKey), crypto.subtle.exportKey("spki", pair.publicKey)]);
   const publicId = bytesToHex(new Uint8Array(spki).slice(-32));
   const vault = await encryptPrivate(pkcs8, password, publicId, spki);
@@ -120,23 +124,29 @@ async function updatePsmSelection() {
 
 async function loadNetwork() {
   state.config = await json(await fetch("/api/config", { cache: "no-store" }));
-  const [assets, defi] = await Promise.all([json(await fetch("/api/assets", { cache: "no-store" })), json(await fetch("/api/defi", { cache: "no-store" }))]);
+  if (state.config.chain_id !== CHAIN_ID || state.config.genesis_hash !== GENESIS_HASH || state.config.production !== false) {
+    throw new Error("Wallet gateway returned the wrong public-testnet identity");
+  }
+  const [assets, defi] = await Promise.all([
+    json(await fetch("/api/assets", { cache: "no-store" })).catch(() => ({ items: [] })),
+    json(await fetch("/api/defi", { cache: "no-store" })).catch(() => ({ stable_assets: [], lending_markets: [], stable_safety: [] })),
+  ]);
   state.defi = defi;
-  state.assets = [{ asset_id: NOOS, symbol: "NOOS", name: "MindChain native asset" }, ...assets.items, ...defi.stable_assets];
+  state.assets = [{ asset_id: NOOS, symbol: "NOOS_TEST", name: "Valueless MindChain test asset" }, ...assets.items, ...defi.stable_assets];
   const unique = new Map(state.assets.map((asset) => [asset.asset_id, asset])); state.assets = [...unique.values()];
   const select = $("#asset"); select.replaceChildren(...state.assets.map((asset) => { const option = document.createElement("option"); option.value = asset.asset_id; option.textContent = `${asset.symbol || "ASSET"} · ${short(asset.asset_id)}`; return option; }));
   $("#height").textContent = format(state.config.head.height);
-  $("#network").classList.add("online"); $("#network span").textContent = `Height ${state.config.head.height}`;
+  $("#network").classList.add("online"); $("#network span").textContent = `Public testnet · ${state.config.head.height}`;
   await refreshPsmView();
 }
 async function refresh() {
   if (!state.account) return;
-  setBusy(true); notice("Reading account state from the identity-bound indexer…");
+  setBusy(true); notice("Reading this valueless public-testnet account…");
   try {
     await loadNetwork();
     const balance = await json(await fetch(`/api/balance?account=${state.account}&asset=${NOOS}`, { cache: "no-store" }));
     $("#noos-balance").textContent = format(balance.amount || balance.balance || 0);
-    notice("Account synchronized. Private key remains non-extractable in this session.");
+    notice("Account synchronized. Back up the encrypted vault before clearing Safari data.");
   } catch (error) { notice(error.message, true); $("#network").classList.remove("online"); $("#network span").textContent = "Unavailable"; }
   finally { setBusy(false); }
 }
@@ -176,7 +186,9 @@ async function sendPayment(form) {
   if (built.chain_id !== state.config.chain_id || built.genesis_hash !== state.config.genesis_hash) throw new Error("Unsigned builder returned the wrong chain identity");
   if (!await reviewTransaction("Sign this transfer?", [["From", state.account], ["To", values.recipient], ["Asset", values.asset], ["Amount", values.amount], ["Transaction ID", built.txid], ["Chain", built.chain_id]])) { notice("Transaction cancelled before signing."); return; }
   const settled = await signSimulateSubmit(built);
-  notice(`Settled ${short(settled.txid)}. Recipient account is payable immediately.`); form.reset(); await refresh();
+  form.reset();
+  await refresh();
+  notice(`Included ${settled.txid} at height ${settled.receipt?.inclusion?.height ?? "pending"} on the public testnet.`);
 }
 
 async function convertPsm(form) {
@@ -255,12 +267,20 @@ $("#send-form").addEventListener("submit", async (event) => { event.preventDefau
 $("#psm-form").addEventListener("submit", async (event) => { event.preventDefault(); if (state.busy) return; setBusy(true); try { await convertPsm(event.currentTarget); } catch (error) { notice(error.message, true); } finally { setBusy(false); } });
 $("#psm-market").addEventListener("change", updatePsmSelection);
 $("#psm-kind").addEventListener("change", updatePsmSelection);
-$("#faucet").addEventListener("click", async () => { setBusy(true); try { const result = await post("/api/wallet/faucet", { account: state.account, amount: "1000000" }); notice(`Valueless test funding settled: ${short(result.txid)}`); await refresh(); } catch (error) { notice(error.message, true); } finally { setBusy(false); } });
+$("#faucet").addEventListener("click", async () => {
+  setBusy(true);
+  try {
+    const result = await post("/api/wallet/faucet", { account: state.account, amount: "1000000" });
+    await refresh();
+    notice(`Received 1,000,000 valueless NOOS_TEST in ${result.txid} at height ${result.receipt?.inclusion?.height ?? "pending"}.`);
+  } catch (error) { notice(error.message, true); }
+  finally { setBusy(false); }
+});
 $("#refresh").addEventListener("click", refresh);
 $("#copy-account").addEventListener("click", async () => { await navigator.clipboard.writeText(state.account); notice("Account public key copied."); });
-$("#backup").addEventListener("click", () => { const blob = new Blob([JSON.stringify(state.vault, null, 2)], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `harbor-wallet-${state.account.slice(0, 8)}.json`; link.click(); URL.revokeObjectURL(link.href); });
+$("#backup").addEventListener("click", () => { const blob = new Blob([JSON.stringify(state.vault, null, 2)], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `harbor-wallet-${state.account.slice(0, 8)}.json`; link.click(); URL.revokeObjectURL(link.href); notice("Encrypted backup created. Keep it with the password; never share either."); });
 $("#lock").addEventListener("click", () => { state.privateKey = null; state.account = null; showAuth("unlock"); });
 window.addEventListener("beforeinstallprompt", (event) => { event.preventDefault(); state.installPrompt = event; $("#install").hidden = false; });
-$("#install").addEventListener("click", async () => { if (!state.installPrompt) return notice("Use your browser’s Install App command on this device."); await state.installPrompt.prompt(); state.installPrompt = null; });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/wallet/sw.js");
+$("#install").addEventListener("click", async () => { if (!state.installPrompt) return notice("On iPhone Safari: tap Share, then Add to Home Screen."); await state.installPrompt.prompt(); state.installPrompt = null; });
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/wallet/sw.js", { updateViaCache: "none" });
 vaultGet().then((vault) => { state.vault = vault; showAuth(vault ? "unlock" : "create"); }).catch((error) => status(error.message, true));

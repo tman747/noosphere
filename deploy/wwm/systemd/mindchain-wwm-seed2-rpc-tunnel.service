@@ -1,0 +1,40 @@
+[Unit]
+Description=MindChain WWM seed-2 loopback RPC tunnel
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=mindchain-wwm
+Group=mindchain-wwm
+ExecStart=/usr/bin/ssh -NT -o BatchMode=yes -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/etc/mindchain-wwm/seed-2-known-hosts -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -i /etc/mindchain-wwm/seed-2-tunnel-key -L 127.0.0.1:39652:127.0.0.1:29652 azureuser@10.10.0.5
+Restart=always
+RestartSec=10s
+TimeoutStopSec=15s
+KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadOnlyPaths=/etc/mindchain-wwm
+
+[Install]
+WantedBy=multi-user.target

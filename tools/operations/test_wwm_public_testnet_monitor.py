@@ -46,6 +46,42 @@ class PublicTestnetMonitorTests(unittest.TestCase):
                 "status": "https://status.example",
                 "artifacts": "https://artifacts.example",
             },
+            "monitoring": {
+                "validator_status_endpoints": [
+                    "https://seed.example/validator-status.json",
+                    "https://seed-2.example/validator-status.json",
+                    "https://seed-3.example/validator-status.json",
+                ],
+            },
+            "public_seeds": [
+                {
+                    "hostname": "seed.example",
+                    "ipv4": "203.0.113.9",
+                    "operator_rpc": "loopback-only",
+                },
+                {
+                    "hostname": "seed-2.example",
+                    "ipv4": "203.0.113.10",
+                    "operator_rpc": "loopback-only",
+                },
+                {
+                    "hostname": "seed-3.example",
+                    "ipv4": "203.0.113.11",
+                    "operator_rpc": "loopback-only",
+                },
+                {
+                    "hostname": "seed-3.example",
+                    "ipv4": "203.0.113.11",
+                    "operator_rpc": "loopback-only:29653",
+                },
+            ],
+            "public_indexers": {
+                "endpoints": [
+                    {"base_url": "https://indexer-a.example"},
+                    {"base_url": "https://indexer-b.example"},
+                    {"base_url": "https://indexer-c.example"},
+                ],
+            },
         }
         self.deployment.write_text(json.dumps(self.deployment_document), encoding="utf-8")
         self.r2_report.write_text(
@@ -70,6 +106,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
             r2_report=self.r2_report,
             worker_config=self.workerd_config,
             source_revision="55" * 20,
+            release_version=f"0.1.0+git.{'55' * 20}",
             interval_seconds=60,
             request_timeout_seconds=5.0,
             seed_hostname="seed.example",
@@ -92,8 +129,31 @@ class PublicTestnetMonitorTests(unittest.TestCase):
     def test_config_requires_fail_closed_exact_bindings(self) -> None:
         config = monitor.load_config(self.arguments())
         self.assertEqual(config.chain_id, "11" * 32)
+        self.assertEqual(config.release_version, f"0.1.0+git.{'55' * 20}")
         self.assertEqual(config.artifact_origin, "https://artifacts.example")
         self.assertEqual(config.worker_bearer_token, self.worker_token)
+        self.assertEqual(len(config.validator_status_urls), 3)
+        self.assertEqual(len(config.indexer_origins), 3)
+        self.assertEqual(
+            [(seed.hostname, seed.ipv4, seed.rpc_ports) for seed in config.seed_hosts],
+            [
+                ("seed.example", "203.0.113.9", (29652,)),
+                ("seed-2.example", "203.0.113.10", (29652,)),
+                ("seed-3.example", "203.0.113.11", (29652, 29653)),
+            ],
+        )
+
+        wrong_release = self.arguments()
+        wrong_release.release_version = f"0.1.0+git.{'66' * 20}"
+        with self.assertRaisesRegex(monitor.MonitorError, "bound to the source revision"):
+            monitor.load_config(wrong_release)
+
+        validator_urls = self.deployment_document["monitoring"]["validator_status_endpoints"]
+        validator_urls[2] = "https://unbound.example/validator-status.json"
+        self.deployment.write_text(json.dumps(self.deployment_document), encoding="utf-8")
+        with self.assertRaisesRegex(monitor.MonitorError, "cover every public seed host"):
+            monitor.load_config(self.arguments())
+        validator_urls[2] = "https://seed-3.example/validator-status.json"
 
         self.deployment_document["production"] = True
         self.deployment.write_text(json.dumps(self.deployment_document), encoding="utf-8")
@@ -115,15 +175,110 @@ class PublicTestnetMonitorTests(unittest.TestCase):
         )
         self.assertNotIn(self.worker_token, json.dumps(detail))
 
+    def test_network_probe_requires_a_coherent_validator_and_indexer_fleet(self) -> None:
+        config = monitor.load_config(self.arguments())
+
+        def validator(witness_index: int, height: int) -> dict[str, object]:
+            return {
+                "witness_index": witness_index,
+                "state": "online",
+                "release_version": config.release_version,
+                "source_revision": config.source_revision,
+                "unsafe_head": {"height": height},
+                "justified": {"epoch": 4, "hash": "aa" * 32},
+                "finalized": {"epoch": 3, "hash": "bb" * 32},
+            }
+
+        validator_entries = [
+            validator(0, 1_000),
+            validator(1, 999),
+            validator(2, 998),
+            validator(3, 997),
+        ]
+        responses: dict[str, dict[str, object]] = {}
+        for url, entries in zip(
+            config.validator_status_urls,
+            (validator_entries[:1], validator_entries[1:2], validator_entries[2:]),
+        ):
+            responses[url] = {
+                "schema": monitor.VALIDATOR_STATUS_SCHEMA,
+                "environment": "public-testnet",
+                "production": False,
+                "chain_id": config.chain_id,
+                "genesis_hash": config.genesis_hash,
+                "validators": entries,
+            }
+        for offset, origin in enumerate(config.indexer_origins):
+            responses[origin + "/api/status"] = {
+                "chain_id": config.chain_id,
+                "genesis_hash": config.genesis_hash,
+                "ready": True,
+                "release_version": config.release_version,
+                "unsafe_head": {"height": str(1_000 - offset)},
+                "finalized": {"height": "768", "hash": "bb" * 32},
+            }
+
+        def response(url: str, _timeout: float) -> tuple[int, object, dict[str, object]]:
+            return 200, {}, responses[url]
+
+        with mock.patch.object(monitor, "request_json", side_effect=response):
+            detail = monitor.network_probe(config, 5.0)
+            self.assertEqual(detail["validator_count"], 4)
+            self.assertEqual(detail["finalized_epoch"], 3)
+            self.assertEqual(detail["source_revision"], config.source_revision)
+            self.assertEqual(detail["release_version"], config.release_version)
+            validator_entries[3]["source_revision"] = "66" * 20
+            with self.assertRaisesRegex(monitor.MonitorError, "release identity is not exact"):
+                monitor.network_probe(config, 5.0)
+            validator_entries[3]["source_revision"] = config.source_revision
+            validator_entries[3]["release_version"] = "0.1.0+git." + "66" * 20
+            with self.assertRaisesRegex(monitor.MonitorError, "release identity is not exact"):
+                monitor.network_probe(config, 5.0)
+            validator_entries[3]["release_version"] = config.release_version
+            first_indexer = responses[config.indexer_origins[0] + "/api/status"]
+            first_indexer["release_version"] = "0.1.0+git." + "66" * 20
+            with self.assertRaisesRegex(monitor.MonitorError, "release mismatch"):
+                monitor.network_probe(config, 5.0)
+            first_indexer["release_version"] = config.release_version
+            first_indexer["finalized"] = {"height": "768", "hash": "cc" * 32}
+            with self.assertRaisesRegex(monitor.MonitorError, "finalized checkpoint disagrees"):
+                monitor.network_probe(config, 5.0)
+            first_indexer["finalized"] = {"height": "768", "hash": "bb" * 32}
+
+
+            validator_entries[3]["unsafe_head"] = {"height": 700}
+            with self.assertRaisesRegex(monitor.MonitorError, "exceed one epoch"):
+                monitor.network_probe(config, 5.0)
+
+            validator_entries[3]["unsafe_head"] = {"height": 997}
+            validator_entries[1]["state"] = "catching_up"
+            with self.assertRaisesRegex(monitor.MonitorError, "validator 1 is catching_up"):
+                monitor.network_probe(config, 5.0)
+
+            third_indexer = responses[config.indexer_origins[2] + "/api/status"]
+            third_indexer["ready"] = False
+            with self.assertRaises(monitor.MonitorError) as caught:
+                monitor.network_probe(config, 5.0)
+            message = str(caught.exception)
+            self.assertIn("validator 1 is catching_up", message)
+            self.assertIn(f"indexer endpoint {config.indexer_origins[2]}", message)
+
     def test_sample_ledger_is_signed_chained_and_summarized_immutably(self) -> None:
         key = monitor.load_signing_key(self.private_key)
-        store = monitor.EvidenceStore(self.root / "ledger", key, "55" * 20, "66" * 32)
+        store = monitor.EvidenceStore(
+            self.root / "ledger",
+            key,
+            "55" * 20,
+            f"0.1.0+git.{'55' * 20}",
+            "66" * 32,
+        )
         checks = [monitor.CheckResult("gateway", True, 12, {"status": 200})]
         first = store.append(checks, "2026-07-15T00:00:00Z")
         second = store.append(checks, "2026-07-15T00:01:00Z")
         monitor.verify_envelope(first, monitor.SAMPLE_DOMAIN, "sample_id")
         monitor.verify_envelope(second, monitor.SAMPLE_DOMAIN, "sample_id")
         self.assertEqual(second["previous_sample_id"], first["sample_id"])
+        self.assertEqual(first["release_version"], f"0.1.0+git.{'55' * 20}")
 
         summary = store.summarize("2026-07-15")
         monitor.verify_envelope(summary, monitor.SUMMARY_DOMAIN, "summary_id")
@@ -148,6 +303,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
             "production_authorized": False,
             "promotion_effect": "NONE",
             "source_revision": config.source_revision,
+            "release_version": config.release_version,
             "deployment_sha256": "66" * 32,
             "observed_at_utc": "2026-07-15T00:00:00Z",
             "previous_sample_id": None,

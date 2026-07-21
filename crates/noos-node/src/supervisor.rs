@@ -749,39 +749,58 @@ async fn sync_ready_peer(
     let Some(mode) = consensus_mode(consensus) else {
         return;
     };
-    let Some(before) = consensus_sync_head(consensus) else {
-        return;
-    };
-    let Some(start_height) = before.0.checked_add(1) else {
-        return;
-    };
-    let range = match p2p
-        .request_range(peer, start_height, MAX_RANGE_HEADERS)
-        .await
-    {
-        Ok(range) => range,
-        Err(error) => {
-            eprintln!(
-                "range-sync request failed from peer {peer} at height {start_height}: {error}"
-            );
+    'sync: loop {
+        let Some(before) = consensus_sync_head(consensus) else {
             return;
-        }
-    };
-    for header in range.headers.0 {
-        let result = if mode == NodeMode::Light {
-            import_wire_header(consensus, p2p, peer, &header.0).await
-        } else {
-            import_wire_block(consensus, p2p, peer, &header.0, false).await
         };
-        if let Err(error) = result {
-            let height = decode_header_announce(&header.0)
-                .ok()
-                .map(|(decoded, _)| decoded.height);
-            eprintln!("range-sync import stopped from peer {peer} at {height:?}: {error}");
+        let Some(start_height) = before.0.checked_add(1) else {
+            return;
+        };
+        let range = match p2p
+            .request_range(peer, start_height, MAX_RANGE_HEADERS)
+            .await
+        {
+            Ok(range) => range,
+            Err(error) => {
+                eprintln!(
+                    "range-sync request failed from peer {peer} at height {start_height}: {error}"
+                );
+                return;
+            }
+        };
+        if range.headers.0.is_empty() {
             return;
         }
-        if mode != NodeMode::Light {
-            tokio::time::sleep(FULL_SYNC_BODY_REQUEST_PACING).await;
+        for header in range.headers.0 {
+            let result = if mode == NodeMode::Light {
+                import_wire_header(consensus, p2p, peer, &header.0).await
+            } else {
+                import_wire_block(consensus, p2p, peer, &header.0, false).await
+            };
+            if let Err(error) = result {
+                // Gossip may execute this height while the range body is in
+                // flight. Resume from the advanced cursor instead of
+                // permanently abandoning an otherwise ready peer.
+                if consensus_sync_head(consensus)
+                    .is_some_and(|after_error| after_error.0 > before.0)
+                {
+                    continue 'sync;
+                }
+                let height = decode_header_announce(&header.0)
+                    .ok()
+                    .map(|(decoded, _)| decoded.height);
+                eprintln!("range-sync import stopped from peer {peer} at {height:?}: {error}");
+                return;
+            }
+            if mode != NodeMode::Light {
+                tokio::time::sleep(FULL_SYNC_BODY_REQUEST_PACING).await;
+            }
+        }
+        let Some(after) = consensus_sync_head(consensus) else {
+            return;
+        };
+        if after.0 <= before.0 || !range.more.0 {
+            return;
         }
     }
 }

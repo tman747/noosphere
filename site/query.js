@@ -124,9 +124,9 @@ function renderCustodian(row) {
   position.textContent = String(row.position + 1).padStart(2, "0");
   profile.textContent = shortHash(row.profile_id);
   profile.title = row.profile_id;
-  domain.textContent = `AS${row.asn} · ${shortHash(row.region_id)} · ${shortHash(row.provider_root)}`;
-  domain.title = `endpoint ${row.endpoint_root} · operator ${row.operator_id}`;
-  status.textContent = "Certified";
+  domain.textContent = `endpoint ${shortHash(row.endpoint_root)}`;
+  domain.title = row.endpoint_root;
+  status.textContent = "On-chain";
   identity.append(profile, domain);
   item.append(position, identity, status);
   return item;
@@ -135,8 +135,7 @@ function renderCustodian(row) {
 function renderHostedProof(hosted) {
   runtime.hosted = hosted;
   nodes.hostedPanel.setAttribute("aria-busy", "false");
-  nodes.hostedPanelState.className = `state-flag ${hosted.ready ? "state-ready" : "state-pending"}`;
-  nodes.hostedPanelState.textContent = hosted.ready ? "17 leaves + runtime" : hosted.reconstruction.state;
+  nodes.hostedPanelState.textContent = hosted.ready ? "17 objects + signed worker" : hosted.worker.state;
   nodes.hostedSourceBytes.textContent = formatBytes(hosted.source_bytes);
   nodes.hostedEncodedBytes.textContent = formatBytes(hosted.encoded_bytes);
   nodes.hostedChainGenesis.textContent = `${shortHash(hosted.chain_id)} / ${shortHash(hosted.genesis_hash)}`;
@@ -149,21 +148,22 @@ function renderHostedProof(hosted) {
   nodes.hostedGeometry.textContent = `${hosted.data_shards}+${hosted.parity_shards} · ${formatDecimal(hosted.stripe_count)} stripes · ${formatDecimal(hosted.share_bytes)} B/share`;
   nodes.hostedSchedulability.textContent = `${hosted.schedulable_minimum} / ${hosted.position_count}`;
   nodes.hostedCustodianMap.replaceChildren(...hosted.custodians.map(renderCustodian));
-  const reconstruction = hosted.reconstruction;
-  nodes.hostedReconstructionState.textContent = reconstruction.state;
-  nodes.hostedReconstructionProgress.max = reconstruction.total_bytes;
-  nodes.hostedReconstructionProgress.value = reconstruction.verified_bytes;
-  const percent = Math.floor((reconstruction.verified_bytes / reconstruction.total_bytes) * 100);
-  nodes.hostedReconstructionProgress.textContent = `${percent}%`;
-  nodes.hostedReconstructionCopy.textContent = `${formatDecimal(reconstruction.verified_bytes)} of ${formatDecimal(reconstruction.total_bytes)} bytes independently verified from finalized custodians.`;
+  const worker = hosted.worker;
+  nodes.hostedReconstructionState.textContent = worker.state;
+  nodes.hostedReconstructionProgress.max = 1;
+  nodes.hostedReconstructionProgress.value = hosted.ready ? 1 : 0;
+  nodes.hostedReconstructionProgress.textContent = hosted.ready ? "Ready" : "Unavailable";
+  nodes.hostedReconstructionCopy.textContent = hosted.ready
+    ? `Signed monitor ${shortHash(worker.monitor_sample_id)} attests that the pinned operator worker is ready. The browser does not download or hash the 3.8 GB GGUF.`
+    : "The signed operator monitor does not currently attest worker readiness.";
   renderHash(nodes.hostedRuntimeRoot, hosted.runtime_root);
   renderHash(nodes.hostedCertificate, hosted.availability_certificate_id);
   nodes.hostedCertificateHorizon.textContent = `#${formatDecimal(hosted.certificate_issued_height)} → #${formatDecimal(hosted.certificate_valid_until_height)}`;
-  nodes.hostedFallback.textContent = "FALSE · disabled";
+  nodes.hostedFallback.textContent = "No alternate route";
   nodes.hostedFallback.classList.add("proof-good");
   nodes.hostedProofDisclosure.textContent = hosted.ready
-    ? "Verified: finalized 17-leaf model graph, 12-position certificate, exact Bonsai geometry, read-only reconstructed GGUF, and pinned Prism runtime. Publisher and gateway artifact fallback are disabled. Validators do not store model weights."
-    : `The chain proof is verified, but executor reconstruction is ${reconstruction.state.toLowerCase()}. Query admission remains closed.`;
+    ? "Validated: pinned identities and twelve custody positions from the local full-node finalized-state response; signed operator-monitor readiness; exact quote, stream, output, and receipt signatures. The browser does not recompute the sparse-Merkle proof or independently verify the 3.8 GB model bytes."
+    : `The pinned finalized model response is valid, but signed worker state is ${worker.state.toLowerCase()}. Query admission remains closed.`;
 }
 
 function blockHostedProof(message) {
@@ -202,7 +202,9 @@ function setBusy(busy, label = "Request quote and start remote job") {
   nodes.input.disabled = busy;
   nodes.outputLimit.disabled = busy;
   nodes.escrowAuthorization.disabled = busy;
-  document.querySelectorAll('input[name="payment-mode"]').forEach((input) => { input.disabled = busy; });
+  document.querySelectorAll('input[name="payment-mode"]').forEach((input) => {
+    input.disabled = busy || input.value === "PAID";
+  });
   nodes.submit.disabled = busy || !runtime.active;
   nodes.submit.querySelector("span").textContent = busy ? label : "Request quote and start remote job";
   nodes.form.setAttribute("aria-busy", String(busy));
@@ -215,7 +217,8 @@ function showAnswer(view) {
 }
 
 function updateCount() {
-  nodes.inputCount.textContent = `${[...nodes.input.value].length.toLocaleString()} / 12,000`;
+  const bytes = new TextEncoder().encode(nodes.input.value.replace(/\r\n/g, "\n").trim()).byteLength;
+  nodes.inputCount.textContent = `${bytes.toLocaleString()} / 12,000 bytes`;
   if (nodes.input.value) setError("");
 }
 
@@ -313,9 +316,9 @@ async function loadState() {
   const verifier = globalThis.MindChainWwmVerifier;
   if (!verifier) {
     setNetwork("blocked", "Verifier unavailable");
-    nodes.pinDisclosure.textContent = "No independent browser light-client verifier is installed. Gateway proofs_verified flags are ignored; dispatch remains disabled.";
-    blockHostedProof("Independent finalized-state verifier unavailable.");
-    announce("Independent light-client verifier unavailable. Query disabled.");
+    nodes.pinDisclosure.textContent = "The pinned browser verifier did not load. Gateway proof flags are ignored and dispatch remains disabled.";
+    blockHostedProof("Pinned browser verifier unavailable.");
+    announce("Pinned proof verifier unavailable. Query disabled.");
     return;
   }
   try {
@@ -329,24 +332,24 @@ async function loadState() {
     runtime.active = active.dispatchable ? active : null;
     nodes.pinChain.textContent = `${shortHash(hosted.chain_id)} / ${shortHash(hosted.genesis_hash)}`;
     nodes.pinModel.textContent = shortHash(active.capsule_id);
-    nodes.pinControl.textContent = "ACTIVE · remote executor edge";
+    nodes.pinControl.textContent = "ACTIVE · bounded operator executor";
     nodes.pinCandidate.textContent = candidate
       ? `${shortHash(candidate.capsule_id)} · AUTHORIZED, NOT ACTIVE · cannot dispatch`
       : "None published";
-    nodes.pinProof.textContent = `Verified resolution ${shortHash(active.resolution_id)}`;
+    nodes.pinProof.textContent = `Local full-node resolution ${shortHash(active.resolution_id)}`;
     nodes.pinDisclosure.textContent = state.disclosure
-      ?? "Only the proof-verified active capsule may dispatch. A published candidate remains inspectable and non-dispatchable.";
+      ?? "Only the pinned finalized active capsule may dispatch. Interactive execution remains off-chain.";
     if (!hosted.ready) {
-      nodes.activation.textContent = `${hosted.reconstruction.state} · admission closed`;
+      nodes.activation.textContent = `${hosted.worker.state} · admission closed`;
       setNetwork("pending", "Executor preparing");
-      announce("Finalized model graph verified. Executor reconstruction is not ready; query disabled.");
+      announce("Pinned model graph validated. Signed worker readiness is unavailable; query disabled.");
       return;
     }
-    nodes.activation.textContent = "ACTIVE · hosted remote";
+    nodes.activation.textContent = "ACTIVE · sponsored testnet";
     nodes.activation.classList.add("active");
-    setNetwork("ready", "Hosted model active");
+    setNetwork("ready", "Bounded inference ready");
     setBusy(false);
-    announce("MindChain-hosted Bonsai and its finalized custodian proof verified. Remote quoting is available.");
+    announce("Pinned finalized model response and signed operator readiness validated. Sponsored remote quoting is available.");
   } catch (error) {
     runtime.active = null;
     runtime.client = null;
@@ -367,6 +370,11 @@ async function submitQuery(event) {
   const prompt = nodes.input.value.replace(/\r\n/g, "\n").trim();
   if (!prompt) {
     setError("Write a specific question before requesting a quote.");
+    nodes.input.focus();
+    return;
+  }
+  if (new TextEncoder().encode(prompt).byteLength > 12_000) {
+    setError("Prompt exceeds the 12,000-byte public inference bound.");
     nodes.input.focus();
     return;
   }

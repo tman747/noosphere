@@ -14,8 +14,9 @@
     {"id": "reverted-retains-inclusion", "kind": "transaction", "valid": true, "value": {"txid": "4444444444444444444444444444444444444444444444444444444444444444", "wtxid": "5555555555555555555555555555555555555555555555555555555555555555", "state": "REVERTED", "fee": "1", "resource_counters": {}, "inclusion": {"height": "9", "hash": "6666666666666666666666666666666666666666666666666666666666666666", "index": "0"}}},
     {"id": "rejected-no-coordinates", "kind": "transaction", "valid": true, "value": {"txid": "4444444444444444444444444444444444444444444444444444444444444444", "wtxid": "5555555555555555555555555555555555555555555555555555555555555555", "state": "REJECTED", "fee": "0", "resource_counters": {}, "rejection_code": "invalid_signature"}},
     {"id": "feature-disabled-envelope", "kind": "error", "valid": true, "status": 409, "value": {"code": "feature_disabled", "message": "mechanism disabled", "request_id": "req-1", "details": {}, "mechanism_id": "M-NEL", "evidence_ref": "/api/v1/evidence/M-NEL"}},
-    {"id": "first-submit", "kind": "submission_semantics", "valid": true, "input": {"canonical_bytes": "AQID", "existing": false}, "expected_status": 202, "expected_duplicate": false},
-    {"id": "duplicate-submit", "kind": "submission_semantics", "valid": true, "input": {"canonical_bytes": "AQID", "existing": true, "same_bytes": true}, "expected_status": 200, "expected_duplicate": true},
+    {"id": "submission-envelope-at-limit", "kind": "submission_envelope_size", "valid": true, "bytes": 1048576, "expected_status": 202},
+    {"id": "node-accepted-submit", "kind": "submission_semantics", "valid": true, "input": {"exact_node_envelope": true, "fresh_node_identity": true, "node_accepted": true}, "expected_status": 202},
+    {"id": "node-refused-submit", "kind": "submission_semantics", "valid": true, "input": {"exact_node_envelope": true, "fresh_node_identity": true, "node_accepted": false}, "expected_status": 409, "expected_error": "node_refused"},
     {"id": "last-page-null-cursor", "kind": "page", "valid": true, "value": {"items": [], "next_cursor": null}}
   ]
 }

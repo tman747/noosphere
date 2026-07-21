@@ -18,6 +18,7 @@ use std::{
     fs,
     path::{Path as FsPath, PathBuf},
     sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::RwLock;
 
@@ -27,7 +28,22 @@ pub mod wwm;
 pub const API_VERSION: &str = "v1";
 pub const MEDIA_TYPE: &str = "application/vnd.noos.v1+json";
 pub const MAX_SUBMISSION_REQUEST_BYTES: usize = 1_048_576;
+pub const SOURCE_REVISION: &str = match option_env!("NOOS_SOURCE_REVISION") {
+    Some(revision) => revision,
+    None => "UNBOUND",
+};
+pub const RELEASE_VERSION: &str = match option_env!("NOOS_RELEASE_VERSION") {
+    Some(version) => version,
+    None => env!("CARGO_PKG_VERSION"),
+};
 const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+
+pub(crate) fn unix_time_ms() -> Option<u64> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|elapsed| u64::try_from(elapsed.as_millis()).ok())
+}
 
 pub type Result<T, E = IndexerError> = std::result::Result<T, E>;
 
@@ -164,6 +180,7 @@ struct IndexState {
     telemetry: TelemetryParser,
     readiness: IndexReadiness,
     generation: u64,
+    last_sync_unix_ms: Option<u64>,
 }
 
 impl Indexer {
@@ -442,13 +459,17 @@ fn api_json(value: Value) -> Response {
 async fn status(State(s): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
     accepted(&headers)?;
     let st = s.indexer.inner.read().await;
+    let freshness_ms = match (unix_time_ms(), st.last_sync_unix_ms) {
+        (Some(now), Some(last_sync)) => now.checked_sub(last_sync).unwrap_or(u64::MAX),
+        _ => u64::MAX,
+    };
     Ok(api_json(json!({
         "readiness":st.readiness,"ready":st.readiness == IndexReadiness::Ready,
         "indexed_generation":st.generation.to_string(),
         "chain_id":s.indexer.identity.chain_id,"genesis_hash":s.indexer.identity.genesis_hash,
-        "protocol_version":"v1","api_version":"v1","release_version":env!("CARGO_PKG_VERSION"),
+        "protocol_version":"v1","api_version":"v1","release_version":RELEASE_VERSION,
         "unsafe_head":st.unsafe_head,"justified":st.justified,"finalized":st.finalized,
-        "freshness_ms":"0","evidence_registry_root":ZERO_HASH
+        "freshness_ms":freshness_ms.to_string(),"evidence_registry_root":ZERO_HASH
     })))
 }
 #[derive(Deserialize)]
@@ -553,8 +574,11 @@ async fn submit_transaction(
                 )
             })?
             .map_err(forward_error)?;
-    let mut response =
-        (StatusCode::ACCEPTED, Json(json!({"txid":submission.txid}))).into_response();
+    let mut response = (
+        StatusCode::ACCEPTED,
+        Json(json!({"txid":submission.txid,"state":"MEMPOOL"})),
+    )
+        .into_response();
     response
         .headers_mut()
         .insert(header::CONTENT_TYPE, HeaderValue::from_static(MEDIA_TYPE));

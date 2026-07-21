@@ -148,7 +148,11 @@ fn main() -> ExitCode {
                 return ExitCode::SUCCESS;
             }
             "--version" => {
-                println!("noosd {}", env!("CARGO_PKG_VERSION"));
+                println!(
+                    "noosd {} source_revision={}",
+                    noos_node::RELEASE_VERSION,
+                    noos_node::SOURCE_REVISION
+                );
                 return ExitCode::SUCCESS;
             }
             "--params" => match take("--params") {

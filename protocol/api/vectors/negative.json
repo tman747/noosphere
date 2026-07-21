@@ -27,8 +27,8 @@
     {"id": "unsupported-content-type", "kind": "media", "valid": false, "content_type": "text/plain", "expected_status": 415, "error": "unsupported_media_type"},
     {"id": "unsupported-accept", "kind": "accept", "valid": false, "accept": "application/xml", "expected_status": 406, "error": "not_acceptable"},
     {"id": "request-over-limit", "kind": "request_size", "valid": false, "bytes": 1048577, "expected_status": 413, "error": "payload_too_large"},
-    {"id": "transaction-over-limit", "kind": "transaction_size", "valid": false, "bytes": 524289, "expected_status": 413, "error": "payload_too_large"},
-    {"id": "duplicate-txid-different-body", "kind": "submission_semantics", "valid": false, "input": {"existing": true, "same_bytes": false}, "expected_status": 409, "error": "txid_conflict"},
+    {"id": "submission-envelope-over-limit", "kind": "submission_envelope_size", "valid": false, "bytes": 1048577, "expected_status": 413, "error": "payload_too_large"},
+    {"id": "legacy-idempotent-submit", "kind": "submission_semantics", "valid": false, "input": {"exact_node_envelope": true, "fresh_node_identity": true, "node_accepted": true}, "expected_status": 200, "error": "legacy_local_admission"},
     {"id": "page-too-large", "kind": "page_count", "valid": false, "value": 201, "error": "invalid_page"},
     {"id": "additional-property", "kind": "error", "valid": false, "status": 400, "value": {"code": "invalid_request", "message": "bad", "request_id": "req", "details": {}, "surprise": true}, "error": "additional_property"}
   ]

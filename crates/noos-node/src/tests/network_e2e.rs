@@ -271,43 +271,35 @@ fn peer_ready_pull_syncs_more_than_one_range_page() {
     let dir_b = test_dir("net-e2e-range-b");
     let a = supervisor::start(networked_config(0xD1, Vec::new()), spec(), dir_a).expect("start a");
     let addr_a = a.p2p_addr.clone().expect("a listens");
-    let target_height = u64::from(noos_p2p::MAX_RANGE_HEADERS) * 2 + 1;
+    let initial_height = u64::from(noos_p2p::MAX_RANGE_HEADERS) + 1;
+    let target_height = initial_height + 32;
     let mut target_hash = status(&a).head_hash;
-    for height in 1..=target_height {
+    for height in 1..=initial_height {
         a.set_now(GENESIS_TIME_MS + height).expect("advance clock");
         target_hash = a.produce_block().expect("produce range-sync block");
     }
 
     let b =
         supervisor::start(networked_config(0xD2, vec![addr_a]), spec(), dir_b).expect("start b");
-    wait_until("first pull-sync page starts", || {
-        let height = status(&b).head_height;
-        (height > 0 && height < target_height).then_some(())
-    });
-    let chain_id = status(&a).chain_id;
-    let (tx, wit, txid) = signed_transfer(
-        chain_id,
-        target_height + 100,
-        &faucet_key(),
-        operator_account(1),
-        250,
-    );
-    assert_eq!(submit(&a, tx, wit).expect("A admits during catch-up"), txid);
-    wait_until("tx gossip remains live between pull-sync pages", || {
-        let height = status(&b).head_height;
-        (height < target_height
-            && matches!(tx_status(&b, txid), ViewLookup::Found(TxStatus::Pending)))
-        .then_some(())
-    });
+    // Keep the announce lane moving while B pulls its multi-page backlog.
+    // A pushed height may win the race against the same in-flight range
+    // entry; sync must restart at the advanced cursor rather than stall.
+    for height in (initial_height + 1)..=target_height {
+        a.set_now(GENESIS_TIME_MS + height).expect("advance clock");
+        target_hash = a.produce_block().expect("produce concurrent block");
+    }
     let imported = wait_until_for(
-        "multi-page peer-ready pull sync",
+        "multi-page peer-ready pull sync with concurrent gossip",
         MULTI_PAGE_SYNC_DEADLINE,
         || {
             let s = status(&b);
             (s.head_height == target_height).then_some(s.head_hash)
         },
     );
-    assert_eq!(imported, target_hash, "B imported every range page");
+    assert_eq!(
+        imported, target_hash,
+        "B imported every range and pushed block"
+    );
 
     b.shutdown();
     a.shutdown();

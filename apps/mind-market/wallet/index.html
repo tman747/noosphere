@@ -3,27 +3,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#11241f">
-  <meta name="description" content="A locally encrypted, installable wallet for MindChain.">
-  <title>Harbor Wallet — MindChain</title>
+  <meta name="theme-color" content="#f7f2e5">
+  <meta name="description" content="Create an encrypted iPhone wallet and send valueless MindChain public-testnet transactions.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Harbor Wallet">
+  <title>Harbor Wallet — MindChain Public Testnet</title>
   <link rel="manifest" href="/wallet/manifest.webmanifest">
   <link rel="icon" href="/wallet/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/wallet/icon-180.png">
   <link rel="stylesheet" href="/wallet/styles.css">
 </head>
 <body>
   <header class="bar">
     <a class="wordmark" href="/">HARBOR<span>WALLET</span></a>
-    <nav><a href="/defi/">DeFi</a><a href="/exchange/">Swap</a></nav>
+    <nav><a href="/wallet/">Public testnet · valueless</a></nav>
     <div class="network" id="network"><i></i><span>Connecting</span></div>
   </header>
 
   <main>
     <section class="unlock" id="unlock-view">
       <div class="unlock-copy">
-        <p class="eyebrow">Self-custody / device encrypted</p>
+        <p class="eyebrow">iPhone-ready / public testnet / valueless</p>
         <h1>Your keys stay here.</h1>
-        <p>Harbor Wallet creates an Ed25519 account in this browser, encrypts its private key with AES-256-GCM, and sends only signatures to MindChain. Install the same application on desktop or mobile.</p>
-        <ul><li>PBKDF2-SHA-256 · 310,000 rounds</li><li>Non-extractable runtime signing key</li><li>Chain identity checked before every transaction</li></ul>
+        <p>Harbor creates an Ed25519 account inside Safari, encrypts the private key with AES-256-GCM, and sends only signatures to the MindChain public testnet.</p>
+        <ul><li>Safari 17 or newer</li><li>Non-extractable runtime signing key</li><li>Exact chain identity checked before every transaction</li></ul>
       </div>
       <div class="unlock-panel">
         <div class="tabs"><button class="active" data-tab="create">Create</button><button data-tab="unlock">Unlock</button><button data-tab="import">Import</button></div>
@@ -31,7 +35,7 @@
           <h2>Create this device wallet</h2>
           <label>Password<input name="password" type="password" minlength="12" autocomplete="new-password" required></label>
           <label>Confirm password<input name="confirm" type="password" minlength="12" autocomplete="new-password" required></label>
-          <p>Use at least 12 characters. If you lose both the password and encrypted backup, nobody can recover the key.</p>
+          <p>Use at least 12 characters. After creation, download the encrypted backup. Clearing Safari data without that backup permanently loses this test wallet.</p>
           <button type="submit">Create encrypted wallet</button>
         </form>
         <form id="unlock-form" class="auth-form hidden">
@@ -52,17 +56,17 @@
 
     <section class="wallet hidden" id="wallet-view">
       <div class="wallet-head">
-        <div><p class="eyebrow">MindChain self-custody account</p><h1>Private keys local.<br>Settlement on-chain.</h1></div>
+        <div><p class="eyebrow">MindChain valueless public-testnet account</p><h1>Private keys local.<br>Settlement on-chain.</h1></div>
         <div class="account-block"><span>ACCOUNT</span><code id="account">—</code><button id="copy-account">Copy address</button></div>
       </div>
       <div class="notice" id="notice" role="status">Synchronizing chain state…</div>
       <section class="balance-strip">
-        <div><span>NOOS BALANCE</span><strong id="noos-balance">—</strong></div>
+        <div><span>NOOS_TEST BALANCE</span><strong id="noos-balance">—</strong></div>
         <div><span>CHAIN HEIGHT</span><strong id="height">—</strong></div>
         <div><span>VAULT</span><strong>Device encrypted</strong></div>
         <button id="refresh">Refresh</button>
       </section>
-      <section class="psm" aria-labelledby="psm-title">
+      <section class="psm hidden" aria-labelledby="psm-title">
         <div class="psm-copy">
           <p class="eyebrow">Protocol stability module</p>
           <h2 id="psm-title">Convert against the reserve.</h2>
@@ -100,12 +104,12 @@
           </form>
         </article>
         <aside>
-          <section class="receive"><p class="eyebrow">Receive</p><h2>Fund this account</h2><p>A first incoming transfer automatically creates this self-authenticating account on-chain.</p><button id="faucet">Request valueless test NOOS</button></section>
-          <section class="vault"><p class="eyebrow">Vault controls</p><button id="backup">Download encrypted backup</button><button id="install">Install wallet</button><button id="lock">Lock now</button></section>
-          <section class="vault"><p class="eyebrow">Passkey recovery</p><p>Requires a WebAuthn PRF-capable passkey. A passkey assertion without the PRF secret cannot decrypt the vault.</p><label>Current password<input id="passkey-password" type="password" minlength="12" autocomplete="current-password"></label><button id="passkey-enroll">Enable passkey recovery</button></section>
+          <section class="receive"><p class="eyebrow">Test funding</p><h2>Fund this account</h2><p>The rate-limited faucet sends 1,000,000 valueless NOOS_TEST. A first deposit automatically creates the account on-chain.</p><button id="faucet">Request test funds</button></section>
+          <section class="vault"><p class="eyebrow">iPhone controls</p><p>Download an encrypted backup before clearing Safari data. To install, use Safari Share → Add to Home Screen.</p><button id="backup">Download encrypted backup</button><button id="install">Install wallet</button><button id="lock">Lock now</button></section>
+          <section class="vault"><p class="eyebrow">Optional passkey recovery</p><p>Requires a WebAuthn PRF-capable passkey. Keep the encrypted backup even when passkey recovery is enabled.</p><label>Current password<input id="passkey-password" type="password" minlength="12" autocomplete="current-password"></label><button id="passkey-enroll">Enable passkey recovery</button></section>
         </aside>
       </section>
-      <section class="privacy-roadmap">
+      <section class="privacy-roadmap hidden">
         <div><p class="eyebrow">Payment privacy</p><h2>Recipient-hidden stable escrow is live at protocol level.</h2></div>
         <p>Private stable payments conceal the recipient and memo behind commitments until claim. Amount and payer remain public. Fully confidential amounts require audited zero-knowledge proving and are not misrepresented as available.</p>
       </section>
