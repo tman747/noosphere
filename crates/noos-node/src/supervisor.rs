@@ -70,6 +70,14 @@ const FULL_SYNC_BODY_REQUEST_PACING: Duration = Duration::from_millis(125);
 /// a healthy peer into a repeated 25-second timeout.
 const SYNC_RANGE_PAGE_HEADERS: u32 = 16;
 
+const fn smaller_sync_range_page(current: u32) -> Option<u32> {
+    if current <= 1 {
+        None
+    } else {
+        Some(current / 2)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Store task
 // ---------------------------------------------------------------------------
@@ -753,6 +761,7 @@ async fn sync_ready_peer(
     let Some(mode) = consensus_mode(consensus) else {
         return;
     };
+    let mut page_headers = SYNC_RANGE_PAGE_HEADERS;
     'sync: loop {
         let Some(before) = consensus_sync_head(consensus) else {
             return;
@@ -760,17 +769,25 @@ async fn sync_ready_peer(
         let Some(start_height) = before.0.checked_add(1) else {
             return;
         };
-        let range = match p2p
-            .request_range(peer, start_height, SYNC_RANGE_PAGE_HEADERS)
-            .await
-        {
+        let range = match p2p.request_range(peer, start_height, page_headers).await {
             Ok(range) => range,
-            Err(error) => {
-                eprintln!(
-                    "range-sync request failed from peer {peer} at height {start_height}: {error}"
-                );
-                return;
-            }
+            Err(error) => match smaller_sync_range_page(page_headers) {
+                Some(smaller_page) => {
+                    eprintln!(
+                        "range-sync page backoff for peer {peer} at height {start_height}: \
+                         {error} (page_headers={page_headers}->{smaller_page})"
+                    );
+                    page_headers = smaller_page;
+                    continue;
+                }
+                None => {
+                    eprintln!(
+                        "range-sync request failed from peer {peer} at height {start_height}: \
+                         {error} (page_headers={page_headers})"
+                    );
+                    return;
+                }
+            },
         };
         if range.headers.0.is_empty() {
             return;
@@ -1257,6 +1274,19 @@ mod tests {
             &secret,
         )
         .expect("signed test vote")
+    }
+
+    #[test]
+    fn range_sync_page_backoff_reaches_single_header_floor() {
+        let mut page = SYNC_RANGE_PAGE_HEADERS;
+        let mut pages = vec![page];
+        while let Some(smaller) = smaller_sync_range_page(page) {
+            pages.push(smaller);
+            page = smaller;
+        }
+
+        assert_eq!(pages, vec![16, 8, 4, 2, 1]);
+        assert_eq!(smaller_sync_range_page(1), None);
     }
 
     #[test]
