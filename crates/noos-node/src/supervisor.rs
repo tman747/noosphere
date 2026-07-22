@@ -40,7 +40,6 @@ use noos_lumen::state::LumenRoots;
 use noos_lumen::wwm::{FinalizedModelResolutionV1, ResolutionSelectorV1};
 use noos_p2p::{
     BodyReplyV1, ChainIdentity, InboundItem, Multiaddr, P2pConfig, P2pEvent, P2pHandle, P2pNode,
-    MAX_RANGE_HEADERS,
 };
 use noos_store::WriteSet;
 use noos_witness::vote::FinalityVoteV1;
@@ -65,6 +64,11 @@ const TX_REGOSSIP_BATCH: usize = 4;
 /// Full-node pull sync stays below the default eight-body-requests/second
 /// peer limit, including low-latency LAN links where transport time is tiny.
 const FULL_SYNC_BODY_REQUEST_PACING: Duration = Duration::from_millis(125);
+/// Keep a range reply below the live store-backed server's request deadline.
+/// Protocol peers may serve up to `MAX_RANGE_HEADERS`; the recovery client
+/// deliberately uses smaller pages so one synchronous store lane cannot turn
+/// a healthy peer into a repeated 25-second timeout.
+const SYNC_RANGE_PAGE_HEADERS: u32 = 16;
 
 // ---------------------------------------------------------------------------
 // Store task
@@ -757,7 +761,7 @@ async fn sync_ready_peer(
             return;
         };
         let range = match p2p
-            .request_range(peer, start_height, MAX_RANGE_HEADERS)
+            .request_range(peer, start_height, SYNC_RANGE_PAGE_HEADERS)
             .await
         {
             Ok(range) => range,
