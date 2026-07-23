@@ -19,7 +19,7 @@ use noos_p2p::{
 use noos_witness::vote::FinalityVoteV1;
 use tokio::runtime::Handle;
 
-use crate::store_port::{key_header, key_height, StorePort};
+use crate::store_port::key_header;
 use crate::supervisor::StoreClient;
 use crate::sync::{EdgeError, NetworkEdge};
 use crate::Hash32;
@@ -114,42 +114,21 @@ impl NodeProtocolStore {
 impl ProtocolStore for NodeProtocolStore {
     fn header(&self, header_hash: &[u8; 32]) -> Option<Vec<u8>> {
         self.store
-            .get_header(&key_header(header_hash))
+            .protocol_header(&key_header(header_hash))
             .ok()
             .flatten()
     }
 
     fn body(&self, block_hash: &[u8; 32]) -> Option<Vec<u8>> {
-        let body = self.store.get_blob(block_hash).ok().flatten()?;
+        let body = self.store.protocol_blob(block_hash).ok().flatten()?;
         self.cache_body_shards(&body);
         Some(body)
     }
 
     fn header_range(&self, start_height: u64, max_headers: u32) -> (Vec<Vec<u8>>, bool) {
-        let mut headers = Vec::new();
-        for offset in 0..u64::from(max_headers) {
-            let Some(height) = start_height.checked_add(offset) else {
-                break;
-            };
-            let Ok(Some(hash)) = self.store.get_index(&key_height(height)) else {
-                break;
-            };
-            let Ok(hash) = <[u8; 32]>::try_from(hash.as_slice()) else {
-                break;
-            };
-            let Ok(Some(header)) = self.store.get_header(&key_header(&hash)) else {
-                break;
-            };
-            headers.push(header);
-        }
-        let next = start_height.saturating_add(headers.len() as u64);
-        let more = self
-            .store
-            .get_index(&key_height(next))
-            .ok()
-            .flatten()
-            .is_some();
-        (headers, more)
+        self.store
+            .protocol_header_range(start_height, max_headers)
+            .unwrap_or_default()
     }
 
     fn shard(&self, content_root: &[u8; 32], shard_index: u32) -> Option<Vec<u8>> {
