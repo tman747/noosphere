@@ -172,6 +172,10 @@ impl P2pNetworkEdge {
         lock(&self.peers).retain(|candidate| candidate != peer);
     }
 
+    pub(crate) fn is_peer_ready(&self, peer: &PeerId) -> bool {
+        lock(&self.peers).contains(peer)
+    }
+
     fn select_peer(&self) -> Result<PeerId, EdgeError> {
         let peers = lock(&self.peers);
         if peers.is_empty() {

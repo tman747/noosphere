@@ -868,6 +868,7 @@ fn consensus_sync_head(consensus: &SyncSender<ConsensusMsg>) -> Option<(u64, Has
 async fn sync_ready_peer(
     consensus: &SyncSender<ConsensusMsg>,
     p2p: &P2pHandle,
+    edge: &P2pNetworkEdge,
     peer: noos_p2p::PeerId,
 ) {
     let Some(mode) = consensus_mode(consensus) else {
@@ -883,23 +884,32 @@ async fn sync_ready_peer(
         };
         let range = match p2p.request_range(peer, start_height, page_headers).await {
             Ok(range) => range,
-            Err(error) => match smaller_sync_range_page(page_headers) {
-                Some(smaller_page) => {
+            Err(error) => {
+                if !edge.is_peer_ready(&peer) {
                     eprintln!(
-                        "range-sync page backoff for peer {peer} at height {start_height}: \
-                         {error} (page_headers={page_headers}->{smaller_page})"
-                    );
-                    page_headers = smaller_page;
-                    continue;
-                }
-                None => {
-                    eprintln!(
-                        "range-sync request failed from peer {peer} at height {start_height}: \
-                         {error} (page_headers={page_headers})"
+                        "range-sync peer unavailable after request failure for {peer} \
+                         at height {start_height}: {error}"
                     );
                     return;
                 }
-            },
+                match smaller_sync_range_page(page_headers) {
+                    Some(smaller_page) => {
+                        eprintln!(
+                            "range-sync page backoff for peer {peer} at height {start_height}: \
+                             {error} (page_headers={page_headers}->{smaller_page})"
+                        );
+                        page_headers = smaller_page;
+                        continue;
+                    }
+                    None => {
+                        eprintln!(
+                            "range-sync request failed from peer {peer} at height {start_height}: \
+                             {error} (page_headers={page_headers})"
+                        );
+                        return;
+                    }
+                }
+            }
         };
         if range.headers.0.is_empty() {
             return;
@@ -1055,7 +1065,7 @@ fn spawn_network(
                         }
                         let peer = peers[sync_cursor % peers.len()];
                         sync_cursor = sync_cursor.wrapping_add(1);
-                        sync_ready_peer(&sync_consensus, &sync_p2p, peer).await;
+                        sync_ready_peer(&sync_consensus, &sync_p2p, &sync_edge, peer).await;
                     }
                 });
                 let mut shutdown_rx = shutdown_rx;
