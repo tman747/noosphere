@@ -1,5 +1,6 @@
 //! Focused coverage for the live-devnet fixture finality driver.
 
+use crate::witness_role::sign_and_release_vote;
 use noos_braid::{CheckpointRef, EPOCH_LENGTH, MAX_FINALITY_CERTIFICATES};
 use noos_witness::vote::FinalityVoteV1;
 
@@ -204,6 +205,128 @@ fn witness_tick_regossips_durable_historical_vote_after_restart() {
         vec![1, 2],
         "the current vote and one durable historical recovery vote are both emitted"
     );
+}
+
+#[test]
+fn witness_ticks_align_historical_regossip_after_independent_restarts() {
+    let aligned_now_ms = 12_000;
+    let mut historical_epochs = Vec::new();
+
+    for witness_index in 0..3 {
+        let dir = test_dir(&format!("devnet-finality-aligned-regossip-{witness_index}"));
+        let mut core = boot_node(&dir, node_config());
+        for _ in 0..EPOCH_LENGTH {
+            produce_next(&mut core);
+        }
+        let chain_id = core.chain_id();
+        for epoch in 2_u64..=5 {
+            let source = CheckpointRef {
+                epoch: epoch - 1,
+                checkpoint_hash: [u8::try_from(epoch - 1).unwrap(); 32],
+            };
+            let target = CheckpointRef {
+                epoch,
+                checkpoint_hash: [u8::try_from(epoch).unwrap(); 32],
+            };
+            let snapshot = snapshot_for(epoch);
+            sign_and_release_vote(
+                &mut core.port,
+                chain_id,
+                epoch,
+                source,
+                target,
+                snapshot.members()[witness_index].validator_id,
+                snapshot.root(),
+                &witness_secret(witness_index),
+            )
+            .expect("persist historical fixture vote");
+        }
+        drop(core);
+
+        let mut restarted = boot_node(&dir, node_config());
+        restarted.set_now(aligned_now_ms);
+        let votes = restarted
+            .devnet_witness_vote_tick(witness_index)
+            .expect("aligned current and historical votes");
+        assert_eq!(votes.len(), 2);
+        historical_epochs.push(
+            votes
+                .iter()
+                .find(|vote| vote.epoch != 1)
+                .expect("historical recovery vote")
+                .epoch,
+        );
+    }
+
+    assert_eq!(
+        historical_epochs,
+        vec![5, 5, 5],
+        "absolute-time slots align the same historical rung across witnesses"
+    );
+}
+
+#[test]
+fn aligned_historical_votes_cascade_a_lagged_producer_after_restart() {
+    const RECOVERY_EPOCH: u64 = 5;
+
+    let producer_dir = test_dir("devnet-finality-aligned-regossip-producer");
+    let mut producer = boot_node(&producer_dir, node_config());
+    for _ in 0..RECOVERY_EPOCH * EPOCH_LENGTH {
+        produce_next(&mut producer);
+    }
+
+    let mut witnesses = Vec::new();
+    for witness_index in 0..3 {
+        let dir = test_dir(&format!(
+            "devnet-finality-aligned-regossip-cascade-{witness_index}"
+        ));
+        let mut witness = boot_node(&dir, node_config());
+        let mut checkpoints = vec![witness.justified()];
+        for height in 1..=RECOVERY_EPOCH * EPOCH_LENGTH {
+            let hash = produce_next(&mut witness);
+            if height % EPOCH_LENGTH == 0 {
+                checkpoints.push(CheckpointRef {
+                    epoch: height / EPOCH_LENGTH,
+                    checkpoint_hash: hash,
+                });
+            }
+        }
+        let chain_id = witness.chain_id();
+        for epoch in 1..=RECOVERY_EPOCH {
+            let snapshot = snapshot_for(epoch);
+            sign_and_release_vote(
+                &mut witness.port,
+                chain_id,
+                epoch,
+                checkpoints[usize::try_from(epoch - 1).unwrap()],
+                checkpoints[usize::try_from(epoch).unwrap()],
+                snapshot.members()[witness_index].validator_id,
+                snapshot.root(),
+                &witness_secret(witness_index),
+            )
+            .expect("persist recovery ladder vote");
+        }
+        drop(witness);
+        witnesses.push(boot_node(&dir, node_config()));
+    }
+
+    for tick in 0..RECOVERY_EPOCH - 1 {
+        for (witness_index, witness) in witnesses.iter_mut().enumerate() {
+            witness.set_now(tick * 1_000);
+            for vote in witness
+                .devnet_witness_vote_tick(witness_index)
+                .expect("aligned recovery votes")
+            {
+                producer
+                    .ingest_network_vote(vote)
+                    .expect("lagged producer accepts recovery vote");
+            }
+        }
+    }
+
+    assert_eq!(producer.justified().epoch, RECOVERY_EPOCH);
+    assert_eq!(producer.finalized().epoch, RECOVERY_EPOCH - 1);
+    assert_eq!(producer.pending_vote_count(), 0);
 }
 
 #[test]

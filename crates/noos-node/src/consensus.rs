@@ -345,7 +345,6 @@ pub struct NodeCore<P: StorePort> {
     orphan_blocks: BTreeMap<Hash32, ParkedBlock>,
     pending_votes: Vec<FinalityVoteV1>,
     deferred_votes: Vec<FinalityVoteV1>,
-    witness_regossip_cursor: usize,
     pending_certs: Vec<FinalityCertificateV1>,
     pub mempool: Mempool,
     pub view: ChainView,
@@ -448,7 +447,6 @@ impl<P: StorePort> NodeCore<P> {
             orphan_blocks: BTreeMap::new(),
             pending_votes: Vec::new(),
             deferred_votes: Vec::new(),
-            witness_regossip_cursor: 0,
             pending_certs: Vec::new(),
             port,
             now_ms: spec.genesis_time_ms,
@@ -823,58 +821,65 @@ impl<P: StorePort> NodeCore<P> {
         current: &FinalityVoteV1,
         witness_index: usize,
     ) -> Result<Option<FinalityVoteV1>, NodeError> {
-        let records = self.port.safety_records(SAFETY_KIND_VOTE)?;
-        let count = records.len();
-        if count == 0 {
+        let raw_records = self.port.safety_records(SAFETY_KIND_VOTE)?;
+        let mut records = Vec::with_capacity(raw_records.len());
+        for raw in raw_records {
+            let record = VoteSafetyRecordV1::decode_canonical(&raw)
+                .map_err(|_| NodeError::Config("malformed durable vote safety record".into()))?;
+            if record.validator_id == current.validator_id
+                && (record.epoch != current.epoch
+                    || record.source != current.source
+                    || record.target != current.target)
+            {
+                records.push(record);
+            }
+        }
+        if records.is_empty() {
             return Ok(None);
         }
-        for _ in 0..count {
-            let index = self.witness_regossip_cursor % count;
-            self.witness_regossip_cursor = self.witness_regossip_cursor.wrapping_add(1);
-            let record = VoteSafetyRecordV1::decode_canonical(&records[index])
-                .map_err(|_| NodeError::Config("malformed durable vote safety record".into()))?;
-            if record.validator_id != current.validator_id
-                || (record.epoch == current.epoch
-                    && record.source == current.source
-                    && record.target == current.target)
-            {
-                continue;
-            }
-            self.ensure_snapshot(record.epoch)?;
-            let snapshot = self
-                .registry
-                .get(record.epoch)
-                .cloned()
-                .ok_or(NodeError::Witness(
-                    noos_witness::WitnessError::UnknownSnapshot,
-                ))?;
-            let member = snapshot.members().get(witness_index).ok_or_else(|| {
-                NodeError::Config("devnet witness index outside fixture set".into())
-            })?;
-            if member.validator_id != record.validator_id {
-                return Err(NodeError::Config(
-                    "durable vote validator does not match fixture witness".into(),
-                ));
-            }
-            let secret = fixture_witness_secret(witness_index).map_err(|_| NodeError::Crypto)?;
-            let vote = sign_and_release_vote(
-                &mut self.port,
-                self.chain_id,
-                record.epoch,
-                record.source,
-                record.target,
-                record.validator_id,
-                snapshot.root(),
-                &secret,
-            )
-            .map_err(|error| {
-                NodeError::Config(format!(
-                    "durable devnet witness vote recovery refused: {error:?}"
-                ))
-            })?;
-            return Ok(Some(vote));
+
+        // Safety records are stored by payload hash, which gives each
+        // validator a different iteration order. Sort by the shared epoch and
+        // select from absolute network time so independently restarted
+        // witnesses regossip the same historical rung within one tick.
+        records.sort_unstable_by_key(|record| std::cmp::Reverse(record.epoch));
+        let tick = usize::try_from(self.now_ms / 1_000).unwrap_or(usize::MAX);
+        let record = records.swap_remove(tick % records.len());
+
+        self.ensure_snapshot(record.epoch)?;
+        let snapshot = self
+            .registry
+            .get(record.epoch)
+            .cloned()
+            .ok_or(NodeError::Witness(
+                noos_witness::WitnessError::UnknownSnapshot,
+            ))?;
+        let member = snapshot
+            .members()
+            .get(witness_index)
+            .ok_or_else(|| NodeError::Config("devnet witness index outside fixture set".into()))?;
+        if member.validator_id != record.validator_id {
+            return Err(NodeError::Config(
+                "durable vote validator does not match fixture witness".into(),
+            ));
         }
-        Ok(None)
+        let secret = fixture_witness_secret(witness_index).map_err(|_| NodeError::Crypto)?;
+        let vote = sign_and_release_vote(
+            &mut self.port,
+            self.chain_id,
+            record.epoch,
+            record.source,
+            record.target,
+            record.validator_id,
+            snapshot.root(),
+            &secret,
+        )
+        .map_err(|error| {
+            NodeError::Config(format!(
+                "durable devnet witness vote recovery refused: {error:?}"
+            ))
+        })?;
+        Ok(Some(vote))
     }
 
     /// Emits the current independently signed fixture witness vote and at
