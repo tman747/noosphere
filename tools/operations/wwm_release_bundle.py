@@ -98,6 +98,7 @@ API_CONTRACT_FILES: Final[tuple[str, ...]] = (
     "protocol/api/vectors/positive.json",
 )
 RUNTIME_PATHS: Final[tuple[str, ...]] = (
+    "apps/network-dashboard",
     "apps/mind-market/wallet",
     "deploy/wwm/public-testnet.json",
     "deploy/wwm/run-public-testnet.ps1",

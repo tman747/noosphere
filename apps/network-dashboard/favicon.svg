@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MindChain">
+  <rect width="64" height="64" fill="#f7f2e5"/>
+  <path d="M13 47V17h8l11 17 11-17h8v30h-8V29L32 45 21 29v18z" fill="#1c1811"/>
+  <rect x="13" y="53" width="38" height="3" fill="#b8340f"/>
+</svg>

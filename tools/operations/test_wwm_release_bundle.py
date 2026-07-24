@@ -125,6 +125,24 @@ class PublicTestnetReleaseBundleTests(unittest.TestCase):
             self.release_version,
         )
 
+    def test_network_dashboard_installer_assets_are_sealed(self) -> None:
+        runtime_files = {
+            path.relative_to(release.ROOT).as_posix()
+            for path in release.tracked_runtime_files()
+        }
+        expected = {
+            "apps/network-dashboard/index.html",
+            "apps/network-dashboard/app.js",
+            "apps/network-dashboard/styles.css",
+            "apps/network-dashboard/favicon.svg",
+            "tools/network_dashboard.py",
+            "deploy/wwm/systemd/install-mindchain-network-dashboard.sh",
+        }
+        self.assertTrue(
+            expected.issubset(runtime_files),
+            f"network dashboard release inputs are missing: {sorted(expected - runtime_files)}",
+        )
+
     def test_exact_bundle_verifies_and_mutated_bytes_fail(self) -> None:
         verified = release.verify_bundle(self.root)
         self.assertEqual(verified["source"]["revision"], self.revision)
