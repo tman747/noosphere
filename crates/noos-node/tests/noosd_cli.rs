@@ -34,8 +34,36 @@ fn help_prints_the_operator_surface_and_exits_zero() {
         "documents the command-line-secret-safe RPC token file"
     );
     assert!(
+        text.contains("--mempool-max-transactions"),
+        "documents bounded mempool capacity"
+    );
+    assert!(
         text.contains("NEVER") || text.contains("never"),
         "the social-checkpoint law is stated"
+    );
+}
+
+#[test]
+fn public_testnet_capacity_flags_parse_as_one_contract() {
+    let out = noosd(&[
+        "--mempool-max-transactions",
+        "65536",
+        "--mempool-max-bytes",
+        "67108864",
+        "--mempool-per-source-pending",
+        "65536",
+        "--mempool-per-account-pending",
+        "65536",
+        "--template-byte-budget",
+        "983040",
+        "--template-max-transactions",
+        "16384",
+        "--help",
+    ]);
+    assert!(
+        out.status.success(),
+        "the sealed launcher capacity flags must parse: {}",
+        String::from_utf8_lossy(&out.stderr)
     );
 }
 
@@ -62,7 +90,10 @@ fn rpc_token_file_failures_are_typed_before_node_boot() {
             .expect("system clock")
             .as_nanos()
     ));
-    let out = noosd(&["--rpc-token-file", missing.to_str().expect("UTF-8 temp path")]);
+    let out = noosd(&[
+        "--rpc-token-file",
+        missing.to_str().expect("UTF-8 temp path"),
+    ]);
     assert!(!out.status.success(), "missing token file must fail");
     assert!(
         String::from_utf8_lossy(&out.stderr).contains("read --rpc-token-file"),

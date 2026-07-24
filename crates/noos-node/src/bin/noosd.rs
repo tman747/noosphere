@@ -16,6 +16,8 @@ use noos_node::rpc::{self, RpcConfig};
 use noos_node::supervisor;
 
 const DEVNET_CONTRACT_CODE_HASH: noos_node::Hash32 = [0xC0; 32];
+const MAX_MEMPOOL_TRANSACTIONS: usize = 1_048_576;
+const MAX_MEMPOOL_BYTES: usize = 1024 * 1024 * 1024;
 
 const HELP: &str = "\
 noosd — MindChain (NOOSPHERE) reference node
@@ -52,6 +54,18 @@ OPTIONS:
     --produce-interval-ms <ms>
                            Block production cadence for --validator
                            (default: 6000 = one block per devnet slot)
+    --mempool-max-transactions <count>
+                           Maximum pending transaction count
+                           (default: 4096; max: 1048576)
+    --mempool-max-bytes <bytes>
+                           Maximum aggregate pending transaction bytes
+                           (default: 8388608; max: 1073741824)
+    --mempool-per-source-pending <count>
+                           Maximum pending transactions per admission source
+                           (default: 256; max: mempool transaction count)
+    --mempool-per-account-pending <count>
+                           Maximum pending transactions per fee payer
+                           (default: 64; max: mempool transaction count)
     --template-byte-budget <bytes>
                            Maximum admitted tx+witness bytes per proposal
                            (default: 786432; max: DA body minus 64 KiB)
@@ -231,6 +245,56 @@ fn main() -> ExitCode {
                     }
                 }
             }
+            "--mempool-max-transactions" => {
+                match take("--mempool-max-transactions").and_then(|v| v.parse().ok()) {
+                    Some(value) if (1..=MAX_MEMPOOL_TRANSACTIONS).contains(&value) => {
+                        mempool.max_count = value;
+                    }
+                    _ => {
+                        eprintln!(
+                            "error: --mempool-max-transactions expects 1..={MAX_MEMPOOL_TRANSACTIONS}"
+                        );
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            "--mempool-max-bytes" => {
+                match take("--mempool-max-bytes").and_then(|v| v.parse().ok()) {
+                    Some(value) if (1..=MAX_MEMPOOL_BYTES).contains(&value) => {
+                        mempool.max_bytes = value;
+                    }
+                    _ => {
+                        eprintln!("error: --mempool-max-bytes expects 1..={MAX_MEMPOOL_BYTES}");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            "--mempool-per-source-pending" => {
+                match take("--mempool-per-source-pending").and_then(|v| v.parse().ok()) {
+                    Some(value) if (1..=MAX_MEMPOOL_TRANSACTIONS).contains(&value) => {
+                        mempool.per_source_pending = value;
+                    }
+                    _ => {
+                        eprintln!(
+                            "error: --mempool-per-source-pending expects 1..={MAX_MEMPOOL_TRANSACTIONS}"
+                        );
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            "--mempool-per-account-pending" => {
+                match take("--mempool-per-account-pending").and_then(|v| v.parse().ok()) {
+                    Some(value) if (1..=MAX_MEMPOOL_TRANSACTIONS).contains(&value) => {
+                        mempool.per_account_pending = value;
+                    }
+                    _ => {
+                        eprintln!(
+                            "error: --mempool-per-account-pending expects 1..={MAX_MEMPOOL_TRANSACTIONS}"
+                        );
+                        return ExitCode::from(2);
+                    }
+                }
+            }
             "--template-byte-budget" => {
                 let maximum = noos_da::MAX_BLOCK_BODY_BYTES.saturating_sub(65_536);
                 match take("--template-byte-budget").and_then(|v| v.parse().ok()) {
@@ -306,6 +370,31 @@ fn main() -> ExitCode {
                 return ExitCode::from(2);
             }
         }
+    }
+    if mempool.max_bytes < mempool.max_tx_bytes {
+        eprintln!(
+            "error: --mempool-max-bytes must be at least {}",
+            mempool.max_tx_bytes
+        );
+        return ExitCode::from(2);
+    }
+    if mempool.per_source_pending > mempool.max_count {
+        eprintln!("error: --mempool-per-source-pending must not exceed --mempool-max-transactions");
+        return ExitCode::from(2);
+    }
+    if mempool.per_account_pending > mempool.max_count {
+        eprintln!(
+            "error: --mempool-per-account-pending must not exceed --mempool-max-transactions"
+        );
+        return ExitCode::from(2);
+    }
+    if mempool.template_byte_budget > mempool.max_bytes {
+        eprintln!("error: --template-byte-budget must not exceed --mempool-max-bytes");
+        return ExitCode::from(2);
+    }
+    if mempool.template_max_txs > mempool.max_count {
+        eprintln!("error: --template-max-transactions must not exceed --mempool-max-transactions");
+        return ExitCode::from(2);
     }
     if rpc_token.is_some() && rpc_token_file.is_some() {
         eprintln!("error: --rpc-token and --rpc-token-file are mutually exclusive");
