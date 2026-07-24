@@ -172,13 +172,6 @@ fn witness_tick_regossips_durable_historical_vote_after_restart() {
         .expect("witness zero epoch one vote");
     assert_eq!(first.len(), 1);
     assert_eq!(first[0].target, epoch_one);
-    drop(core);
-    let mut core = boot_node(&dir, node_config());
-    let restarted_vote = core
-        .devnet_witness_vote_tick(0)
-        .expect("restart re-releases the durable epoch one vote");
-    assert_eq!(restarted_vote.len(), 1);
-    assert_eq!(restarted_vote[0].target, epoch_one);
 
     let snapshot = snapshot_for(1);
     for index in 1..3 {
@@ -194,6 +187,9 @@ fn witness_tick_regossips_durable_historical_vote_after_restart() {
         .expect("remote fixture vote");
         core.ingest_network_vote(vote).expect("remote quorum vote");
     }
+    assert_eq!(core.justified(), epoch_one);
+    drop(core);
+    let mut core = boot_node(&dir, node_config());
     assert_eq!(core.justified(), epoch_one);
 
     let mut outbound_epochs = core
