@@ -151,7 +151,7 @@ fn authenticated_future_source_votes_retry_after_justification_advances() {
 }
 
 #[test]
-fn witness_tick_regossips_historical_vote_after_local_finality_advances() {
+fn witness_tick_regossips_durable_historical_vote_after_restart() {
     let dir = test_dir("devnet-finality-historical-regossip");
     let mut core = boot_node(&dir, node_config());
     let mut epoch_one_hash = None;
@@ -172,6 +172,13 @@ fn witness_tick_regossips_historical_vote_after_local_finality_advances() {
         .expect("witness zero epoch one vote");
     assert_eq!(first.len(), 1);
     assert_eq!(first[0].target, epoch_one);
+    drop(core);
+    let mut core = boot_node(&dir, node_config());
+    let restarted_vote = core
+        .devnet_witness_vote_tick(0)
+        .expect("restart re-releases the durable epoch one vote");
+    assert_eq!(restarted_vote.len(), 1);
+    assert_eq!(restarted_vote[0].target, epoch_one);
 
     let snapshot = snapshot_for(1);
     for index in 1..3 {
@@ -199,7 +206,7 @@ fn witness_tick_regossips_historical_vote_after_local_finality_advances() {
     assert_eq!(
         outbound_epochs,
         vec![1, 2],
-        "the current vote and one bounded historical recovery vote are both emitted"
+        "the current vote and one durable historical recovery vote are both emitted"
     );
 }
 

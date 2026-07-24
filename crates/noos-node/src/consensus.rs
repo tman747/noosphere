@@ -77,9 +77,10 @@ use crate::roots::{
 };
 use crate::store_port::{
     key_certificate, key_header, key_height, StorePort, KEY_FINALIZED, KEY_HEAD, KEY_JUSTIFIED,
+    SAFETY_KIND_VOTE,
 };
 use crate::view::ChainView;
-use crate::witness_role::sign_and_release_vote;
+use crate::witness_role::{sign_and_release_vote, VoteSafetyRecordV1};
 use crate::{Hash32, NodeError};
 
 /// Devnet beacon-randomness fixture feeding reserve sampling until the
@@ -87,7 +88,6 @@ use crate::{Hash32, NodeError};
 pub const DEVNET_BEACON_RANDOMNESS: [u8; 32] = [0x5A; 32];
 
 const MAX_PENDING_NETWORK_VOTES: usize = 1024;
-const MAX_RECENT_WITNESS_VOTES: usize = 1024;
 
 /// Node operating mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -345,7 +345,6 @@ pub struct NodeCore<P: StorePort> {
     orphan_blocks: BTreeMap<Hash32, ParkedBlock>,
     pending_votes: Vec<FinalityVoteV1>,
     deferred_votes: Vec<FinalityVoteV1>,
-    recent_witness_votes: Vec<FinalityVoteV1>,
     witness_regossip_cursor: usize,
     pending_certs: Vec<FinalityCertificateV1>,
     pub mempool: Mempool,
@@ -449,7 +448,6 @@ impl<P: StorePort> NodeCore<P> {
             orphan_blocks: BTreeMap::new(),
             pending_votes: Vec::new(),
             deferred_votes: Vec::new(),
-            recent_witness_votes: Vec::new(),
             witness_regossip_cursor: 0,
             pending_certs: Vec::new(),
             port,
@@ -820,39 +818,63 @@ impl<P: StorePort> NodeCore<P> {
         self.queue_certificate(cert)?;
         Ok(true)
     }
-    fn remember_witness_vote(&mut self, vote: &FinalityVoteV1) {
-        if self.recent_witness_votes.iter().any(|known| {
-            known.epoch == vote.epoch
-                && known.source == vote.source
-                && known.target == vote.target
-                && known.validator_id == vote.validator_id
-        }) {
-            return;
-        }
-        if self.recent_witness_votes.len() >= MAX_RECENT_WITNESS_VOTES {
-            self.recent_witness_votes.remove(0);
-        }
-        self.recent_witness_votes.push(vote.clone());
-    }
-
-    fn historical_witness_vote(&mut self, current: &FinalityVoteV1) -> Option<FinalityVoteV1> {
-        let count = self.recent_witness_votes.len();
+    fn durable_historical_witness_vote(
+        &mut self,
+        current: &FinalityVoteV1,
+        witness_index: usize,
+    ) -> Result<Option<FinalityVoteV1>, NodeError> {
+        let records = self.port.safety_records(SAFETY_KIND_VOTE)?;
+        let count = records.len();
         if count == 0 {
-            return None;
+            return Ok(None);
         }
         for _ in 0..count {
             let index = self.witness_regossip_cursor % count;
             self.witness_regossip_cursor = self.witness_regossip_cursor.wrapping_add(1);
-            let candidate = &self.recent_witness_votes[index];
-            if candidate.validator_id == current.validator_id
-                && (candidate.epoch != current.epoch
-                    || candidate.source != current.source
-                    || candidate.target != current.target)
+            let record = VoteSafetyRecordV1::decode_canonical(&records[index])
+                .map_err(|_| NodeError::Config("malformed durable vote safety record".into()))?;
+            if record.validator_id != current.validator_id
+                || (record.epoch == current.epoch
+                    && record.source == current.source
+                    && record.target == current.target)
             {
-                return Some(candidate.clone());
+                continue;
             }
+            self.ensure_snapshot(record.epoch)?;
+            let snapshot = self
+                .registry
+                .get(record.epoch)
+                .cloned()
+                .ok_or(NodeError::Witness(
+                    noos_witness::WitnessError::UnknownSnapshot,
+                ))?;
+            let member = snapshot.members().get(witness_index).ok_or_else(|| {
+                NodeError::Config("devnet witness index outside fixture set".into())
+            })?;
+            if member.validator_id != record.validator_id {
+                return Err(NodeError::Config(
+                    "durable vote validator does not match fixture witness".into(),
+                ));
+            }
+            let secret = fixture_witness_secret(witness_index).map_err(|_| NodeError::Crypto)?;
+            let vote = sign_and_release_vote(
+                &mut self.port,
+                self.chain_id,
+                record.epoch,
+                record.source,
+                record.target,
+                record.validator_id,
+                snapshot.root(),
+                &secret,
+            )
+            .map_err(|error| {
+                NodeError::Config(format!(
+                    "durable devnet witness vote recovery refused: {error:?}"
+                ))
+            })?;
+            return Ok(Some(vote));
         }
-        None
+        Ok(None)
     }
 
     /// Emits the current independently signed fixture witness vote and at
@@ -920,8 +942,7 @@ impl<P: StorePort> NodeCore<P> {
             self.ingest_network_vote(vote.clone())?;
             vote
         };
-        self.remember_witness_vote(&current);
-        let historical = self.historical_witness_vote(&current);
+        let historical = self.durable_historical_witness_vote(&current, witness_index)?;
         let mut outbound = Vec::with_capacity(usize::from(historical.is_some()) + 1);
         outbound.push(current);
         if let Some(vote) = historical {
