@@ -258,10 +258,81 @@ fn witness_ticks_align_historical_regossip_after_independent_restarts() {
         );
     }
 
-    assert_eq!(
-        historical_epochs,
-        vec![5, 5, 5],
+    assert!(
+        historical_epochs
+            .iter()
+            .all(|epoch| *epoch == historical_epochs[0]),
         "absolute-time slots align the same historical rung across witnesses"
+    );
+    assert!((2..=5).contains(&historical_epochs[0]));
+}
+
+#[test]
+fn witness_ticks_rendezvous_across_shifted_durable_histories() {
+    let histories = [2_u64..=5, 3_u64..=6, 4_u64..=7];
+    let mut witnesses = Vec::new();
+
+    for (witness_index, epochs) in histories.into_iter().enumerate() {
+        let dir = test_dir(&format!(
+            "devnet-finality-rendezvous-regossip-{witness_index}"
+        ));
+        let mut core = boot_node(&dir, node_config());
+        for _ in 0..EPOCH_LENGTH {
+            produce_next(&mut core);
+        }
+        let chain_id = core.chain_id();
+        for epoch in epochs {
+            let source = CheckpointRef {
+                epoch: epoch - 1,
+                checkpoint_hash: [u8::try_from(epoch - 1).unwrap(); 32],
+            };
+            let target = CheckpointRef {
+                epoch,
+                checkpoint_hash: [u8::try_from(epoch).unwrap(); 32],
+            };
+            let snapshot = snapshot_for(epoch);
+            sign_and_release_vote(
+                &mut core.port,
+                chain_id,
+                epoch,
+                source,
+                target,
+                snapshot.members()[witness_index].validator_id,
+                snapshot.root(),
+                &witness_secret(witness_index),
+            )
+            .expect("persist shifted historical fixture vote");
+        }
+        drop(core);
+        witnesses.push(boot_node(&dir, node_config()));
+    }
+
+    let mut saw_epoch_four = false;
+    let mut saw_epoch_five = false;
+    for tick in 0..8_u64 {
+        let selected = witnesses
+            .iter_mut()
+            .enumerate()
+            .map(|(witness_index, witness)| {
+                witness.set_now(tick * 1_000);
+                witness
+                    .devnet_witness_vote_tick(witness_index)
+                    .expect("rendezvous current and historical votes")
+                    .into_iter()
+                    .find(|vote| vote.epoch != 1)
+                    .expect("historical recovery vote")
+                    .epoch
+            })
+            .collect::<Vec<_>>();
+        if selected.iter().all(|epoch| *epoch == selected[0]) {
+            saw_epoch_four |= selected[0] == 4;
+            saw_epoch_five |= selected[0] == 5;
+        }
+    }
+
+    assert!(
+        saw_epoch_four && saw_epoch_five,
+        "shifted histories rendezvous on every epoch in their intersection"
     );
 }
 

@@ -89,6 +89,19 @@ pub const DEVNET_BEACON_RANDOMNESS: [u8; 32] = [0x5A; 32];
 
 const MAX_PENDING_NETWORK_VOTES: usize = 1024;
 
+/// Deterministic rendezvous score for one absolute-time recovery slot.
+///
+/// The epoch, not a local vector index, is the rendezvous key: witnesses with
+/// overlapping but non-identical durable histories therefore select the same
+/// shared rung whenever that rung wins the slot.
+#[allow(clippy::arithmetic_side_effects)]
+fn historical_vote_rendezvous_score(tick: u64, epoch: u64) -> u64 {
+    let mut value = epoch ^ tick.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
+}
+
 /// Node operating mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeMode {
@@ -838,13 +851,20 @@ impl<P: StorePort> NodeCore<P> {
             return Ok(None);
         }
 
-        // Safety records are stored by payload hash, which gives each
-        // validator a different iteration order. Sort by the shared epoch and
-        // select from absolute network time so independently restarted
-        // witnesses regossip the same historical rung within one tick.
-        records.sort_unstable_by_key(|record| std::cmp::Reverse(record.epoch));
-        let tick = usize::try_from(self.now_ms / 1_000).unwrap_or(usize::MAX);
-        let record = records.swap_remove(tick % records.len());
+        // Rendezvous-rank absolute epoch IDs instead of indexing modulo the
+        // local record count. Modulo counts permanently de-align witnesses
+        // restored from snapshots with different durable-history prefixes.
+        let tick = self.now_ms / 1_000;
+        let mut record_index = 0;
+        let mut best_score = historical_vote_rendezvous_score(tick, records[0].epoch);
+        for (index, candidate) in records.iter().enumerate().skip(1) {
+            let score = historical_vote_rendezvous_score(tick, candidate.epoch);
+            if score < best_score {
+                record_index = index;
+                best_score = score;
+            }
+        }
+        let record = records.swap_remove(record_index);
 
         self.ensure_snapshot(record.epoch)?;
         let snapshot = self
