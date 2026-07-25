@@ -252,6 +252,7 @@ enum SwarmCmd {
 
 /// Duplicate-cache lanes (push protocols only).
 const DUP_LANES: usize = 4;
+const VOTE_DUP_REPLAY_MS: u64 = 60_000;
 
 const fn dup_lane(protocol: Protocol) -> Option<usize> {
     match protocol {
@@ -1254,13 +1255,20 @@ fn check_chain(shared: &Shared, chain_id: &[u8; 32]) -> Result<(), Violation> {
     }
 }
 
-/// Duplicate-cache insert; `true` = first sight.
+/// Duplicate-cache insert; `true` = first sight inside the protocol's replay
+/// window. Finality votes become deliverable again because durable recovery
+/// intentionally re-sends identical signed votes after peers reconnect.
 fn dup_fresh(shared: &Shared, protocol: Protocol, payload: &[u8]) -> bool {
     let Some(lane) = dup_lane(protocol) else {
         return true;
     };
     let digest = message_digest(protocol, payload);
-    lock(&shared.dups)[lane].insert(digest)
+    let mut dups = lock(&shared.dups);
+    if protocol == Protocol::BraidVote {
+        dups[lane].insert_replayable(digest, shared.now_ms(), VOTE_DUP_REPLAY_MS)
+    } else {
+        dups[lane].insert(digest)
+    }
 }
 
 fn dispatch(

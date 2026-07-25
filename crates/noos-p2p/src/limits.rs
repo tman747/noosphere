@@ -122,13 +122,19 @@ impl LimitsConfig {
 // ---------------------------------------------------------------------------
 
 /// Bounded LRU set of 32-byte content digests. Lazy eviction: the order queue
-/// may hold stale entries for re-touched digests; `map` sequence numbers
+/// may hold stale entries for re-touched digests; entry sequence numbers
 /// disambiguate.
+#[derive(Debug, Clone, Copy)]
+struct DupEntry {
+    sequence: u64,
+    accepted_at_ms: u64,
+}
+
 #[derive(Debug)]
 pub struct DupCache {
     capacity: usize,
     seq: u64,
-    map: HashMap<[u8; 32], u64>,
+    map: HashMap<[u8; 32], DupEntry>,
     order: VecDeque<([u8; 32], u64)>,
 }
 
@@ -146,7 +152,51 @@ impl DupCache {
     /// cached — a duplicate.
     pub fn insert(&mut self, digest: [u8; 32]) -> bool {
         self.seq = self.seq.wrapping_add(1);
-        let fresh = self.map.insert(digest, self.seq).is_none();
+        let fresh = !self.map.contains_key(&digest);
+        let accepted_at_ms = self
+            .map
+            .get(&digest)
+            .map_or(0, |entry| entry.accepted_at_ms);
+        self.map.insert(
+            digest,
+            DupEntry {
+                sequence: self.seq,
+                accepted_at_ms,
+            },
+        );
+        self.touch(digest);
+        fresh
+    }
+
+    /// Inserts a digest while allowing it to become fresh again after a
+    /// caller-supplied replay interval. Re-touches inside the interval remain
+    /// duplicates and do not extend the interval.
+    pub fn insert_replayable(
+        &mut self,
+        digest: [u8; 32],
+        now_ms: u64,
+        replay_after_ms: u64,
+    ) -> bool {
+        self.seq = self.seq.wrapping_add(1);
+        let (fresh, accepted_at_ms) = match self.map.get(&digest) {
+            None => (true, now_ms),
+            Some(entry) if now_ms.saturating_sub(entry.accepted_at_ms) >= replay_after_ms => {
+                (true, now_ms)
+            }
+            Some(entry) => (false, entry.accepted_at_ms),
+        };
+        self.map.insert(
+            digest,
+            DupEntry {
+                sequence: self.seq,
+                accepted_at_ms,
+            },
+        );
+        self.touch(digest);
+        fresh
+    }
+
+    fn touch(&mut self, digest: [u8; 32]) {
         self.order.push_back((digest, self.seq));
         while self.map.len() > self.capacity {
             self.evict_one();
@@ -155,7 +205,6 @@ impl DupCache {
         while self.order.len() > self.capacity.saturating_mul(4) {
             self.pop_stale();
         }
-        fresh
     }
 
     pub fn contains(&self, digest: &[u8; 32]) -> bool {
@@ -172,7 +221,7 @@ impl DupCache {
 
     fn pop_stale(&mut self) {
         if let Some((digest, seq)) = self.order.pop_front() {
-            if self.map.get(&digest) == Some(&seq) {
+            if self.map.get(&digest).map(|entry| entry.sequence) == Some(seq) {
                 // Not stale after all: this is the live entry; keep it live
                 // by re-appending (it is the oldest live digest).
                 self.order.push_front((digest, seq));
@@ -182,7 +231,7 @@ impl DupCache {
 
     fn evict_one(&mut self) {
         while let Some((digest, seq)) = self.order.pop_front() {
-            if self.map.get(&digest) == Some(&seq) {
+            if self.map.get(&digest).map(|entry| entry.sequence) == Some(seq) {
                 self.map.remove(&digest);
                 return;
             }
@@ -326,6 +375,19 @@ mod tests {
         assert!(c.contains(&d(1)), "recently refreshed survives");
         assert!(!c.contains(&d(2)), "LRU victim evicted");
         assert!(c.contains(&d(3)));
+    }
+
+    #[test]
+    fn dup_cache_replays_after_interval_without_sliding_expiry() {
+        let mut c = DupCache::new(2);
+        let digest = [7; 32];
+        assert!(c.insert_replayable(digest, 1_000, 60_000));
+        assert!(!c.insert_replayable(digest, 60_999, 60_000));
+        assert!(
+            c.insert_replayable(digest, 61_000, 60_000),
+            "the first accepted observation, not duplicate touches, anchors replay"
+        );
+        assert!(!c.insert_replayable(digest, 61_000, 60_000));
     }
 
     #[test]
