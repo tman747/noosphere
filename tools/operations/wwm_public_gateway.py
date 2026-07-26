@@ -206,8 +206,8 @@ def load_config(args: argparse.Namespace) -> GatewayConfig:
                     "inference_hosted_config",
                     Path("C:/mindchain/wwm-testnet/secrets/hosted-model-publisher.json"),
                 ),
-                node_rpc=node_rpc,
-                node_token=token,
+                node_rpc=fallback_node_rpc or node_rpc,
+                node_token=fallback_node_token or token,
             )
             tokenizer = OfflineTokenizer(
                 executable=getattr(
