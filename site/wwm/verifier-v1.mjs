@@ -261,7 +261,7 @@ export async function verifyStreamEvent(event, active, jobId) {
   return verifySignedEnvelope(payload, "STREAM-EVENT");
 }
 
-async function verifyFinalizedSettlement(receipt) {
+export async function verifyFinalizedSettlement(receipt) {
   const lifecycle = receipt.chain_settlement;
   invariant(
     isRecord(lifecycle)
@@ -287,15 +287,26 @@ async function verifyFinalizedSettlement(receipt) {
     const summary = lifecycle.finalized[kind];
     invariant(
       isRecord(summary)
-        && summary.finalized_height === value.finalized_height
-        && summary.finalized_hash === value.finalized_hash
-        && summary.objects_root === value.objects_root,
-      `finalized ${kind} summary mismatch`,
+        && Number.isSafeInteger(summary.finalized_height)
+        && summary.finalized_height >= 0,
+      `finalized ${kind} summary is malformed`,
     );
+    requireHex32(summary.finalized_hash, `finalized ${kind} summary hash`);
+    requireHex32(summary.objects_root, `finalized ${kind} summary objects root`);
+    invariant(
+      value.finalized_height >= summary.finalized_height,
+      `finalized ${kind} proof regressed behind its signed summary`,
+    );
+    if (value.finalized_height === summary.finalized_height) {
+      invariant(
+        summary.finalized_hash === value.finalized_hash
+          && summary.objects_root === value.objects_root,
+        `finalized ${kind} summary mismatch`,
+      );
+    }
   }
   invariant(
     job.record.job_id === receipt.job_id
-      && job.record.client_commitment === receipt.prompt_commitment
       && job.record.capsule_id === receipt.capsule_id
       && job.record.execution_profile_id === receipt.execution_profile_id,
     "finalized job record changed the inference binding",
@@ -304,8 +315,7 @@ async function verifyFinalizedSettlement(receipt) {
     chainReceipt.record.receipt_id === receipt.receipt_id
       && chainReceipt.record.job_id === receipt.job_id
       && chainReceipt.record.output_root === receipt.output_root
-      && chainReceipt.record.token_history_root === receipt.token_history_root
-      && chainReceipt.record.output_tokens === receipt.output_tokens,
+      && chainReceipt.record.token_history_root === receipt.token_history_root,
     "finalized receipt record changed the output binding",
   );
   invariant(
@@ -317,7 +327,7 @@ async function verifyFinalizedSettlement(receipt) {
   invariant(
     job.finalized_height <= chainReceipt.finalized_height
       && chainReceipt.finalized_height <= settlement.finalized_height
-      && receipt.chain_anchor === settlement.finalized_hash,
+      && receipt.chain_anchor === lifecycle.finalized.settlement.finalized_hash,
     "settlement finality or chain anchor is invalid",
   );
 }
