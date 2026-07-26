@@ -2,7 +2,7 @@ const PROMPT_DOMAIN = "NOOS/WWM/PROMPT-COMMITMENT/V2\0";
 const MAX_PROMPT_BYTES = 12_000;
 const MAX_OUTPUT_TOKENS = 16;
 const PAYMENT_MODES = new Set(["SPONSORED", "PAID"]);
-const TERMINAL_EVENT_TYPES = new Set(["receipt.completed"]);
+const TERMINAL_EVENT_TYPES = new Set(["settlement.finalized"]);
 export const BONSAI_HOSTING = Object.freeze({
   artifactId: "d3d1bcf9f704c58c695d7c0837be25a5cfbd7ff71b440bfc9be4a4a46bb528b0",
   manifestRoot: "80f211eb4ebfd26df62bdeac69bc663ca97664eaf179188af78d1288aee42de7",
@@ -508,10 +508,16 @@ export class WwmV2Client {
           }
           if (!(await this.verifier.verifyStreamEvent(event, this.active, jobId))) fail("invalid_stream_signature");
           lastEventId = event.id;
-          if (event.payload.type === "receipt.completed") {
+          if (event.payload.type === "receipt.completed" || event.payload.type === "settlement.finalized") {
             if (!(await this.verifier.verifyReceipt(event.payload.data, this.active))) fail("invalid_receipt_proof");
           }
           await onEvent(event);
+          if (
+            event.payload.type === "receipt.completed"
+            && event.payload.data.terminal_status !== "COMPLETED"
+          ) {
+            terminal = true;
+          }
           if (TERMINAL_EVENT_TYPES.has(event.payload.type)) {
             terminal = true;
             break;

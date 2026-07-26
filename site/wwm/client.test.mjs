@@ -252,8 +252,9 @@ test("bad quote signature rejects before job submission", async () => {
 test("canonical SSE resumes with Last-Event-ID and never reruns job", async () => {
   const calls = [];
   const delta = { id: 1, type: "output.delta", data: { delta: "Bon", evidence_state: "PROVISIONAL_SIGNED", signature: "valid" } };
-  const receipt = { job_id: IDS.job, capsule_id: IDS.capsule, evidence_state: "MATCHED_QUORUM", terminal_status: "COMPLETED", settlement_state: "FINALIZED_PAID", signature: "valid" };
-  const terminal = { id: 2, type: "receipt.completed", data: receipt };
+  const provisional = { id: 2, type: "receipt.completed", data: { job_id: IDS.job, capsule_id: IDS.capsule, evidence_state: "PROVISIONAL_SIGNED", terminal_status: "COMPLETED", settlement_state: "PENDING_CHAIN", signature: "valid" } };
+  const receipt = { job_id: IDS.job, capsule_id: IDS.capsule, evidence_state: "PROVISIONAL_SIGNED", terminal_status: "COMPLETED", settlement_state: "FINALIZED_PAID", signature: "valid" };
+  const terminal = { id: 3, type: "settlement.finalized", data: receipt };
   const event = (value) => `id: ${value.id}\nevent: ${value.type}\ndata: ${JSON.stringify(value)}\n\n`;
   const client = await clientWithRouter(async (url, options = {}) => {
     const path = new URL(String(url)).pathname; calls.push({ path, options });
@@ -261,20 +262,20 @@ test("canonical SSE resumes with Last-Event-ID and never reruns job", async () =
     if (path.endsWith("/stream")) {
       if (!options.headers["Last-Event-ID"]) return new Response(event(delta));
       assert.equal(options.headers["Last-Event-ID"], "1");
-      return new Response(event(terminal));
+      return new Response(event(provisional) + event(terminal));
     }
     throw new Error(`unexpected ${path}`);
   });
   const observed = [];
-  assert.equal(await client.stream(IDS.job, (item) => observed.push(item)), "2");
-  assert.deepEqual(observed.map((item) => item.payload.type), ["output.delta", "receipt.completed"]);
+  assert.equal(await client.stream(IDS.job, (item) => observed.push(item)), "3");
+  assert.deepEqual(observed.map((item) => item.payload.type), ["output.delta", "receipt.completed", "settlement.finalized"]);
   assert.equal(calls.filter(({ path }) => path.endsWith("/stream")).length, 2);
   assert.equal(calls.filter(({ path }) => path.endsWith("/jobs")).length, 0);
 });
 
 test("browser-native fetch keeps its receiver and drains a terminal stream", async () => {
-  const terminal = { id: 1, type: "receipt.completed", data: { job_id: IDS.job, capsule_id: IDS.capsule, evidence_state: "PROVISIONAL_SIGNED", terminal_status: "COMPLETED", settlement_state: "PENDING_CHAIN", signature: "valid" } };
-  const bytes = new TextEncoder().encode(`id: 1\nevent: receipt.completed\ndata: ${JSON.stringify(terminal)}\n\n`);
+  const terminal = { id: 1, type: "settlement.finalized", data: { job_id: IDS.job, capsule_id: IDS.capsule, evidence_state: "PROVISIONAL_SIGNED", terminal_status: "COMPLETED", settlement_state: "FINALIZED_PAID", signature: "valid" } };
+  const bytes = new TextEncoder().encode(`id: 1\nevent: settlement.finalized\ndata: ${JSON.stringify(terminal)}\n\n`);
   let reads = 0;
   let cancelled = false;
   function browserFetch(url) {

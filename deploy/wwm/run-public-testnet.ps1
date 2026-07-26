@@ -268,6 +268,7 @@ $Specs = @(
             '--wallet-faucet-db', $WalletFaucetDb,
             '--inference-secrets', $InferenceSecrets,
             '--inference-database', $InferenceDatabase,
+            '--inference-hosted-config', $NeuralPublisherHostedConfig,
             '--inference-worker-origin', $InferenceWorkerOrigin,
             '--inference-tokenizer', $InferenceTokenizer,
             '--inference-model', $InferenceModel,

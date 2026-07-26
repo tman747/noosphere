@@ -120,6 +120,16 @@ class Executor(Protocol):
         on_chunk: Callable[[bytes, str], None],
     ) -> ExecutionResult: ...
 
+class SettlementBackend(Protocol):
+    def capture(self, snapshot: StateSnapshot) -> dict: ...
+
+    def settle(
+        self,
+        request: Mapping[str, object],
+        checkpoint: Mapping[str, object],
+        on_checkpoint: Callable[[dict], None],
+    ) -> dict: ...
+
 
 def canonical_json(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -502,6 +512,7 @@ class InferenceService:
         signing_seed: bytes,
         provider: SnapshotProvider,
         executor: Executor,
+        settlement_backend: SettlementBackend | None = None,
         now_ms: Callable[[], int] | None = None,
         start_worker: bool = True,
     ):
@@ -516,17 +527,29 @@ class InferenceService:
         self.client_pepper = hmac.new(signing_seed, b"NOOS/WWM/PUBLIC-INFERENCE/CLIENT-PEPPER/V1", hashlib.sha256).digest()
         self.provider = provider
         self.executor = executor
+        self.settlement_backend = settlement_backend
         self.now_ms = now_ms or (lambda: int(time.time() * 1000))
         self._admission_lock = threading.Lock()
         self._condition = threading.Condition()
         self._closed = threading.Event()
         self._queue: queue.Queue[str | None] = queue.Queue(maxsize=MAX_QUEUED)
+        self._settlement_queue: queue.Queue[str | None] = queue.Queue()
         self._worker: threading.Thread | None = None
+        self._settlement_worker: threading.Thread | None = None
         self._initialize_database()
         self._recover_interrupted_jobs()
+        pending_settlements = self._recover_pending_settlements()
         if start_worker:
             self._worker = threading.Thread(target=self._worker_loop, name="wwm-public-inference", daemon=True)
+            self._settlement_worker = threading.Thread(
+                target=self._settlement_worker_loop,
+                name="wwm-public-inference-settlement",
+                daemon=True,
+            )
             self._worker.start()
+            self._settlement_worker.start()
+            for job_id in pending_settlements:
+                self._settlement_queue.put_nowait(job_id)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=10)
@@ -546,6 +569,7 @@ class InferenceService:
                     client_hash TEXT NOT NULL,
                     quote_json TEXT NOT NULL,
                     request_json TEXT NOT NULL,
+                    settlement_binding_json TEXT,
                     created_ms INTEGER NOT NULL,
                     expires_height INTEGER NOT NULL,
                     used_job_id TEXT
@@ -578,8 +602,27 @@ class InferenceService:
                     created_ms INTEGER NOT NULL,
                     PRIMARY KEY(job_id, event_id)
                 );
+                CREATE TABLE IF NOT EXISTS inference_settlements (
+                    job_id TEXT PRIMARY KEY REFERENCES inference_jobs(job_id),
+                    state TEXT NOT NULL,
+                    request_json TEXT NOT NULL,
+                    checkpoint_json TEXT NOT NULL,
+                    result_json TEXT,
+                    error_code TEXT,
+                    attempts INTEGER NOT NULL,
+                    created_ms INTEGER NOT NULL,
+                    updated_ms INTEGER NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS inference_settlements_state
+                    ON inference_settlements(state);
                 """
             )
+            quote_columns = {
+                str(row["name"])
+                for row in db.execute("PRAGMA table_info(inference_quotes)").fetchall()
+            }
+            if "settlement_binding_json" not in quote_columns:
+                db.execute("ALTER TABLE inference_quotes ADD COLUMN settlement_binding_json TEXT")
 
     def _recover_interrupted_jobs(self) -> None:
         with self._connect() as db:
@@ -589,16 +632,28 @@ class InferenceService:
         for row in rows:
             self._complete_without_output(str(row["job_id"]), "FAILED", "GATEWAY_RESTARTED")
 
+    def _recover_pending_settlements(self) -> list[str]:
+        if self.settlement_backend is None:
+            return []
+        with self._connect() as db:
+            rows = db.execute(
+                "SELECT job_id FROM inference_settlements WHERE state!='FINALIZED' ORDER BY created_ms"
+            ).fetchall()
+        return [str(row["job_id"]) for row in rows]
+
     def close(self) -> None:
         self._closed.set()
-        try:
-            self._queue.put_nowait(None)
-        except queue.Full:
-            pass
+        for worker_queue in (self._queue, self._settlement_queue):
+            try:
+                worker_queue.put_nowait(None)
+            except queue.Full:
+                pass
         with self._condition:
             self._condition.notify_all()
         if self._worker is not None:
             self._worker.join(timeout=5)
+        if self._settlement_worker is not None:
+            self._settlement_worker.join(timeout=5)
 
     @staticmethod
     def is_get_route(path: str) -> bool:
@@ -690,7 +745,12 @@ class InferenceService:
             "environment": "public-testnet",
             "production": False,
             "promotion_effect": "NONE",
-            "disclosure": "Interactive answers run off-chain on one bounded operator executor. The browser verifies the signed monitor, pinned finalized model resolution, gateway signatures, output commitments, and receipt. Interactive jobs are not on-chain settlements; scheduled neural pulses are separate finalized chain records.",
+            "interactive_chain_settlement": self.settlement_backend is not None,
+            "disclosure": (
+                "Interactive answers run off-chain on one bounded operator executor. Successful answers receive a canonical zero-value sponsored job, receipt, and settlement on MindChain; execution evidence remains provisional and is not a factuality certificate."
+                if self.settlement_backend is not None
+                else "Interactive answers run off-chain on one bounded operator executor. The browser verifies the signed monitor, pinned finalized model resolution, gateway signatures, output commitments, and receipt. Interactive jobs are not on-chain settlements; scheduled neural pulses are separate finalized chain records."
+            ),
             "limits": {
                 "prompt_bytes": MAX_PROMPT_BYTES,
                 "output_tokens": sorted(OUTPUT_TOKEN_LIMITS),
@@ -787,6 +847,16 @@ class InferenceService:
         state = self._state_value(snapshot)
         if state["enabled"] is not True:
             raise InferenceError(503, "ADMISSION_DISABLED", "Signed worker readiness is unavailable.")
+        settlement_binding = None
+        if self.settlement_backend is not None:
+            try:
+                settlement_binding = self.settlement_backend.capture(snapshot)
+            except Exception as error:
+                raise InferenceError(
+                    503,
+                    "SETTLEMENT_UNAVAILABLE",
+                    "Finalized chain settlement binding is unavailable.",
+                ) from error
         active = state["resolution"]["active"]
         expected = {
             "pin_id": state["resolution"]["pin_id"],
@@ -835,12 +905,13 @@ class InferenceService:
                 "QUOTE",
             )
             db.execute(
-                "INSERT INTO inference_quotes(quote_id,client_hash,quote_json,request_json,created_ms,expires_height) VALUES(?,?,?,?,?,?)",
+                "INSERT INTO inference_quotes(quote_id,client_hash,quote_json,request_json,settlement_binding_json,created_ms,expires_height) VALUES(?,?,?,?,?,?,?)",
                 (
                     quote_id,
                     client_hash,
                     canonical_json(quote).decode("utf-8"),
                     canonical_json(request).decode("utf-8"),
+                    None if settlement_binding is None else canonical_json(settlement_binding).decode("utf-8"),
                     now,
                     quote["expires_at_height"],
                 ),
@@ -877,7 +948,7 @@ class InferenceService:
                     {"schema": "noos/wwm-job/v2", "job_id": replay["job_id"], "status": replay["status"], "replayed": True},
                 )
             quote_row = db.execute(
-                "SELECT client_hash,quote_json,used_job_id,expires_height FROM inference_quotes WHERE quote_id=?",
+                "SELECT client_hash,quote_json,used_job_id,expires_height,settlement_binding_json FROM inference_quotes WHERE quote_id=?",
                 (quote_id,),
             ).fetchone()
             if quote_row is None or quote_row["client_hash"] != client_hash:
@@ -890,6 +961,29 @@ class InferenceService:
             snapshot = self.provider.snapshot()
             if snapshot.head_height > int(quote_row["expires_height"]):
                 raise InferenceError(409, "QUOTE_EXPIRED", "Quote expired at its bounded chain height.")
+            if self.settlement_backend is not None and quote_row["settlement_binding_json"] is None:
+                try:
+                    settlement_binding = self.settlement_backend.capture(snapshot)
+                except Exception as error:
+                    raise InferenceError(
+                        503,
+                        "SETTLEMENT_UNAVAILABLE",
+                        "Finalized chain settlement binding is unavailable.",
+                    ) from error
+                if (
+                    settlement_binding.get("capsule_id") != quote.get("capsule_id")
+                    or settlement_binding.get("execution_profile_id") != quote.get("execution_profile_id")
+                    or settlement_binding.get("query_policy_id") != quote.get("query_profile_id")
+                ):
+                    raise InferenceError(
+                        409,
+                        "ACTIVE_BINDING_MISMATCH",
+                        "Quote binding is no longer the finalized active settlement binding.",
+                    )
+                db.execute(
+                    "UPDATE inference_quotes SET settlement_binding_json=? WHERE quote_id=?",
+                    (canonical_json(settlement_binding).decode("utf-8"), quote_id),
+                )
             recent = db.execute(
                 "SELECT COUNT(*) FROM inference_jobs WHERE client_hash=? AND created_ms>=?",
                 (client_hash, now - JOB_WINDOW_SECONDS * 1000),
@@ -984,33 +1078,69 @@ class InferenceService:
                     "SELECT event_id,payload_json FROM inference_events WHERE job_id=? AND event_id>? ORDER BY event_id",
                     (job_id, cursor),
                 ).fetchall()
-                status_row = db.execute("SELECT status FROM inference_jobs WHERE job_id=?", (job_id,)).fetchone()
+                status_row = db.execute(
+                    """
+                    SELECT j.status,s.state AS settlement_state
+                    FROM inference_jobs j
+                    LEFT JOIN inference_settlements s ON s.job_id=j.job_id
+                    WHERE j.job_id=?
+                    """,
+                    (job_id,),
+                ).fetchone()
             for row in rows:
                 payload = json.loads(str(row["payload_json"]))
                 cursor = int(row["event_id"])
                 yield payload
-            if status_row is None or str(status_row["status"]) in TERMINAL_STATUSES:
+            if status_row is None:
+                return
+            status = str(status_row["status"])
+            settlement_state = status_row["settlement_state"]
+            if status in TERMINAL_STATUSES and not (
+                status == "COMPLETED"
+                and settlement_state is not None
+                and str(settlement_state) != "FINALIZED"
+            ):
                 return
             with self._condition:
                 notified = self._condition.wait(timeout=15)
             if not notified:
                 yield None
 
+    def _append_event_in_db(
+        self,
+        db: sqlite3.Connection,
+        job_id: str,
+        event_type: str,
+        data: dict,
+    ) -> dict:
+        row = db.execute(
+            "SELECT COALESCE(MAX(event_id),0)+1 FROM inference_events WHERE job_id=?",
+            (job_id,),
+        ).fetchone()
+        event_id = int(row[0])
+        payload = self._sign({"id": event_id, "type": event_type, "data": data}, "STREAM-EVENT")
+        db.execute(
+            "INSERT INTO inference_events(job_id,event_id,event_type,payload_json,created_ms) VALUES(?,?,?,?,?)",
+            (job_id, event_id, event_type, canonical_json(payload).decode("utf-8"), self.now_ms()),
+        )
+        return payload
+
     def _append_event(self, job_id: str, event_type: str, data: dict) -> dict:
         with self._connect() as db:
-            row = db.execute(
-                "SELECT COALESCE(MAX(event_id),0)+1 FROM inference_events WHERE job_id=?",
-                (job_id,),
-            ).fetchone()
-            event_id = int(row[0])
-            payload = self._sign({"id": event_id, "type": event_type, "data": data}, "STREAM-EVENT")
-            db.execute(
-                "INSERT INTO inference_events(job_id,event_id,event_type,payload_json,created_ms) VALUES(?,?,?,?,?)",
-                (job_id, event_id, event_type, canonical_json(payload).decode("utf-8"), self.now_ms()),
-            )
+            db.execute("BEGIN IMMEDIATE")
+            payload = self._append_event_in_db(db, job_id, event_type, data)
         with self._condition:
             self._condition.notify_all()
         return payload
+
+    @staticmethod
+    def _lifecycle_id(job_id: str, label: str) -> str:
+        return hashlib.sha256(
+            b"NOOS/WWM/PUBLIC-INFERENCE/LIFECYCLE/V1\0"
+            + bytes.fromhex(job_id)
+            + b"\0"
+            + label.encode("ascii")
+        ).hexdigest()
 
     def _receipt_base(
         self,
@@ -1023,18 +1153,30 @@ class InferenceService:
     ) -> dict:
         value = {
             "schema": "noos/wwm-receipt/v2",
+            "receipt_id": self._lifecycle_id(job_id, "receipt"),
             "job_id": job_id,
+            "tenant_id": "public-testnet-sponsored",
             "capsule_id": quote["capsule_id"],
             "execution_profile_id": quote["execution_profile_id"],
             "query_profile_id": quote["query_profile_id"],
+            "prompt_commitment": quote["prompt_commitment"],
+            "output_commitment": "0" * 64,
+            "output_tokens": 0,
             "terminal_status": status,
             "evidence_state": evidence,
             "chain_anchor": None,
             "settlement_state": "PENDING_CHAIN",
+            "payment_mode": quote["payment_mode"],
+            "payment_reference": quote["payment_reference"],
+            "executor_id": None,
             "execution_scope": "OFF_CHAIN_INTERACTIVE_TESTNET",
             "production": False,
             "promotion_effect": "NONE",
-            "disclosure": "Gateway-signed off-chain interactive execution receipt. It is not a factuality certificate and has not been settled on MindChain.",
+            "disclosure": (
+                "Gateway-signed off-chain interactive execution receipt. Successful execution is awaiting canonical zero-value sponsored settlement on MindChain; execution evidence remains provisional and is not a factuality certificate."
+                if self.settlement_backend is not None and status == "COMPLETED"
+                else "Gateway-signed off-chain interactive execution receipt. It is not a factuality certificate and has not been settled on MindChain."
+            ),
             "completed_at_ms": self.now_ms(),
         }
         if error_code is not None:
@@ -1043,7 +1185,7 @@ class InferenceService:
 
     def _job_quote(self, db: sqlite3.Connection, job_id: str) -> tuple[sqlite3.Row, dict]:
         row = db.execute(
-            "SELECT j.*,q.quote_json FROM inference_jobs j JOIN inference_quotes q ON q.quote_id=j.quote_id WHERE j.job_id=?",
+            "SELECT j.*,q.quote_json,q.settlement_binding_json FROM inference_jobs j JOIN inference_quotes q ON q.quote_id=j.quote_id WHERE j.job_id=?",
             (job_id,),
         ).fetchone()
         if row is None:
@@ -1053,11 +1195,72 @@ class InferenceService:
     def _store_receipt(self, job_id: str, status: str, receipt: dict) -> None:
         now = self.now_ms()
         with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
             db.execute(
                 "UPDATE inference_jobs SET status=?,receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=?",
                 (status, canonical_json(receipt).decode("utf-8"), now, job_id),
             )
-        self._append_event(job_id, "receipt.completed", receipt)
+            self._append_event_in_db(db, job_id, "receipt.completed", receipt)
+        with self._condition:
+            self._condition.notify_all()
+
+    def _store_completed_receipt(
+        self,
+        job_id: str,
+        row: sqlite3.Row,
+        quote: dict,
+        result: ExecutionResult,
+        receipt: dict,
+    ) -> None:
+        if self.settlement_backend is None:
+            self._store_receipt(job_id, "COMPLETED", receipt)
+            return
+        binding_json = row["settlement_binding_json"]
+        if binding_json is None:
+            raise InferenceError(
+                503,
+                "SETTLEMENT_BINDING_MISSING",
+                "Finalized chain settlement binding is unavailable.",
+            )
+        request = {
+            "schema": "noos/wwm-public-inference-settlement-request/v1",
+            "job_id": job_id,
+            "receipt_id": receipt["receipt_id"],
+            "settlement_id": self._lifecycle_id(job_id, "settlement"),
+            "quote": quote,
+            "binding": json.loads(str(binding_json)),
+            "inference": {
+                "output_root": result.output_root,
+                "token_history_root": result.token_history_root,
+                "output_tokens": result.output_tokens,
+            },
+        }
+        now = self.now_ms()
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute(
+                "UPDATE inference_jobs SET status='COMPLETED',receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=?",
+                (canonical_json(receipt).decode("utf-8"), now, job_id),
+            )
+            db.execute(
+                """
+                INSERT INTO inference_settlements(
+                    job_id,state,request_json,checkpoint_json,result_json,error_code,attempts,created_ms,updated_ms
+                ) VALUES(?,?,?,?,NULL,NULL,0,?,?)
+                """,
+                (
+                    job_id,
+                    "PENDING",
+                    canonical_json(request).decode("utf-8"),
+                    "{}",
+                    now,
+                    now,
+                ),
+            )
+            self._append_event_in_db(db, job_id, "receipt.completed", receipt)
+        with self._condition:
+            self._condition.notify_all()
+        self._settlement_queue.put_nowait(job_id)
 
     def _complete_without_output(self, job_id: str, status: str, error_code: str) -> None:
         with self._connect() as db:
@@ -1099,6 +1302,223 @@ class InferenceService:
                 )
             finally:
                 self._queue.task_done()
+
+    @staticmethod
+    def _finalized_record(result: Mapping[str, object], kind: str, identifier: str) -> dict:
+        selected = result.get(kind)
+        if not isinstance(selected, dict):
+            raise InferenceError(502, "SETTLEMENT_PROOF_INVALID", f"Finalized {kind} proof is missing.")
+        if (
+            selected.get("schema") != "noos/finalized-wwm-record/v1"
+            or selected.get("trust_scope") != "LOCAL_FULL_NODE_FINALIZED_STATE"
+            or selected.get("kind") != kind
+            or selected.get("id") != identifier
+            or isinstance(selected.get("finalized_height"), bool)
+            or not isinstance(selected.get("finalized_height"), int)
+            or int(selected["finalized_height"]) < 0
+            or not isinstance(selected.get("finalized_hash"), str)
+            or HEX32.fullmatch(str(selected["finalized_hash"])) is None
+            or not isinstance(selected.get("objects_root"), str)
+            or HEX32.fullmatch(str(selected["objects_root"])) is None
+            or not isinstance(selected.get("record"), dict)
+        ):
+            raise InferenceError(502, "SETTLEMENT_PROOF_INVALID", f"Finalized {kind} proof is malformed.")
+        return selected
+
+    def _settlement_lifecycle(
+        self,
+        request: Mapping[str, object],
+        result: Mapping[str, object],
+    ) -> tuple[dict, str]:
+        job_id = str(request["job_id"])
+        receipt_id = str(request["receipt_id"])
+        settlement_id = str(request["settlement_id"])
+        if (
+            result.get("schema") != "noos/wwm-public-inference-settlement-result/v1"
+            or result.get("job_id") != job_id
+            or result.get("receipt_id") != receipt_id
+            or result.get("settlement_id") != settlement_id
+        ):
+            raise InferenceError(502, "SETTLEMENT_PROOF_INVALID", "Finalized settlement identities changed.")
+        job = self._finalized_record(result, "job", job_id)
+        receipt = self._finalized_record(result, "receipt", receipt_id)
+        settlement = self._finalized_record(result, "settlement", settlement_id)
+        quote = request.get("quote")
+        inference = request.get("inference")
+        binding = request.get("binding")
+        if not isinstance(quote, dict) or not isinstance(inference, dict) or not isinstance(binding, dict):
+            raise InferenceError(502, "SETTLEMENT_PROOF_INVALID", "Settlement request binding is malformed.")
+        job_value = job["record"]
+        receipt_value = receipt["record"]
+        settlement_value = settlement["record"]
+        if (
+            job_value.get("job_id") != job_id
+            or job_value.get("client_commitment") != quote.get("prompt_commitment")
+            or job_value.get("capsule_id") != quote.get("capsule_id")
+            or job_value.get("execution_profile_id") != quote.get("execution_profile_id")
+            or receipt_value.get("receipt_id") != receipt_id
+            or receipt_value.get("job_id") != job_id
+            or receipt_value.get("output_root") != inference.get("output_root")
+            or receipt_value.get("token_history_root") != inference.get("token_history_root")
+            or settlement_value.get("settlement_id") != settlement_id
+            or settlement_value.get("job_id") != job_id
+            or settlement_value.get("receipt_id") != receipt_id
+            or settlement_value.get("fund_profile_id") != binding.get("fund_profile_id")
+        ):
+            raise InferenceError(502, "SETTLEMENT_PROOF_INVALID", "Canonical settlement records changed execution bindings.")
+        heights = [
+            int(job["finalized_height"]),
+            int(receipt["finalized_height"]),
+            int(settlement["finalized_height"]),
+        ]
+        if heights != sorted(heights):
+            raise InferenceError(502, "SETTLEMENT_PROOF_INVALID", "Canonical settlement finality is not monotonic.")
+
+        def summary(value: Mapping[str, object]) -> dict:
+            return {
+                "finalized_height": value["finalized_height"],
+                "finalized_hash": value["finalized_hash"],
+                "objects_root": value["objects_root"],
+            }
+
+        lifecycle = {
+            "schema": "noos/wwm-public-inference-chain-settlement/v1",
+            "job_id": job_id,
+            "receipt_id": receipt_id,
+            "settlement_id": settlement_id,
+            "finalized": {
+                "job": summary(job),
+                "receipt": summary(receipt),
+                "settlement": summary(settlement),
+            },
+        }
+        for source, target in (
+            ("open_transaction_id", "open_transaction_id"),
+            ("close_transaction_id", "close_transaction_id"),
+        ):
+            transaction_id = result.get(source)
+            if transaction_id is not None:
+                if not isinstance(transaction_id, str) or HEX32.fullmatch(transaction_id) is None:
+                    raise InferenceError(502, "SETTLEMENT_PROOF_INVALID", "Settlement transaction ID is malformed.")
+                lifecycle[target] = transaction_id
+        return lifecycle, str(settlement["finalized_hash"])
+
+    def _settle_job(self, job_id: str) -> None:
+        backend = self.settlement_backend
+        if backend is None:
+            return
+        with self._connect() as db:
+            row = db.execute(
+                """
+                SELECT s.state,s.request_json,s.checkpoint_json,s.attempts,j.receipt_json
+                FROM inference_settlements s
+                JOIN inference_jobs j ON j.job_id=s.job_id
+                WHERE s.job_id=?
+                """,
+                (job_id,),
+            ).fetchone()
+            if row is None or str(row["state"]) == "FINALIZED":
+                return
+            db.execute(
+                "UPDATE inference_settlements SET state='FINALIZING',attempts=attempts+1,error_code=NULL,updated_ms=? WHERE job_id=?",
+                (self.now_ms(), job_id),
+            )
+        request = json.loads(str(row["request_json"]))
+        checkpoint = json.loads(str(row["checkpoint_json"]))
+        if not isinstance(request, dict) or not isinstance(checkpoint, dict):
+            raise InferenceError(500, "SETTLEMENT_STATE_INVALID", "Durable settlement state is malformed.")
+
+        def save_checkpoint(value: dict) -> None:
+            with self._connect() as checkpoint_db:
+                checkpoint_db.execute(
+                    "UPDATE inference_settlements SET checkpoint_json=?,updated_ms=? WHERE job_id=? AND state!='FINALIZED'",
+                    (canonical_json(value).decode("utf-8"), self.now_ms(), job_id),
+                )
+
+        result = backend.settle(request, checkpoint, save_checkpoint)
+        if not isinstance(result, dict):
+            raise InferenceError(502, "SETTLEMENT_PROOF_INVALID", "Settlement backend returned no proof.")
+        lifecycle, chain_anchor = self._settlement_lifecycle(request, result)
+        provisional = json.loads(str(row["receipt_json"]))
+        if not isinstance(provisional, dict):
+            raise InferenceError(500, "SETTLEMENT_STATE_INVALID", "Provisional receipt is malformed.")
+        unsigned = {
+            key: value
+            for key, value in provisional.items()
+            if key not in {"signature", "signing_key_id"}
+        }
+        unsigned.update(
+            {
+                "chain_anchor": chain_anchor,
+                "settlement_state": "FINALIZED_PAID",
+                "chain_settlement": lifecycle,
+                "settled_at_ms": self.now_ms(),
+                "disclosure": "Gateway-signed off-chain interactive execution receipt with a canonical zero-value sponsored job, receipt, and settlement finalized on MindChain. Execution evidence remains provisional and is not a factuality certificate.",
+            }
+        )
+        finalized = self._sign(unsigned, "RECEIPT")
+        now = self.now_ms()
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute(
+                "UPDATE inference_jobs SET receipt_json=?,updated_ms=? WHERE job_id=?",
+                (canonical_json(finalized).decode("utf-8"), now, job_id),
+            )
+            db.execute(
+                """
+                UPDATE inference_settlements
+                SET state='FINALIZED',result_json=?,error_code=NULL,updated_ms=?
+                WHERE job_id=?
+                """,
+                (canonical_json(result).decode("utf-8"), now, job_id),
+            )
+            self._append_event_in_db(db, job_id, "settlement.finalized", finalized)
+        with self._condition:
+            self._condition.notify_all()
+
+    def _settlement_worker_loop(self) -> None:
+        while not self._closed.is_set():
+            try:
+                job_id = self._settlement_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            if job_id is None:
+                return
+            try:
+                self._settle_job(job_id)
+            except Exception as error:
+                attempts = 1
+                try:
+                    with self._connect() as db:
+                        row = db.execute(
+                            "SELECT attempts FROM inference_settlements WHERE job_id=?",
+                            (job_id,),
+                        ).fetchone()
+                        if row is not None:
+                            attempts = max(1, int(row["attempts"]))
+                        db.execute(
+                            "UPDATE inference_settlements SET state='RETRY',error_code=?,updated_ms=? WHERE job_id=? AND state!='FINALIZED'",
+                            (type(error).__name__, self.now_ms(), job_id),
+                        )
+                except Exception:
+                    pass
+                print(
+                    json.dumps(
+                        {
+                            "schema": "noos/wwm-public-inference-log/v1",
+                            "event": "settlement_retry",
+                            "job_id": job_id,
+                            "attempt": attempts,
+                            "error_type": type(error).__name__,
+                        },
+                        sort_keys=True,
+                    ),
+                    flush=True,
+                )
+                if not self._closed.wait(min(60, 2 ** min(attempts, 6))):
+                    self._settlement_queue.put_nowait(job_id)
+            finally:
+                self._settlement_queue.task_done()
 
     def _execute_job(self, job_id: str) -> None:
         with self._connect() as db:
@@ -1167,6 +1587,7 @@ class InferenceService:
             receipt.update(
                 {
                     "output_root": result.output_root,
+                    "output_commitment": result.output_root,
                     "token_history_root": result.token_history_root,
                     "output_tokens": result.output_tokens,
                     "output_bytes": len(result.output),
@@ -1174,7 +1595,13 @@ class InferenceService:
                     "tokenizer_executable_sha256": result.tokenizer_sha256,
                 }
             )
-            self._store_receipt(job_id, "COMPLETED", self._sign(receipt, "RECEIPT"))
+            self._store_completed_receipt(
+                job_id,
+                row,
+                quote,
+                result,
+                self._sign(receipt, "RECEIPT"),
+            )
         except (InferenceError, UnicodeDecodeError) as error:
             code = error.code if isinstance(error, InferenceError) else "INVALID_UTF8_OUTPUT"
             self._complete_without_output(job_id, "FAILED", code)
