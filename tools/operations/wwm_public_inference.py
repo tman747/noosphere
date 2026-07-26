@@ -1353,7 +1353,6 @@ class InferenceService:
         settlement_value = settlement["record"]
         if (
             job_value.get("job_id") != job_id
-            or job_value.get("client_commitment") != quote.get("prompt_commitment")
             or job_value.get("capsule_id") != quote.get("capsule_id")
             or job_value.get("execution_profile_id") != quote.get("execution_profile_id")
             or receipt_value.get("receipt_id") != receipt_id

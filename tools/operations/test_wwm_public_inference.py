@@ -143,7 +143,6 @@ class SettlementFixture:
                 120,
                 {
                     "job_id": job_id,
-                    "client_commitment": quote["prompt_commitment"],
                     "capsule_id": quote["capsule_id"],
                     "execution_profile_id": quote["execution_profile_id"],
                 },
