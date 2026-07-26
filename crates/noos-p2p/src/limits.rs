@@ -224,7 +224,7 @@ impl DupCache {
             if self.map.get(&digest).map(|entry| entry.sequence) == Some(seq) {
                 // Not stale after all: this is the live entry; keep it live
                 // by re-appending (it is the oldest live digest).
-                self.order.push_front((digest, seq));
+                self.order.push_back((digest, seq));
             }
         }
     }
@@ -398,6 +398,21 @@ mod tests {
         }
         assert_eq!(c.len(), 1);
         assert!(c.order.len() <= 16, "lazy queue bounded: {}", c.order.len());
+    }
+
+    #[test]
+    fn dup_cache_rotates_live_front_while_discarding_stale_touches() {
+        let mut c = DupCache::new(2);
+        let first = [1; 32];
+        let second = [2; 32];
+        assert!(c.insert(first));
+        assert!(c.insert(second));
+        for _ in 0..7 {
+            assert!(!c.insert(second));
+        }
+        assert!(c.contains(&first));
+        assert!(c.contains(&second));
+        assert!(c.order.len() <= 8, "lazy queue bounded: {}", c.order.len());
     }
 
     #[test]
