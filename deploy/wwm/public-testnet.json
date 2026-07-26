@@ -20,13 +20,33 @@
     "reconstruction_threshold": 8,
     "schedulable_minimum": 9
   },
+  "release_evidence": {
+    "source_revision": "2b86fc04701cad4a729d9780dfca460db56ac0d2",
+    "release_version": "0.1.0+git.2b86fc04701cad4a729d9780dfca460db56ac0d2",
+    "local_bundle_id": "f7841c887c29756ccf8e851e5c8cf92797ef16e6473dfdcf9143033b6cd23da0",
+    "ci_bundle_id": "b116034dc467da13e6d17b9f88726bf434ff454e117680974b8567aacf255e52",
+    "ci_workflow_run": "https://github.com/tman747/noosphere/actions/runs/30192240410",
+    "ci_artifact_digest": "b3472504299ad00a43e23235ce2a248e3344d891e931b57cc5310eec64ea2833",
+    "linux_archive_sha256": "f2ccdfad9b61bd8a062c42385f6bf847b85e7d1442c31e8b09f8fa566c286c61",
+    "independent_reproduction": false,
+    "safe_rollback_source_revision": "dd7f326ec1b08b2d64d9e51d77af60843a1d5cd5",
+    "fleet_convergence_observed_at_utc": "2026-07-26T16:42:56.870213Z",
+    "fleet_convergence_evidence_sha256": "10f2cffe3261df47d726269572c270caa681ad4374fe7bccbe25a4830c55e9bf",
+    "configuration_sha256": {
+      "local_supervisor": "09e64ef3f00f0c3d2b6b5ad4ba6aa3246ee6cab70247016ab02fd2de8dc09fcd",
+      "validator_launcher": "d829c2d589d8f000cef6a9df71d01f3ceb9ed0fa679e17feaa6f7f849ab6a667",
+      "validator_service": "9cd28b4decb569b6d1a6db5f1497ca3a02549972eca0335330118e475752b0f4",
+      "witness_service_template": "55d442d1277376538ae74177e2e6d96bc4069fae91835e0ee7493e1be1d980b9",
+      "genesis_parameters": "11ddd7c816361830448f9cabb742777482c978ffc3c29ce7b285cd2fbeef9c01"
+    }
+  },
   "local_services": {
     "node_rpc": "127.0.0.1:29652",
     "node_p2p": "/ip4/0.0.0.0/udp/29650/quic-v1",
     "node_role": "observer-read-gateway-source",
-    "node_binary_sha256": "3246b5d1c5f75e29b9f66c62cda6ea8b5c113c8387b7020caf4bc8e3426e0940",
-    "node_source_revision": "50a674a16fcf0cecf9c97d213771d183231e35a6",
-    "node_replay_repair": "durable-certificate-evidence-v1",
+    "node_binary_sha256": "4d80e13e05b9cf89c43fb9d32c9448bbe64f8635b2dd84946eddaf8f5e10a838",
+    "node_source_revision": "2b86fc04701cad4a729d9780dfca460db56ac0d2",
+    "node_replay_repair": "adaptive-range-sync-rendezvous-finality-bounded-replay-queue-rotation-v1",
     "bootstrap_peers": [
       "/ip4/20.15.164.29/udp/31004/quic-v1",
       "/ip4/172.202.41.123/udp/31005/quic-v1",
@@ -151,18 +171,9 @@
     "fixture_keys": true,
     "single_operator_control": true,
     "production_eligible": false,
-    "node_source_revision": "50a674a16fcf0cecf9c97d213771d183231e35a6",
-    "node_binary_sha256": "800eb140fdbb3057efaf6f377a2de06f571b6efeb8ad4ea3d3539b3ee9aa4111",
-    "node_replay_repair": "durable-certificate-evidence-v1",
-    "runtime_overrides": [
-      {
-        "witness_index": 2,
-        "machine": "mindchain-seed-3",
-        "node_binary_sha256": "dea6b62dd80dc6b2adf1fb54dd9862d142f4729952540abdbc1ea1f0c78e6075",
-        "source_patch": "sync-ready-peer-advanced-cursor-v1",
-        "deployed_at_utc": "2026-07-21T00:39:05Z"
-      }
-    ]
+    "node_source_revision": "2b86fc04701cad4a729d9780dfca460db56ac0d2",
+    "node_binary_sha256": "2e274698fbb6dfeb8513fdec3378497ec6077720ebd96f42685d99d1706565a5",
+    "node_replay_repair": "adaptive-range-sync-rendezvous-finality-bounded-replay-queue-rotation-v1"
   },
   "host_memory_safety": {
     "mindchain-seed-1_swap_gib": 8,
@@ -174,11 +185,13 @@
   },
   "public_indexers": {
     "api_version": "v1",
+    "source_revision": "2b86fc04701cad4a729d9780dfca460db56ac0d2",
+    "release_version": "0.1.0+git.2b86fc04701cad4a729d9780dfca460db56ac0d2",
     "maximum_freshness_ms": 15000,
     "minimum_control_cluster_quorum": 2,
     "quorum_basis": "distinct-virtual-machine-failure-domains",
     "operator_independent": false,
-    "indexer_binary_sha256": "7de37626fdad7f9814b933f7e3f7dbe45429f9e800d66b23bf7152e3704cc9d9",
+    "indexer_binary_sha256": "a710dc9ca062772b2369a2ebc7452c9b351bab798d2280d60867697939b1c471",
     "endpoints": [
       {
         "base_url": "https://wwm-seed.mindchain.network",
