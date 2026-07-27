@@ -460,6 +460,8 @@ export class WwmV2Client {
     hash32(job.job_id, "invalid_job_id");
     if (job.schema !== "noos/wwm-job/v2"
       || typeof job.replayed !== "boolean"
+      || !Number.isSafeInteger(job.deadline_at_ms)
+      || job.deadline_at_ms < 0
       || !["QUEUED", "RUNNING", "CANCEL_REQUESTED", "COMPLETED", "CANCELLED", "FAILED", "NO_QUORUM"].includes(job.status)) {
       fail("job_binding_mismatch");
     }

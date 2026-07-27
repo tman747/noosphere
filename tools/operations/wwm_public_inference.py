@@ -58,6 +58,8 @@ JOB_LIMIT: Final[int] = 3
 GLOBAL_JOB_LIMIT: Final[int] = 24
 MAX_RUNNING: Final[int] = 1
 MAX_QUEUED: Final[int] = 2
+JOB_DEADLINE_SECONDS: Final[int] = 300
+EXECUTOR_CANCEL_POLL_SECONDS: Final[float] = 0.1
 QUOTE_HEIGHT_TTL: Final[int] = 256
 SPONSOR_REFERENCE: Final[str] = "PUBLIC_TESTNET_SPONSOR_V1"
 HEX16 = re.compile(r"^[0-9a-f]{32}$")
@@ -121,6 +123,7 @@ class Executor(Protocol):
         prompt: str,
         maximum_output_tokens: int,
         on_chunk: Callable[[bytes, str], None],
+        abort_code: Callable[[], str | None],
     ) -> ExecutionResult: ...
 
 class SettlementBackend(Protocol):
@@ -403,8 +406,49 @@ class WorkerdExecutor:
                 },
                 method="POST",
             ),
-            timeout=300,
+            timeout=JOB_DEADLINE_SECONDS,
         )
+
+    @staticmethod
+    def _raise_abort(code: str) -> None:
+        if code == "USER_REQUESTED":
+            raise InferenceError(409, code, "Inference execution was cancelled by the user.")
+        if code == "JOB_DEADLINE_EXPIRED":
+            raise InferenceError(504, code, "The bounded inference deadline expired.")
+        raise InferenceError(500, "EXECUTION_CONTROL_INVALID", "Inference execution control returned an invalid state.")
+
+    def _cancel_job(self, job_id: str) -> None:
+        request = urllib.request.Request(
+            self.origin + f"/internal/wwm/v1/jobs/{job_id}",
+            headers={
+                "Accept": "application/json",
+                "Authorization": f"Bearer {self.token}",
+                "User-Agent": "mindchain-public-inference/1",
+            },
+            method="DELETE",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                status = int(response.status)
+                if status not in {202, 204}:
+                    raise InferenceError(
+                        503,
+                        "EXECUTOR_CANCEL_FAILED",
+                        "Private inference worker rejected execution cancellation.",
+                    )
+        except urllib.error.HTTPError as error:
+            if error.code != 404:
+                raise InferenceError(
+                    503,
+                    "EXECUTOR_CANCEL_FAILED",
+                    "Private inference worker rejected execution cancellation.",
+                ) from error
+        except (OSError, urllib.error.URLError) as error:
+            raise InferenceError(
+                503,
+                "EXECUTOR_CANCEL_FAILED",
+                "Private inference worker cancellation became unavailable.",
+            ) from error
 
     def run(
         self,
@@ -412,13 +456,23 @@ class WorkerdExecutor:
         prompt: str,
         maximum_output_tokens: int,
         on_chunk: Callable[[bytes, str], None],
+        abort_code: Callable[[], str | None],
     ) -> ExecutionResult:
         started = time.monotonic()
+        abort = abort_code()
+        if abort is not None:
+            self._raise_abort(abort)
         prompt_ids = self.tokenizer.tokenize(prompt.encode("utf-8"), MAX_INPUT_TOKENS)
+        abort = abort_code()
+        if abort is not None:
+            self._raise_abort(abort)
         self._json(
             "/internal/wwm/v1/capacity-quotes",
             {"prompt_tokens": len(prompt_ids), "max_output_tokens": maximum_output_tokens},
         )
+        abort = abort_code()
+        if abort is not None:
+            self._raise_abort(abort)
         accepted = self._json(
             "/internal/wwm/v1/jobs",
             {
@@ -444,8 +498,27 @@ class WorkerdExecutor:
         output = bytearray()
         terminal: dict | None = None
         expected_sequence = 1
+        watcher_stop = threading.Event()
+        cancellation_errors: list[InferenceError] = []
+
+        def watch_execution() -> None:
+            while not watcher_stop.wait(EXECUTOR_CANCEL_POLL_SECONDS):
+                if abort_code() is None:
+                    continue
+                try:
+                    self._cancel_job(job_id)
+                except InferenceError as error:
+                    cancellation_errors.append(error)
+                return
+
+        watcher = threading.Thread(
+            target=watch_execution,
+            name=f"wwm-public-inference-cancel-{job_id[:8]}",
+            daemon=True,
+        )
+        watcher.start()
         try:
-            with urllib.request.urlopen(request, timeout=300) as response:
+            with urllib.request.urlopen(request, timeout=JOB_DEADLINE_SECONDS) as response:
                 if response.headers.get_content_type() != "text/event-stream":
                     raise InferenceError(502, "INVALID_EXECUTOR_STREAM", "Inference worker returned a non-SSE stream.")
                 while True:
@@ -491,6 +564,16 @@ class WorkerdExecutor:
             raise InferenceError(502, "EXECUTOR_REJECTED", f"Inference worker returned HTTP {error.code}.") from error
         except (OSError, urllib.error.URLError) as error:
             raise InferenceError(503, "EXECUTOR_UNAVAILABLE", "Private inference worker became unavailable.") from error
+        finally:
+            watcher_stop.set()
+            watcher.join(timeout=1)
+        abort = abort_code()
+        if abort is not None:
+            self._raise_abort(abort)
+        if cancellation_errors:
+            raise cancellation_errors[0]
+        if terminal is not None and terminal.get("code") == "runtime_timeout":
+            self._raise_abort("JOB_DEADLINE_EXPIRED")
         if terminal is None or terminal.get("code") != "completed":
             raise InferenceError(502, "EXECUTOR_INCOMPLETE", "Inference worker did not emit a completed terminal event.")
         output_root = terminal.get("output_root")
@@ -663,6 +746,7 @@ class InferenceService:
                     prompt TEXT,
                     prompt_commitment TEXT NOT NULL,
                     maximum_output_tokens INTEGER NOT NULL,
+                    deadline_at_ms INTEGER NOT NULL,
                     status TEXT NOT NULL,
                     receipt_json TEXT,
                     created_ms INTEGER NOT NULL,
@@ -702,6 +786,16 @@ class InferenceService:
             }
             if "settlement_binding_json" not in quote_columns:
                 db.execute("ALTER TABLE inference_quotes ADD COLUMN settlement_binding_json TEXT")
+            job_columns = {
+                str(row["name"])
+                for row in db.execute("PRAGMA table_info(inference_jobs)").fetchall()
+            }
+            if "deadline_at_ms" not in job_columns:
+                db.execute("ALTER TABLE inference_jobs ADD COLUMN deadline_at_ms INTEGER")
+                db.execute(
+                    "UPDATE inference_jobs SET deadline_at_ms=created_ms+? WHERE deadline_at_ms IS NULL",
+                    (JOB_DEADLINE_SECONDS * 1000,),
+                )
         self._migrate_plaintext_storage()
 
     def _migrate_plaintext_storage(self) -> None:
@@ -1068,7 +1162,7 @@ class InferenceService:
         client_hash = self._client_hash(client)
         with self._admission_lock, self._connect() as db:
             replay = db.execute(
-                "SELECT job_id,quote_id,prompt_commitment,status FROM inference_jobs WHERE client_hash=? AND idempotency_key=?",
+                "SELECT job_id,quote_id,prompt_commitment,status,deadline_at_ms FROM inference_jobs WHERE client_hash=? AND idempotency_key=?",
                 (client_hash, key),
             ).fetchone()
             if replay is not None:
@@ -1076,7 +1170,13 @@ class InferenceService:
                     raise InferenceError(409, "IDEMPOTENCY_CONFLICT", "Idempotency key is already bound to another request.")
                 return InferenceReply(
                     200,
-                    {"schema": "noos/wwm-job/v2", "job_id": replay["job_id"], "status": replay["status"], "replayed": True},
+                    {
+                        "schema": "noos/wwm-job/v2",
+                        "job_id": replay["job_id"],
+                        "status": replay["status"],
+                        "deadline_at_ms": int(replay["deadline_at_ms"]),
+                        "replayed": True,
+                    },
                 )
             quote_row = db.execute(
                 "SELECT client_hash,quote_json,used_job_id,expires_height,settlement_binding_json FROM inference_quotes WHERE quote_id=?",
@@ -1153,8 +1253,9 @@ class InferenceService:
             if queued >= MAX_QUEUED:
                 raise InferenceError(429, "EXECUTOR_QUEUE_FULL", "The bounded two-job waiting queue is full.", retry_after=30)
             job_id = secrets.token_hex(32)
+            deadline_at_ms = now + JOB_DEADLINE_SECONDS * 1000
             db.execute(
-                "INSERT INTO inference_jobs(job_id,quote_id,client_hash,idempotency_key,prompt,prompt_commitment,maximum_output_tokens,status,created_ms,updated_ms) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO inference_jobs(job_id,quote_id,client_hash,idempotency_key,prompt,prompt_commitment,maximum_output_tokens,deadline_at_ms,status,created_ms,updated_ms) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     job_id,
                     quote_id,
@@ -1163,6 +1264,7 @@ class InferenceService:
                     self._seal_storage("PROMPT", job_id, encoded_prompt),
                     commitment,
                     quote["maximum_output_tokens"],
+                    deadline_at_ms,
                     "QUEUED",
                     now,
                     now,
@@ -1174,21 +1276,42 @@ class InferenceService:
         except queue.Full:
             self._complete_without_output(job_id, "FAILED", "EXECUTOR_QUEUE_DESYNCHRONIZED")
             raise InferenceError(503, "EXECUTOR_QUEUE_FULL", "Bounded executor queue became unavailable.", retry_after=30)
-        return InferenceReply(202, {"schema": "noos/wwm-job/v2", "job_id": job_id, "status": "QUEUED", "replayed": False})
+        return InferenceReply(
+            202,
+            {
+                "schema": "noos/wwm-job/v2",
+                "job_id": job_id,
+                "status": "QUEUED",
+                "deadline_at_ms": deadline_at_ms,
+                "replayed": False,
+            },
+        )
 
     def _cancel(self, job_id: str, body: dict) -> InferenceReply:
         reason = body.get("reason", "USER_REQUESTED")
         if reason != "USER_REQUESTED":
             raise InferenceError(400, "INVALID_CANCEL_REASON", "Only USER_REQUESTED cancellation is accepted.")
         now = self.now_ms()
+        deadline_expired = False
         with self._connect() as db:
-            row = db.execute("SELECT status FROM inference_jobs WHERE job_id=?", (job_id,)).fetchone()
+            row = db.execute(
+                "SELECT status,deadline_at_ms FROM inference_jobs WHERE job_id=?",
+                (job_id,),
+            ).fetchone()
             if row is None:
                 raise InferenceError(404, "JOB_NOT_FOUND", "Inference job was not found.")
             status = str(row["status"])
             if status not in TERMINAL_STATUSES:
-                status = "CANCEL_REQUESTED"
-                db.execute("UPDATE inference_jobs SET status=?,updated_ms=? WHERE job_id=?", (status, now, job_id))
+                deadline_expired = now >= int(row["deadline_at_ms"])
+                if not deadline_expired:
+                    status = "CANCEL_REQUESTED"
+                    db.execute(
+                        "UPDATE inference_jobs SET status=?,updated_ms=? WHERE job_id=?",
+                        (status, now, job_id),
+                    )
+        if deadline_expired:
+            self._complete_without_output(job_id, "FAILED", "JOB_DEADLINE_EXPIRED")
+            status = "FAILED"
         with self._condition:
             self._condition.notify_all()
         return InferenceReply(200, {"schema": "noos/wwm-cancel/v2", "job_id": job_id, "status": status})
@@ -1453,10 +1576,15 @@ class InferenceService:
             row, quote = self._job_quote(db, job_id)
             if str(row["status"]) in TERMINAL_STATUSES and row["receipt_json"] is not None:
                 return
-        receipt = self._sign(
-            self._receipt_base(job_id, quote, status, evidence="NONE", error_code=error_code),
-            "RECEIPT",
+        unsigned = self._receipt_base(
+            job_id,
+            quote,
+            status,
+            evidence="NONE",
+            error_code=error_code,
         )
+        unsigned["deadline_at_ms"] = int(row["deadline_at_ms"])
+        receipt = self._sign(unsigned, "RECEIPT")
         if self.settlement_backend is None:
             self._store_receipt(job_id, status, receipt)
             return
@@ -1755,20 +1883,38 @@ class InferenceService:
                 self._settlement_queue.task_done()
 
     def _execute_job(self, job_id: str) -> None:
+        terminal_before_start: tuple[str, str] | None = None
         with self._connect() as db:
             row, quote = self._job_quote(db, job_id)
-            if row["status"] == "CANCEL_REQUESTED":
-                pass
-            elif row["status"] != "QUEUED":
+            status = str(row["status"])
+            deadline_at_ms = int(row["deadline_at_ms"])
+            if status == "CANCEL_REQUESTED":
+                terminal_before_start = ("CANCELLED", "USER_REQUESTED")
+            elif status != "QUEUED":
                 return
+            elif self.now_ms() >= deadline_at_ms:
+                terminal_before_start = ("FAILED", "JOB_DEADLINE_EXPIRED")
             else:
                 db.execute(
                     "UPDATE inference_jobs SET status='RUNNING',updated_ms=? WHERE job_id=?",
                     (self.now_ms(), job_id),
                 )
-        if row["status"] == "CANCEL_REQUESTED":
-            self._complete_without_output(job_id, "CANCELLED", "USER_REQUESTED")
+        if terminal_before_start is not None:
+            self._complete_without_output(job_id, *terminal_before_start)
             return
+
+        def execution_abort_code() -> str | None:
+            with self._connect() as control_db:
+                current = control_db.execute(
+                    "SELECT status,deadline_at_ms FROM inference_jobs WHERE job_id=?",
+                    (job_id,),
+                ).fetchone()
+            if current is None or str(current["status"]) == "CANCEL_REQUESTED":
+                return "USER_REQUESTED"
+            if self.now_ms() >= int(current["deadline_at_ms"]):
+                return "JOB_DEADLINE_EXPIRED"
+            return None
+
         prompt = self._open_prompt(job_id, str(row["prompt"]))
         maximum = int(row["maximum_output_tokens"])
         decoder = codecs.getincrementaldecoder("utf-8")("strict")
@@ -1776,11 +1922,9 @@ class InferenceService:
 
         def on_chunk(chunk: bytes, incremental_root: str) -> None:
             nonlocal output_bytes
-            output_bytes += len(chunk)
-            with self._connect() as event_db:
-                current = event_db.execute("SELECT status FROM inference_jobs WHERE job_id=?", (job_id,)).fetchone()
-            if current is None or current["status"] == "CANCEL_REQUESTED":
+            if execution_abort_code() is not None:
                 return
+            output_bytes += len(chunk)
             delta = decoder.decode(chunk, final=False)
             if delta:
                 self._append_event(
@@ -1797,7 +1941,18 @@ class InferenceService:
                 )
 
         try:
-            result = self.executor.run(job_id, prompt, maximum, on_chunk)
+            result = self.executor.run(
+                job_id,
+                prompt,
+                maximum,
+                on_chunk,
+                execution_abort_code,
+            )
+            abort = execution_abort_code()
+            if abort is not None:
+                status = "CANCELLED" if abort == "USER_REQUESTED" else "FAILED"
+                self._complete_without_output(job_id, status, abort)
+                return
             tail = decoder.decode(b"", final=True)
             if tail:
                 self._append_event(
@@ -1812,10 +1967,9 @@ class InferenceService:
                         "output_bytes": len(result.output),
                     },
                 )
-            with self._connect() as db:
-                current = db.execute("SELECT status FROM inference_jobs WHERE job_id=?", (job_id,)).fetchone()
-            if current is not None and current["status"] == "CANCEL_REQUESTED":
-                self._complete_without_output(job_id, "CANCELLED", "USER_REQUESTED")
+            completed_at_ms = self.now_ms()
+            if completed_at_ms >= deadline_at_ms:
+                self._complete_without_output(job_id, "FAILED", "JOB_DEADLINE_EXPIRED")
                 return
             receipt = self._receipt_base(job_id, quote, "COMPLETED", evidence="PROVISIONAL_SIGNED")
             receipt.update(
@@ -1826,6 +1980,8 @@ class InferenceService:
                     "output_tokens": result.output_tokens,
                     "output_bytes": len(result.output),
                     "duration_ms": result.duration_ms,
+                    "deadline_at_ms": deadline_at_ms,
+                    "completed_at_ms": completed_at_ms,
                     "tokenizer_executable_sha256": result.tokenizer_sha256,
                 }
             )
@@ -1837,5 +1993,8 @@ class InferenceService:
                 self._sign(receipt, "RECEIPT"),
             )
         except (InferenceError, UnicodeDecodeError) as error:
-            code = error.code if isinstance(error, InferenceError) else "INVALID_UTF8_OUTPUT"
-            self._complete_without_output(job_id, "FAILED", code)
+            code = execution_abort_code()
+            if code is None:
+                code = error.code if isinstance(error, InferenceError) else "INVALID_UTF8_OUTPUT"
+            status = "CANCELLED" if code == "USER_REQUESTED" else "FAILED"
+            self._complete_without_output(job_id, status, code)

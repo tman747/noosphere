@@ -4,7 +4,9 @@ import hashlib
 import json
 import sqlite3
 import tempfile
+import threading
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from blake3 import blake3
@@ -13,9 +15,11 @@ from tools.operations.wwm_public_inference import (
     CHAIN_ID,
     GENESIS_HASH,
     PROMPT_DOMAIN,
+    JOB_DEADLINE_SECONDS,
     ExecutionResult,
     InferenceError,
     InferenceService,
+    WorkerdExecutor,
     StateSnapshot,
 )
 from tools.operations.wwm_public_settlement import (
@@ -84,7 +88,7 @@ class SnapshotFixture:
 
 
 class ExecutorFixture:
-    def run(self, job_id, prompt, maximum_output_tokens, on_chunk) -> ExecutionResult:
+    def run(self, job_id, prompt, maximum_output_tokens, on_chunk, abort_code) -> ExecutionResult:
         self.job_id = job_id
         self.prompt = prompt
         output = b"Bonsai"
@@ -233,6 +237,99 @@ def submit_fixture_job(
 
 
 class PublicInferenceSettlementTest(unittest.TestCase):
+    def test_workerd_executor_propagates_abort_with_authenticated_delete(self) -> None:
+        submitted = threading.Event()
+        cancelled = threading.Event()
+
+        class Headers:
+            def __init__(self, content_type: str) -> None:
+                self.content_type = content_type
+
+            def get_content_type(self) -> str:
+                return self.content_type
+
+        class Response:
+            def __init__(self, body: bytes, content_type: str, status: int = 200) -> None:
+                self.body = body
+                self.headers = Headers(content_type)
+                self.status = status
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self, maximum: int) -> bytes:
+                return self.body[:maximum]
+
+        class StreamResponse(Response):
+            def __init__(self) -> None:
+                super().__init__(b"", "text/event-stream")
+                self.sent = False
+
+            def readline(self, maximum: int) -> bytes:
+                if self.sent:
+                    return b""
+                if not cancelled.wait(2):
+                    raise TimeoutError("executor cancellation was not propagated")
+                self.sent = True
+                return b'data: {"type":"terminal","code":"cancelled","output_root":null}\n'
+
+        class Tokenizer:
+            executable_sha256 = hex32(150)
+
+            @staticmethod
+            def tokenize(value: bytes, maximum: int) -> list[int]:
+                return [1]
+
+            @staticmethod
+            def output_commitment(value: bytes, maximum: int) -> tuple[int, str]:
+                raise AssertionError("cancelled output must not be committed")
+
+        def urlopen(request, timeout):
+            method = request.get_method()
+            if method == "POST" and request.full_url.endswith("/capacity-quotes"):
+                return Response(b'{"accepted":true}', "application/json")
+            if method == "POST" and request.full_url.endswith("/jobs"):
+                submitted.set()
+                return Response(
+                    json.dumps(
+                        {
+                            "job_id": hex32(151),
+                            "stream": f"/internal/wwm/v1/jobs/{hex32(151)}/stream",
+                        },
+                        separators=(",", ":"),
+                    ).encode("utf-8"),
+                    "application/json",
+                )
+            if method == "GET" and request.full_url.endswith("/stream"):
+                return StreamResponse()
+            if method == "DELETE" and request.full_url.endswith(hex32(151)):
+                cancelled.set()
+                return Response(b"", "application/json", status=202)
+            raise AssertionError(f"unexpected executor request {method} {request.full_url}")
+
+        executor = WorkerdExecutor(
+            origin="http://127.0.0.1:29807",
+            token="44" * 32,
+            tokenizer=Tokenizer(),
+        )
+        with patch(
+            "tools.operations.wwm_public_inference.urllib.request.urlopen",
+            side_effect=urlopen,
+        ):
+            with self.assertRaises(InferenceError) as raised:
+                executor.run(
+                    hex32(151),
+                    "cancel me",
+                    8,
+                    lambda chunk, root: self.fail("cancelled execution emitted output"),
+                    lambda: "USER_REQUESTED" if submitted.is_set() else None,
+                )
+        self.assertEqual(raised.exception.code, "USER_REQUESTED")
+        self.assertTrue(cancelled.is_set())
+
     def test_success_streams_provisional_then_finalized_chain_receipt(self) -> None:
         provider = SnapshotFixture()
         executor = ExecutorFixture()
@@ -312,13 +409,188 @@ class PublicInferenceSettlementTest(unittest.TestCase):
             finally:
                 service.close()
 
+    def test_duplicate_submission_replays_one_job_without_rerunning(self) -> None:
+        class CountingExecutor(ExecutorFixture):
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def run(self, job_id, prompt, maximum_output_tokens, on_chunk, abort_code):
+                self.calls += 1
+                return super().run(
+                    job_id,
+                    prompt,
+                    maximum_output_tokens,
+                    on_chunk,
+                    abort_code,
+                )
+
+        prompt = "IDEMPOTENCY_CANARY_f94f0442"
+        salt = "22" * 32
+        commitment = hashlib.sha256(
+            PROMPT_DOMAIN + bytes.fromhex(salt) + prompt.encode("utf-8")
+        ).hexdigest()
+        with tempfile.TemporaryDirectory() as temporary:
+            database = Path(temporary) / "inference.sqlite3"
+            executor = CountingExecutor()
+            service = InferenceService(
+                database=database,
+                signing_seed=bytes.fromhex("12" * 32),
+                provider=SnapshotFixture(),
+                executor=executor,
+                start_worker=False,
+            )
+            try:
+                job_id = submit_fixture_job(service, prompt)
+                with sqlite3.connect(database) as db:
+                    quote_id, deadline_at_ms = db.execute(
+                        "SELECT quote_id,deadline_at_ms FROM inference_jobs WHERE job_id=?",
+                        (job_id,),
+                    ).fetchone()
+                db.close()
+                replay = service.post(
+                    "/api/wwm/v2/jobs",
+                    {
+                        "quote_id": quote_id,
+                        "prompt": prompt,
+                        "prompt_commitment": commitment,
+                        "prompt_salt": salt,
+                    },
+                    "127.0.0.1",
+                    "55" * 16,
+                ).value
+                self.assertEqual(replay["job_id"], job_id)
+                self.assertEqual(replay["status"], "QUEUED")
+                self.assertEqual(replay["deadline_at_ms"], deadline_at_ms)
+                self.assertTrue(replay["replayed"])
+                service._execute_job(job_id)
+                completed = service.post(
+                    "/api/wwm/v2/jobs",
+                    {
+                        "quote_id": quote_id,
+                        "prompt": prompt,
+                        "prompt_commitment": commitment,
+                        "prompt_salt": salt,
+                    },
+                    "127.0.0.1",
+                    "55" * 16,
+                ).value
+                self.assertEqual(completed["status"], "COMPLETED")
+                self.assertEqual(executor.calls, 1)
+                with sqlite3.connect(database) as db:
+                    self.assertEqual(
+                        db.execute("SELECT COUNT(*) FROM inference_jobs").fetchone()[0],
+                        1,
+                    )
+                db.close()
+            finally:
+                service.close()
+
+    def test_invalid_settlement_proofs_cannot_consume_refund(self) -> None:
+        def wrong_model(result: dict) -> None:
+            result["job"]["record"]["capsule_id"] = hex32(201)
+
+        def wrong_finality(result: dict) -> None:
+            result["settlement"]["finalized_hash"] = "not-a-finalized-hash"
+
+        def wrong_output(result: dict) -> None:
+            result["receipt"]["record"]["output_root"] = hex32(202)
+
+        class TamperedSettlement(SettlementFixture):
+            def __init__(self, mutate) -> None:
+                super().__init__()
+                self.mutate = mutate
+
+            def settle(self, request, checkpoint, on_checkpoint) -> dict:
+                result = super().settle(request, checkpoint, on_checkpoint)
+                self.mutate(result)
+                return result
+
+        for name, mutate in (
+            ("wrong_model", wrong_model),
+            ("wrong_finality", wrong_finality),
+            ("wrong_output", wrong_output),
+        ):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                database = Path(temporary) / "inference.sqlite3"
+                service = InferenceService(
+                    database=database,
+                    signing_seed=bytes.fromhex("12" * 32),
+                    provider=SnapshotFixture(),
+                    executor=ExecutorFixture(),
+                    settlement_backend=TamperedSettlement(mutate),
+                    start_worker=False,
+                )
+                try:
+                    job_id = submit_fixture_job(
+                        service,
+                        f"INVALID_SETTLEMENT_{name}_CANARY",
+                    )
+                    service.post(
+                        f"/api/wwm/v2/jobs/{job_id}/cancel",
+                        {"reason": "USER_REQUESTED"},
+                        "127.0.0.1",
+                        None,
+                    )
+                    service._execute_job(job_id)
+                    with self.assertRaises(InferenceError) as rejected:
+                        service._settle_job(job_id)
+                    self.assertEqual(
+                        rejected.exception.code,
+                        "SETTLEMENT_PROOF_INVALID",
+                    )
+                    provisional = service.get(
+                        f"/api/wwm/v2/jobs/{job_id}/receipt",
+                        "",
+                        "127.0.0.1",
+                    ).value
+                    self.assertEqual(provisional["terminal_status"], "CANCELLED")
+                    self.assertEqual(provisional["settlement_state"], "PENDING_CHAIN")
+                    self.assertEqual(provisional["output_commitment"], "0" * 64)
+                    with sqlite3.connect(database) as db:
+                        settlement_state, result_json, prompt = db.execute(
+                            """
+                            SELECT s.state,s.result_json,j.prompt
+                            FROM inference_settlements s
+                            JOIN inference_jobs j ON j.job_id=s.job_id
+                            WHERE s.job_id=?
+                            """,
+                            (job_id,),
+                        ).fetchone()
+                    db.close()
+                    self.assertEqual(settlement_state, "FINALIZING")
+                    self.assertIsNone(result_json)
+                    self.assertIsNone(prompt)
+
+                    valid = SettlementFixture()
+                    service.settlement_backend = valid
+                    service._settle_job(job_id)
+                    finalized = service.get(
+                        f"/api/wwm/v2/jobs/{job_id}/receipt",
+                        "",
+                        "127.0.0.1",
+                    ).value
+                    self.assertEqual(
+                        finalized["settlement_state"],
+                        "FINALIZED_REFUNDED",
+                    )
+                    self.assertEqual(finalized["output_commitment"], "0" * 64)
+                    events = list(
+                        service.stream(f"/api/wwm/v2/jobs/{job_id}/stream", "0")
+                    )
+                    self.assertEqual(
+                        [event["type"] for event in events],
+                        ["receipt.completed", "settlement.finalized"],
+                    )
+                finally:
+                    service.close()
+
     def test_prompt_and_stream_plaintext_never_persist(self) -> None:
         provider = SnapshotFixture()
         prompt = "PROMPT_CANARY_7f04c551"
         output = b"OUTPUT_CANARY_94ba913e"
 
         class CanaryExecutor:
-            def run(self, job_id, observed_prompt, maximum_output_tokens, on_chunk):
+            def run(self, job_id, observed_prompt, maximum_output_tokens, on_chunk, abort_code):
                 self.prompt = observed_prompt
                 output_root = blake3(output).hexdigest()
                 on_chunk(output, output_root)
@@ -479,6 +751,58 @@ class PublicInferenceSettlementTest(unittest.TestCase):
             finally:
                 service.close()
 
+    def test_running_cancel_reaches_executor_and_finalizes_refund(self) -> None:
+        class BlockingExecutor:
+            def __init__(self) -> None:
+                self.started = threading.Event()
+                self.poll = threading.Event()
+                self.observed_abort: str | None = None
+
+            def run(self, job_id, prompt, maximum_output_tokens, on_chunk, abort_code):
+                self.started.set()
+                while True:
+                    self.observed_abort = abort_code()
+                    if self.observed_abort is not None:
+                        raise InferenceError(
+                            409,
+                            self.observed_abort,
+                            "Execution control terminated the fixture.",
+                        )
+                    self.poll.wait(0.01)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            executor = BlockingExecutor()
+            service = InferenceService(
+                database=Path(temporary) / "inference.sqlite3",
+                signing_seed=bytes.fromhex("12" * 32),
+                provider=SnapshotFixture(),
+                executor=executor,
+                settlement_backend=SettlementFixture(),
+            )
+            try:
+                job_id = submit_fixture_job(service, "CANCEL_RUNNING_CANARY_8e78de98")
+                self.assertTrue(executor.started.wait(2))
+                cancelled = service.post(
+                    f"/api/wwm/v2/jobs/{job_id}/cancel",
+                    {"reason": "USER_REQUESTED"},
+                    "127.0.0.1",
+                    None,
+                ).value
+                self.assertEqual(cancelled["status"], "CANCEL_REQUESTED")
+                events = list(service.stream(f"/api/wwm/v2/jobs/{job_id}/stream", None))
+                self.assertEqual(
+                    [event["type"] for event in events],
+                    ["receipt.completed", "settlement.finalized"],
+                )
+                self.assertEqual(executor.observed_abort, "USER_REQUESTED")
+                receipt = events[-1]["data"]
+                self.assertEqual(receipt["terminal_status"], "CANCELLED")
+                self.assertEqual(receipt["error_code"], "USER_REQUESTED")
+                self.assertEqual(receipt["settlement_state"], "FINALIZED_REFUNDED")
+                self.assertEqual(receipt["output_commitment"], "0" * 64)
+            finally:
+                service.close()
+
     def test_gateway_restart_fails_active_job_and_resumes_terminal_stream(self) -> None:
         prompt = "RESTART_CANARY_b01d84ec"
         with tempfile.TemporaryDirectory() as temporary:
@@ -519,30 +843,229 @@ class PublicInferenceSettlementTest(unittest.TestCase):
             finally:
                 recovered.close()
 
+    def test_restart_resumes_pending_settlement_without_rerunning_execution(self) -> None:
+        class CountingExecutor(ExecutorFixture):
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def run(self, job_id, prompt, maximum_output_tokens, on_chunk, abort_code):
+                self.calls += 1
+                return super().run(
+                    job_id,
+                    prompt,
+                    maximum_output_tokens,
+                    on_chunk,
+                    abort_code,
+                )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            database = Path(temporary) / "inference.sqlite3"
+            executor = CountingExecutor()
+            settlement = SettlementFixture()
+            first = InferenceService(
+                database=database,
+                signing_seed=bytes.fromhex("12" * 32),
+                provider=SnapshotFixture(),
+                executor=executor,
+                settlement_backend=settlement,
+                start_worker=False,
+            )
+            job_id = submit_fixture_job(first, "SETTLEMENT_RESTART_CANARY_4f87c2f4")
+            first._execute_job(job_id)
+            first.close()
+            self.assertEqual(executor.calls, 1)
+
+            resumed = InferenceService(
+                database=database,
+                signing_seed=bytes.fromhex("12" * 32),
+                provider=SnapshotFixture(),
+                executor=executor,
+                settlement_backend=settlement,
+            )
+            try:
+                resumed_events = list(
+                    resumed.stream(f"/api/wwm/v2/jobs/{job_id}/stream", "2")
+                )
+                self.assertEqual(
+                    [event["type"] for event in resumed_events],
+                    ["settlement.finalized"],
+                )
+                self.assertEqual(executor.calls, 1)
+                self.assertEqual(
+                    resumed_events[0]["data"]["settlement_state"],
+                    "FINALIZED_PAID",
+                )
+            finally:
+                resumed.close()
+
+            terminal = InferenceService(
+                database=database,
+                signing_seed=bytes.fromhex("12" * 32),
+                provider=SnapshotFixture(),
+                executor=executor,
+                settlement_backend=settlement,
+                start_worker=False,
+            )
+            try:
+                replayed = list(
+                    terminal.stream(f"/api/wwm/v2/jobs/{job_id}/stream", "2")
+                )
+                self.assertEqual(
+                    [event["type"] for event in replayed],
+                    ["settlement.finalized"],
+                )
+                self.assertEqual(executor.calls, 1)
+                self.assertEqual(settlement.checkpoints, ["open_finalized"])
+            finally:
+                terminal.close()
+
+    def test_restart_backfills_deadline_for_existing_database(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            database = Path(temporary) / "inference.sqlite3"
+            first = InferenceService(
+                database=database,
+                signing_seed=bytes.fromhex("12" * 32),
+                provider=SnapshotFixture(),
+                executor=ExecutorFixture(),
+                start_worker=False,
+            )
+            job_id = submit_fixture_job(first, "DEADLINE_MIGRATION_CANARY_d80998ce")
+            first.close()
+            with sqlite3.connect(database) as db:
+                created_ms = db.execute(
+                    "SELECT created_ms FROM inference_jobs WHERE job_id=?",
+                    (job_id,),
+                ).fetchone()[0]
+                db.execute("ALTER TABLE inference_jobs DROP COLUMN deadline_at_ms")
+            db.close()
+
+            recovered = InferenceService(
+                database=database,
+                signing_seed=bytes.fromhex("12" * 32),
+                provider=SnapshotFixture(),
+                executor=ExecutorFixture(),
+                start_worker=False,
+            )
+            try:
+                with sqlite3.connect(database) as db:
+                    deadline_at_ms = db.execute(
+                        "SELECT deadline_at_ms FROM inference_jobs WHERE job_id=?",
+                        (job_id,),
+                    ).fetchone()[0]
+                db.close()
+                self.assertEqual(
+                    deadline_at_ms,
+                    created_ms + JOB_DEADLINE_SECONDS * 1000,
+                )
+                receipt = recovered.get(
+                    f"/api/wwm/v2/jobs/{job_id}/receipt",
+                    "",
+                    "127.0.0.1",
+                ).value
+                self.assertEqual(receipt["error_code"], "GATEWAY_RESTARTED")
+                self.assertEqual(receipt["deadline_at_ms"], deadline_at_ms)
+            finally:
+                recovered.close()
+
+    def test_worker_disconnect_refunds_once_across_gateway_restart(self) -> None:
+        class RestartingExecutor:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def run(self, job_id, prompt, maximum_output_tokens, on_chunk, abort_code):
+                self.calls += 1
+                raise InferenceError(
+                    503,
+                    "EXECUTOR_UNAVAILABLE",
+                    "The private worker restarted during execution.",
+                )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            database = Path(temporary) / "inference.sqlite3"
+            executor = RestartingExecutor()
+            settlement = SettlementFixture()
+            first = InferenceService(
+                database=database,
+                signing_seed=bytes.fromhex("12" * 32),
+                provider=SnapshotFixture(),
+                executor=executor,
+                settlement_backend=settlement,
+                start_worker=False,
+            )
+            job_id = submit_fixture_job(first, "WORKER_RESTART_CANARY_f2707aba")
+            first._execute_job(job_id)
+            first._settle_job(job_id)
+            first.close()
+            self.assertEqual(executor.calls, 1)
+
+            recovered = InferenceService(
+                database=database,
+                signing_seed=bytes.fromhex("12" * 32),
+                provider=SnapshotFixture(),
+                executor=executor,
+                settlement_backend=settlement,
+                start_worker=False,
+            )
+            try:
+                events = list(
+                    recovered.stream(f"/api/wwm/v2/jobs/{job_id}/stream", "0")
+                )
+                self.assertEqual(
+                    [event["type"] for event in events],
+                    ["receipt.completed", "settlement.finalized"],
+                )
+                receipt = events[-1]["data"]
+                self.assertEqual(receipt["terminal_status"], "FAILED")
+                self.assertEqual(receipt["error_code"], "EXECUTOR_UNAVAILABLE")
+                self.assertEqual(receipt["settlement_state"], "FINALIZED_REFUNDED")
+                self.assertEqual(receipt["output_commitment"], "0" * 64)
+                self.assertEqual(executor.calls, 1)
+                self.assertEqual(settlement.checkpoints, ["open_finalized"])
+            finally:
+                recovered.close()
+
     def test_executor_deadline_failure_clears_prompt_and_refuses_output(self) -> None:
         prompt = "TIMEOUT_CANARY_53da489c"
+        clock_ms = [1_000_000]
 
         class TimeoutExecutor:
-            def run(self, job_id, observed_prompt, maximum_output_tokens, on_chunk):
+            def __init__(self) -> None:
+                self.observed_abort: str | None = None
+
+            def run(self, job_id, observed_prompt, maximum_output_tokens, on_chunk, abort_code):
+                clock_ms[0] += JOB_DEADLINE_SECONDS * 1000
+                self.observed_abort = abort_code()
                 raise InferenceError(
                     504,
-                    "JOB_DEADLINE_EXPIRED",
+                    self.observed_abort or "EXECUTION_CONTROL_INVALID",
                     "The bounded inference deadline expired.",
                 )
 
         with tempfile.TemporaryDirectory() as temporary:
             database = Path(temporary) / "inference.sqlite3"
             settlement = SettlementFixture()
+            executor = TimeoutExecutor()
             service = InferenceService(
                 database=database,
                 signing_seed=bytes.fromhex("12" * 32),
                 provider=SnapshotFixture(),
-                executor=TimeoutExecutor(),
+                executor=executor,
+                now_ms=lambda: clock_ms[0],
                 settlement_backend=settlement,
                 start_worker=False,
             )
             try:
                 job_id = submit_fixture_job(service, prompt)
+                with sqlite3.connect(database) as db:
+                    created_ms, deadline_at_ms = db.execute(
+                        "SELECT created_ms,deadline_at_ms FROM inference_jobs WHERE job_id=?",
+                        (job_id,),
+                    ).fetchone()
+                db.close()
+                self.assertEqual(
+                    deadline_at_ms,
+                    created_ms + JOB_DEADLINE_SECONDS * 1000,
+                )
                 service._execute_job(job_id)
                 service._settle_job(job_id)
                 receipt = service.get(
@@ -552,6 +1075,7 @@ class PublicInferenceSettlementTest(unittest.TestCase):
                 ).value
                 self.assertEqual(receipt["terminal_status"], "FAILED")
                 self.assertEqual(receipt["error_code"], "JOB_DEADLINE_EXPIRED")
+                self.assertEqual(executor.observed_abort, "JOB_DEADLINE_EXPIRED")
                 self.assertEqual(receipt["evidence_state"], "NONE")
                 self.assertEqual(receipt["output_tokens"], 0)
                 self.assertEqual(receipt["settlement_state"], "FINALIZED_REFUNDED")

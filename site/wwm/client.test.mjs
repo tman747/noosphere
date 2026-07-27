@@ -220,7 +220,7 @@ test("sponsored and paid quote/job paths preserve active pin and salt", async ()
     }
     if (path.endsWith("/jobs")) {
       const request = JSON.parse(options.body); requests.push({ kind: "job", request, headers: options.headers });
-      return json({ schema: "noos/wwm-job/v2", job_id: IDS.job, status: "RUNNING", replayed: false });
+      return json({ schema: "noos/wwm-job/v2", job_id: IDS.job, status: "RUNNING", deadline_at_ms: 4_102_444_800_000, replayed: false });
     }
     throw new Error(`unexpected ${path}`);
   };

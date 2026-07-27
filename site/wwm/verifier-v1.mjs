@@ -368,9 +368,20 @@ export async function verifyReceipt(receipt, active) {
   requireHex32(receipt.receipt_id, "receipt ID");
   requireHex32(receipt.job_id, "receipt job ID");
   requireHex32(receipt.prompt_commitment, "receipt prompt commitment");
+  invariant(
+    Number.isSafeInteger(receipt.deadline_at_ms)
+      && receipt.deadline_at_ms >= 0
+      && Number.isSafeInteger(receipt.completed_at_ms)
+      && receipt.completed_at_ms >= 0,
+    "receipt deadline coordinates are invalid",
+  );
   const signatureValid = await verifySignedEnvelope(receipt, "RECEIPT");
   if (!signatureValid) return false;
   if (receipt.terminal_status === "COMPLETED") {
+    invariant(
+      receipt.completed_at_ms < receipt.deadline_at_ms,
+      "completed receipt exceeded its execution deadline",
+    );
     invariant(receipt.evidence_state === "PROVISIONAL_SIGNED", "completed receipt evidence is invalid");
     requireHex32(receipt.output_root, "receipt output root");
     invariant(receipt.output_commitment === receipt.output_root, "receipt output commitment mismatch");
