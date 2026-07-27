@@ -36,6 +36,10 @@ foreach ($required in @(
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     throw "Python 3 is required by the compute coordinator and dashboard."
 }
+& python -c "import cryptography" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    throw "Python package 'cryptography' is required for the signed workload registry."
+}
 if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
     throw "Cargo is required once to locate the built release binaries."
 }
@@ -99,6 +103,7 @@ $ToolFiles = @(
     "run_installed_host.ps1",
     "lan_testnet.py",
     "compute_market.py",
+    "compute_workload_registry.py",
     "compute_worker.py",
     "wallet_transfer.py",
     "network_dashboard.py",

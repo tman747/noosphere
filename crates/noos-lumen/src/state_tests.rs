@@ -1920,6 +1920,42 @@ fn compute_market_escrow_requires_requester_acceptance_before_payment() {
 }
 
 #[test]
+fn compute_market_rejects_unregistered_workload_before_escrow() {
+    let mut ledger = genesis();
+    let before = ledger.roots();
+    let payer_before = ledger.balance(&PAYER, &NOOS_ASSET);
+    let (open, open_witnesses, open_tx) = build_tx(
+        1,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::OpenComputeJob {
+            requester: PAYER,
+            workload_kind: 1,
+            input_root: [0x55; 32],
+            units: 100,
+            unit_size: 4096,
+            max_price_per_unit: 10,
+            deadline_height: 20,
+        }],
+        vec![],
+    );
+    let job_id = compute_job_id(&txid(&open_tx), 0);
+    let outcome = ledger
+        .apply_transaction(&ctx(1), &open, &open_witnesses, &StubEngine, &AcceptAll)
+        .unwrap();
+    let ApplyOutcome::Failed { receipt, code, .. } = outcome else {
+        panic!("expected unregistered workload to fail, got {outcome:?}");
+    };
+
+    assert_eq!(code, FailCode::PostconditionFailed);
+    assert!(ledger.get_compute_job(&job_id).is_none());
+    assert_eq!(before.objects_root, ledger.roots().objects_root);
+    let charged = payer_before - ledger.balance(&PAYER, &NOOS_ASSET);
+    assert_eq!(charged, FeeParamsV1::testnet_fixture().failure_fee);
+    assert_eq!(receipt.fee_charged, charged);
+}
+
+#[test]
 fn duplicate_nullifier_rejects_within_and_across_transactions() {
     let mut ledger = genesis();
     let seed = mint_note_via_withdraw(&mut ledger, 1, 5_000, 0x21);

@@ -22,6 +22,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from compute_workload_registry import (  # noqa: E402
+    VerifiedRegistry,
+    commit_input,
+    load_registry,
+    read_public_key,
+    validate_payload as validate_registered_payload,
+)
 from compute_worker import compute_root, live_status, submit_action  # noqa: E402
 from wallet_transfer import api_json, cargo_binary, derive, load_profile, read_seed  # noqa: E402
 
@@ -31,13 +38,23 @@ MAX_BODY = 64 * 1024
 
 
 class Market:
-    def __init__(self, profile: dict, seed: str, account: int, index: int, db_path: Path, admin_token: str):
+    def __init__(
+        self,
+        profile: dict,
+        seed: str,
+        account: int,
+        index: int,
+        db_path: Path,
+        admin_token: str,
+        registry: VerifiedRegistry,
+    ):
         self.profile = profile
         self.seed = seed
         self.account = account
         self.index = index
         self.requester = str(derive(cargo_binary("noos-cli"), seed, account, index)["verifying_key"])
         self.admin_token = admin_token
+        self.registry = registry
         self.db = sqlite3.connect(db_path, check_same_thread=False)
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=FULL")
@@ -68,18 +85,25 @@ class Market:
         max_price = int(value.get("max_price_per_unit", 1))
         deadline_blocks = int(value.get("deadline_blocks", 1000))
         seed = int(value.get("seed", secrets.randbits(31)))
-        if not 1 <= shard_count <= 64 or not 1 <= units <= 1_000_000:
-            raise ValueError("shard_count or units_per_shard outside bounds")
-        if not 1 <= rounds <= 1_048_576 or not 1 <= max_price <= 10**18:
-            raise ValueError("rounds or price outside bounds")
         status = self.chain("/api/status")
-        deadline = int(status["unsafe_head"]["height"]) + deadline_blocks
+        height = int(status["unsafe_head"]["height"])
+        workload = self.registry.require_active(0, height)
+        limits = workload.limits
+        if not 1 <= shard_count <= 64:
+            raise ValueError("shard_count outside bounds")
+        if (
+            not 1 <= units <= limits["max_units"]
+            or not 1 <= rounds <= limits["max_unit_size"]
+            or units * rounds > limits["max_operations"]
+        ):
+            raise ValueError("workload exceeds signed registry bounds")
+        if not 1 <= max_price <= 10**18:
+            raise ValueError("price outside bounds")
+        deadline = height + deadline_blocks
         created: list[dict] = []
         for shard in range(shard_count):
             payload = {"seed": seed, "start": shard * units, "units": units, "rounds": rounds}
-            input_root = hashlib.sha256(
-                b"NOOS/COMPUTE/MIX32/INPUT/V1" + json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-            ).hexdigest()
+            input_root = commit_input(workload, payload)
             with self.lock:
                 self.db.execute(
                     "INSERT OR REPLACE INTO payload_inputs(input_root,seed,start,units,rounds,created_ms) VALUES(?,?,?,?,?,?)",
@@ -88,7 +112,7 @@ class Market:
                 self.db.commit()
             result = submit_action(self.profile, self.seed, self.account, self.index, {
                 "type": "open_compute_job", "requester": self.requester,
-                "workload_kind": 0, "input_root": input_root, "units": units,
+                "workload_kind": workload.workload_kind, "input_root": input_root, "units": units,
                 "unit_size": rounds, "max_price_per_unit": str(max_price),
                 "deadline_height": deadline,
             })
@@ -102,9 +126,20 @@ class Market:
                     (job_id, seed, shard * units, units, rounds, int(time.time() * 1000)),
                 )
                 self.db.commit()
-            created.append({"job_id": job_id, "txid": result["txid"], **payload})
-        return {"requester": self.requester, "jobs": created,
-                "total_units": shard_count * units, "maximum_escrow": str(shard_count * units * max_price)}
+            created.append({
+                "job_id": job_id,
+                "txid": result["txid"],
+                "workload_id": workload.workload_id,
+                **payload,
+            })
+        return {
+            "requester": self.requester,
+            "workload_registry_id": self.registry.registry_id,
+            "workload_id": workload.workload_id,
+            "jobs": created,
+            "total_units": shard_count * units,
+            "maximum_escrow": str(shard_count * units * max_price),
+        }
 
     def payload(self, job_id: str) -> dict | None:
         with self.lock:
@@ -139,16 +174,32 @@ class Market:
     def accept(self, value: dict) -> dict:
         job_id = str(value.get("job_id", ""))
         claimed_root = str(value.get("result_root", ""))
-        payload = self.payload(job_id)
-        if payload is None:
+        stored = self.payload(job_id)
+        if stored is None:
             raise ValueError("unknown job")
-        expected = compute_root(payload["seed"], payload["start"], payload["units"], payload["rounds"],
-                                max(1, min(32, payload["units"])))
-        if claimed_root != expected:
-            raise ValueError("result root failed independent recomputation")
         jobs = self.chain("/api/v1/jobs").get("items", [])
         job = next((item for item in jobs if item.get("job_id") == job_id), None)
-        if job is None or job.get("state") != 2 or job.get("result_root") != expected:
+        if job is None or job.get("state") != 2:
+            raise ValueError("chain job is not a submitted result")
+        payload = {name: stored[name] for name in ("seed", "start", "units", "rounds")}
+        workload, seed, start, units, rounds = validate_registered_payload(
+            self.registry,
+            job,
+            payload,
+            height=None,
+            max_operations=None,
+        )
+        expected = compute_root(
+            workload,
+            seed,
+            start,
+            units,
+            rounds,
+            max(1, min(32, units)),
+        )
+        if claimed_root != expected:
+            raise ValueError("result root failed independent recomputation")
+        if job.get("result_root") != expected:
             raise ValueError("chain job is not a matching submitted result")
         result = submit_action(self.profile, self.seed, self.account, self.index, {
             "type": "accept_compute_result", "requester": self.requester, "job_id": job_id,
@@ -158,7 +209,7 @@ class Market:
                             (result["txid"], expected, job_id))
             self.db.commit()
         return {"job_id": job_id, "result_root": expected, "settlement_txid": result["txid"],
-                "state": result["state"]}
+                "state": result["state"], "workload_id": workload.workload_id}
 
     def ensure_helper_worker(self) -> None:
         workers = self.chain("/api/v1/workers").get("items", [])
@@ -173,11 +224,24 @@ class Market:
 
     def helper_claim(self) -> dict:
         self.ensure_helper_worker()
+        height = int(self.chain("/api/status")["unsafe_head"]["height"])
+        workload = self.registry.require_active(0, height)
         jobs = self.chain("/api/v1/jobs").get("items", [])
         for job in sorted(jobs, key=lambda item: item.get("job_id", "")):
-            if job.get("state") != 0 or job.get("workload_kind") != 0:
+            if job.get("state") != 0 or job.get("workload_kind") != workload.workload_kind:
                 continue
             job_id = str(job["job_id"])
+            stored = self.payload(job_id)
+            if stored is None:
+                continue
+            payload = {name: stored[name] for name in ("seed", "start", "units", "rounds")}
+            validate_registered_payload(
+                self.registry,
+                job,
+                payload,
+                height=height,
+                max_operations=None,
+            )
             with self.lock:
                 if self.db.execute("SELECT 1 FROM helper_claims WHERE job_id=?", (job_id,)).fetchone():
                     continue
@@ -188,9 +252,11 @@ class Market:
                 submit_action(self.profile, self.seed, self.account, self.index, {
                     "type": "claim_compute_job", "worker": self.requester, "job_id": job_id,
                 })
-                payload = self.payload(job_id)
-                if payload is not None:
-                    return payload
+                return {
+                    "job_id": job_id,
+                    "workload_id": workload.workload_id,
+                    **payload,
+                }
             except Exception:
                 with self.lock:
                     self.db.execute("DELETE FROM helper_claims WHERE job_id=?", (job_id,))
@@ -200,16 +266,34 @@ class Market:
     def helper_result(self, value: dict) -> dict:
         job_id = str(value.get("job_id", ""))
         claimed_root = str(value.get("result_root", ""))
-        payload = self.payload(job_id)
-        if payload is None:
+        stored = self.payload(job_id)
+        if stored is None:
             raise ValueError("unknown helper job")
-        expected = compute_root(payload["seed"], payload["start"], payload["units"], payload["rounds"],
-                                max(1, min(32, payload["units"])))
+        jobs = self.chain("/api/v1/jobs").get("items", [])
+        job = next((item for item in jobs if item.get("job_id") == job_id), None)
+        if job is None or job.get("state") != 1:
+            raise ValueError("chain helper job is not claimed")
+        payload = {name: stored[name] for name in ("seed", "start", "units", "rounds")}
+        workload, seed, start, units, rounds = validate_registered_payload(
+            self.registry,
+            job,
+            payload,
+            height=None,
+            max_operations=None,
+        )
+        expected = compute_root(
+            workload,
+            seed,
+            start,
+            units,
+            rounds,
+            max(1, min(32, units)),
+        )
         if expected != claimed_root:
             raise ValueError("helper result failed independent recomputation")
         submit_action(self.profile, self.seed, self.account, self.index, {
             "type": "submit_compute_result", "worker": self.requester, "job_id": job_id,
-            "result_root": expected, "completed_units": payload["units"],
+            "result_root": expected, "completed_units": units,
         })
         return self.accept({"job_id": job_id, "result_root": expected})
 
@@ -244,11 +328,15 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlsplit(self.path).path
         try:
             if path == "/api/health":
-                self.reply(200, {"ok": True, "version": "0.2", "operator_head": bool(self.market.profile.get("_operator_node"))})
+                self.reply(200, {"ok": True, "version": "0.3", "operator_head": bool(self.market.profile.get("_operator_node")),
+                                 "workload_registry_id": self.market.registry.registry_id})
             elif path == "/api/config":
-                self.reply(200, {"requester": self.market.requester,
-                                 "chain_id": self.market.profile["chain_id"],
-                                 "api_base_url": self.market.profile["api_base_url"]})
+                self.reply(200, {
+                    "requester": self.market.requester,
+                    "chain_id": self.market.profile["chain_id"],
+                    "api_base_url": self.market.profile["api_base_url"],
+                    "workload_registry": self.market.registry.summary(),
+                })
             elif path == "/api/workers":
                 self.reply(200, self.market.chain("/api/v1/workers"))
             elif path == "/api/jobs":
@@ -301,6 +389,8 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", required=True)
+    parser.add_argument("--workload-registry", type=Path, required=True)
+    parser.add_argument("--registry-public-key", type=Path, required=True)
     parser.add_argument("--seed-file")
     parser.add_argument("--account", type=int, default=0)
     parser.add_argument("--index", type=int, default=0)
@@ -327,12 +417,32 @@ def main() -> int:
             raise SystemExit("operator token must contain at least 24 characters")
         profile["_operator_node"] = args.operator_node
         profile["_operator_token"] = operator_token
-    market = Market(profile, read_seed(args.seed_file), args.account, args.index, Path(args.database), token)
+    registry = load_registry(
+        args.workload_registry,
+        trusted_public_key=read_public_key(args.registry_public_key),
+        expected_chain_id=str(profile["chain_id"]),
+        expected_genesis_hash=str(profile["genesis_hash"]),
+        height=int(live_status(profile)["unsafe_head"]["height"]),
+    )
+    market = Market(
+        profile,
+        read_seed(args.seed_file),
+        args.account,
+        args.index,
+        Path(args.database),
+        token,
+        registry,
+    )
     host, port_text = args.listen.rsplit(":", 1)
     server = ThreadingHTTPServer((host, int(port_text)), Handler)
     server.market = market  # type: ignore[attr-defined]
-    print(json.dumps({"listen": args.listen, "requester": market.requester,
-                      "chain": market.profile["chain_id"]}, indent=2), flush=True)
+    print(json.dumps({
+        "listen": args.listen,
+        "requester": market.requester,
+        "chain": market.profile["chain_id"],
+        "workload_registry": registry.registry_id,
+        "registry_signer_key_id": registry.signer_key_id,
+    }, indent=2), flush=True)
     server.serve_forever()
     return 0
 

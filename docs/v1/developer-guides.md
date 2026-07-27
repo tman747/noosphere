@@ -182,16 +182,27 @@ matching submitted result; settlement pays the agreed price and refunds unused
 escrow atomically. Open jobs and expired unfinished jobs can be cancelled by
 the requester.
 
-`tools/compute_market.py` opens deterministic MIX32 shards and independently
-recomputes each result root before acceptance. `tools/compute_worker.py` keeps a
-worker seed local, executes CPU shards, and signs claim/result transactions.
-The `/apps/compute-market` browser helper uses WebGPU when available and a
-bounded CPU fallback otherwise; it is suitable for a phone or laptop browser.
+`tools/compute_workload_registry.py` freezes the only admitted V0 workload as
+a canonical, chain/genesis-bound Ed25519-signed registry. Its signed body binds
+the workload identity, payload schema, commitment domains, full-recomputation
+verifier, meter, operation limits, activation/retirement heights, and the
+fail-closed rejection vector set. Both `tools/compute_market.py` and
+`tools/compute_worker.py` require `--workload-registry` and an independently
+distributed `--registry-public-key`; a registry supplied by the coordinator is
+not a trust root. The invitation-host installer generates and ACL-protects this
+key, freezes the registry once, and verifies it on every reconciliation.
+
+`tools/compute_market.py` opens deterministic MIX32 shards within the signed
+limits and independently recomputes each result root before acceptance.
+`tools/compute_worker.py` keeps a worker seed local, refuses unknown, inactive,
+retired, over-meter, or commitment-mismatched jobs before execution, executes
+CPU shards, and signs claim/result transactions. The `/apps/compute-market`
+browser helper uses WebGPU when available and a bounded CPU fallback.
 Browser helpers use the coordinator's explicitly custodial test-network worker
 identity, so rewards accrue to that identity rather than to a browser-held
-wallet. The workload is deliberately registered and deterministic: arbitrary
-native code, neural-model rental, confidential inputs, production dispute
-proofs, and permissionless GPU kernels are not claimed.
+wallet. MIX32 is deliberately deterministic: arbitrary native code,
+neural-model rental, confidential inputs, production dispute proofs, and
+permissionless GPU kernels are not admitted.
 
 ## Neural execution reality
 

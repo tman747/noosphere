@@ -4253,7 +4253,7 @@ impl LumenLedger {
                     max_price_per_unit,
                     deadline_height,
                 } => {
-                    if *workload_kind > 1
+                    if *workload_kind != 0
                         || *units == 0
                         || *units > 1_000_000_000
                         || *unit_size == 0

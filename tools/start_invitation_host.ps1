@@ -152,12 +152,16 @@ if (-not $ApiRunning) {
 $MarketSeed = "C:\tmp\mindchain-owner.seed"
 $MarketToken = "C:\tmp\mindchain-admin.token"
 $MarketDatabase = "C:\tmp\mindchain-compute-live.sqlite3"
+$WorkloadRegistry = Join-Path $NetworkRoot "compute-workload-registry.json"
+$WorkloadRegistryPrivate = Join-Path $NetworkRoot "compute-workload-registry.seed"
+$WorkloadRegistryPublic = Join-Path $NetworkRoot "compute-workload-registry.public"
 $MarketReady = $false
 $MarketListener = Get-NetTCPConnection -LocalPort 18110 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($MarketListener) {
     try {
         $MarketHealth = Invoke-RestMethod -Uri "http://127.0.0.1:18110/api/health" -TimeoutSec 2
-        $MarketReady = ($MarketHealth.version -eq "0.2" -and $MarketHealth.operator_head -eq $true)
+        $MarketReady = ($MarketHealth.version -eq "0.3" -and $MarketHealth.operator_head -eq $true -and
+            -not [string]::IsNullOrWhiteSpace([string]$MarketHealth.workload_registry_id))
     } catch {
         $MarketReady = $false
     }
@@ -178,6 +182,48 @@ if (-not $MarketReady -and (Test-Path -LiteralPath $MarketSeed) -and (Test-Path 
         }
     } until (($ApiReady -and (Test-Path -LiteralPath $Profile)) -or (Get-Date) -ge $Deadline)
     if ($ApiReady -and (Test-Path -LiteralPath $Profile)) {
+        $RegistryTool = Join-Path $Repo "tools\compute_workload_registry.py"
+        if (-not (Test-Path -LiteralPath $WorkloadRegistryPublic)) {
+            if (
+                (Test-Path -LiteralPath $WorkloadRegistryPrivate) -or
+                (Test-Path -LiteralPath $WorkloadRegistry)
+            ) {
+                throw "The workload registry trust files are incomplete; refusing to replace the signer."
+            }
+            & python $RegistryTool keygen `
+                --private-key $WorkloadRegistryPrivate `
+                --public-key $WorkloadRegistryPublic
+            if ($LASTEXITCODE -ne 0) {
+                throw "Could not generate the workload registry signing key."
+            }
+            & icacls.exe $WorkloadRegistryPrivate /inheritance:r /grant:r "SYSTEM:(F)" "Administrators:(F)" | Out-Null
+        }
+        if (-not (Test-Path -LiteralPath $WorkloadRegistry)) {
+            if (-not (Test-Path -LiteralPath $WorkloadRegistryPrivate)) {
+                throw "The workload registry is missing and its signing key is unavailable."
+            }
+            & python $RegistryTool freeze `
+                --chain-id ([string]$Status.chain_id) `
+                --genesis-hash ([string]$Status.genesis_hash) `
+                --private-key $WorkloadRegistryPrivate `
+                --output $WorkloadRegistry `
+                --valid-from-height 0 `
+                --expires-at-height 18446744073709551615 `
+                --activate-at-height 0 `
+                --retire-at-height 18446744073709551615
+            if ($LASTEXITCODE -ne 0) {
+                throw "Could not freeze the signed workload registry."
+            }
+        }
+        & python $RegistryTool verify `
+            --registry $WorkloadRegistry `
+            --trusted-public-key $WorkloadRegistryPublic `
+            --chain-id ([string]$Status.chain_id) `
+            --genesis-hash ([string]$Status.genesis_hash) `
+            --height ([string][uint64]$Status.unsafe_head.height)
+        if ($LASTEXITCODE -ne 0) {
+            throw "The signed workload registry failed identity, lifecycle, or signature verification."
+        }
         $MarketArgs = @(
             (Join-Path $Repo "tools\compute_market.py"),
             "--profile", $Profile,
@@ -186,7 +232,9 @@ if (-not $MarketReady -and (Test-Path -LiteralPath $MarketSeed) -and (Test-Path 
             "--database", $MarketDatabase,
             "--admin-token-file", $MarketToken,
             "--operator-node", "127.0.0.1:21632",
-            "--operator-token-file", $OperatorSecret
+            "--operator-token-file", $OperatorSecret,
+            "--workload-registry", $WorkloadRegistry,
+            "--registry-public-key", $WorkloadRegistryPublic
         )
         Start-Process python -WorkingDirectory $Repo -ArgumentList $MarketArgs -WindowStyle Minimized
         $MarketReady = $true

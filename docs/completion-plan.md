@@ -220,7 +220,7 @@ exact revision and the resulting immutable evidence validates.
 | `NET-06` | `READY` | Package producer, node, indexer, gateway, dashboard, and private configuration as least-privilege auto-start services with repair and uninstall. |
 | `NET-07` | `READY` | Add signed installer/update manifests, downgrade protection, rollback, repair, and data-preserving uninstall for supported desktop platforms. |
 | `NET-08` | `READY` | Generate or recover a local worker payout identity outside browser and coordinator storage; settle a WAN job directly to it. |
-| `NET-09` | `READY` | Freeze a signed workload registry with canonical identity, verifier, metering, limits, lifecycle, and rejection vectors. |
+| `NET-09` | `DONE` | Frozen signed MIX32 registry binds canonical identity, verifier, metering, limits, lifecycle, and executable fail-closed rejection vectors. |
 | `NET-10` | `READY` | Enforce filesystem, network, memory, runtime, storage, GPU, temperature, battery, schedule, and bandwidth policies against malicious workloads. |
 | `NET-11` | `READY` | Implement objective result verification, timeout, dispute, penalty, cancellation, and refund paths that cannot release escrow for invalid work. |
 

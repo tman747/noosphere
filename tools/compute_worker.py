@@ -20,6 +20,13 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from compute_workload_registry import (  # noqa: E402
+    VerifiedRegistry,
+    WorkloadSpec,
+    load_registry,
+    read_public_key,
+    validate_payload as validate_registered_payload,
+)
 from wallet_transfer import (  # noqa: E402
     api_json, cargo_binary, checked_status, cli_json, derive, load_profile, read_seed,
 )
@@ -117,12 +124,24 @@ def mix_one(seed: int, global_index: int, rounds: int) -> int:
     return value
 
 
-def compute_root(seed: int, start: int, units: int, rounds: int, threads: int) -> str:
-    if not 1 <= units <= 1_000_000 or not 1 <= rounds <= 1_048_576:
+def compute_root(
+    workload: WorkloadSpec,
+    seed: int,
+    start: int,
+    units: int,
+    rounds: int,
+    threads: int,
+) -> str:
+    limits = workload.limits
+    if (
+        not 1 <= units <= limits["max_units"]
+        or not 1 <= rounds <= limits["max_unit_size"]
+        or units * rounds > limits["max_operations"]
+    ):
         raise ValueError("workload bounds exceeded")
     with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as pool:
         values = pool.map(lambda item: mix_one(seed, item, rounds), range(start, start + units), chunksize=64)
-        digest = hashlib.sha256(b"NOOS/COMPUTE/MIX32/RESULT/V1")
+        digest = hashlib.sha256(workload.result_domain)
         for value in values:
             digest.update(value.to_bytes(4, "little"))
     return digest.hexdigest()
@@ -131,38 +150,30 @@ def compute_root(seed: int, start: int, units: int, rounds: int, threads: int) -
 def get_payload(market: str, job_id: str) -> dict:
     with urllib.request.urlopen(f"{market.rstrip('/')}/api/payload/{job_id}", timeout=10) as response:
         value = json.load(response)
-    if not isinstance(value, dict):
-        raise RuntimeError("market returned malformed payload")
-    return value
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"job_id", "seed", "start", "units", "rounds"}
+        or value.get("job_id") != job_id
+    ):
+        raise RuntimeError("market returned malformed or mismatched payload")
+    return {name: value[name] for name in ("seed", "start", "units", "rounds")}
 
 
-def validate_payload(job: dict, payload: dict, max_operations: int) -> tuple[int, int, int, int]:
-    """Bind coordinator bytes to the claimed on-chain job and local meter."""
-    if job.get("workload_kind") != 0:
-        raise ValueError("unregistered workload kind")
-    if set(payload) != {"seed", "start", "units", "rounds"}:
-        raise ValueError("MIX32 payload fields mismatch")
-    if any(type(payload[name]) is not int for name in payload):
-        raise ValueError("MIX32 payload fields must be integers")
-    seed, start, units, rounds = (
-        payload["seed"], payload["start"], payload["units"], payload["rounds"]
+def validate_payload(
+    registry: VerifiedRegistry,
+    job: dict,
+    payload: dict,
+    height: int,
+    max_operations: int,
+) -> tuple[WorkloadSpec, int, int, int, int]:
+    """Bind coordinator bytes to the signed workload, on-chain job, and local meter."""
+    return validate_registered_payload(
+        registry,
+        job,
+        payload,
+        height=height,
+        max_operations=max_operations,
     )
-    if not 0 <= seed <= 0xFFFFFFFF or not 0 <= start <= 0xFFFFFFFFFFFFFFFF:
-        raise ValueError("MIX32 seed or start is out of range")
-    if not 1 <= units <= 1_000_000 or not 1 <= rounds <= 1_048_576:
-        raise ValueError("MIX32 workload bounds exceeded")
-    operations = units * rounds
-    if max_operations < 1 or operations > max_operations:
-        raise ValueError("MIX32 deterministic operation budget exceeded")
-    if units != int(job.get("units", "0")) or rounds != int(job.get("unit_size", "0")):
-        raise ValueError("MIX32 payload differs from the on-chain meter")
-    commitment = hashlib.sha256(
-        b"NOOS/COMPUTE/MIX32/INPUT/V1"
-        + json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
-    if commitment != job.get("input_root"):
-        raise ValueError("MIX32 payload commitment mismatch")
-    return seed, start, units, rounds
 
 
 def notify_result(market: str, job_id: str, result_root: str) -> dict:
@@ -186,14 +197,27 @@ def register(args: argparse.Namespace, profile: dict, seed: str, worker: str) ->
     return submit_action(profile, seed, args.account, args.index, action)
 
 
-def run_worker(args: argparse.Namespace, profile: dict, seed: str, worker: str) -> None:
+def run_worker(
+    args: argparse.Namespace,
+    profile: dict,
+    seed: str,
+    worker: str,
+    registry: VerifiedRegistry,
+) -> None:
     print(json.dumps({"worker": worker, "platform": platform.platform(), "threads": args.threads,
-                      "market": args.market}, indent=2), flush=True)
+                      "market": args.market, "workload_registry": registry.registry_id,
+                      "registry_signer_key_id": registry.signer_key_id}, indent=2), flush=True)
     while True:
         try:
+            height = int(live_status(profile)["unsafe_head"]["height"])
+            workload = registry.require_active(0, height)
             jobs = api_json(str(profile["api_base_url"]), "/api/v1/jobs").get("items", [])
-            candidates = [job for job in jobs if job.get("state") == 0 and job.get("workload_kind") == 0
-                          and int(job.get("max_price_per_unit", "0")) >= args.price_per_unit]
+            candidates = [
+                job for job in jobs
+                if job.get("state") == 0
+                and job.get("workload_kind") == workload.workload_kind
+                and int(job.get("max_price_per_unit", "0")) >= args.price_per_unit
+            ]
             if not candidates:
                 time.sleep(args.poll)
                 continue
@@ -206,11 +230,13 @@ def run_worker(args: argparse.Namespace, profile: dict, seed: str, worker: str) 
                 time.sleep(0.5)
                 continue
             payload = get_payload(args.market, job_id)
-            workload_seed, start, units, rounds = validate_payload(
-                job, payload, args.max_operations
+            workload, workload_seed, start, units, rounds = validate_payload(
+                registry, job, payload, height, args.max_operations
             )
             started = time.perf_counter()
-            result_root = compute_root(workload_seed, start, units, rounds, args.threads)
+            result_root = compute_root(
+                workload, workload_seed, start, units, rounds, args.threads
+            )
             elapsed = time.perf_counter() - started
             submit_action(profile, seed, args.account, args.index, {
                 "type": "submit_compute_result", "worker": worker, "job_id": job_id,
@@ -229,6 +255,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", required=True)
     parser.add_argument("--market", required=True)
+    parser.add_argument("--workload-registry", type=Path, required=True)
+    parser.add_argument("--registry-public-key", type=Path, required=True)
     parser.add_argument("--seed-file")
     parser.add_argument("--account", type=int, default=0)
     parser.add_argument("--index", type=int, default=0)
@@ -243,10 +271,17 @@ def main() -> int:
     seed = read_seed(args.seed_file)
     exe = cargo_binary("noos-cli")
     worker = str(derive(exe, seed, args.account, args.index)["verifying_key"])
+    registry = load_registry(
+        args.workload_registry,
+        trusted_public_key=read_public_key(args.registry_public_key),
+        expected_chain_id=str(profile["chain_id"]),
+        expected_genesis_hash=str(profile["genesis_hash"]),
+        height=int(live_status(profile)["unsafe_head"]["height"]),
+    )
     if args.command in {"register", "register-and-run"}:
         print(json.dumps(register(args, profile, seed, worker), indent=2), flush=True)
     if args.command in {"run", "register-and-run"}:
-        run_worker(args, profile, seed, worker)
+        run_worker(args, profile, seed, worker, registry)
     return 0
 
 
