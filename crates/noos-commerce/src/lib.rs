@@ -4,6 +4,7 @@
 //! never projects a metadata budget: it carries canonical Lumen job, receipt,
 //! settlement, and the exact pinned Work Loom obligation.
 #![forbid(unsafe_code)]
+pub mod campaign;
 pub mod governance;
 pub mod marketplace;
 pub mod review_gate;

@@ -3666,7 +3666,12 @@ dependencies = [
  "blake3",
  "ed25519-dalek",
  "noos-lumen",
+ "noos-stable-operator",
+ "noos-stable-safety",
+ "noos-wallet",
  "noos-work-loom",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

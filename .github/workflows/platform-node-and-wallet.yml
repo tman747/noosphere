@@ -107,6 +107,7 @@ jobs:
           cargo test --locked -p noos-workerd
           cargo test --locked -p noos-mind
           cargo test --locked -p noos-commerce
+          cargo run --locked -p noos-commerce --bin application_economy_campaign -- --source-revision "${GITHUB_SHA}" --seed 20260727 --output "${RUNNER_TEMP}/application-economy-campaign.json"
           cargo test --locked -p noos-stable-operator
           cargo test --locked -p noos-stable-safety
           cargo test --locked -p noos-umbra
