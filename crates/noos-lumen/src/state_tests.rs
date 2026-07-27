@@ -2806,6 +2806,75 @@ fn neural_wwm_timeout_finalizes_explicit_no_quorum_receipt() {
 }
 
 #[test]
+fn testnet_wwm_failure_receipts_refund_without_output_commitments() {
+    for (index, terminal_code) in [
+        WwmTerminalCode::Cancelled,
+        WwmTerminalCode::Deadline,
+        WwmTerminalCode::NoQuorum,
+        WwmTerminalCode::Rejected,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (mut ledger, job, mut receipt, mut settlement) =
+            wwm_flow_fixture(WwmControlMode::Testnet);
+        receipt.receipt_id = [0xb0 + u8::try_from(index).unwrap(); 32];
+        receipt.output_tokens = 0;
+        receipt.output_root = [0; 32];
+        receipt.token_history_root = [0; 32];
+        receipt.signer_ids = BoundedList::default();
+        receipt.control_cluster_ids = BoundedList::default();
+        receipt.evidence_tier = if terminal_code == WwmTerminalCode::NoQuorum {
+            WwmEvidenceTier::NoQuorum
+        } else {
+            WwmEvidenceTier::LocalVerified
+        };
+        receipt.metered_amount = 0;
+        receipt.paid_amount = 0;
+        receipt.refunded_amount = job.reserved_amount;
+        receipt.terminal_code = terminal_code;
+        settlement.settlement_id = [0xc0 + u8::try_from(index).unwrap(); 32];
+        settlement.receipt_id = receipt.receipt_id;
+        settlement.paid_amount = 0;
+        settlement.refunded_amount = job.reserved_amount;
+        settlement.released_amount = 0;
+        assert!(matches!(
+            apply_wwm_action(&mut ledger, 10, ActionV1::OpenWwmJob(job)),
+            ApplyOutcome::Applied { .. }
+        ));
+        assert!(matches!(
+            apply_wwm_action(&mut ledger, 11, ActionV1::RecordWwmReceipt(receipt)),
+            ApplyOutcome::Applied { .. }
+        ));
+        assert!(matches!(
+            apply_wwm_action(&mut ledger, 12, ActionV1::SettleWwmJob(settlement)),
+            ApplyOutcome::Applied { .. }
+        ));
+    }
+}
+
+#[test]
+fn testnet_wwm_complete_receipt_requires_output_commitments() {
+    let (mut ledger, job, mut receipt, _) = wwm_flow_fixture(WwmControlMode::Testnet);
+    receipt.output_tokens = 0;
+    receipt.output_root = [0; 32];
+    receipt.token_history_root = [0; 32];
+    receipt.paid_amount = 0;
+    receipt.refunded_amount = job.reserved_amount;
+    assert!(matches!(
+        apply_wwm_action(&mut ledger, 10, ActionV1::OpenWwmJob(job)),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply_wwm_action(&mut ledger, 11, ActionV1::RecordWwmReceipt(receipt)),
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn testnet_wwm_job_receipt_settlement_flow_is_insert_once_and_bound() {
     let (mut ledger, job, receipt, settlement) = wwm_flow_fixture(WwmControlMode::Testnet);
     assert!(matches!(

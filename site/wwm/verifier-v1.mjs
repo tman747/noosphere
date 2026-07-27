@@ -31,6 +31,16 @@ function requireHex32(value, label) {
   return value;
 }
 
+function expectedTerminalCode(receipt) {
+  if (receipt.terminal_status === "COMPLETED") return 0;
+  if (receipt.terminal_status === "CANCELLED") return 1;
+  if (receipt.terminal_status === "FAILED") {
+    return receipt.error_code === "JOB_DEADLINE_EXPIRED" ? 2 : 4;
+  }
+  if (receipt.terminal_status === "NO_QUORUM") return 3;
+  throw new Error("receipt terminal status is invalid");
+}
+
 function base64ToBytes(value, label) {
   invariant(typeof value === "string" && /^[A-Za-z0-9+/]+={0,2}$/.test(value), `${label} is not canonical base64`);
   let decoded;
@@ -255,7 +265,10 @@ export async function verifyStreamEvent(event, active, jobId) {
   } else if (payload.type === "receipt.completed" || payload.type === "settlement.finalized") {
     invariant(payload.data.job_id === jobId, "terminal event job binding mismatch");
     if (payload.type === "settlement.finalized") {
-      invariant(payload.data.settlement_state === "FINALIZED_PAID", "settlement event is not finalized");
+      const expected = payload.data.terminal_status === "COMPLETED"
+        ? "FINALIZED_PAID"
+        : "FINALIZED_REFUNDED";
+      invariant(payload.data.settlement_state === expected, "settlement event outcome is invalid");
     }
   }
   return verifySignedEnvelope(payload, "STREAM-EVENT");
@@ -315,14 +328,20 @@ export async function verifyFinalizedSettlement(receipt) {
     chainReceipt.record.receipt_id === receipt.receipt_id
       && chainReceipt.record.job_id === receipt.job_id
       && chainReceipt.record.output_root === receipt.output_root
-      && chainReceipt.record.token_history_root === receipt.token_history_root,
-    "finalized receipt record changed the output binding",
+      && chainReceipt.record.token_history_root === receipt.token_history_root
+      && chainReceipt.record.terminal_code === expectedTerminalCode(receipt)
+      && chainReceipt.record.paid_amount === "0"
+      && chainReceipt.record.refunded_amount === "0",
+    "finalized receipt record changed the output or terminal binding",
   );
   invariant(
     settlement.record.settlement_id === settlementId
       && settlement.record.job_id === receipt.job_id
-      && settlement.record.receipt_id === receipt.receipt_id,
-    "finalized settlement record changed lifecycle identities",
+      && settlement.record.receipt_id === receipt.receipt_id
+      && settlement.record.paid_amount === "0"
+      && settlement.record.refunded_amount === "0"
+      && settlement.record.released_amount === "0",
+    "finalized settlement record changed lifecycle or amount bindings",
   );
   invariant(
     job.finalized_height <= chainReceipt.finalized_height
@@ -367,10 +386,25 @@ export async function verifyReceipt(receipt, active) {
   } else {
     invariant(
       receipt.evidence_state === "NONE"
-        && receipt.settlement_state === "PENDING_CHAIN"
-        && receipt.chain_anchor === null,
-      "non-complete receipt overclaims evidence or settlement",
+        && receipt.output_commitment === "0".repeat(64)
+        && receipt.output_root === "0".repeat(64)
+        && receipt.token_history_root === "0".repeat(64)
+        && receipt.output_tokens === 0,
+      "non-complete receipt contains output evidence",
     );
+    if (receipt.settlement_state === "PENDING_CHAIN") {
+      invariant(
+        receipt.chain_anchor === null && receipt.chain_settlement === undefined,
+        "pending refund settlement overclaims finality",
+      );
+    } else {
+      invariant(
+        receipt.settlement_state === "FINALIZED_REFUNDED",
+        "non-complete receipt settlement state is invalid",
+      );
+      requireHex32(receipt.chain_anchor, "receipt chain anchor");
+      await verifyFinalizedSettlement(receipt);
+    }
   }
   return true;
 }

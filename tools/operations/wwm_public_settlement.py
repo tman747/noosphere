@@ -175,7 +175,39 @@ class DevnetSettlementBackend:
         job_id = _text(request, "job_id", hex32=True)
         receipt_id = _text(request, "receipt_id", hex32=True)
         settlement_id = _text(request, "settlement_id", hex32=True)
+        terminal_status = request.get("terminal_status")
+        error_code = request.get("error_code")
+        if terminal_status == "COMPLETED":
+            terminal_code = "complete"
+        elif terminal_status == "CANCELLED":
+            terminal_code = "cancelled"
+        elif terminal_status == "FAILED":
+            terminal_code = (
+                "deadline" if error_code == "JOB_DEADLINE_EXPIRED" else "rejected"
+            )
+        elif terminal_status == "NO_QUORUM":
+            terminal_code = "no_quorum"
+        else:
+            raise PublicSettlementError("settlement terminal status is invalid")
+        output_tokens = _uint(inference, "output_tokens")
+        token_history_root = _text(inference, "token_history_root", hex32=True)
+        output_root = _text(inference, "output_root", hex32=True)
+        completed = terminal_code == "complete"
+        if completed and (
+            output_tokens == 0
+            or token_history_root == "0" * 64
+            or output_root == "0" * 64
+        ):
+            raise PublicSettlementError("completed settlement lacks output commitments")
+        if not completed and (
+            output_tokens != 0
+            or token_history_root != "0" * 64
+            or output_root != "0" * 64
+        ):
+            raise PublicSettlementError("refunded settlement contains output commitments")
         anchor_height = _uint(job_record, "finalized_height")
+        signer_ids = list(executor_ids) if completed else []
+        evidence_tier = "no_quorum" if terminal_code == "no_quorum" else "local_verified"
         receipt = {
             "receipt_id": receipt_id,
             "job_id": job_id,
@@ -187,12 +219,12 @@ class DevnetSettlementBackend:
             "sbom_root": _text(binding, "sbom_root", hex32=True),
             "execution_profile_id": _text(binding, "execution_profile_id", hex32=True),
             "input_tokens": _uint(quote, "input_tokens"),
-            "output_tokens": _uint(inference, "output_tokens"),
-            "token_history_root": _text(inference, "token_history_root", hex32=True),
-            "output_root": _text(inference, "output_root", hex32=True),
-            "signer_ids": list(executor_ids),
-            "control_cluster_ids": list(executor_ids),
-            "evidence_tier": "local_verified",
+            "output_tokens": output_tokens,
+            "token_history_root": token_history_root,
+            "output_root": output_root,
+            "signer_ids": signer_ids,
+            "control_cluster_ids": signer_ids,
+            "evidence_tier": evidence_tier,
             "availability_until": _uint(binding, "certificate_valid_until"),
             "evidence_until": _uint(binding, "certificate_valid_until"),
             "anchor_height": anchor_height,
@@ -200,7 +232,7 @@ class DevnetSettlementBackend:
             "metered_amount": "0",
             "paid_amount": "0",
             "refunded_amount": "0",
-            "terminal_code": "complete",
+            "terminal_code": terminal_code,
             "signatures": [],
         }
         settlement = {

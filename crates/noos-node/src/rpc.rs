@@ -641,11 +641,16 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
                 "capsule_id": hex(&receipt.capsule_id),
                 "artifact_id": hex(&receipt.artifact_id),
                 "execution_profile_id": hex(&receipt.execution_profile_id),
+                "input_tokens": receipt.input_tokens,
+                "output_tokens": receipt.output_tokens,
                 "output_root": hex(&receipt.output_root),
                 "token_history_root": hex(&receipt.token_history_root),
                 "anchor_height": receipt.anchor_height,
                 "anchor_block": hex(&receipt.anchor_block),
                 "terminal_code": receipt.terminal_code as u8,
+                "metered_amount": receipt.metered_amount.to_string(),
+                "paid_amount": receipt.paid_amount.to_string(),
+                "refunded_amount": receipt.refunded_amount.to_string(),
             }),
             _ => {
                 return json_error(
@@ -661,6 +666,9 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
                 "job_id": hex(&settlement.job_id),
                 "receipt_id": hex(&settlement.receipt_id),
                 "fund_profile_id": hex(&settlement.fund_profile_id),
+                "paid_amount": settlement.paid_amount.to_string(),
+                "refunded_amount": settlement.refunded_amount.to_string(),
+                "released_amount": settlement.released_amount.to_string(),
                 "settled_height": settlement.settled_height,
             }),
             _ => {

@@ -4733,8 +4733,21 @@ impl LumenLedger {
                     }
                     if overlay_object(&ov, self, &neural_query_key(&job.job_id)).is_some() {
                         validate_neural_wwm_receipt(&ov, self, &job, v, ctx.height)?;
-                    } else if v.output_root == [0; 32] || v.token_history_root == [0; 32] {
-                        return Err(FailCode::PostconditionFailed);
+                    } else {
+                        let commitments_are_zero =
+                            v.output_root == [0; 32] && v.token_history_root == [0; 32];
+                        let terminal_is_valid = match v.terminal_code {
+                            WwmTerminalCode::Complete => !commitments_are_zero,
+                            WwmTerminalCode::Cancelled
+                            | WwmTerminalCode::Deadline
+                            | WwmTerminalCode::NoQuorum
+                            | WwmTerminalCode::Rejected => {
+                                commitments_are_zero && v.output_tokens == 0 && v.paid_amount == 0
+                            }
+                        };
+                        if !terminal_is_valid {
+                            return Err(FailCode::PostconditionFailed);
+                        }
                     }
                     wwm_insert_unique(
                         &mut ov,
