@@ -52,6 +52,31 @@ def keygen(path: Path) -> str:
     ).hex()
 
 
+def require_hex32(value: object, field: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"invitation {field} must be lowercase hexadecimal")
+    try:
+        decoded = bytes.fromhex(value)
+    except ValueError as error:
+        raise ValueError(f"invitation {field} must be lowercase hexadecimal") from error
+    if len(decoded) != 32 or value != decoded.hex():
+        raise ValueError(f"invitation {field} must contain exactly 32 lowercase bytes")
+    return value
+
+
+def validate_invite_identity(invite: dict, role: str) -> None:
+    if not isinstance(invite, dict):
+        raise ValueError("invitation body must be an object")
+    for field in ("chain_id", "genesis_hash", "params_sha256"):
+        require_hex32(invite.get(field), field)
+    if invite.get("test_network") is not True:
+        raise ValueError("invitation leases are restricted to the test network")
+    if role.startswith("witness-"):
+        expected_index = int(role.removeprefix("witness-"))
+        if invite.get("witness_index") != expected_index:
+            raise ValueError("invitation witness role does not match its index")
+
+
 def open_db(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path)
@@ -86,6 +111,7 @@ def issue_lease(
 ) -> dict:
     if role not in ROLES:
         raise ValueError(f"unsupported invitation role: {role}")
+    validate_invite_identity(invite, role)
     if platform not in {"windows", "macos", "linux"}:
         raise ValueError(f"unsupported invitation platform: {platform}")
     if not 60 <= ttl_seconds <= 30 * 24 * 60 * 60:
@@ -127,7 +153,12 @@ def issue_lease(
     return signed
 
 
-def verify_lease(invite: dict, database: Path | None = None, now_ms: int | None = None) -> None:
+def verify_lease(
+    invite: dict,
+    database: Path | None = None,
+    now_ms: int | None = None,
+    trusted_public_key_hex: str | None = None,
+) -> None:
     if invite.get("schema") != SCHEMA:
         raise ValueError("unsupported invitation lease schema")
     now = int(time.time() * 1000) if now_ms is None else now_ms
@@ -142,6 +173,12 @@ def verify_lease(invite: dict, database: Path | None = None, now_ms: int | None 
         raise ValueError("invitation lease signature is malformed") from error
     if len(public) != 32 or len(signature) != 64:
         raise ValueError("invitation lease signature has the wrong length")
+    if trusted_public_key_hex is None and database is None:
+        raise ValueError("invitation verification requires a trusted public key or issuance database")
+    if trusted_public_key_hex is not None:
+        trusted = require_hex32(trusted_public_key_hex, "trusted signing key")
+        if invite["signing_key"] != trusted:
+            raise ValueError("invitation signing key is not trusted")
     try:
         Ed25519PublicKey.from_public_bytes(public).verify(
             signature, DOMAIN + canonical_payload(invite)
@@ -207,6 +244,7 @@ def main() -> int:
     verify = sub.add_parser("verify")
     verify.add_argument("--invite", required=True)
     verify.add_argument("--database")
+    verify.add_argument("--trusted-public-key")
     revoke = sub.add_parser("revoke")
     revoke.add_argument("--database", required=True)
     revoke.add_argument("--lease-id", required=True)
@@ -224,7 +262,11 @@ def main() -> int:
         print(json.dumps({"lease_id": signed["lease_id"], "expires_unix_ms": signed["expires_unix_ms"]}, indent=2))
     elif args.command == "verify":
         invite = json.loads(Path(args.invite).read_text(encoding="utf-8"))
-        verify_lease(invite, Path(args.database) if args.database else None)
+        verify_lease(
+            invite,
+            Path(args.database) if args.database else None,
+            trusted_public_key_hex=args.trusted_public_key,
+        )
         print(json.dumps({"valid": True, "lease_id": invite["lease_id"]}, indent=2))
     elif args.command == "revoke":
         if not revoke_lease(Path(args.database), args.lease_id):
