@@ -420,13 +420,22 @@ also executes these suites; its result is not claimed before completion.
 
 | ID | State | Work and exit |
 |---|---|---|
-| `PRIVATE-01` | `EXTERNAL_BLOCKED` | Verify fresh composite CPU/GPU/workload attestation, firmware policy, revocation, rollback counter, model identity, and client challenge. |
+| `PRIVATE-01` | `EXTERNAL_BLOCKED` | Composite CPU/GPU/workload quote verification is implemented; fresh vendor-backed hardware, firmware, revocation, rollback-counter, model-identity, and client-challenge evidence is still external. |
 | `PRIVATE-02` | `READY` | Add encrypted private retrieval and output with blinded profile-specific receipts and local key/history control. |
 | `PRIVATE-03` | `READY` | Prove prompt, context, activation, KV, logits, and output do not persist in host-visible cache, logs, crash state, or telemetry. |
-| `PRIVATE-04` | `READY` | Implement fail-closed ODoH/OHTTP/onion routing with fixed buckets, control-cluster diversity, no direct fallback, and separate route disclosure. |
-| `PRIVATE-05` | `READY` | Isolate native browser origins by publisher key and immutable content identity, including storage, service worker, cache, and permissions. |
-| `PRIVATE-06` | `EXTERNAL_BLOCKED` | Produce reproducible threshold-signed browser builds, transparency inclusion, staged update, revocation, downgrade rejection, and rollback evidence. |
+| `PRIVATE-04` | `DONE` | Signed ODoH/OHTTP/onion route selection enforces fixed buckets, control-cluster diversity, explicit route disclosure, and fail-closed private retry with no direct fallback. |
+| `PRIVATE-05` | `DONE` | Native origins bind publisher key, immutable content identity, and version; encrypted origin keys partition cookies, storage, IndexedDB, service workers, cache, TLS, circuits, history, and permission receipts. |
+| `PRIVATE-06` | `EXTERNAL_BLOCKED` | Threshold update admission, transparency roots, rollout sequence, revocation, downgrade rejection, and bounded rollback are implemented; reproducible independently signed browser artifacts remain external. |
 | `PRIVATE-07` | `EXTERNAL_BLOCKED` | Keep P2/P3 proof, malicious MPC, deep mix, and custom-engine assurance disabled until full relation, leakage, performance, and independent-verifier gates pass. |
+
+At revision `bdfec84908c83df52e4de816261e6d00829ab0f5`,
+`noos-umbra`, `noos-route`, `noos-mix`, and `noos-wallet` passed 83 tests
+across eight suites. The tests cover composite attestation replay, rollback,
+revocation and GPU-policy rejection; HPKE workload-only release; fixed route
+buckets and direct-fallback traps; origin/partition isolation and nonce
+separation; and two-builder update admission with bounded rollback. These
+software checks do not substitute for the external hardware and independent
+build evidence retained in `PRIVATE-01` and `PRIVATE-06`.
 
 ### Track K — application economy
 

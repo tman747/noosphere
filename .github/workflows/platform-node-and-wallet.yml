@@ -106,6 +106,10 @@ jobs:
           cargo test --locked -p noos-cli
           cargo test --locked -p noos-workerd
           cargo test --locked -p noos-mind
+          cargo test --locked -p noos-umbra
+          cargo test --locked -p noos-route
+          cargo test --locked -p noos-mix
+          cargo test --locked -p noos-wallet
       - name: Test mobile wallet SDK boundary
         shell: bash
         run: cargo test --locked -p noos-wallet-sdk
