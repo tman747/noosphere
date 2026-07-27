@@ -553,7 +553,7 @@ scenarios and wrote
 | `PROMOTE-02` | `OWNER_BLOCKED` | Resolve production chain, genesis, authorities, economics, operators, origins, retention, and release constants in exact signed records. |
 | `PROMOTE-03` | `DONE` | Deterministic exact-revision protocol, cryptography, economics, operations, wallet, and browser audit handoff packaging includes reproducible verification, source/blob manifests, raw vectors, threat inventory, report templates, and signed-independence ingestion. |
 | `PROMOTE-04` | `EXTERNAL_BLOCKED` | The exact-revision local Rust/Go/Python vector, mutation/fuzz, small-state, model/runtime, authorization, genesis, and reproduction-assurance lab is complete; run qualification scale and obtain independently authored, independently controlled reproduction plus real vendor/hardware evidence. |
-| `PROMOTE-05` | `EXTERNAL_BLOCKED` | Run all client pairings across two independently managed client/verifier families with restart, snapshot, proof, unknown-tag, oversize, WAN, and AI-off tests. |
+| `PROMOTE-05` | `EXTERNAL_BLOCKED` | The local exact-revision Rust/Go AA/AB/BA/BB campaign with restart, snapshot, proof, unknown-tag, oversize, WAN, crash, and AI-off coverage is complete; rerun at qualification scale across two independently managed client/verifier families on a public adversarial devnet. |
 | `PROMOTE-06` | `DURATION_BLOCKED` | Append-only threshold-signed public-duration automation is complete; collect 90 public cryptographic/economic days, 30 application days, and seven uninterrupted AI-off days at the exact frozen revision. |
 | `PROMOTE-07` | `OWNER_BLOCKED` | Canonical ceremony, Quiet-Week, anchor, DKG, genesis-reproduction, and authorization tooling is complete; owner scheduling, real post-freeze inputs, multiparty DKG, and all-AI-off production bootstrap remain. |
 | `PROMOTE-08` | `EXTERNAL_BLOCKED` | Threshold-signed cap, checkpoint, one-checkpoint disable, target-recovery, exit, WAN, blackout, and saturation controls are complete; run them for 180 real public days with independently controlled operators and observers. |
@@ -642,6 +642,23 @@ its 12-file artifact tree is
 The result remains smoke-scale, non-authorizing, and blocked on qualification
 scale, independent authorship/control and reproduction, and a real
 model-vendor/hardware matrix.
+
+Revision `87cbb798426368924bbfdbb6a1fb4460903bd940` adds the
+two-client campaign and CI integration. Its first exact smoke correctly failed:
+the crash-matrix simulator preserved recovery evidence but omitted the declared
+Rust/Go client-pair matrix. Revision
+`c21e8dc702e83bfab313baba52cd011878664af0` repairs and tests that evidence
+path. The exact rerun passed all 14 lanes: all AA/AB/BA/BB process pairings,
+base transfer, 16 frozen WAN seeds, AI-off, crash, restart, snapshot, malformed
+proof, unknown wire tag, oversize, WAN production-control, and AI-off
+production-control paths. The immutable result is
+`E:/noosphere-evidence/two-client-devnet-campaign-c21e8dc.json`, SHA-256
+`67b50991e5d96dcb54c7f8ae1f45a0e6a1e6cff931f083c826e0cc8f9f728b9c`;
+its 25-file artifact tree is
+`2bffd530ec37e0ecb00cb2064912be533200ea1262bef902bc3dec1ee26688f5`.
+It explicitly remains smoke-scale, local, non-public, non-authorizing, and
+blocked on two independently managed families, qualification scale, a public
+adversarial WAN run, and seven uninterrupted public AI-off days.
 
 ### Track M — external prerequisites
 
