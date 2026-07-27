@@ -556,7 +556,7 @@ scenarios and wrote
 | `PROMOTE-05` | `EXTERNAL_BLOCKED` | Run all client pairings across two independently managed client/verifier families with restart, snapshot, proof, unknown-tag, oversize, WAN, and AI-off tests. |
 | `PROMOTE-06` | `DURATION_BLOCKED` | Append-only threshold-signed public-duration automation is complete; collect 90 public cryptographic/economic days, 30 application days, and seven uninterrupted AI-off days at the exact frozen revision. |
 | `PROMOTE-07` | `OWNER_BLOCKED` | Canonical ceremony, Quiet-Week, anchor, DKG, genesis-reproduction, and authorization tooling is complete; owner scheduling, real post-freeze inputs, multiparty DKG, and all-AI-off production bootstrap remain. |
-| `PROMOTE-08` | `EXTERNAL_BLOCKED` | Run a 180-day capped-value canary with one-checkpoint disable, target recovery, independent exits, WAN, blackout, and saturation drills. |
+| `PROMOTE-08` | `EXTERNAL_BLOCKED` | Threshold-signed cap, checkpoint, one-checkpoint disable, target-recovery, exit, WAN, blackout, and saturation controls are complete; run them for 180 real public days with independently controlled operators and observers. |
 | `PROMOTE-09` | `OWNER_BLOCKED` | Exact-byte multiparty final-freeze and cutover signing/verification tooling is complete; collect owner role keys and final signatures only after every lower gate passes. |
 | `PROMOTE-10` | `READY` | Rebaseline all base and WWM claims at one exact revision; run every actionable falsifier and preserve every negative or killed result append-only. |
 
@@ -611,6 +611,19 @@ records. The explicit V2 promotion CLI also returned structurally valid while
 preserving `DNS PROHIBITED` and an honestly blocked promotion. This completes
 the repository-controlled contract freeze, not the owner signature or
 independent G0 review.
+
+Revision `567c93d016ffa8788ff5f805891641c3c4ffdeed` adds the G4
+capped-value canary verifier and CI gate. Eleven focused tests passed cap
+overflow, late disable, direct reactivation, recovery-lineage, replay,
+signature-tamper, observer-collision, strict-schema, seed, and immutable-output
+paths. The exact CLI smoke at
+`E:/noosphere-evidence/g4-canary-smoke-567c93d/result.json` passed the control
+contract at eight basis points and all six drill classes; its SHA-256 is
+`d973c4e740efb49550ddbf7c6292381e95cbf35e4b31fb3e36c97d5f73eff95c`.
+It remains explicitly `TEST_FIXTURE_NOT_EVIDENCE`,
+`EXTERNAL_PUBLIC_TIME_VERIFICATION_REQUIRED`,
+`independent_control_established=false`, `production_authorized=false`, and
+`promotion_effect=NONE`. No part of the 180-day external gate is claimed.
 
 ### Track M — external prerequisites
 
