@@ -389,7 +389,7 @@ satisfy either gate.
 | `MIND-02` | `DONE` | Immutable rights-filtered snapshots prove inclusion, exclusion, supersession, rollback, and independent-builder equality. |
 | `MIND-03` | `DONE` | Deterministic lexical, graph, and vector profiles bind manifests, tie vectors, index roots, and reproducible rebuilds. |
 | `MIND-04` | `DONE` | Signed retrieval receipts bind snapshot and index roots, policy, selected links, ranks, citation spans, builder, and context root. |
-| `MIND-05` | `EXTERNAL_BLOCKED` | Run poisoning, Sybil, copied-source, stale-fact, invalid-rights, minority-correction, revocation, and private-draft leak campaigns. |
+| `MIND-05` | `ACTIVE` | Poison quarantine/rejection, 128-identity Sybil containment, reviewer separation, upheld challenge, and contributor revocation campaigns now pass; copied-source, stale-fact, invalid-rights, minority-correction, and private-draft leak campaigns remain. |
 
 The code-controlled exits for `MIND-01` through `MIND-04` are implemented in
 `crates/noos-mind`. At revision
@@ -397,6 +397,16 @@ The code-controlled exits for `MIND-01` through `MIND-04` are implemented in
 noos-mind` passed all 22 library and operator tests locally. Exact-revision CI
 run [`30303085311`](https://github.com/tman747/noosphere/actions/runs/30303085311)
 also exercises this crate; its result is not claimed before completion.
+
+Revision `14ef276b733780294ed08e77fc55cf3580200f47` adds the immutable
+knowledge-assurance campaign and CI gate. The `noos-mind` suite passed 25
+tests. An exact-revision smoke with seed `20260727` passed five scenarios:
+one poison object and all 128 Sybil identities ended with zero snapshot or
+training eligibility; unauthorized reviewer actions were rejected; an upheld
+challenge rejected its object; and contributor revocation preserved the
+immutable object while preventing lifecycle re-entry. Evidence is
+`D:/tmp/knowledge-assurance-campaign-14ef276.json` and is explicitly
+non-promoting.
 
 ### Track I — governed immutable improvement
 
@@ -406,7 +416,7 @@ also exercises this crate; its result is not claimed before completion.
 | `IMPROVE-02` | `DONE` | Insert-once adapter candidates bind immutable lineage, artifacts, checkpoints, receipts, evaluations, and an explicit rollback parent. |
 | `IMPROVE-03` | `DONE` | Signed role-scoped records and gates separate proposer, trainer, evaluator, challenger, activator, and emergency authority. |
 | `IMPROVE-04` | `DONE` | Shadow and staged canary control enforces floors, ordered ceilings, automatic parent rollback, emergency expiry, and old-revision pinning. |
-| `IMPROVE-05` | `EXTERNAL_BLOCKED` | Run independent poisoning, model replacement, benchmark gaming, extraction, memorization, privacy, and evaluator-capture campaigns. |
+| `IMPROVE-05` | `ACTIVE` | Exact canary disclosure, partial n-gram memorization, poison-trigger, and membership-inference evaluation is implemented; independent model replacement, benchmark gaming, extraction, privacy, and evaluator-capture campaigns remain. |
 
 The code-controlled exits for `IMPROVE-01` through `IMPROVE-04` are
 implemented by `wwm_model_improvement.py` and `wwm_continuous_learning.py`.
@@ -415,6 +425,17 @@ continuous-learning, and web-capacity suites passed all 36 tests locally.
 Exact-revision CI run
 [`30303085311`](https://github.com/tman747/noosphere/actions/runs/30303085311)
 also executes these suites; its result is not claimed before completion.
+
+Revision `532ca993844f3c47acb8c1eb557e23549156840b` adds the strict,
+signed `wwm_poison_memorization_evaluation.py` gate. It evaluates exact
+canary disclosure with Aho-Corasick matching, bounded contiguous and n-gram
+overlap, poison-target activation, and membership-inference AUC without
+persisting canary plaintext or source paths. Its 10 focused tests passed; the
+combined model-improvement, continuous-learning, and poison/memorization
+suites passed all 35 tests locally. An exact-revision, non-promoting smoke
+passed with zero disclosures, zero poison-trigger hits, zero overlap, and
+membership AUC `5000` bps. The signed evidence is
+`D:/tmp/poison-memorization-smoke-c86a2d9387394e8387a04eaa5bfdd4c4/report-532ca993844f.json`.
 
 ### Track J — private inference and Mind Browser
 
