@@ -60,12 +60,13 @@ final class WalletViewModel: ObservableObject {
                 maximumFreshnessMs: configuration.maximumFreshnessMilliseconds
             )
             let vault = try SecureEnclaveSeedVault(chainID: configuration.chainIDData())
+            let client = configuration.enabled
+                ? try MindChainWalletAPIClient(configuration: configuration)
+                : nil
             self.configuration = configuration
             self.core = core
             self.vault = vault
-            self.client = configuration.enabled
-                ? try MindChainWalletAPIClient(configuration: configuration)
-                : nil
+            self.client = client
             self.networkEnabled = configuration.enabled
             self.networkReason = configuration.disabledReason
             self.chainID = configuration.chainID
