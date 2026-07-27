@@ -557,7 +557,7 @@ scenarios and wrote
 | `PROMOTE-06` | `DURATION_BLOCKED` | Append-only threshold-signed public-duration automation is complete; collect 90 public cryptographic/economic days, 30 application days, and seven uninterrupted AI-off days at the exact frozen revision. |
 | `PROMOTE-07` | `OWNER_BLOCKED` | Canonical ceremony, Quiet-Week, anchor, DKG, genesis-reproduction, and authorization tooling is complete; owner scheduling, real post-freeze inputs, multiparty DKG, and all-AI-off production bootstrap remain. |
 | `PROMOTE-08` | `EXTERNAL_BLOCKED` | Run a 180-day capped-value canary with one-checkpoint disable, target recovery, independent exits, WAN, blackout, and saturation drills. |
-| `PROMOTE-09` | `OWNER_BLOCKED` | Collect final multiparty signatures over identical release, genesis, evidence, role, governance, and cutover bytes only after every lower gate passes. |
+| `PROMOTE-09` | `OWNER_BLOCKED` | Exact-byte multiparty final-freeze and cutover signing/verification tooling is complete; collect owner role keys and final signatures only after every lower gate passes. |
 | `PROMOTE-10` | `READY` | Rebaseline all base and WWM claims at one exact revision; run every actionable falsifier and preserve every negative or killed result append-only. |
 
 At revision `b7dbc5a7d740268a572529352edbdb774a7f6324`,
@@ -594,6 +594,14 @@ All 24 production-authorization tests, the Rust golden-vector test, and the
 full ceremony self-test passed. The exact non-authorizing vector is
 `E:/noosphere-evidence/genesis-vector-5b1c857.json` with SHA-256
 `6031d1f46d51c2a6760f662a9c64267f7bcf789e296d3689ae1c2243b8ea4383`.
+
+The same revision's final-promotion gate binds the exact promotion ledger
+root, release manifest, final identity freeze, role keyring, prepared cutover,
+chain identity, and revision before accepting the complete cutover role set.
+Four focused cutover tests passed the valid test-only signature path and
+rejected a blocked lower gate, a missing role, component-hash substitution,
+dummy signature objects, and signed gate records whose referenced evidence
+bytes were absent. No production key or final signature exists or is implied.
 
 ### Track M — external prerequisites
 
