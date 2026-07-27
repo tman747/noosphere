@@ -236,12 +236,18 @@ exact revision and the resulting immutable evidence validates.
 
 | ID | State | Work and exit |
 |---|---|---|
-| `NATIVE-01` | `ACTIVE` | Run `noos-wallet-sdk` tests on the main Windows/macOS platform workflow and retain exact-revision results. |
-| `NATIVE-02` | `ACTIVE` | Regenerate UniFFI bindings and fail CI on any uncommitted generated difference. |
-| `NATIVE-03` | `READY` | Build Android on Linux and Windows and compile Swift package/iOS application on macOS from pinned toolchains. |
+| `NATIVE-01` | `DONE` | Windows and macOS run `noos-wallet-sdk` tests in the main platform workflow at an exact revision. |
+| `NATIVE-02` | `DONE` | CI regenerates UniFFI bindings and rejects any committed/generated difference. |
+| `NATIVE-03` | `DONE` | Pinned jobs build Android on Linux and Windows, the Swift package/iOS application on macOS, and native targets on Windows/macOS. |
 | `NATIVE-04` | `EXTERNAL_BLOCKED` | Record StrongBox/non-StrongBox and Secure Enclave, biometric fallback, backup exclusion, recovery, deletion, and migration behavior on physical devices. |
-| `NATIVE-05` | `READY` | Emit checksums and subject manifests for SDKs, bindings, installers, Android packages, and iOS outputs. |
+| `NATIVE-05` | `DONE` | The release-supply job emits bounded subject manifests and checksums for SDKs, bindings, installers, Android packages, and iOS outputs. |
 | `NATIVE-06` | `EXTERNAL_BLOCKED` | Obtain matching outputs from two independent builders for every supported target and record differences without normalization. |
+
+The exact-revision proof for `NATIVE-01`, `NATIVE-02`, `NATIVE-03`, and
+`NATIVE-05` is GitHub Actions run
+[`30284012278`](https://github.com/tman747/noosphere/actions/runs/30284012278):
+all eight jobs completed successfully for
+`0d5f1c40c5c7317dc0570ffa40fd7be59dae5d72`.
 
 ### Track G — deterministic model assurance
 
