@@ -357,7 +357,11 @@ def main() -> int:
         out = a.out or (ROOT / "evidence" / f"differential-admission-{a.generated}.json")
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
-        print(f"RESULT production_admission_differential={verdict} cases={a.generated} divergences={divergences} matrix={';'.join(matrix)} evidence={out.relative_to(ROOT)}")
+        try:
+            evidence_path = out.relative_to(ROOT).as_posix()
+        except ValueError:
+            evidence_path = out.resolve().as_posix()
+        print(f"RESULT production_admission_differential={verdict} cases={a.generated} divergences={divergences} matrix={';'.join(matrix)} evidence={evidence_path}")
         return int(divergences != 0)
 
 

@@ -9,6 +9,10 @@ on:
       - "wallet/**"
       - "apps/mind-market/wallet/**"
       - "tools/e2e/**"
+      - "go/**"
+      - "tools/gates/**"
+      - "tools/genesis/**"
+      - "protocol/vectors/**"
       - "tools/gates/check_throughput.py"
       - "tools/operations/**"
       - "tools/*.py"
@@ -68,6 +72,49 @@ jobs:
             tools.test_worker_payout_identity \
             tools.test_compute_worker_network \
             tools.test_worker_sandbox
+
+  cross-language-lab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13.5"
+      - name: Install pinned Go toolchain
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: "1.25.4"
+          cache: false
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.1 --profile minimal
+          rustup default 1.96.1
+      - name: Run deterministic cross-language laboratory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --only-binary=:all: "blake3==1.0.9" "cryptography==49.0.0" "py-ecc==8.0.0"
+          python -m unittest -v tools.gates.test_cross_language_lab tools.gates.test_check_vectors
+          python tools/gates/cross_language_lab.py run \
+            --source-revision "${GITHUB_SHA}" \
+            --profile smoke \
+            --seed 0x4e4f4f53 \
+            --cargo-target-dir "${RUNNER_TEMP}/cross-language-cargo" \
+            --output "${RUNNER_TEMP}/cross-language-lab.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: mindchain-cross-language-lab-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/cross-language-lab.json
+            ${{ runner.temp }}/cross-language-lab-artifacts/
+          if-no-files-found: error
+          retention-days: 30
 
   native:
     strategy:

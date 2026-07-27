@@ -1,6 +1,8 @@
 package conformance
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -84,5 +86,31 @@ func TestVectorCorpusShape(t *testing.T) {
 		if len(rep.Cases) != n {
 			t.Errorf("%s: %d cases, want %d", rel, len(rep.Cases), n)
 		}
+	}
+}
+
+func TestRunFileSkipsRegisteredAlternateEnvelopes(t *testing.T) {
+	for _, format := range []string{wwmVectorFormat, wwmManifestFormat} {
+		path := filepath.Join(t.TempDir(), "document.json")
+		if err := os.WriteFile(path, []byte(`{"format":"`+format+`"}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		report, err := RunFile(path)
+		if err != nil {
+			t.Fatalf("%s: %v", format, err)
+		}
+		if report != nil {
+			t.Fatalf("%s: alternate envelope unexpectedly ran", format)
+		}
+	}
+}
+
+func TestRunFileRejectsMalformedCanonicalEnvelope(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "document.json")
+	if err := os.WriteFile(path, []byte(`{"schema":{"not":"a string"},"cases":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RunFile(path); err == nil {
+		t.Fatal("malformed canonical envelope was silently skipped")
 	}
 }
