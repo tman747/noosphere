@@ -422,7 +422,7 @@ also executes these suites; its result is not claimed before completion.
 |---|---|---|
 | `PRIVATE-01` | `EXTERNAL_BLOCKED` | Composite CPU/GPU/workload quote verification is implemented; fresh vendor-backed hardware, firmware, revocation, rollback-counter, model-identity, and client-challenge evidence is still external. |
 | `PRIVATE-02` | `DONE` | Explicit local, same-workload, and separately attested retrieval modes bind snapshot, profile, leakage budget, encrypted query and citations; fixed-bucket output and signed blinded receipts use client-held output and history keys with no public fallback. |
-| `PRIVATE-03` | `READY` | Prove prompt, context, activation, KV, logits, and output do not persist in host-visible cache, logs, crash state, or telemetry. |
+| `PRIVATE-03` | `ACTIVE` | Non-cloneable private memory wipes prompt, context, activation, KV, logits, and output on every terminal path; strict host admission disables plaintext cache, scratch, logs and dumps, and telemetry is off or delayed threshold-only. Live crash/reboot target scans remain required. |
 | `PRIVATE-04` | `DONE` | Signed ODoH/OHTTP/onion route selection enforces fixed buckets, control-cluster diversity, explicit route disclosure, and fail-closed private retry with no direct fallback. |
 | `PRIVATE-05` | `DONE` | Native origins bind publisher key, immutable content identity, and version; encrypted origin keys partition cookies, storage, IndexedDB, service workers, cache, TLS, circuits, history, and permission receipts. |
 | `PRIVATE-06` | `EXTERNAL_BLOCKED` | Threshold update admission, transparency roots, rollout sequence, revocation, downgrade rejection, and bounded rollback are implemented; reproducible independently signed browser artifacts remain external. |
@@ -446,6 +446,25 @@ output reject. `noos-umbra` and `noos-wallet` passed 80 tests locally;
 exact-revision CI run
 [`30303863679`](https://github.com/tman747/noosphere/actions/runs/30303863679)
 is not claimed before completion.
+
+Revision `6dc7b0e4f7dbe20c08086839a92cfea6de62701e` adds strict
+private-host admission, six-class ephemeral memory, terminal-path zeroization,
+and an identifier-free delayed aggregate telemetry API. `noos-umbra` passed 64
+tests, and all six private-state canary classes were detected by the signed
+database/cache/log/crash/telemetry audit in six passing audit-tool tests.
+Exact-revision CI run
+[`30304116430`](https://github.com/tman747/noosphere/actions/runs/30304116430)
+is not claimed before completion. `PRIVATE-03` stays active until a deployed P1
+worker passes the signed success, cancellation, timeout, crash, and reboot
+matrix; policy fixtures cannot prove host behavior.
+
+The `PRIVATE-07` software gate is closed: Umbra rejects every enabled non-base
+suite registration, P1 and deep-route constants remain false, BESI remains
+`P3_DEEP_SEALED`/`ASSURED_SPLIT` only, and malicious-3PC/HFHE candidates report
+their external blockers without an activation path. The Umbra and BESI suites
+passed 139 tests locally at
+`6dc7b0e4f7dbe20c08086839a92cfea6de62701e`. This is a fail-closed gate, not
+evidence that any stronger suite is ready.
 
 ### Track K — application economy
 
