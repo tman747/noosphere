@@ -187,12 +187,45 @@ exact revision and the resulting immutable evidence validates.
 
 | ID | State | Work and exit |
 |---|---|---|
-| `INF-01` | `READY` | Exercise a sponsored finalized open, execution, close, and paid receipt on the live valueless testnet. |
-| `INF-02` | `READY` | Exercise user cancellation and deadline timeout with deterministic close, charge, and refund outcomes. |
-| `INF-03` | `READY` | Restart gateway and worker during active and terminal jobs; resume SSE without rerunning terminal work. |
-| `INF-04` | `READY` | Reject bad event signatures, wrong model/key/finality proofs, duplicate submissions, and invalid settlement while preserving refunds. |
-| `INF-05` | `READY` | Inspect database, cache, logs, crash artifacts, and telemetry for prompt/output canaries after success, cancellation, timeout, crash, and reboot. |
-| `INF-06` | `READY` | Record p50/p95/p99 latency, completion, queue bounds, refunds, evidence bytes, and base-finality impact under declared concurrency and failures. |
+| `INF-01` | `DONE` | A sponsored finalized open, execution, close, and paid receipt completed on the live valueless testnet at the exact deployed revision. |
+| `INF-02` | `ACTIVE` | Durable five-minute deadlines, authenticated sidecar cancellation, deterministic cancellation/deadline precedence, terminal zero-output receipts, and refund settlement are implemented; the corrected revision still requires a live timeout and finalized-refund rerun. |
+| `INF-03` | `ACTIVE` | Active gateway restart fails closed without rerunning work, pending settlement resumes from its durable checkpoint, terminal SSE replays by event ID, and worker disconnect refunds exactly once; exact deployed restart evidence remains. |
+| `INF-04` | `ACTIVE` | Browser signatures, active model/key/finality bindings, idempotent job submission, and canonical settlement proofs fail closed; exact deployed negative evidence remains. |
+| `INF-05` | `ACTIVE` | Prompt/event encryption, terminal prompt erasure, legacy migration, WAL truncation, and a signed five-phase scanner are implemented; the corrected revision must pass all live persistence targets. |
+| `INF-06` | `ACTIVE` | Durable queue/start coordinates and a signed collector now record p50/p95/p99 latency, completion, queue bounds, refunds, evidence bytes, and base-finality impact; an exact live concurrency/failure campaign remains. |
+
+The exact deployed `49e097e3065dfc2c7522ba5cc5c7c56b88e6fd51`
+does not close `INF-02` or `INF-05`. Live cancellation job
+`7e3ee2710f5d16e8dc510aee485092ffb8b360dbaec0ea651184addaa91080af`
+ended `CANCELLED` with zero output, but had no durable settlement row and
+remained `PENDING_CHAIN`. Signed persistence scan
+`fde5f79a6b1d9057d24bf1a1bd3df0ab6692adb5f85716f27a7ab9a16cbd5fe7`
+then found the cancellation prompt canary in the main inference database.
+These are preserved failing observations, not passing evidence.
+
+Revision `d608c76` adds encrypted prompt/event storage, migration and vacuum,
+a durable absolute deadline, authenticated worker `DELETE`, cancellation and
+deadline precedence, chain-backed failure receipts, settlement recovery, and
+strict browser deadline verification. Fifteen service contract tests cover
+success, running and queued cancellation, exact deadline expiry, restart,
+resumable settlement/SSE, worker disconnect, idempotency, malformed model,
+output, and finality proofs, and plaintext erasure. The main workflow now runs
+these tests, the five-phase scanner tests, browser verification, and the
+workerd cancellation endpoint at the exact revision. The track remains active
+until a corrected deployment reproduces every outcome and the live five-phase
+scan passes.
+
+`wwm_inference_metrics.py` takes an online SQLite backup rather than racing the
+live WAL, binds the snapshot and base-impact input digests, and records raw
+nearest-rank distributions for end-to-end, execution, queue, settlement, and
+base-finality latency. It conserves admitted and terminal status counts,
+successful outcomes, finalized and pending refunds, the fixed two-job queue,
+legacy unknown queue observations, and durable receipt/event/settlement bytes.
+The Ed25519 envelope is immutable, exact-revision bound, and independently
+recomputes every percentile, rate, byte total, and base p95 degradation. Four
+collector contract tests plus the 15 lifecycle tests pass at
+`445877071d149cf25e2a6de2e2a1c636c8beab97`; live concurrency and fault
+measurements are still required.
 
 ### Track C — operator, challenger, and custody independence
 
