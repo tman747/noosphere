@@ -551,7 +551,7 @@ scenarios and wrote
 |---|---|---|
 | `PROMOTE-01` | `OWNER_BLOCKED` | Sign protocol/API/peer v2 identity, predecessor root, schemas, domains, bounds, authorization, rollback, and mixed-version rejection. |
 | `PROMOTE-02` | `OWNER_BLOCKED` | Resolve production chain, genesis, authorities, economics, operators, origins, retention, and release constants in exact signed records. |
-| `PROMOTE-03` | `READY` | Produce exact-revision protocol, cryptography, economics, operations, wallet, and browser audit handoff bundles with reproducible commands and raw vectors. |
+| `PROMOTE-03` | `DONE` | Deterministic exact-revision protocol, cryptography, economics, operations, wallet, and browser audit handoff packaging includes reproducible verification, source/blob manifests, raw vectors, threat inventory, report templates, and signed-independence ingestion. |
 | `PROMOTE-04` | `EXTERNAL_BLOCKED` | Complete deterministic cross-language vectors, mutation/fuzz, small-state, model/runtime, authorization, and independent reproduction. |
 | `PROMOTE-05` | `EXTERNAL_BLOCKED` | Run all client pairings across two independently managed client/verifier families with restart, snapshot, proof, unknown-tag, oversize, WAN, and AI-off tests. |
 | `PROMOTE-06` | `DURATION_BLOCKED` | Collect 90 public cryptographic/economic days, 30 application days, and seven uninterrupted AI-off days at the exact frozen revision. |
@@ -559,6 +559,18 @@ scenarios and wrote
 | `PROMOTE-08` | `EXTERNAL_BLOCKED` | Run a 180-day capped-value canary with one-checkpoint disable, target recovery, independent exits, WAN, blackout, and saturation drills. |
 | `PROMOTE-09` | `OWNER_BLOCKED` | Collect final multiparty signatures over identical release, genesis, evidence, role, governance, and cutover bytes only after every lower gate passes. |
 | `PROMOTE-10` | `READY` | Rebaseline all base and WWM claims at one exact revision; run every actionable falsifier and preserve every negative or killed result append-only. |
+
+At revision `b7dbc5a7d740268a572529352edbdb774a7f6324`,
+`tools/audit/build_handoff.py` produced
+`E:/noosphere-audit/noosphere-review-handoff-b7dbc5a.zip`. Independent
+verification against the trusted Git revision reproduced source tree
+`a85905673eb9e4229a6432472c090021c45b5bab`, bundle ID
+`sha256:5c7d51e8d183cbd6b70a2b4ce9297249968cdd381a51872535ae674ecdf5ee3b`,
+and outer SHA-256
+`f2ac644727d9b9dfe4b30bf45e10fbc213d13950e59a6ed452eaaf140ab682d1`.
+The bundle remains `READY_FOR_EXTERNAL_AUDITOR_HANDOFF`; it explicitly records
+`external_audit_complete=false`, has no promotion effect, and does not satisfy
+`EXT-03`.
 
 ### Track M — external prerequisites
 
