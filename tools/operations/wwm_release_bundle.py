@@ -98,6 +98,7 @@ API_CONTRACT_FILES: Final[tuple[str, ...]] = (
     "protocol/api/vectors/positive.json",
 )
 RUNTIME_PATHS: Final[tuple[str, ...]] = (
+    "apps/network-dashboard",
     "apps/mind-market/wallet",
     "deploy/wwm/public-testnet.json",
     "deploy/wwm/run-public-testnet.ps1",
@@ -110,6 +111,7 @@ RUNTIME_PATHS: Final[tuple[str, ...]] = (
     "tools/operations/wwm_neural_publisher.py",
     "tools/operations/wwm_public_gateway.py",
     "tools/operations/wwm_public_inference.py",
+    "tools/operations/wwm_public_settlement.py",
     "tools/operations/wwm_public_testnet_monitor.py",
     "tools/operations/wwm_release_bundle.py",
     "tools/operations/wwm_static_bundle_server.py",

@@ -137,6 +137,8 @@ pub struct PoolEntry {
     pub tx: TransactionV1,
     pub witnesses: TransactionWitnessesV1,
     encoded_len: usize,
+    tx_bytes: Vec<u8>,
+    wit_bytes: Vec<u8>,
     /// Account authorization descriptors against which every signature was
     /// verified at admission. Execution may reuse that result only while all
     /// descriptors remain byte-identical.
@@ -167,6 +169,8 @@ struct PreparedAdmission {
     tx: TransactionV1,
     witnesses: TransactionWitnessesV1,
     encoded_len: usize,
+    tx_bytes: Vec<u8>,
+    wit_bytes: Vec<u8>,
     source: SourceId,
     fee: u128,
     usage: Usage,
@@ -222,6 +226,8 @@ impl SeenCache {
 pub struct Mempool {
     cfg: MempoolConfig,
     entries: BTreeMap<Hash32, PoolEntry>,
+    /// Arrival order for bounded, cyclic pending-transaction re-gossip.
+    arrival_order: VecDeque<Hash32>,
     /// Eviction order: ascending `(density, seq, txid)` — lowest first.
     by_density: BTreeSet<(u128, u64, Hash32)>,
     /// Common density while the expensive eviction index can stay elided.
@@ -243,6 +249,7 @@ impl Mempool {
             cfg,
             entries: BTreeMap::new(),
             by_density: BTreeSet::new(),
+            arrival_order: VecDeque::new(),
             uniform_density: None,
             per_account: BTreeMap::new(),
             per_source: BTreeMap::new(),
@@ -273,6 +280,34 @@ impl Mempool {
     #[must_use]
     pub fn contains(&self, txid: &Hash32) -> bool {
         self.entries.contains_key(txid)
+    }
+
+    /// Returns a bounded arrival-order batch for cyclic re-gossip.
+    ///
+    /// The caller owns the cursor so transport retries never mutate admission
+    /// order or consensus-visible mempool state.
+    pub(crate) fn regossip_batch(
+        &self,
+        cursor: &mut usize,
+        limit: usize,
+    ) -> Vec<(Vec<u8>, Vec<u8>)> {
+        if self.arrival_order.is_empty() || limit == 0 {
+            *cursor = 0;
+            return Vec::new();
+        }
+        let visit = limit.min(self.arrival_order.len());
+        let mut batch = Vec::with_capacity(visit);
+        for _ in 0..visit {
+            if *cursor >= self.arrival_order.len() {
+                *cursor = 0;
+            }
+            let txid = self.arrival_order[*cursor];
+            *cursor = cursor.saturating_add(1);
+            if let Some(entry) = self.entries.get(&txid) {
+                batch.push((entry.tx_bytes.clone(), entry.wit_bytes.clone()));
+            }
+        }
+        batch
     }
 
     fn materialize_density_index(&mut self) {
@@ -394,6 +429,8 @@ impl Mempool {
             id,
             tx,
             witnesses: wits,
+            tx_bytes: tx_bytes.to_vec(),
+            wit_bytes: wit_bytes.to_vec(),
             source,
             encoded_len,
             fee,
@@ -412,6 +449,8 @@ impl Mempool {
             id,
             tx,
             witnesses,
+            tx_bytes,
+            wit_bytes,
             source,
             encoded_len,
             fee,
@@ -466,6 +505,8 @@ impl Mempool {
             tx,
             witnesses,
             encoded_len,
+            tx_bytes,
+            wit_bytes,
             signature_authorizations,
             fee,
             density,
@@ -480,6 +521,7 @@ impl Mempool {
         let source_count = self.per_source.entry(source).or_default();
         *source_count = source_count.saturating_add(1);
         self.entries.insert(id, entry);
+        self.arrival_order.push_back(id);
         Ok(id)
     }
     /// Full admission pipeline; returns the txid on acceptance.
@@ -566,6 +608,7 @@ impl Mempool {
     /// Removes an entry from every index; returns it when present.
     pub fn remove(&mut self, txid: &Hash32) -> Option<PoolEntry> {
         let entry = self.entries.remove(txid)?;
+        self.arrival_order.retain(|id| id != txid);
         if self.uniform_density.is_none() {
             self.by_density.remove(&entry.density_key());
         }
@@ -608,6 +651,8 @@ impl Mempool {
             }
             removed.push(entry);
         }
+        let entries = &self.entries;
+        self.arrival_order.retain(|txid| entries.contains_key(txid));
         for payer in affected_payers {
             let empty = if let Some(queue) = self.per_account.get_mut(&payer) {
                 queue.retain(|txid| self.entries.contains_key(txid));

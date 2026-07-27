@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { webcrypto } from "node:crypto";
 import { canonicalJson } from "../neural-core-v3.mjs";
-import { verifySignedEnvelope } from "./verifier-v1.mjs";
+import { verifyFinalizedSettlement, verifySignedEnvelope } from "./verifier-v1.mjs";
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
@@ -69,4 +69,78 @@ test("an envelope cannot substitute an unpinned signing key", async () => {
     () => verifySignedEnvelope(signed.envelope, "STREAM-EVENT", signed.publicKeyBase64, "22".repeat(32)),
     /not pinned/,
   );
+});
+
+test("finalized settlement accepts a newer canonical proof snapshot", async () => {
+  const hex32 = (byte) => byte.repeat(64);
+  const jobId = hex32("1");
+  const receiptId = hex32("2");
+  const settlementId = hex32("3");
+  const capsuleId = hex32("4");
+  const executionProfileId = hex32("5");
+  const outputRoot = hex32("6");
+  const tokenHistoryRoot = hex32("7");
+  const summaryHash = hex32("8");
+  const currentHash = hex32("9");
+  const currentRoot = hex32("a");
+  const record = (kind, id, value) => ({
+    schema: "noos/finalized-wwm-record/v1",
+    trust_scope: "LOCAL_FULL_NODE_FINALIZED_STATE",
+    kind,
+    id,
+    finalized_height: 30,
+    finalized_hash: currentHash,
+    objects_root: currentRoot,
+    canonical_record_hex: "00",
+    proof_hex: "01",
+    record: value,
+  });
+  const records = {
+    [`/api/wwm-record/job/${jobId}`]: record("job", jobId, {
+      job_id: jobId,
+      capsule_id: capsuleId,
+      execution_profile_id: executionProfileId,
+    }),
+    [`/api/wwm-record/receipt/${receiptId}`]: record("receipt", receiptId, {
+      receipt_id: receiptId,
+      job_id: jobId,
+      output_root: outputRoot,
+      token_history_root: tokenHistoryRoot,
+    }),
+    [`/api/wwm-record/settlement/${settlementId}`]: record("settlement", settlementId, {
+      settlement_id: settlementId,
+      job_id: jobId,
+      receipt_id: receiptId,
+    }),
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => new Response(JSON.stringify(records[url]), {
+    status: records[url] ? 200 : 404,
+    headers: { "Content-Type": "application/json" },
+  });
+  try {
+    await verifyFinalizedSettlement({
+      job_id: jobId,
+      receipt_id: receiptId,
+      capsule_id: capsuleId,
+      execution_profile_id: executionProfileId,
+      output_root: outputRoot,
+      token_history_root: tokenHistoryRoot,
+      output_tokens: 8,
+      chain_anchor: summaryHash,
+      chain_settlement: {
+        schema: "noos/wwm-public-inference-chain-settlement/v1",
+        job_id: jobId,
+        receipt_id: receiptId,
+        settlement_id: settlementId,
+        finalized: {
+          job: { finalized_height: 10, finalized_hash: hex32("b"), objects_root: hex32("c") },
+          receipt: { finalized_height: 20, finalized_hash: summaryHash, objects_root: hex32("d") },
+          settlement: { finalized_height: 20, finalized_hash: summaryHash, objects_root: hex32("d") },
+        },
+      },
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

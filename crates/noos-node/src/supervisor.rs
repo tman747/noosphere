@@ -22,7 +22,7 @@
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TryRecvError, TrySendError};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -38,10 +38,7 @@ use noos_lumen::objects::{
 };
 use noos_lumen::state::LumenRoots;
 use noos_lumen::wwm::{FinalizedModelResolutionV1, ResolutionSelectorV1};
-use noos_p2p::{
-    ChainIdentity, InboundItem, Multiaddr, P2pConfig, P2pEvent, P2pHandle, P2pNode,
-    MAX_RANGE_HEADERS,
-};
+use noos_p2p::{ChainIdentity, InboundItem, Multiaddr, P2pConfig, P2pEvent, P2pHandle, P2pNode};
 use noos_store::WriteSet;
 use noos_witness::vote::FinalityVoteV1;
 use tokio::runtime::Handle;
@@ -51,13 +48,35 @@ use crate::genesis::GenesisSpec;
 use crate::mempool::AdmitError;
 use crate::metrics::Metrics;
 use crate::network::{decode_header_announce, decode_tx_pushes, NodeProtocolStore, P2pNetworkEdge};
-use crate::store_port::{InProcStore, StorePort};
+use crate::store_port::{key_header, key_height, InProcStore, StorePort};
 use crate::view::{BlockSummary, TxStatus, ViewLookup};
 use crate::{Hash32, NodeError};
 
 /// Bounded inbox capacities (node-v1.md §7.1).
 pub const CONSENSUS_INBOX: usize = 1024;
 pub const STORE_INBOX: usize = 64;
+const STORE_PRIORITY_INBOX: usize = 16;
+const STORE_PRIORITY_BURST: usize = 4;
+/// Pending transactions are retried after queue pressure and peer reconnects.
+/// Forty pushes/second stays below the default per-peer Lumen rate limit.
+const TX_REGOSSIP_INTERVAL_MS: u64 = 100;
+const TX_REGOSSIP_BATCH: usize = 4;
+/// Full-node pull sync stays below the default eight-body-requests/second
+/// peer limit, including low-latency LAN links where transport time is tiny.
+const FULL_SYNC_BODY_REQUEST_PACING: Duration = Duration::from_millis(125);
+/// Keep a range reply below the live store-backed server's request deadline.
+/// Protocol peers may serve up to `MAX_RANGE_HEADERS`; the recovery client
+/// deliberately uses smaller pages so one synchronous store lane cannot turn
+/// a healthy peer into a repeated 25-second timeout.
+const SYNC_RANGE_PAGE_HEADERS: u32 = 16;
+
+const fn smaller_sync_range_page(current: u32) -> Option<u32> {
+    if current <= 1 {
+        None
+    } else {
+        Some(current / 2)
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Store task
@@ -74,6 +93,7 @@ enum StoreMsg {
     GetIndex(Vec<u8>, Reply<Result<Option<Vec<u8>>, String>>),
     GetReceipt(Vec<u8>, Reply<Result<Option<Vec<u8>>, String>>),
     GetBlob(Hash32, Reply<Result<Option<Vec<u8>>, String>>),
+    ProtocolHeaderRange(u64, u32, Reply<(Vec<Vec<u8>>, bool)>),
     ScanIndices(
         Vec<u8>,
         Reply<Result<crate::store_port::ScanEntries, String>>,
@@ -89,6 +109,7 @@ enum StoreMsg {
 #[derive(Clone)]
 pub struct StoreClient {
     tx: SyncSender<StoreMsg>,
+    priority_tx: SyncSender<StoreMsg>,
 }
 
 fn store_err(msg: String) -> NodeError {
@@ -104,6 +125,32 @@ impl StoreClient {
         reply_rx
             .recv()
             .map_err(|_| NodeError::ChannelClosed("store reply"))
+    }
+
+    fn priority_round_trip<T>(
+        &self,
+        build: impl FnOnce(Reply<T>) -> StoreMsg,
+    ) -> Result<T, NodeError> {
+        let (reply_tx, reply_rx) = sync_channel(1);
+        self.priority_tx
+            .send(build(reply_tx))
+            .map_err(|_| NodeError::ChannelClosed("priority store inbox"))?;
+        reply_rx
+            .recv()
+            .map_err(|_| NodeError::ChannelClosed("priority store reply"))
+    }
+
+    pub(crate) fn protocol_header(&self, key: &[u8]) -> Result<Option<Vec<u8>>, NodeError> {
+        self.priority_round_trip(|r| StoreMsg::GetHeader(key.to_vec(), r))?
+            .map_err(store_err)
+    }
+
+    pub(crate) fn protocol_header_range(
+        &self,
+        start_height: u64,
+        max_headers: u32,
+    ) -> Result<(Vec<Vec<u8>>, bool), NodeError> {
+        self.priority_round_trip(|r| StoreMsg::ProtocolHeaderRange(start_height, max_headers, r))
     }
 }
 
@@ -155,8 +202,78 @@ impl StorePort for StoreClient {
     }
 }
 
-fn store_task(mut store: InProcStore, rx: &Receiver<StoreMsg>) {
-    while let Ok(msg) = rx.recv() {
+fn read_protocol_header_range(
+    store: &InProcStore,
+    start_height: u64,
+    max_headers: u32,
+) -> (Vec<Vec<u8>>, bool) {
+    let mut headers = Vec::new();
+    for offset in 0..u64::from(max_headers) {
+        let Some(height) = start_height.checked_add(offset) else {
+            break;
+        };
+        let Ok(Some(hash)) = store.get_index(&key_height(height)) else {
+            break;
+        };
+        let Ok(hash) = <[u8; 32]>::try_from(hash.as_slice()) else {
+            break;
+        };
+        let Ok(Some(header)) = store.get_header(&key_header(&hash)) else {
+            break;
+        };
+        headers.push(header);
+    }
+    let next = start_height.saturating_add(headers.len() as u64);
+    let more = store.get_index(&key_height(next)).ok().flatten().is_some();
+    (headers, more)
+}
+
+fn recv_store_msg(
+    rx: &Receiver<StoreMsg>,
+    priority_rx: &Receiver<StoreMsg>,
+    priority_streak: &mut usize,
+) -> Option<StoreMsg> {
+    loop {
+        if *priority_streak < STORE_PRIORITY_BURST {
+            match priority_rx.try_recv() {
+                Ok(msg) => {
+                    *priority_streak += 1;
+                    return Some(msg);
+                }
+                Err(TryRecvError::Empty | TryRecvError::Disconnected) => {}
+            }
+        }
+        match rx.try_recv() {
+            Ok(msg) => {
+                *priority_streak = 0;
+                return Some(msg);
+            }
+            Err(TryRecvError::Disconnected) => return priority_rx.try_recv().ok(),
+            Err(TryRecvError::Empty) => {}
+        }
+        match priority_rx.try_recv() {
+            Ok(msg) => {
+                *priority_streak = priority_streak.saturating_add(1);
+                return Some(msg);
+            }
+            Err(TryRecvError::Empty | TryRecvError::Disconnected) => {}
+        }
+        match rx.recv_timeout(Duration::from_millis(10)) {
+            Ok(msg) => {
+                *priority_streak = 0;
+                return Some(msg);
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                return priority_rx.try_recv().ok();
+            }
+        }
+    }
+}
+
+fn store_task(mut store: InProcStore, rx: &Receiver<StoreMsg>, priority_rx: &Receiver<StoreMsg>) {
+    let mut priority_streak = 0;
+    while let Some(msg) = recv_store_msg(rx, priority_rx, &mut priority_streak) {
         match msg {
             StoreMsg::Commit(ws, reply) => {
                 let _ = reply.send(store.commit(*ws).map_err(|e| e.to_string()));
@@ -185,6 +302,13 @@ fn store_task(mut store: InProcStore, rx: &Receiver<StoreMsg>) {
             }
             StoreMsg::GetBlob(hash, reply) => {
                 let _ = reply.send(store.get_blob(&hash).map_err(|e| e.to_string()));
+            }
+            StoreMsg::ProtocolHeaderRange(start_height, max_headers, reply) => {
+                let _ = reply.send(read_protocol_header_range(
+                    &store,
+                    start_height,
+                    max_headers,
+                ));
             }
             StoreMsg::ScanIndices(prefix, reply) => {
                 let _ = reply.send(store.scan_indices(&prefix).map_err(|e| e.to_string()));
@@ -254,6 +378,7 @@ pub enum ConsensusMsg {
         ticket: GroundTicketV1,
         claim: BodyDaClaimV1,
         shards: Vec<ShardCandidateV1>,
+        regossip: bool,
         reply: Reply<Result<ImportOutcome, String>>,
     },
     ImportHeader {
@@ -423,6 +548,8 @@ fn core_loop<P: StorePort>(
     let mut inbound_votes_accepted = 0_u64;
     let mut inbound_votes_rejected = 0_u64;
     let mut last_vote_error: Option<String> = None;
+    let mut last_tx_regossip_ms = 0_u64;
+    let mut tx_regossip_cursor = 0_usize;
     while let Ok(msg) = rx.recv() {
         match msg {
             ConsensusMsg::SubmitTx {
@@ -475,15 +602,18 @@ fn core_loop<P: StorePort>(
                 ticket,
                 claim,
                 shards,
+                regossip,
                 reply,
             } => {
                 let result = core
                     .import_block_owned(&header, &ticket, &claim, shards)
                     .map_err(|e| e.to_string());
-                // Re-announce newly executed blocks so gossip crosses more
-                // than one hop; the p2p layer suppresses duplicate pushes.
-                if let (Ok(ImportOutcome::Executed { .. }), Some(gossip)) = (&result, gossip) {
-                    let _ = gossip.try_send(OutboundGossip::Header(header, ticket));
+                // Live next-block gossip may cross one more hop. Pull recovery
+                // must not amplify historical pages into rate-limited gossip.
+                if regossip {
+                    if let (Ok(ImportOutcome::Executed { .. }), Some(gossip)) = (&result, gossip) {
+                        let _ = gossip.try_send(OutboundGossip::Header(header, ticket));
+                    }
                 }
                 let _ = reply.send(result);
             }
@@ -538,10 +668,12 @@ fn core_loop<P: StorePort>(
                 let result = core
                     .devnet_witness_vote_tick(witness_index)
                     .map_err(|error| error.to_string());
-                if let (Ok(Some(vote)), Some(gossip)) = (&result, gossip) {
-                    let _ = gossip.try_send(OutboundGossip::Vote(vote.clone()));
+                if let (Ok(votes), Some(gossip)) = (&result, gossip) {
+                    for vote in votes {
+                        let _ = gossip.try_send(OutboundGossip::Vote(vote.clone()));
+                    }
                 }
-                let _ = reply.send(result.map(|vote| vote.is_some()));
+                let _ = reply.send(result.map(|votes| !votes.is_empty()));
             }
             ConsensusMsg::ResolveModel {
                 selector,
@@ -653,7 +785,25 @@ fn core_loop<P: StorePort>(
             } => {
                 let _ = reply.send(core.ledger().balance(&account, &asset));
             }
-            ConsensusMsg::SetNow(t) => core.set_now(t),
+            ConsensusMsg::SetNow(t) => {
+                core.set_now(t);
+                if let Some(gossip) = gossip {
+                    if t.saturating_sub(last_tx_regossip_ms) >= TX_REGOSSIP_INTERVAL_MS {
+                        last_tx_regossip_ms = t;
+                        for (tx_bytes, wit_bytes) in core
+                            .mempool
+                            .regossip_batch(&mut tx_regossip_cursor, TX_REGOSSIP_BATCH)
+                        {
+                            if gossip
+                                .try_send(OutboundGossip::Tx(tx_bytes, wit_bytes))
+                                .is_err()
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
             ConsensusMsg::InjectCrash => panic!("injected consensus crash (containment test)"),
             ConsensusMsg::Shutdown => return true,
         }
@@ -666,6 +816,7 @@ async fn import_wire_block(
     p2p: &P2pHandle,
     peer: noos_p2p::PeerId,
     announced: &[u8],
+    regossip: bool,
 ) -> Result<ImportOutcome, String> {
     let (header, ticket) = decode_header_announce(announced)
         .map_err(|error| format!("decode header announce: {error:?}"))?;
@@ -697,6 +848,7 @@ async fn import_wire_block(
             ticket,
             claim: *encoded.claim(),
             shards,
+            regossip,
             reply,
         })
         .map_err(|_| "consensus inbox closed".to_owned())?;
@@ -757,11 +909,13 @@ fn consensus_sync_head(consensus: &SyncSender<ConsensusMsg>) -> Option<(u64, Has
 async fn sync_ready_peer(
     consensus: &SyncSender<ConsensusMsg>,
     p2p: &P2pHandle,
+    edge: &P2pNetworkEdge,
     peer: noos_p2p::PeerId,
 ) {
     let Some(mode) = consensus_mode(consensus) else {
         return;
     };
+    let mut page_headers = SYNC_RANGE_PAGE_HEADERS;
     'sync: loop {
         let Some(before) = consensus_sync_head(consensus) else {
             return;
@@ -769,11 +923,34 @@ async fn sync_ready_peer(
         let Some(start_height) = before.0.checked_add(1) else {
             return;
         };
-        let Ok(range) = p2p
-            .request_range(peer, start_height, MAX_RANGE_HEADERS)
-            .await
-        else {
-            return;
+        let range = match p2p.request_range(peer, start_height, page_headers).await {
+            Ok(range) => range,
+            Err(error) => {
+                if !edge.is_peer_ready(&peer) {
+                    eprintln!(
+                        "range-sync peer unavailable after request failure for {peer} \
+                         at height {start_height}: {error}"
+                    );
+                    return;
+                }
+                match smaller_sync_range_page(page_headers) {
+                    Some(smaller_page) => {
+                        eprintln!(
+                            "range-sync page backoff for peer {peer} at height {start_height}: \
+                             {error} (page_headers={page_headers}->{smaller_page})"
+                        );
+                        page_headers = smaller_page;
+                        continue;
+                    }
+                    None => {
+                        eprintln!(
+                            "range-sync request failed from peer {peer} at height {start_height}: \
+                             {error} (page_headers={page_headers})"
+                        );
+                        return;
+                    }
+                }
+            }
         };
         if range.headers.0.is_empty() {
             return;
@@ -782,12 +959,12 @@ async fn sync_ready_peer(
             let result = if mode == NodeMode::Light {
                 import_wire_header(consensus, p2p, peer, &header.0).await
             } else {
-                import_wire_block(consensus, p2p, peer, &header.0).await
+                import_wire_block(consensus, p2p, peer, &header.0, false).await
             };
             if let Err(error) = result {
-                // A gossip push can execute this height while the range body is
-                // in flight. If the sync head advanced, restart from the new
-                // cursor instead of permanently abandoning this ready peer.
+                // Gossip may execute this height while the range body is in
+                // flight. Resume from the advanced cursor instead of
+                // permanently abandoning an otherwise ready peer.
                 if consensus_sync_head(consensus)
                     .is_some_and(|after_error| after_error.0 > before.0)
                 {
@@ -796,8 +973,11 @@ async fn sync_ready_peer(
                 let height = decode_header_announce(&header.0)
                     .ok()
                     .map(|(decoded, _)| decoded.height);
-                eprintln!("range-sync import stopped at {height:?}: {error}");
+                eprintln!("range-sync import stopped from peer {peer} at {height:?}: {error}");
                 return;
+            }
+            if mode != NodeMode::Light {
+                tokio::time::sleep(FULL_SYNC_BODY_REQUEST_PACING).await;
             }
         }
         let Some(after) = consensus_sync_head(consensus) else {
@@ -847,6 +1027,14 @@ fn load_or_create_p2p_seed(data_dir: &Path) -> Result<[u8; 32], NodeError> {
         }
         Err(error) => Err(NodeError::Config(format!("create p2p-key: {error}"))),
     }
+}
+
+fn enqueue_inbound_vote(consensus: &SyncSender<ConsensusMsg>, vote: FinalityVoteV1) -> bool {
+    consensus
+        .send(ConsensusMsg::InboundVote {
+            vote: Box::new(vote),
+        })
+        .is_ok()
 }
 
 fn spawn_network(
@@ -900,21 +1088,33 @@ fn spawn_network(
                 }
 
                 let edge = P2pNetworkEdge::new(p2p.clone(), Handle::current());
+                // Recovery pulls run independently so body downloads never
+                // stall transaction, vote, or live-header gossip processing.
+                let sync_edge = edge.clone();
+                let sync_p2p = p2p.clone();
+                let sync_consensus = consensus.clone();
+                let sync_task = tokio::spawn(async move {
+                    let mut sync_interval = tokio::time::interval(Duration::from_secs(5));
+                    sync_interval
+                        .set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                    let mut sync_cursor = 0_usize;
+                    loop {
+                        sync_interval.tick().await;
+                        let peers = sync_edge.peers();
+                        if peers.is_empty() {
+                            continue;
+                        }
+                        let peer = peers[sync_cursor % peers.len()];
+                        sync_cursor = sync_cursor.wrapping_add(1);
+                        sync_ready_peer(&sync_consensus, &sync_p2p, &sync_edge, peer).await;
+                    }
+                });
                 let mut shutdown_rx = shutdown_rx;
-                let mut sync_interval = tokio::time::interval(Duration::from_secs(5));
-                sync_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                let mut gossip_open = true;
                 loop {
                     tokio::select! {
-                        _ = &mut shutdown_rx => {
-                            p2p.shutdown();
-                            break;
-                        }
-                        _ = sync_interval.tick() => {
-                            for peer in edge.peers() {
-                                sync_ready_peer(&consensus, &p2p, peer).await;
-                            }
-                        }
-                        gossip = gossip_rx.recv() => {
+                        _ = &mut shutdown_rx => break,
+                        gossip = gossip_rx.recv(), if gossip_open => {
                             match gossip {
                                 Some(OutboundGossip::Header(header, ticket)) => {
                                     edge.push_header(&header, &ticket).await;
@@ -928,18 +1128,28 @@ fn spawn_network(
                                 Some(OutboundGossip::Vote(vote)) => {
                                     edge.push_vote(&vote).await;
                                 }
-                                None => {}
+                                None => gossip_open = false,
                             }
                         }
                         event = events.recv() => {
                             let Some(event) = event else { break };
                             match event {
                                 P2pEvent::PeerReady { peer, .. } => {
+                                    eprintln!("p2p peer ready: {peer}");
                                     edge.peer_ready(peer);
-                                    sync_ready_peer(&consensus, &p2p, peer).await;
                                 }
-                                P2pEvent::PeerDisconnected { peer }
-                                | P2pEvent::HandshakeRejected { peer, .. } => {
+                                P2pEvent::PeerDisconnected { peer } => {
+                                    eprintln!("p2p peer disconnected: {peer}");
+                                    edge.peer_gone(&peer);
+                                }
+                                P2pEvent::HandshakeRejected {
+                                    peer,
+                                    code,
+                                    by_remote,
+                                } => {
+                                    eprintln!(
+                                        "p2p handshake rejected: peer={peer} code={code:?} by_remote={by_remote}"
+                                    );
                                     edge.peer_gone(&peer);
                                 }
                                 P2pEvent::Inbound { peer, item } => match item {
@@ -956,10 +1166,7 @@ fn spawn_network(
                                             Some((announced, local))
                                                 if local
                                                     .checked_add(1)
-                                                    .is_some_and(|next| announced > next) =>
-                                            {
-                                                sync_ready_peer(&consensus, &p2p, peer).await;
-                                            }
+                                                    .is_some_and(|next| announced > next) => {}
                                             Some(_) => {
                                                 if consensus_mode(&consensus)
                                                     == Some(NodeMode::Light)
@@ -970,7 +1177,7 @@ fn spawn_network(
                                                     .await;
                                                 } else {
                                                     let _ = import_wire_block(
-                                                        &consensus, &p2p, peer, &header,
+                                                        &consensus, &p2p, peer, &header, true,
                                                     )
                                                     .await;
                                                 }
@@ -1007,8 +1214,8 @@ fn spawn_network(
                                     }
                                     InboundItem::Vote { vote } => {
                                         if let Ok(vote) = FinalityVoteV1::decode_canonical(&vote) {
-                                            let _ = consensus.try_send(ConsensusMsg::InboundVote {
-                                                vote: Box::new(vote),
+                                            let _ = tokio::task::block_in_place(|| {
+                                                enqueue_inbound_vote(&consensus, vote)
                                             });
                                         }
                                     }
@@ -1022,6 +1229,8 @@ fn spawn_network(
                         }
                     }
                 }
+                sync_task.abort();
+                p2p.shutdown();
             });
         })
         .map_err(|error| NodeError::Config(format!("spawn p2p task: {error}")))?;
@@ -1136,15 +1345,17 @@ pub fn start(
     // Store task.
     let store = InProcStore::open(data_dir, &built.chain_id, &built.genesis_hash)?;
     let (store_tx, store_rx) = sync_channel::<StoreMsg>(STORE_INBOX);
+    let (priority_store_tx, priority_store_rx) = sync_channel::<StoreMsg>(STORE_PRIORITY_INBOX);
     let store_handle = std::thread::Builder::new()
         .name("noos-store".into())
-        .spawn(move || store_task(store, &store_rx))
+        .spawn(move || store_task(store, &store_rx, &priority_store_rx))
         .map_err(|e| NodeError::Config(format!("spawn store task: {e}")))?;
 
     // Consensus task with contained-crash restart.
     let (consensus_tx, consensus_rx) = sync_channel::<ConsensusMsg>(CONSENSUS_INBOX);
     let store_client = StoreClient {
         tx: store_tx.clone(),
+        priority_tx: priority_store_tx,
     };
     let network_store = store_client.clone();
     let network_chain_id = built.chain_id;
@@ -1214,4 +1425,170 @@ pub fn start(
         network_shutdown,
         network_handle,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use noos_crypto::BlsSecretKey;
+    use std::sync::mpsc::RecvTimeoutError;
+    use std::thread;
+
+    fn test_vote() -> FinalityVoteV1 {
+        let secret = BlsSecretKey::from_seed([7; 32]).expect("test BLS key");
+        FinalityVoteV1::sign(
+            [1; 32],
+            1,
+            CheckpointRef {
+                epoch: 0,
+                checkpoint_hash: [2; 32],
+            },
+            CheckpointRef {
+                epoch: 1,
+                checkpoint_hash: [3; 32],
+            },
+            [7; 32],
+            [4; 32],
+            &secret,
+        )
+        .expect("signed test vote")
+    }
+
+    #[test]
+    fn range_sync_page_backoff_reaches_single_header_floor() {
+        let mut page = SYNC_RANGE_PAGE_HEADERS;
+        let mut pages = vec![page];
+        while let Some(smaller) = smaller_sync_range_page(page) {
+            pages.push(smaller);
+            page = smaller;
+        }
+
+        assert_eq!(pages, vec![16, 8, 4, 2, 1]);
+        assert_eq!(smaller_sync_range_page(1), None);
+    }
+
+    #[test]
+    fn priority_store_lane_preempts_normal_backlog() {
+        let (store_tx, store_rx) = sync_channel(1);
+        let (priority_tx, priority_rx) = sync_channel(1);
+        let (normal_reply, _) = sync_channel(1);
+        let (priority_reply, _) = sync_channel(1);
+        store_tx
+            .send(StoreMsg::AppliedSeq(normal_reply))
+            .expect("queue normal store work");
+        priority_tx
+            .send(StoreMsg::ProtocolHeaderRange(42, 16, priority_reply))
+            .expect("queue protocol range work");
+
+        let mut priority_streak = 0;
+        match recv_store_msg(&store_rx, &priority_rx, &mut priority_streak).expect("priority work")
+        {
+            StoreMsg::ProtocolHeaderRange(42, 16, _) => {}
+            _ => panic!("protocol range work did not preempt normal backlog"),
+        }
+        assert!(matches!(
+            recv_store_msg(&store_rx, &priority_rx, &mut priority_streak),
+            Some(StoreMsg::AppliedSeq(_))
+        ));
+    }
+
+    #[test]
+    fn priority_store_lane_yields_after_bounded_burst() {
+        let (store_tx, store_rx) = sync_channel(1);
+        let (priority_tx, priority_rx) = sync_channel(STORE_PRIORITY_BURST + 1);
+        let (normal_reply, _) = sync_channel(1);
+        store_tx
+            .send(StoreMsg::AppliedSeq(normal_reply))
+            .expect("queue normal store work");
+        for height in 0..=STORE_PRIORITY_BURST as u64 {
+            let (reply, _) = sync_channel(1);
+            priority_tx
+                .send(StoreMsg::ProtocolHeaderRange(height, 1, reply))
+                .expect("queue priority store work");
+        }
+
+        let mut priority_streak = 0;
+        for expected_height in 0..STORE_PRIORITY_BURST as u64 {
+            match recv_store_msg(&store_rx, &priority_rx, &mut priority_streak)
+                .expect("priority burst work")
+            {
+                StoreMsg::ProtocolHeaderRange(height, 1, _) => {
+                    assert_eq!(height, expected_height);
+                }
+                _ => panic!("normal work interrupted the bounded priority burst"),
+            }
+        }
+        assert!(matches!(
+            recv_store_msg(&store_rx, &priority_rx, &mut priority_streak),
+            Some(StoreMsg::AppliedSeq(_))
+        ));
+    }
+
+    #[test]
+    fn protocol_header_range_uses_one_priority_round_trip() {
+        let (store_tx, store_rx) = sync_channel(1);
+        let (priority_tx, priority_rx) = sync_channel(1);
+        let client = StoreClient {
+            tx: store_tx,
+            priority_tx,
+        };
+        let responder = thread::spawn(move || {
+            match priority_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("protocol range request")
+            {
+                StoreMsg::ProtocolHeaderRange(7, 2, reply) => {
+                    reply
+                        .send((vec![vec![1], vec![2]], true))
+                        .expect("protocol range reply");
+                }
+                _ => panic!("protocol range was not batched"),
+            }
+        });
+
+        assert_eq!(
+            client
+                .protocol_header_range(7, 2)
+                .expect("protocol range result"),
+            (vec![vec![1], vec![2]], true)
+        );
+        assert!(matches!(store_rx.try_recv(), Err(TryRecvError::Empty)));
+        responder.join().expect("protocol range responder");
+    }
+
+    #[test]
+    fn inbound_vote_waits_for_consensus_capacity_instead_of_dropping() {
+        let (consensus_tx, consensus_rx) = sync_channel(1);
+        consensus_tx
+            .send(ConsensusMsg::SetNow(7))
+            .expect("fill consensus inbox");
+
+        let sender = consensus_tx.clone();
+        let (done_tx, done_rx) = sync_channel(1);
+        let vote_sender = thread::spawn(move || {
+            done_tx
+                .send(enqueue_inbound_vote(&sender, test_vote()))
+                .expect("report vote delivery");
+        });
+
+        assert!(matches!(
+            done_rx.recv_timeout(Duration::from_millis(50)),
+            Err(RecvTimeoutError::Timeout)
+        ));
+        assert!(matches!(
+            consensus_rx.recv_timeout(Duration::from_secs(1)),
+            Ok(ConsensusMsg::SetNow(7))
+        ));
+        assert!(done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("vote delivery result"));
+        match consensus_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("queued inbound vote")
+        {
+            ConsensusMsg::InboundVote { vote } => assert_eq!(vote.epoch, 1),
+            _ => panic!("unexpected consensus message"),
+        }
+        vote_sender.join().expect("vote sender");
+    }
 }

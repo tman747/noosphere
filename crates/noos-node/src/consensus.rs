@@ -81,14 +81,30 @@ use crate::roots::{
 };
 use crate::store_port::{
     key_certificate, key_header, key_height, StorePort, KEY_FINALIZED, KEY_HEAD, KEY_JUSTIFIED,
+    SAFETY_KIND_VOTE,
 };
 use crate::view::{ChainView, TxStatus, ViewLookup};
-use crate::witness_role::sign_and_release_vote;
+use crate::witness_role::{sign_and_release_vote, VoteSafetyRecordV1};
 use crate::{Hash32, NodeError};
 
 /// Devnet beacon-randomness fixture feeding reserve sampling until the
 /// live beacon output is wired through membership (node-v1.md §9 gap G3).
 pub const DEVNET_BEACON_RANDOMNESS: [u8; 32] = [0x5A; 32];
+
+const MAX_PENDING_NETWORK_VOTES: usize = 1024;
+
+/// Deterministic rendezvous score for one absolute-time recovery slot.
+///
+/// The epoch, not a local vector index, is the rendezvous key: witnesses with
+/// overlapping but non-identical durable histories therefore select the same
+/// shared rung whenever that rung wins the slot.
+#[allow(clippy::arithmetic_side_effects)]
+fn historical_vote_rendezvous_score(tick: u64, epoch: u64) -> u64 {
+    let mut value = epoch ^ tick.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
+}
 
 /// Node operating mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -317,7 +333,12 @@ impl CheckpointView for VoteCheckpointView<'_> {
     }
 
     fn descends(&self, source: &CheckpointRef, target: &CheckpointRef) -> bool {
-        DagAncestry { dag: self.dag }.descends(source, target)
+        // Finalized-history pruning may remove the ancestry needed to
+        // re-check an authenticated vote that can no longer affect state.
+        // Let `validate_vote` continue through signature verification; its
+        // subsequent justification check classifies this as a stale no-op.
+        target.epoch <= self.justified.epoch
+            || (DagAncestry { dag: self.dag }).descends(source, target)
     }
 }
 
@@ -345,6 +366,7 @@ pub struct NodeCore<P: StorePort> {
     parked: BTreeMap<Hash32, ParkedBlock>,
     orphan_blocks: BTreeMap<Hash32, ParkedBlock>,
     pending_votes: Vec<FinalityVoteV1>,
+    deferred_votes: Vec<FinalityVoteV1>,
     pending_certs: Vec<FinalityCertificateV1>,
     pub mempool: Mempool,
     pub view: ChainView,
@@ -453,6 +475,7 @@ impl<P: StorePort> NodeCore<P> {
             parked: BTreeMap::new(),
             orphan_blocks: BTreeMap::new(),
             pending_votes: Vec::new(),
+            deferred_votes: Vec::new(),
             pending_certs: Vec::new(),
             port,
             now_ms: spec.genesis_time_ms,
@@ -551,7 +574,18 @@ impl<P: StorePort> NodeCore<P> {
     }
     #[must_use]
     pub fn pending_vote_count(&self) -> usize {
-        self.pending_votes.len()
+        self.pending_votes.len() + self.deferred_votes.len()
+    }
+
+    fn reserve_vote_slot(&mut self) {
+        if self.pending_vote_count() < MAX_PENDING_NETWORK_VOTES {
+            return;
+        }
+        if self.deferred_votes.is_empty() {
+            self.pending_votes.remove(0);
+        } else {
+            self.deferred_votes.remove(0);
+        }
     }
 
     #[must_use]
@@ -779,14 +813,47 @@ impl<P: StorePort> NodeCore<P> {
         self.now_ms = now_ms;
     }
 
-    /// Queues a verified-shape certificate for the next produced block and
-    /// ingests it into local finality immediately.
+    /// Queues a verified-shape certificate for the next produced block,
+    /// ingests it into local finality immediately, and retries authenticated
+    /// votes whose source has just become justified.
     pub fn queue_certificate(&mut self, cert: FinalityCertificateV1) -> Result<(), NodeError> {
+        self.queue_certificate_inner(cert)?;
+        self.retry_deferred_votes()
+    }
+
+    fn queue_certificate_inner(&mut self, cert: FinalityCertificateV1) -> Result<(), NodeError> {
         self.process_certificate(&cert)?;
         if self.pending_certs.len() < MAX_FINALITY_CERTIFICATES as usize {
             self.pending_certs.push(cert);
         }
         Ok(())
+    }
+
+    fn retry_deferred_votes(&mut self) -> Result<(), NodeError> {
+        loop {
+            let justified = self.tracker.justified_head();
+            let mut ready = Vec::new();
+            let mut waiting = Vec::with_capacity(self.deferred_votes.len());
+            for vote in std::mem::take(&mut self.deferred_votes) {
+                if vote.source == justified {
+                    ready.push(vote);
+                } else if vote.source.epoch > justified.epoch {
+                    waiting.push(vote);
+                }
+            }
+            self.deferred_votes = waiting;
+            if ready.is_empty() {
+                return Ok(());
+            }
+
+            let before = justified;
+            for vote in ready {
+                self.ingest_network_vote_once(vote)?;
+            }
+            if self.tracker.justified_head() == before {
+                return Ok(());
+            }
+        }
     }
 
     /// Devnet fixture finality driver (TEST NETWORKS ONLY; see
@@ -851,22 +918,96 @@ impl<P: StorePort> NodeCore<P> {
         self.queue_certificate(cert)?;
         Ok(true)
     }
-    /// Emits one independently signed fixture witness vote for a distributed
-    /// engineering testnet. Unlike [`Self::devnet_finality_tick`], this signs
-    /// only the selected member and relies on votes from distinct network
-    /// peers to reach quorum. The vote safety record is durable before return.
+    fn durable_historical_witness_vote(
+        &mut self,
+        current: &FinalityVoteV1,
+        witness_index: usize,
+    ) -> Result<Option<FinalityVoteV1>, NodeError> {
+        let raw_records = self.port.safety_records(SAFETY_KIND_VOTE)?;
+        let mut records = Vec::with_capacity(raw_records.len());
+        for raw in raw_records {
+            let record = VoteSafetyRecordV1::decode_canonical(&raw)
+                .map_err(|_| NodeError::Config("malformed durable vote safety record".into()))?;
+            if record.validator_id == current.validator_id
+                && (record.epoch != current.epoch
+                    || record.source != current.source
+                    || record.target != current.target)
+            {
+                records.push(record);
+            }
+        }
+        if records.is_empty() {
+            return Ok(None);
+        }
+
+        // Rendezvous-rank absolute epoch IDs instead of indexing modulo the
+        // local record count. Modulo counts permanently de-align witnesses
+        // restored from snapshots with different durable-history prefixes.
+        let tick = self.now_ms / 1_000;
+        let mut record_index = 0;
+        let mut best_score = historical_vote_rendezvous_score(tick, records[0].epoch);
+        for (index, candidate) in records.iter().enumerate().skip(1) {
+            let score = historical_vote_rendezvous_score(tick, candidate.epoch);
+            if score < best_score {
+                record_index = index;
+                best_score = score;
+            }
+        }
+        let record = records.swap_remove(record_index);
+
+        self.ensure_snapshot(record.epoch)?;
+        let snapshot = self
+            .registry
+            .get(record.epoch)
+            .cloned()
+            .ok_or(NodeError::Witness(
+                noos_witness::WitnessError::UnknownSnapshot,
+            ))?;
+        let member = snapshot
+            .members()
+            .get(witness_index)
+            .ok_or_else(|| NodeError::Config("devnet witness index outside fixture set".into()))?;
+        if member.validator_id != record.validator_id {
+            return Err(NodeError::Config(
+                "durable vote validator does not match fixture witness".into(),
+            ));
+        }
+        let secret = fixture_witness_secret(witness_index).map_err(|_| NodeError::Crypto)?;
+        let vote = sign_and_release_vote(
+            &mut self.port,
+            self.chain_id,
+            record.epoch,
+            record.source,
+            record.target,
+            record.validator_id,
+            snapshot.root(),
+            &secret,
+        )
+        .map_err(|error| {
+            NodeError::Config(format!(
+                "durable devnet witness vote recovery refused: {error:?}"
+            ))
+        })?;
+        Ok(Some(vote))
+    }
+
+    /// Emits the current independently signed fixture witness vote and at
+    /// most one bounded historical recovery vote. Unlike
+    /// [`Self::devnet_finality_tick`], this signs only the selected member and
+    /// relies on votes from distinct network peers to reach quorum. The vote
+    /// safety record is durable before return.
     ///
     /// `witness_index` is intentionally restricted to the frozen four-member
     /// test fixture and is refused by `noosd` for non-test parameters.
     pub fn devnet_witness_vote_tick(
         &mut self,
         witness_index: usize,
-    ) -> Result<Option<FinalityVoteV1>, NodeError> {
+    ) -> Result<Vec<FinalityVoteV1>, NodeError> {
         let source = self.tracker.justified_head();
         let next_epoch = source.epoch.saturating_add(1);
         let boundary_height = next_epoch.saturating_mul(EPOCH_LENGTH);
         if self.exec_height < boundary_height {
-            return Ok(None);
+            return Ok(Vec::new());
         }
         let target = CheckpointRef {
             epoch: next_epoch,
@@ -890,34 +1031,60 @@ impl<P: StorePort> NodeCore<P> {
             .members()
             .get(witness_index)
             .ok_or_else(|| NodeError::Config("devnet witness index outside fixture set".into()))?;
-        if let Some(known) = self.pending_votes.iter().find(|known| {
+        let current = if let Some(known) = self.pending_votes.iter().find(|known| {
             known.epoch == next_epoch
                 && known.source == source
                 && known.target == target
                 && known.validator_id == member.validator_id
         }) {
-            return Ok(Some(known.clone()));
+            known.clone()
+        } else {
+            let secret = fixture_witness_secret(witness_index).map_err(|_| NodeError::Crypto)?;
+            let vote = sign_and_release_vote(
+                &mut self.port,
+                self.chain_id,
+                next_epoch,
+                source,
+                target,
+                member.validator_id,
+                snapshot.root(),
+                &secret,
+            )
+            .map_err(|error| {
+                NodeError::Config(format!("devnet witness vote refused: {error:?}"))
+            })?;
+            self.ingest_network_vote(vote.clone())?;
+            vote
+        };
+        let historical = self.durable_historical_witness_vote(&current, witness_index)?;
+        let mut outbound = Vec::with_capacity(usize::from(historical.is_some()) + 1);
+        outbound.push(current);
+        if let Some(vote) = historical {
+            outbound.push(vote);
         }
-        let secret = fixture_witness_secret(witness_index).map_err(|_| NodeError::Crypto)?;
-        let vote = sign_and_release_vote(
-            &mut self.port,
-            self.chain_id,
-            next_epoch,
-            source,
-            target,
-            member.validator_id,
-            snapshot.root(),
-            &secret,
-        )
-        .map_err(|error| NodeError::Config(format!("devnet witness vote refused: {error:?}")))?;
-        self.ingest_network_vote(vote.clone())?;
-        Ok(Some(vote))
+        Ok(outbound)
     }
 
-    /// Validates and aggregates an inbound checkpoint vote. A quorum is
-    /// converted through the witness crate's sole certificate constructor
-    /// and enters the same certificate path as block-carried certificates.
+    /// Validates and aggregates an inbound checkpoint vote. Authenticated
+    /// votes whose source is ahead of the local justified checkpoint remain
+    /// bounded in memory and are retried when that source becomes justified.
+    /// A quorum is converted through the witness crate's sole certificate
+    /// constructor and enters the same path as block-carried certificates.
     pub fn ingest_network_vote(&mut self, vote: FinalityVoteV1) -> Result<(), NodeError> {
+        self.ingest_network_vote_once(vote)?;
+        self.retry_deferred_votes()
+    }
+
+    fn ingest_network_vote_once(&mut self, vote: FinalityVoteV1) -> Result<(), NodeError> {
+        if vote.epoch > self.exec_height / EPOCH_LENGTH {
+            return Err(NodeError::Witness(
+                noos_witness::WitnessError::UnknownSnapshot,
+            ));
+        }
+        if vote.source.epoch > 0 {
+            self.ensure_snapshot(vote.source.epoch)?;
+        }
+        self.ensure_snapshot(vote.epoch)?;
         let snapshot = self
             .registry
             .get(vote.epoch)
@@ -925,12 +1092,46 @@ impl<P: StorePort> NodeCore<P> {
             .ok_or(NodeError::Witness(
                 noos_witness::WitnessError::UnknownSnapshot,
             ))?;
+        let justified = self.tracker.justified_head();
         let view = VoteCheckpointView {
             dag: &self.dag,
-            justified: self.tracker.justified_head(),
+            justified,
         };
-        validate_vote(&vote, &self.chain_id, &snapshot, &view)?;
+        match validate_vote(&vote, &self.chain_id, &snapshot, &view) {
+            Ok(()) => {}
+            Err(noos_witness::WitnessError::SourceNotJustified)
+                if vote.target.epoch <= justified.epoch =>
+            {
+                return Ok(());
+            }
+            Err(noos_witness::WitnessError::SourceNotJustified)
+                if vote.source.epoch > justified.epoch =>
+            {
+                if self.pending_votes.iter().any(|known| {
+                    known.epoch == vote.epoch
+                        && known.source == vote.source
+                        && known.target == vote.target
+                        && known.validator_id == vote.validator_id
+                }) || self.deferred_votes.iter().any(|known| {
+                    known.epoch == vote.epoch
+                        && known.source == vote.source
+                        && known.target == vote.target
+                        && known.validator_id == vote.validator_id
+                }) {
+                    return Ok(());
+                }
+                self.reserve_vote_slot();
+                self.deferred_votes.push(vote);
+                return Ok(());
+            }
+            Err(error) => return Err(NodeError::Witness(error)),
+        }
         if self.pending_votes.iter().any(|known| {
+            known.epoch == vote.epoch
+                && known.source == vote.source
+                && known.target == vote.target
+                && known.validator_id == vote.validator_id
+        }) || self.deferred_votes.iter().any(|known| {
             known.epoch == vote.epoch
                 && known.source == vote.source
                 && known.target == vote.target
@@ -938,9 +1139,7 @@ impl<P: StorePort> NodeCore<P> {
         }) {
             return Ok(());
         }
-        if self.pending_votes.len() >= 1024 {
-            self.pending_votes.remove(0);
-        }
+        self.reserve_vote_slot();
         self.pending_votes.push(vote.clone());
         let quorum: Vec<_> = self
             .pending_votes
@@ -960,7 +1159,7 @@ impl<P: StorePort> NodeCore<P> {
                         || known.source != vote.source
                         || known.target != vote.target
                 });
-                self.queue_certificate(cert)
+                self.queue_certificate_inner(cert)
             }
             Err(noos_witness::WitnessError::QuorumNotMet) => Ok(()),
             Err(error) => Err(NodeError::Witness(error)),
@@ -1105,7 +1304,7 @@ impl<P: StorePort> NodeCore<P> {
 
     /// Restart-only header replay. A failed boot drops the whole core, so
     /// durable canonical records can be revalidated in place instead of
-    /// cloning the growing DAG before every historical header.
+    /// cloning the growing DAG and ledger before every historical header.
     fn replay_header_stages_in_place(
         &mut self,
         header: &BlockHeaderV1,
@@ -1145,7 +1344,7 @@ impl<P: StorePort> NodeCore<P> {
                 }
             }
         }
-        Self::validate_checkpoint_binding(&self.dag, &self.tracker, header, &hash)?;
+        Self::validate_checkpoint_binding_on(&self.dag, &self.tracker, header, &hash)?;
         Ok(outcome)
     }
 
@@ -2609,9 +2808,18 @@ impl<P: StorePort> NodeCore<P> {
         header: &BlockHeaderV1,
         hash: &Hash32,
     ) -> Result<(), NodeError> {
-        let justified = tracker.justified_head();
-        let finalized = tracker.finalized_head();
-        if header.justified_checkpoint != justified || header.finalized_checkpoint != finalized {
+        Self::validate_checkpoint_binding_on(dag, tracker, header, hash)
+    }
+
+    fn validate_checkpoint_binding_on(
+        dag: &HeaderDag,
+        tracker: &FinalityTracker,
+        header: &BlockHeaderV1,
+        hash: &Hash32,
+    ) -> Result<(), NodeError> {
+        let justified = header.justified_checkpoint;
+        let finalized = header.finalized_checkpoint;
+        if !tracker.has_checkpoint_view(&justified, &finalized) {
             return Err(NodeError::Dag(noos_braid::DagError::UnverifiedCheckpoint));
         }
         for checkpoint in [finalized, justified] {

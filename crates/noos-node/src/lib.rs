@@ -73,7 +73,6 @@ pub mod witness_role;
 mod tests;
 
 use std::fmt;
-
 /// Exact source revision embedded by controlled release builds.
 ///
 /// Ordinary developer builds remain visibly unbound rather than claiming a

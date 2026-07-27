@@ -43,6 +43,20 @@
       "JobStatus": {"enum": ["QUEUED", "RUNNING", "CANCEL_REQUESTED", "COMPLETED", "CANCELLED", "FAILED", "NO_QUORUM"]},
       "EvidenceState": {"enum": ["NONE", "PROVISIONAL_SIGNED", "MATCHED_QUORUM"]},
       "SettlementState": {"enum": ["PENDING_CHAIN", "FINALIZED_PAID", "FINALIZED_REFUNDED"]},
+      "FinalizedRecordSummary": {
+        "type": "object", "additionalProperties": false,
+        "required": ["finalized_height", "finalized_hash", "objects_root"],
+        "properties": {"finalized_height": {"type": "integer", "minimum": 1}, "finalized_hash": {"$ref": "#/components/schemas/Hash32"}, "objects_root": {"$ref": "#/components/schemas/Hash32"}}
+      },
+      "ChainSettlement": {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "job_id", "receipt_id", "settlement_id", "finalized"],
+        "properties": {
+          "schema": {"const": "noos/wwm-public-inference-chain-settlement/v1"}, "job_id": {"$ref": "#/components/schemas/Hash32"}, "receipt_id": {"$ref": "#/components/schemas/Hash32"}, "settlement_id": {"$ref": "#/components/schemas/Hash32"},
+          "open_transaction_id": {"$ref": "#/components/schemas/Hash32"}, "close_transaction_id": {"$ref": "#/components/schemas/Hash32"},
+          "finalized": {"type": "object", "additionalProperties": false, "required": ["job", "receipt", "settlement"], "properties": {"job": {"$ref": "#/components/schemas/FinalizedRecordSummary"}, "receipt": {"$ref": "#/components/schemas/FinalizedRecordSummary"}, "settlement": {"$ref": "#/components/schemas/FinalizedRecordSummary"}}}
+        }
+      },
       "CapsuleResolution": {
         "type": "object", "additionalProperties": false,
         "required": ["capsule_id", "model_name", "artifact_sha256", "artifact_length", "execution_profile_id", "query_profile_id", "activation_state"],
@@ -119,11 +133,15 @@
           "schema": {"const": "noos/wwm-receipt/v2"}, "receipt_id": {"$ref": "#/components/schemas/Hash32"}, "job_id": {"$ref": "#/components/schemas/Hash32"}, "tenant_id": {"type": "string"}, "capsule_id": {"$ref": "#/components/schemas/Hash32"},
           "execution_profile_id": {"$ref": "#/components/schemas/Hash32"}, "prompt_commitment": {"$ref": "#/components/schemas/Hash32"}, "output_commitment": {"$ref": "#/components/schemas/Hash32"}, "output_tokens": {"type": "integer", "minimum": 0, "maximum": 512},
           "terminal_status": {"$ref": "#/components/schemas/JobStatus"}, "evidence_state": {"$ref": "#/components/schemas/EvidenceState"}, "chain_anchor": {"oneOf": [{"type": "null"}, {"$ref": "#/components/schemas/Hash32"}]}, "settlement_state": {"$ref": "#/components/schemas/SettlementState"},
-          "payment_mode": {"$ref": "#/components/schemas/PaymentMode"}, "payment_reference": {"type": "string"}, "executor_id": {"oneOf": [{"type": "null"}, {"type": "string"}]}, "signature": {"type": "string", "minLength": 1}
+          "payment_mode": {"$ref": "#/components/schemas/PaymentMode"}, "payment_reference": {"type": "string"}, "executor_id": {"oneOf": [{"type": "null"}, {"type": "string"}]},
+          "query_profile_id": {"$ref": "#/components/schemas/Hash32"}, "output_root": {"$ref": "#/components/schemas/Hash32"}, "token_history_root": {"$ref": "#/components/schemas/Hash32"}, "output_bytes": {"type": "integer", "minimum": 0}, "duration_ms": {"type": "integer", "minimum": 1}, "tokenizer_executable_sha256": {"$ref": "#/components/schemas/Hash32"},
+          "execution_scope": {"enum": ["OFF_CHAIN_INTERACTIVE_TESTNET"]}, "production": {"const": false}, "promotion_effect": {"const": "NONE"}, "disclosure": {"type": "string", "minLength": 1}, "completed_at_ms": {"type": "integer", "minimum": 0}, "settled_at_ms": {"type": "integer", "minimum": 0}, "error_code": {"type": "string"}, "chain_settlement": {"$ref": "#/components/schemas/ChainSettlement"},
+          "signing_key_id": {"$ref": "#/components/schemas/Hash32"}, "signature": {"type": "string", "minLength": 1}
         }
       },
       "Error": {"type": "object", "required": ["error"], "properties": {"error": {"type": "object", "required": ["code", "message"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "request_id": {"type": "string"}}}}}
     },
     "responses": {"Error": {"description": "Bounded v2 error", "content": {"application/vnd.noos.wwm.v2+json": {"schema": {"$ref": "#/components/schemas/Error"}}}}}
   }
+}
 }

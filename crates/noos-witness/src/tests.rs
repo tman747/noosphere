@@ -460,6 +460,11 @@ fn vote_validity_law_every_branch() {
         validate_vote(&bad_sig, &chain, &snap, &view),
         Err(WitnessError::SignatureInvalid)
     );
+    assert_eq!(
+        validate_vote(&bad_sig, &chain, &snap, &FixtureView::nothing_justified()),
+        Err(WitnessError::SignatureInvalid),
+        "a future-source vote is authenticated before it can be deferred"
+    );
 }
 
 // ---------------------------------------------------------------------------

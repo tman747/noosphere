@@ -393,6 +393,10 @@ pub struct FinalityTracker {
     chain_id: [u8; 32],
     /// Every justified checkpoint, by (epoch, hash).
     justified: BTreeSet<(u64, [u8; 32])>,
+    /// Every exact `(justified, finalized)` pointer pair reached after
+    /// verified certificate ingestion. Historical block import may bind to
+    /// one of these views without weakening the exact-evidence law.
+    checkpoint_views: BTreeSet<(CheckpointRef, CheckpointRef)>,
     highest_justified: CheckpointRef,
     finalized: CheckpointRef,
     /// Duplicate-ingest short-circuit set (content digests).
@@ -408,9 +412,12 @@ impl FinalityTracker {
     pub fn genesis(chain_id: [u8; 32], genesis: CheckpointRef) -> Self {
         let mut justified = BTreeSet::new();
         justified.insert((genesis.epoch, genesis.checkpoint_hash));
+        let mut checkpoint_views = BTreeSet::new();
+        checkpoint_views.insert((genesis, genesis));
         Self {
             chain_id,
             justified,
+            checkpoint_views,
             highest_justified: genesis,
             finalized: genesis,
             seen: BTreeSet::new(),
@@ -432,6 +439,16 @@ impl FinalityTracker {
     pub fn is_checkpoint_justified(&self, checkpoint: &CheckpointRef) -> bool {
         self.justified
             .contains(&(checkpoint.epoch, checkpoint.checkpoint_hash))
+    }
+    /// Whether this exact finality pointer pair was reached through verified
+    /// certificates (or is the genesis pair).
+    #[must_use]
+    pub fn has_checkpoint_view(
+        &self,
+        justified: &CheckpointRef,
+        finalized: &CheckpointRef,
+    ) -> bool {
+        self.checkpoint_views.contains(&(*justified, *finalized))
     }
 
     /// Whether `digest` belongs to a certificate whose ingestion advanced
@@ -483,22 +500,26 @@ impl FinalityTracker {
         }
 
         // Direct-child finalization rule (§3).
-        if Some(verified.target.epoch) == verified.source.epoch.checked_add(1) {
+        let outcome = if Some(verified.target.epoch) == verified.source.epoch.checked_add(1) {
             if verified.source.epoch < self.finalized.epoch {
                 // Older consistent finalization: no pointer motion.
-                return Ok(IngestOutcome::Justified);
-            }
-            if verified.source.epoch == self.finalized.epoch {
+                IngestOutcome::Justified
+            } else if verified.source.epoch == self.finalized.epoch {
                 if verified.source.checkpoint_hash != self.finalized.checkpoint_hash {
                     return Err(WitnessError::ConflictingFinalization);
                 }
-                return Ok(IngestOutcome::Justified);
+                IngestOutcome::Justified
+            } else {
+                self.finalized = verified.source;
+                self.finalized_carriers.insert(digest);
+                IngestOutcome::Finalized(verified.source)
             }
-            self.finalized = verified.source;
-            self.finalized_carriers.insert(digest);
-            return Ok(IngestOutcome::Finalized(verified.source));
-        }
-        Ok(IngestOutcome::Justified)
+        } else {
+            IngestOutcome::Justified
+        };
+        self.checkpoint_views
+            .insert((self.highest_justified, self.finalized));
+        Ok(outcome)
     }
 }
 

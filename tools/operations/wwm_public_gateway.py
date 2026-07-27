@@ -34,6 +34,10 @@ from tools.operations.wwm_public_inference import (  # noqa: E402
     OfflineTokenizer,
     WorkerdExecutor,
 )
+from tools.operations.wwm_public_settlement import (  # noqa: E402
+    DevnetSettlementBackend,
+    PublicSettlementError,
+)
 
 SCHEMA: Final[str] = "noos/wwm-public-testnet-gateway/v1"
 MAX_UPSTREAM_BYTES: Final[int] = 2 * 1024 * 1024
@@ -196,6 +200,15 @@ def load_config(args: argparse.Namespace) -> GatewayConfig:
         if fallback_node_rpc is not None and fallback_node_token is not None:
             node_sources.append((fallback_node_rpc, fallback_node_token))
         try:
+            settlement_backend = DevnetSettlementBackend(
+                hosted_config=getattr(
+                    args,
+                    "inference_hosted_config",
+                    Path("C:/mindchain/wwm-testnet/secrets/hosted-model-publisher.json"),
+                ),
+                node_rpc=fallback_node_rpc or node_rpc,
+                node_token=fallback_node_token or token,
+            )
             tokenizer = OfflineTokenizer(
                 executable=getattr(
                     args,
@@ -229,9 +242,12 @@ def load_config(args: argparse.Namespace) -> GatewayConfig:
                     token=worker_token,
                     tokenizer=tokenizer,
                 ),
+                settlement_backend=settlement_backend,
             )
         except InferenceError as error:
             raise GatewayError(error.message) from error
+        except PublicSettlementError as error:
+            raise GatewayError(str(error)) from error
     return GatewayConfig(
         listen_host=listen_host,
         listen_port=listen_port,
@@ -1016,6 +1032,11 @@ def parse_args() -> argparse.Namespace:
         "--inference-database",
         type=Path,
         default=Path("C:/mindchain/wwm-testnet/inference/public-inference.sqlite3"),
+    )
+    parser.add_argument(
+        "--inference-hosted-config",
+        type=Path,
+        default=Path("C:/mindchain/wwm-testnet/secrets/hosted-model-publisher.json"),
     )
     parser.add_argument("--inference-worker-origin", default="http://127.0.0.1:29807")
     parser.add_argument(

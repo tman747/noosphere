@@ -293,9 +293,12 @@ function renderReceipt(receipt) {
   nodes.cancelJob.disabled = true;
   const receiptPath = `${runtime.client.baseUrl}/jobs/${encodeURIComponent(receipt.job_id)}/receipt`;
   renderProofLink(nodes.hostedReceiptLink, receiptPath, shortHash(receipt.job_id), `Receipt ${receipt.job_id}`);
+  const settlementId = receipt.chain_settlement?.settlement_id;
   renderProofLink(
     nodes.hostedSettlementLink,
-    `${receiptPath}#settlement`,
+    settlementId
+      ? `/api/wwm-record/settlement/${encodeURIComponent(settlementId)}`
+      : `${receiptPath}#settlement`,
     receipt.chain_anchor ? `${receipt.settlement_state} · ${shortHash(receipt.chain_anchor)}` : String(receipt.settlement_state ?? "PENDING_CHAIN"),
     receipt.chain_anchor ?? "Settlement anchor pending",
   );
@@ -427,7 +430,7 @@ async function submitQuery(event) {
         renderEvidence(data.evidence_state);
       } else if (payload.type === "evidence.updated") {
         renderEvidence(data.evidence_state);
-      } else if (payload.type === "receipt.completed") {
+      } else if (payload.type === "receipt.completed" || payload.type === "settlement.finalized") {
         renderReceipt(data);
       } else {
         throw new WwmClientError("unknown_stream_event");

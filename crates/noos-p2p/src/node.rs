@@ -50,6 +50,10 @@ const SEND_ATTEMPTS: u8 = 2;
 /// macroblock while bounding per-peer memory and bandwidth pressure.
 const BODY_CHUNK_CONCURRENCY: usize = 8;
 
+/// End-to-end ceiling from enqueue through reconnect and reply delivery.
+/// Per-exchange timeouts cannot bound time spent waiting in the outbox.
+const OUTBOUND_DELIVERY_TIMEOUT: Duration = Duration::from_secs(25);
+
 // ---------------------------------------------------------------------------
 // Public configuration and surface types
 // ---------------------------------------------------------------------------
@@ -186,6 +190,8 @@ pub enum SendError {
     PeerRejected,
     /// Connection lost and delivery attempts exhausted.
     Disconnected,
+    /// The peer left an outbound substream exchange incomplete.
+    Timeout,
     /// The reply failed canonical decode.
     BadReply,
     /// The node is shutting down.
@@ -198,6 +204,7 @@ impl core::fmt::Display for SendError {
             SendError::QueueFull => "queue_full",
             SendError::PeerRejected => "peer_rejected",
             SendError::Disconnected => "disconnected",
+            SendError::Timeout => "timeout",
             SendError::BadReply => "bad_reply",
             SendError::NodeShutdown => "node_shutdown",
         };
@@ -252,6 +259,7 @@ enum SwarmCmd {
 
 /// Duplicate-cache lanes (push protocols only).
 const DUP_LANES: usize = 4;
+const VOTE_DUP_REPLAY_MS: u64 = 60_000;
 
 const fn dup_lane(protocol: Protocol) -> Option<usize> {
     match protocol {
@@ -490,7 +498,7 @@ impl P2pHandle {
             header: Bounded(header),
         };
         let rx = self.enqueue(peer, Protocol::BraidHeader, env.encode_canonical());
-        async move { decode_reply::<HeaderReplyV1>(rx.await) }
+        async move { await_reply::<HeaderReplyV1>(rx).await }
     }
 
     /// Request a header by hash.
@@ -504,12 +512,25 @@ impl P2pHandle {
             header_hash,
         };
         let rx = self.enqueue(peer, Protocol::BraidHeader, env.encode_canonical());
-        async move { decode_reply::<HeaderReplyV1>(rx.await) }
+        async move { await_reply::<HeaderReplyV1>(rx).await }
     }
 
     /// Targeted repair: assemble THIS body from bounded, concurrently fetched
     /// priority-lane chunks.
     pub async fn request_body(
+        &self,
+        peer: PeerId,
+        block_hash: [u8; 32],
+    ) -> Result<Option<Vec<u8>>, SendError> {
+        tokio::time::timeout(
+            OUTBOUND_DELIVERY_TIMEOUT,
+            self.request_body_inner(peer, block_hash),
+        )
+        .await
+        .map_err(|_| SendError::Timeout)?
+    }
+
+    async fn request_body_inner(
         &self,
         peer: PeerId,
         block_hash: [u8; 32],
@@ -568,9 +589,7 @@ impl P2pHandle {
             .acquire()
             .await
             .map_err(|_| SendError::NodeShutdown)?;
-        if !wait_ready(&self.shared, peer).await {
-            return Err(SendError::Disconnected);
-        }
+        wait_request_ready(&self.shared, peer).await?;
         let request = BodyRequestV1 {
             chain_id: self.chain_id(),
             block_hash,
@@ -611,7 +630,7 @@ impl P2pHandle {
             vote: Bounded(vote),
         };
         let rx = self.enqueue(peer, Protocol::BraidVote, env.encode_canonical());
-        async move { decode_reply::<PushReplyV1>(rx.await) }
+        async move { await_reply::<PushReplyV1>(rx).await }
     }
 
     /// Push a transaction (normal lane).
@@ -625,7 +644,7 @@ impl P2pHandle {
             tx: Bounded(tx),
         };
         let rx = self.enqueue(peer, Protocol::LumenTx, env.encode_canonical());
-        async move { decode_reply::<PushReplyV1>(rx.await) }
+        async move { await_reply::<PushReplyV1>(rx).await }
     }
 
     /// Request an ascending header range (priority lane).
@@ -641,7 +660,7 @@ impl P2pHandle {
             max_headers,
         };
         let rx = self.enqueue(peer, Protocol::SyncRange, env.encode_canonical());
-        async move { decode_reply::<RangeReplyV1>(rx.await) }
+        async move { await_reply::<RangeReplyV1>(rx).await }
     }
 
     /// Request finalized light-client history (priority lane). The request and
@@ -664,7 +683,7 @@ impl P2pHandle {
             let Some(rx) = rx else {
                 return Err(SendError::BadReply);
             };
-            let reply = decode_reply::<LightUpdateReplyV1>(rx.await)?;
+            let reply = await_reply::<LightUpdateReplyV1>(rx).await?;
             if reply.chain_id != chain_id
                 || reply.genesis_hash != genesis_hash
                 || reply.requested_start != start_height
@@ -690,7 +709,7 @@ impl P2pHandle {
             chunk_index,
         };
         let rx = self.enqueue(peer, Protocol::SyncSnapshot, env.encode_canonical());
-        async move { decode_reply::<SnapshotReplyV1>(rx.await) }
+        async move { await_reply::<SnapshotReplyV1>(rx).await }
     }
 
     /// Request one DA shard (normal lane).
@@ -706,7 +725,7 @@ impl P2pHandle {
             shard_index,
         };
         let rx = self.enqueue(peer, Protocol::BlobShard, env.encode_canonical());
-        async move { decode_reply::<ShardReplyV1>(rx.await) }
+        async move { await_reply::<ShardReplyV1>(rx).await }
     }
 
     /// Push a Work Loom receipt (normal lane). While the lane is disabled the
@@ -721,7 +740,7 @@ impl P2pHandle {
             receipt: Bounded(receipt),
         };
         let rx = self.enqueue(peer, Protocol::LoomReceipt, env.encode_canonical());
-        async move { decode_reply::<PushReplyV1>(rx.await) }
+        async move { await_reply::<PushReplyV1>(rx).await }
     }
 
     /// Opens a raw substream, bypassing envelopes and lanes — conformance
@@ -801,6 +820,15 @@ fn decode_reply<T: NoosDecode>(
 ) -> Result<T, SendError> {
     let bytes = raw.map_err(|_| SendError::Disconnected)??;
     T::decode_canonical(&bytes).map_err(|_| SendError::BadReply)
+}
+
+async fn await_reply<T: NoosDecode>(
+    rx: oneshot::Receiver<Result<Vec<u8>, SendError>>,
+) -> Result<T, SendError> {
+    let raw = tokio::time::timeout(OUTBOUND_DELIVERY_TIMEOUT, rx)
+        .await
+        .map_err(|_| SendError::Timeout)?;
+    decode_reply(raw)
 }
 
 /// Non-poisoning lock: this crate never panics while holding a mutex, and a
@@ -1293,6 +1321,27 @@ async fn accept_loop(
     }
 }
 
+/// Waits for an outbound target to become handshake-ready. The public
+/// request's end-to-end deadline bounds this wait across reconnects.
+async fn wait_request_ready(shared: &Arc<Shared>, peer: PeerId) -> Result<(), SendError> {
+    let rx = {
+        let peers = lock(&shared.peers);
+        peers.get(&peer).map(|entry| entry.ready_tx.subscribe())
+    };
+    let Some(mut rx) = rx else {
+        std::future::pending::<()>().await;
+        return Err(SendError::Disconnected);
+    };
+    loop {
+        match *rx.borrow() {
+            ReadyState::Ready => return Ok(()),
+            ReadyState::Rejected => return Err(SendError::PeerRejected),
+            ReadyState::Pending => {}
+        }
+        rx.changed().await.map_err(|_| SendError::NodeShutdown)?;
+    }
+}
+
 /// Waits (with grace) for the peer's handshake to complete.
 async fn wait_ready(shared: &Arc<Shared>, peer: PeerId) -> bool {
     let rx = {
@@ -1372,13 +1421,20 @@ fn check_chain(shared: &Shared, chain_id: &[u8; 32]) -> Result<(), Violation> {
     }
 }
 
-/// Duplicate-cache insert; `true` = first sight.
+/// Duplicate-cache insert; `true` = first sight inside the protocol's replay
+/// window. Finality votes become deliverable again because durable recovery
+/// intentionally re-sends identical signed votes after peers reconnect.
 fn dup_fresh(shared: &Shared, protocol: Protocol, payload: &[u8]) -> bool {
     let Some(lane) = dup_lane(protocol) else {
         return true;
     };
     let digest = message_digest(protocol, payload);
-    lock(&shared.dups)[lane].insert(digest)
+    let mut dups = lock(&shared.dups);
+    if protocol == Protocol::BraidVote {
+        dups[lane].insert_replayable(digest, shared.now_ms(), VOTE_DUP_REPLAY_MS)
+    } else {
+        dups[lane].insert(digest)
+    }
 }
 
 fn dispatch(

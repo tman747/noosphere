@@ -146,11 +146,12 @@ pub fn validate_vote(
     let member = snapshot
         .member(&vote.validator_id)
         .ok_or(WitnessError::UnknownValidator)?;
-    if !view.is_justified(&vote.source) {
-        return Err(WitnessError::SourceNotJustified);
-    }
     if !view.descends(&vote.source, &vote.target) {
         return Err(WitnessError::TargetNotDescended);
     }
-    vote.verify_signature(&BlsPublicKey::from_bytes(member.consensus_bls_key.0))
+    vote.verify_signature(&BlsPublicKey::from_bytes(member.consensus_bls_key.0))?;
+    if !view.is_justified(&vote.source) {
+        return Err(WitnessError::SourceNotJustified);
+    }
+    Ok(())
 }

@@ -4,6 +4,7 @@ import {
   canonicalJson,
   findCheck,
   validateModelResolution,
+  validateWwmRecord,
   verifyMonitorEnvelope,
 } from "../neural-core-v3.mjs";
 
@@ -15,7 +16,7 @@ const SIGNING_DOMAIN = new TextEncoder().encode("NOOS/SIG/WWM/PUBLIC-INFERENCE/V
 const HEX32 = /^[0-9a-f]{64}$/;
 const U64 = /^(0|[1-9][0-9]{0,19})$/;
 const RECEIPT_STATUSES = new Set(["COMPLETED", "CANCELLED", "FAILED", "NO_QUORUM"]);
-const EVENT_TYPES = new Set(["output.delta", "evidence.updated", "receipt.completed"]);
+const EVENT_TYPES = new Set(["output.delta", "evidence.updated", "receipt.completed", "settlement.finalized"]);
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
@@ -185,6 +186,7 @@ function validateGatewayProjection(resolution, model, sample) {
 
 export async function verifyResolution(resolution, gatewayState) {
   invariant(isRecord(gatewayState), "gateway state envelope is missing");
+  invariant(gatewayState.interactive_chain_settlement === true, "interactive chain settlement is unavailable");
   invariant(
     isRecord(gatewayState.signer)
       && gatewayState.signer.algorithm === "Ed25519"
@@ -250,10 +252,84 @@ export async function verifyStreamEvent(event, active, jobId) {
       "signed output delta binding is invalid",
     );
     requireHex32(payload.data.incremental_output_root, "incremental output root");
-  } else if (payload.type === "receipt.completed") {
+  } else if (payload.type === "receipt.completed" || payload.type === "settlement.finalized") {
     invariant(payload.data.job_id === jobId, "terminal event job binding mismatch");
+    if (payload.type === "settlement.finalized") {
+      invariant(payload.data.settlement_state === "FINALIZED_PAID", "settlement event is not finalized");
+    }
   }
   return verifySignedEnvelope(payload, "STREAM-EVENT");
+}
+
+export async function verifyFinalizedSettlement(receipt) {
+  const lifecycle = receipt.chain_settlement;
+  invariant(
+    isRecord(lifecycle)
+      && lifecycle.schema === "noos/wwm-public-inference-chain-settlement/v1"
+      && lifecycle.job_id === receipt.job_id
+      && lifecycle.receipt_id === receipt.receipt_id,
+    "finalized settlement lifecycle binding is invalid",
+  );
+  const settlementId = requireHex32(lifecycle.settlement_id, "settlement ID");
+  for (const field of ["open_transaction_id", "close_transaction_id"]) {
+    if (lifecycle[field] !== undefined) requireHex32(lifecycle[field], field);
+  }
+  invariant(isRecord(lifecycle.finalized), "finalized settlement summaries are missing");
+  const [job, chainReceipt, settlement] = await Promise.all([
+    fetchJson(`/api/wwm-record/job/${encodeURIComponent(receipt.job_id)}`),
+    fetchJson(`/api/wwm-record/receipt/${encodeURIComponent(receipt.receipt_id)}`),
+    fetchJson(`/api/wwm-record/settlement/${encodeURIComponent(settlementId)}`),
+  ]);
+  validateWwmRecord(job, "job", receipt.job_id);
+  validateWwmRecord(chainReceipt, "receipt", receipt.receipt_id);
+  validateWwmRecord(settlement, "settlement", settlementId);
+  for (const [kind, value] of Object.entries({ job, receipt: chainReceipt, settlement })) {
+    const summary = lifecycle.finalized[kind];
+    invariant(
+      isRecord(summary)
+        && Number.isSafeInteger(summary.finalized_height)
+        && summary.finalized_height >= 0,
+      `finalized ${kind} summary is malformed`,
+    );
+    requireHex32(summary.finalized_hash, `finalized ${kind} summary hash`);
+    requireHex32(summary.objects_root, `finalized ${kind} summary objects root`);
+    invariant(
+      value.finalized_height >= summary.finalized_height,
+      `finalized ${kind} proof regressed behind its signed summary`,
+    );
+    if (value.finalized_height === summary.finalized_height) {
+      invariant(
+        summary.finalized_hash === value.finalized_hash
+          && summary.objects_root === value.objects_root,
+        `finalized ${kind} summary mismatch`,
+      );
+    }
+  }
+  invariant(
+    job.record.job_id === receipt.job_id
+      && job.record.capsule_id === receipt.capsule_id
+      && job.record.execution_profile_id === receipt.execution_profile_id,
+    "finalized job record changed the inference binding",
+  );
+  invariant(
+    chainReceipt.record.receipt_id === receipt.receipt_id
+      && chainReceipt.record.job_id === receipt.job_id
+      && chainReceipt.record.output_root === receipt.output_root
+      && chainReceipt.record.token_history_root === receipt.token_history_root,
+    "finalized receipt record changed the output binding",
+  );
+  invariant(
+    settlement.record.settlement_id === settlementId
+      && settlement.record.job_id === receipt.job_id
+      && settlement.record.receipt_id === receipt.receipt_id,
+    "finalized settlement record changed lifecycle identities",
+  );
+  invariant(
+    job.finalized_height <= chainReceipt.finalized_height
+      && chainReceipt.finalized_height <= settlement.finalized_height
+      && receipt.chain_anchor === lifecycle.finalized.settlement.finalized_hash,
+    "settlement finality or chain anchor is invalid",
+  );
 }
 
 export async function verifyReceipt(receipt, active) {
@@ -265,21 +341,38 @@ export async function verifyReceipt(receipt, active) {
       && receipt.query_profile_id === active.query_profile_id
       && RECEIPT_STATUSES.has(receipt.terminal_status)
       && receipt.execution_scope === "OFF_CHAIN_INTERACTIVE_TESTNET"
-      && receipt.settlement_state === "PENDING_CHAIN"
-      && receipt.chain_anchor === null
       && receipt.production === false
-      && receipt.promotion_effect === "NONE",
+      && receipt.promotion_effect === "NONE"
+      && receipt.payment_mode === "SPONSORED",
     "receipt scope or active-capsule binding is invalid",
   );
+  requireHex32(receipt.receipt_id, "receipt ID");
+  requireHex32(receipt.job_id, "receipt job ID");
+  requireHex32(receipt.prompt_commitment, "receipt prompt commitment");
+  const signatureValid = await verifySignedEnvelope(receipt, "RECEIPT");
+  if (!signatureValid) return false;
   if (receipt.terminal_status === "COMPLETED") {
     invariant(receipt.evidence_state === "PROVISIONAL_SIGNED", "completed receipt evidence is invalid");
     requireHex32(receipt.output_root, "receipt output root");
+    invariant(receipt.output_commitment === receipt.output_root, "receipt output commitment mismatch");
     requireHex32(receipt.token_history_root, "receipt token history root");
     invariant(Number.isSafeInteger(receipt.output_tokens) && receipt.output_tokens > 0 && receipt.output_tokens <= 16, "receipt output token count is invalid");
+    if (receipt.settlement_state === "PENDING_CHAIN") {
+      invariant(receipt.chain_anchor === null && receipt.chain_settlement === undefined, "pending settlement overclaims finality");
+    } else {
+      invariant(receipt.settlement_state === "FINALIZED_PAID", "completed receipt settlement state is invalid");
+      requireHex32(receipt.chain_anchor, "receipt chain anchor");
+      await verifyFinalizedSettlement(receipt);
+    }
   } else {
-    invariant(receipt.evidence_state === "NONE", "non-complete receipt must not claim output evidence");
+    invariant(
+      receipt.evidence_state === "NONE"
+        && receipt.settlement_state === "PENDING_CHAIN"
+        && receipt.chain_anchor === null,
+      "non-complete receipt overclaims evidence or settlement",
+    );
   }
-  return verifySignedEnvelope(receipt, "RECEIPT");
+  return true;
 }
 
 export const expectedIdentity = Object.freeze({ chain_id: CHAIN_ID, genesis_hash: GENESIS_HASH });

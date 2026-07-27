@@ -524,6 +524,25 @@ fn duplicate_ticket_tuple_rejected_and_window_resets_at_finality() {
     assert!(!scan.contains(&proposer, 10, &ticket.extra_nonce));
 }
 
+#[test]
+fn duplicate_ticket_index_respects_branch_ancestry() {
+    let (mut dag, ghash) = new_dag();
+    let a1 = extend(&mut dag, ghash, 1, 1, 7);
+    let b1 = extend(&mut dag, ghash, 1, 2, 8);
+
+    let same_branch = mk_header(a1, 2, 3, MODEST, 0, 0);
+    assert_eq!(
+        dag.insert(same_branch, &mk_ticket(7)).unwrap_err(),
+        DagError::DuplicateTicketTuple
+    );
+
+    let sibling_branch = mk_header(b1, 2, 4, MODEST, 0, 0);
+    assert!(matches!(
+        dag.insert(sibling_branch, &mk_ticket(7)).unwrap(),
+        InsertOutcome::Inserted { .. }
+    ));
+}
+
 // ---------------------------------------------------------------------------
 // Fork choice
 // ---------------------------------------------------------------------------

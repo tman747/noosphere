@@ -43,8 +43,8 @@ throughput_arguments=(
   --mempool-max-bytes 67108864
   --mempool-per-source-pending 65536
   --mempool-per-account-pending 65536
-  --template-byte-budget 33554432
-  --template-max-transactions 32768
+  --template-byte-budget 983040
+  --template-max-transactions 16384
 )
 if [[ "${NODE_ROLE}" == "validator" ]]; then
   arguments+=(--validator --produce-interval-ms "${PRODUCE_INTERVAL_MS}" "${throughput_arguments[@]}")
