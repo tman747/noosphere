@@ -554,7 +554,7 @@ scenarios and wrote
 | `PROMOTE-03` | `DONE` | Deterministic exact-revision protocol, cryptography, economics, operations, wallet, and browser audit handoff packaging includes reproducible verification, source/blob manifests, raw vectors, threat inventory, report templates, and signed-independence ingestion. |
 | `PROMOTE-04` | `EXTERNAL_BLOCKED` | Complete deterministic cross-language vectors, mutation/fuzz, small-state, model/runtime, authorization, and independent reproduction. |
 | `PROMOTE-05` | `EXTERNAL_BLOCKED` | Run all client pairings across two independently managed client/verifier families with restart, snapshot, proof, unknown-tag, oversize, WAN, and AI-off tests. |
-| `PROMOTE-06` | `DURATION_BLOCKED` | Collect 90 public cryptographic/economic days, 30 application days, and seven uninterrupted AI-off days at the exact frozen revision. |
+| `PROMOTE-06` | `DURATION_BLOCKED` | Append-only threshold-signed public-duration automation is complete; collect 90 public cryptographic/economic days, 30 application days, and seven uninterrupted AI-off days at the exact frozen revision. |
 | `PROMOTE-07` | `OWNER_BLOCKED` | Complete parameter Quiet Week, post-freeze Bitcoin anchor, multiparty DKG, final genesis reproduction, and all-AI-off bootstrap demonstration. |
 | `PROMOTE-08` | `EXTERNAL_BLOCKED` | Run a 180-day capped-value canary with one-checkpoint disable, target recovery, independent exits, WAN, blackout, and saturation drills. |
 | `PROMOTE-09` | `OWNER_BLOCKED` | Collect final multiparty signatures over identical release, genesis, evidence, role, governance, and cutover bytes only after every lower gate passes. |
@@ -571,6 +571,15 @@ and outer SHA-256
 The bundle remains `READY_FOR_EXTERNAL_AUDITOR_HANDOFF`; it explicitly records
 `external_audit_complete=false`, has no promotion effect, and does not satisfy
 `EXT-03`.
+
+At revision `3f0e0bbd25d9512947c4851fe2eafa46b932072b`, the 16 focused
+`public_duration.py` tests passed. They cover exact-revision manifest
+signatures, threshold-signed monotonic checkpoints, external publication-time
+binding, replay and retrospective-anchor rejection, OpenTimestamps/Bitcoin
+trust, gap limits, drills, and lane durations. A CLI smoke against the
+not-started template and an empty ledger returned `NOT_STARTED`, zero
+qualifying days, and `promotion_effect=NONE`. The collector and verifier are
+complete; no real G3 day has been claimed.
 
 ### Track M — external prerequisites
 
