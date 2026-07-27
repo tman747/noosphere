@@ -4,6 +4,8 @@
 //! never projects a metadata budget: it carries canonical Lumen job, receipt,
 //! settlement, and the exact pinned Work Loom obligation.
 #![forbid(unsafe_code)]
+pub mod governance;
+pub mod marketplace;
 use noos_lumen::wwm::{
     FundBucketTag, WwmEvidenceTier, WwmJobV1, WwmReceiptV1, WwmSettlementV1, WwmTerminalCode,
 };

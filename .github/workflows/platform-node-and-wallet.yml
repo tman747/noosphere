@@ -106,6 +106,7 @@ jobs:
           cargo test --locked -p noos-cli
           cargo test --locked -p noos-workerd
           cargo test --locked -p noos-mind
+          cargo test --locked -p noos-commerce
           cargo test --locked -p noos-umbra
           cargo test --locked -p noos-private-besi
           cargo test --locked -p noos-route
