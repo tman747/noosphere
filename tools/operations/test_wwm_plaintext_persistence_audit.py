@@ -75,6 +75,27 @@ class PlaintextPersistenceAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(audit.AuditError, "failing persistence scan"):
             audit.seal_matrix(reports, self.seed)
 
+    def test_all_private_state_classes_are_audited_without_echoing_plaintext(self) -> None:
+        canaries = {
+            "database": [b"PRIVATE_PROMPT_01234567"],
+            "cache": [b"PRIVATE_CONTEXT_0123456"],
+            "logs": [b"PRIVATE_ACTIVATION_0123"],
+            "crash_artifacts": [b"PRIVATE_KV_STATE_012345"],
+            "telemetry": [b"PRIVATE_LOGITS_01234567", b"PRIVATE_OUTPUT_01234567"],
+        }
+        for category, values in canaries.items():
+            self.targets[category].joinpath(f"{category}.bin").write_bytes(b"\n".join(values))
+        flattened = [canary for values in canaries.values() for canary in values]
+        body = audit.perform_scan(self.manifest("reboot"), flattened)
+        self.assertEqual(body["verdict"], "FAIL")
+        self.assertEqual(
+            {row["canary_sha256"] for row in body["findings"]},
+            {audit.sha256(canary) for canary in flattened},
+        )
+        encoded = audit.canonical_json(body)
+        for canary in flattened:
+            self.assertNotIn(canary, encoded)
+
     def test_chunk_boundary_and_case_folded_match_are_detected(self) -> None:
         canary = b"BOUNDARY_CANARY_ABCDEF"
         prefix = b"x" * (audit.CHUNK_BYTES - 5)

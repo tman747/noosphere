@@ -421,7 +421,7 @@ also executes these suites; its result is not claimed before completion.
 | ID | State | Work and exit |
 |---|---|---|
 | `PRIVATE-01` | `EXTERNAL_BLOCKED` | Composite CPU/GPU/workload quote verification is implemented; fresh vendor-backed hardware, firmware, revocation, rollback-counter, model-identity, and client-challenge evidence is still external. |
-| `PRIVATE-02` | `READY` | Add encrypted private retrieval and output with blinded profile-specific receipts and local key/history control. |
+| `PRIVATE-02` | `DONE` | Explicit local, same-workload, and separately attested retrieval modes bind snapshot, profile, leakage budget, encrypted query and citations; fixed-bucket output and signed blinded receipts use client-held output and history keys with no public fallback. |
 | `PRIVATE-03` | `READY` | Prove prompt, context, activation, KV, logits, and output do not persist in host-visible cache, logs, crash state, or telemetry. |
 | `PRIVATE-04` | `DONE` | Signed ODoH/OHTTP/onion route selection enforces fixed buckets, control-cluster diversity, explicit route disclosure, and fail-closed private retry with no direct fallback. |
 | `PRIVATE-05` | `DONE` | Native origins bind publisher key, immutable content identity, and version; encrypted origin keys partition cookies, storage, IndexedDB, service workers, cache, TLS, circuits, history, and permission receipts. |
@@ -436,6 +436,16 @@ buckets and direct-fallback traps; origin/partition isolation and nonce
 separation; and two-builder update admission with bounded rollback. These
 software checks do not substitute for the external hardware and independent
 build evidence retained in `PRIVATE-01` and `PRIVATE-06`.
+
+Revision `25d9402dbca40d77f3dc1b594f36e35dc9bfe183` adds the
+profile-bound private retrieval disclosure, XChaCha20-Poly1305 fixed-bucket
+output envelope, encrypted citation IDs, locally keyed history binding, and
+executor-signed blinded receipt. Wrong keys, profile substitution, route
+tampering, attestation downgrade, ciphertext tampering, and missing completed
+output reject. `noos-umbra` and `noos-wallet` passed 80 tests locally;
+exact-revision CI run
+[`30303863679`](https://github.com/tman747/noosphere/actions/runs/30303863679)
+is not claimed before completion.
 
 ### Track K — application economy
 
