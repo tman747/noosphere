@@ -385,21 +385,36 @@ satisfy either gate.
 
 | ID | State | Work and exit |
 |---|---|---|
-| `MIND-01` | `READY` | Promote MindLink from local import semantics to a canonical rights, visibility, provenance, challenge, correction, and future-use revocation object. |
-| `MIND-02` | `READY` | Build immutable rights-filtered knowledge snapshots with inclusion, exclusion, supersession, and rollback proofs. |
-| `MIND-03` | `READY` | Build deterministic lexical/graph/vector index profiles with independent builders, tie vectors, manifests, and rebuild equality. |
-| `MIND-04` | `READY` | Bind snapshot, index roots, policy, selected links, ranks, citation spans, builder, and context root in retrieval receipts. |
+| `MIND-01` | `DONE` | Canonical signed MindLinks bind rights, visibility, provenance, challenge, correction, and future-use revocation. |
+| `MIND-02` | `DONE` | Immutable rights-filtered snapshots prove inclusion, exclusion, supersession, rollback, and independent-builder equality. |
+| `MIND-03` | `DONE` | Deterministic lexical, graph, and vector profiles bind manifests, tie vectors, index roots, and reproducible rebuilds. |
+| `MIND-04` | `DONE` | Signed retrieval receipts bind snapshot and index roots, policy, selected links, ranks, citation spans, builder, and context root. |
 | `MIND-05` | `EXTERNAL_BLOCKED` | Run poisoning, Sybil, copied-source, stale-fact, invalid-rights, minority-correction, revocation, and private-draft leak campaigns. |
+
+The code-controlled exits for `MIND-01` through `MIND-04` are implemented in
+`crates/noos-mind`. At revision
+`3dc664bf9c2be347bfd51a88bffc92edc99cdb63`, `cargo test --locked -p
+noos-mind` passed all 22 library and operator tests locally. Exact-revision CI
+run [`30303085311`](https://github.com/tman747/noosphere/actions/runs/30303085311)
+also exercises this crate; its result is not claimed before completion.
 
 ### Track I — governed immutable improvement
 
 | ID | State | Work and exit |
 |---|---|---|
-| `IMPROVE-01` | `READY` | Commit rights-clean dataset membership, train/eval split, exclusions, canaries, recipe, code, compiler, budget, and parent roots. |
-| `IMPROVE-02` | `READY` | Create insert-once adapter candidates with immutable lineage, artifacts, receipts, evaluations, and explicit rollback parent. |
-| `IMPROVE-03` | `READY` | Enforce distinct proposer, trainer, evaluator, challenger, activator, and emergency authority scopes. |
-| `IMPROVE-04` | `READY` | Run shadow and staged canary traffic with hard floors, automatic parent rollback, emergency expiry, and old-revision pinning. |
+| `IMPROVE-01` | `DONE` | Signed dataset snapshots bind rights-clean sorted membership, train/eval split, exclusions, private canaries, recipe, code, compiler, budget, and parent roots. |
+| `IMPROVE-02` | `DONE` | Insert-once adapter candidates bind immutable lineage, artifacts, checkpoints, receipts, evaluations, and an explicit rollback parent. |
+| `IMPROVE-03` | `DONE` | Signed role-scoped records and gates separate proposer, trainer, evaluator, challenger, activator, and emergency authority. |
+| `IMPROVE-04` | `DONE` | Shadow and staged canary control enforces floors, ordered ceilings, automatic parent rollback, emergency expiry, and old-revision pinning. |
 | `IMPROVE-05` | `EXTERNAL_BLOCKED` | Run independent poisoning, model replacement, benchmark gaming, extraction, memorization, privacy, and evaluator-capture campaigns. |
+
+The code-controlled exits for `IMPROVE-01` through `IMPROVE-04` are
+implemented by `wwm_model_improvement.py` and `wwm_continuous_learning.py`.
+At revision `3dc664bf9c2be347bfd51a88bffc92edc99cdb63`, their model-improvement,
+continuous-learning, and web-capacity suites passed all 36 tests locally.
+Exact-revision CI run
+[`30303085311`](https://github.com/tman747/noosphere/actions/runs/30303085311)
+also executes these suites; its result is not claimed before completion.
 
 ### Track J — private inference and Mind Browser
 
