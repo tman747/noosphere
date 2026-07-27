@@ -116,6 +116,16 @@ jobs:
           cargo test --locked -p noos-route
           cargo test --locked -p noos-mix
           cargo test --locked -p noos-wallet
+      - name: Verify genesis ceremony reproduction
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --only-binary=:all: "blake3==1.0.9" "cryptography==49.0.0" "py-ecc==8.0.0"
+          cargo build --locked --release -p noos-node --bin noos-genesis-vector
+          cargo run --quiet --locked --release -p noos-node --bin noos-genesis-vector -- --params protocol/genesis/devnet-parameters.toml --genesis-time 1760000000000
+          python -m unittest -v tools.genesis.test_production_authorization
+          python tools/genesis/ceremony.py --self-test
       - name: Test mobile wallet SDK boundary
         shell: bash
         run: cargo test --locked -p noos-wallet-sdk

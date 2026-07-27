@@ -360,6 +360,32 @@ class ParameterAndSignatureTests(AuthorizationFixtures, unittest.TestCase):
         with self.assertRaisesRegex(pa.AuthorizationError, "devnet bond fixture"):
             pa.canonical_mainnet_manifest(devnet_bond)
 
+    def test_risk_review_controls_are_required_zero_and_uniquely_bound(self):
+        self.assertEqual(set(pa.ZERO_CONTROLS), set(pa.CONTROL_PARAM_NAMES))
+        self.assertEqual(
+            pa.CONTROL_PARAM_NAMES["lending_reviewed_enabled"],
+            "lending_reviewed",
+        )
+        self.assertEqual(
+            pa.CONTROL_PARAM_NAMES["bridge_reviewed_enabled"],
+            "bridge_reviewed",
+        )
+        self.assertEqual(
+            len(pa.CONTROL_PARAM_NAMES),
+            len(set(pa.CONTROL_PARAM_NAMES.values())),
+        )
+        for control in ("lending_reviewed_enabled", "bridge_reviewed_enabled"):
+            with self.subTest(control=control, mutation="missing"):
+                missing = copy.deepcopy(self.params)
+                del missing["controls"][control]
+                with self.assertRaisesRegex(pa.AuthorizationError, control):
+                    pa.validate_mainnet_parameters(missing, test_mode=True)
+            with self.subTest(control=control, mutation="enabled"):
+                enabled = copy.deepcopy(self.params)
+                enabled["controls"][control] = True
+                with self.assertRaisesRegex(pa.AuthorizationError, control):
+                    pa.validate_mainnet_parameters(enabled, test_mode=True)
+
     def test_unresolved_address_layout_keeps_production_builder_owner_blocked(self):
         allocation = copy.deepcopy(self.allocation)
         allocation.pop("is_test_fixture")
