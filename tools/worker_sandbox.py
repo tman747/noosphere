@@ -393,7 +393,6 @@ def _linux_battery() -> tuple[bool | None, int | None, bool | None]:
 
 def _windows_battery() -> tuple[bool | None, int | None, bool | None]:
     try:
-
         class SystemPowerStatus(ctypes.Structure):
             _fields_ = [
                 ("ACLineStatus", ctypes.c_ubyte),
