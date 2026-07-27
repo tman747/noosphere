@@ -549,7 +549,7 @@ scenarios and wrote
 
 | ID | State | Work and exit |
 |---|---|---|
-| `PROMOTE-01` | `OWNER_BLOCKED` | Sign protocol/API/peer v2 identity, predecessor root, schemas, domains, bounds, authorization, rollback, and mixed-version rejection. |
+| `PROMOTE-01` | `OWNER_BLOCKED` | Protocol/API/peer v2 schemas, predecessor, domains, bounds, authorization, rollback, and mixed-version rejection are frozen and validated; owner identity signatures and independent G0 review remain. |
 | `PROMOTE-02` | `OWNER_BLOCKED` | Resolve production chain, genesis, authorities, economics, operators, origins, retention, and release constants in exact signed records. |
 | `PROMOTE-03` | `DONE` | Deterministic exact-revision protocol, cryptography, economics, operations, wallet, and browser audit handoff packaging includes reproducible verification, source/blob manifests, raw vectors, threat inventory, report templates, and signed-independence ingestion. |
 | `PROMOTE-04` | `EXTERNAL_BLOCKED` | Complete deterministic cross-language vectors, mutation/fuzz, small-state, model/runtime, authorization, and independent reproduction. |
@@ -602,6 +602,15 @@ Four focused cutover tests passed the valid test-only signature path and
 rejected a blocked lower gate, a missing role, component-hash substitution,
 dummy signature objects, and signed gate records whose referenced evidence
 bytes were absent. No production key or final signature exists or is implied.
+
+At revision `a58e8781c19ee1611290b29b450d24fe206ce744`, all eight focused
+protocol-v2 contract tests passed. They reject missing, wrong, or cyclic V1
+predecessors; V1/V2 cross-decoding; mixed protocol/API/peer identities; unknown
+actions and payload tags; every frozen bound plus one; and fabricated pass
+records. The explicit V2 promotion CLI also returned structurally valid while
+preserving `DNS PROHIBITED` and an honestly blocked promotion. This completes
+the repository-controlled contract freeze, not the owner signature or
+independent G0 review.
 
 ### Track M — external prerequisites
 
