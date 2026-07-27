@@ -249,6 +249,14 @@ The exact-revision proof for `NATIVE-01`, `NATIVE-02`, `NATIVE-03`, and
 all eight jobs completed successfully for
 `0d5f1c40c5c7317dc0570ffa40fd7be59dae5d72`.
 
+`mobile_device_evidence.py` now validates signed per-device observations,
+required security-state coverage, and exact-revision bundles;
+`mobile_release_reproduction.py` preserves raw independent-builder subjects
+and records byte-for-byte differences. These collection workflows are done.
+The physical-device observations and genuinely independent builds remain the
+external exits in `NATIVE-04` and `NATIVE-06`; local self-attestation cannot
+satisfy either gate.
+
 ### Track G — deterministic model assurance
 
 | ID | State | Work and exit |
