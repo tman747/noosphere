@@ -462,6 +462,9 @@ export class WwmV2Client {
       || typeof job.replayed !== "boolean"
       || !Number.isSafeInteger(job.deadline_at_ms)
       || job.deadline_at_ms < 0
+      || !Number.isSafeInteger(job.queue_depth_at_submit)
+      || job.queue_depth_at_submit < 0
+      || job.queue_depth_at_submit > 2
       || !["QUEUED", "RUNNING", "CANCEL_REQUESTED", "COMPLETED", "CANCELLED", "FAILED", "NO_QUORUM"].includes(job.status)) {
       fail("job_binding_mismatch");
     }

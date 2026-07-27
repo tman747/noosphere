@@ -104,6 +104,7 @@ jobs:
           cargo test --locked -p noos-node --lib -- --test-threads=1
           cargo test --locked -p noos-lumen
           cargo test --locked -p noos-cli
+          cargo test --locked -p noos-workerd
       - name: Test mobile wallet SDK boundary
         shell: bash
         run: cargo test --locked -p noos-wallet-sdk
@@ -358,8 +359,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p browser-capacity-evidence
-          python -m pip install --disable-pip-version-check --only-binary=:all: "cryptography==49.0.0"
+          python -m pip install --disable-pip-version-check --only-binary=:all: "blake3==1.0.9" "cryptography==49.0.0"
           python -m pip show cryptography > browser-capacity-evidence/python-cryptography.txt
+          python -m pip show blake3 > browser-capacity-evidence/python-blake3.txt
           node --version | tee browser-capacity-evidence/node-version.txt
           node --test \
             site/wwm/client.test.mjs \
@@ -375,6 +377,10 @@ jobs:
             tools.operations.test_wwm_web_capacity_devnet \
             tools.operations.test_wwm_web_capacity_pilot \
             tools.operations.test_wwm_web_capacity_resilience \
+            tools.operations.test_wwm_public_inference \
+            tools.operations.test_wwm_inference_metrics \
+            tools.operations.test_wwm_plaintext_persistence_audit \
+            tools.operations.test_wwm_public_gateway \
             2>&1 | tee browser-capacity-evidence/python-tests.txt
       - name: Record exact browser capacity evidence
         shell: bash

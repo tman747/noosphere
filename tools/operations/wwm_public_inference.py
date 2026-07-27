@@ -747,6 +747,8 @@ class InferenceService:
                     prompt_commitment TEXT NOT NULL,
                     maximum_output_tokens INTEGER NOT NULL,
                     deadline_at_ms INTEGER NOT NULL,
+                    queue_depth_at_submit INTEGER NOT NULL,
+                    started_ms INTEGER,
                     status TEXT NOT NULL,
                     receipt_json TEXT,
                     created_ms INTEGER NOT NULL,
@@ -796,6 +798,13 @@ class InferenceService:
                     "UPDATE inference_jobs SET deadline_at_ms=created_ms+? WHERE deadline_at_ms IS NULL",
                     (JOB_DEADLINE_SECONDS * 1000,),
                 )
+            if "queue_depth_at_submit" not in job_columns:
+                db.execute("ALTER TABLE inference_jobs ADD COLUMN queue_depth_at_submit INTEGER")
+                db.execute(
+                    "UPDATE inference_jobs SET queue_depth_at_submit=0 WHERE queue_depth_at_submit IS NULL"
+                )
+            if "started_ms" not in job_columns:
+                db.execute("ALTER TABLE inference_jobs ADD COLUMN started_ms INTEGER")
         self._migrate_plaintext_storage()
 
     def _migrate_plaintext_storage(self) -> None:
@@ -1162,7 +1171,7 @@ class InferenceService:
         client_hash = self._client_hash(client)
         with self._admission_lock, self._connect() as db:
             replay = db.execute(
-                "SELECT job_id,quote_id,prompt_commitment,status,deadline_at_ms FROM inference_jobs WHERE client_hash=? AND idempotency_key=?",
+                "SELECT job_id,quote_id,prompt_commitment,status,deadline_at_ms,queue_depth_at_submit FROM inference_jobs WHERE client_hash=? AND idempotency_key=?",
                 (client_hash, key),
             ).fetchone()
             if replay is not None:
@@ -1175,6 +1184,7 @@ class InferenceService:
                         "job_id": replay["job_id"],
                         "status": replay["status"],
                         "deadline_at_ms": int(replay["deadline_at_ms"]),
+                        "queue_depth_at_submit": replay["queue_depth_at_submit"],
                         "replayed": True,
                     },
                 )
@@ -1254,8 +1264,9 @@ class InferenceService:
                 raise InferenceError(429, "EXECUTOR_QUEUE_FULL", "The bounded two-job waiting queue is full.", retry_after=30)
             job_id = secrets.token_hex(32)
             deadline_at_ms = now + JOB_DEADLINE_SECONDS * 1000
+            queue_depth_at_submit = queued + 1
             db.execute(
-                "INSERT INTO inference_jobs(job_id,quote_id,client_hash,idempotency_key,prompt,prompt_commitment,maximum_output_tokens,deadline_at_ms,status,created_ms,updated_ms) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO inference_jobs(job_id,quote_id,client_hash,idempotency_key,prompt,prompt_commitment,maximum_output_tokens,deadline_at_ms,queue_depth_at_submit,status,created_ms,updated_ms) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     job_id,
                     quote_id,
@@ -1265,6 +1276,7 @@ class InferenceService:
                     commitment,
                     quote["maximum_output_tokens"],
                     deadline_at_ms,
+                    queue_depth_at_submit,
                     "QUEUED",
                     now,
                     now,
@@ -1283,6 +1295,7 @@ class InferenceService:
                 "job_id": job_id,
                 "status": "QUEUED",
                 "deadline_at_ms": deadline_at_ms,
+                "queue_depth_at_submit": queue_depth_at_submit,
                 "replayed": False,
             },
         )
@@ -1895,9 +1908,10 @@ class InferenceService:
             elif self.now_ms() >= deadline_at_ms:
                 terminal_before_start = ("FAILED", "JOB_DEADLINE_EXPIRED")
             else:
+                started_ms = self.now_ms()
                 db.execute(
-                    "UPDATE inference_jobs SET status='RUNNING',updated_ms=? WHERE job_id=?",
-                    (self.now_ms(), job_id),
+                    "UPDATE inference_jobs SET status='RUNNING',started_ms=?,updated_ms=? WHERE job_id=?",
+                    (started_ms, started_ms, job_id),
                 )
         if terminal_before_start is not None:
             self._complete_without_output(job_id, *terminal_before_start)

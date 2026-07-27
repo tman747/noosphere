@@ -442,8 +442,8 @@ class PublicInferenceSettlementTest(unittest.TestCase):
             try:
                 job_id = submit_fixture_job(service, prompt)
                 with sqlite3.connect(database) as db:
-                    quote_id, deadline_at_ms = db.execute(
-                        "SELECT quote_id,deadline_at_ms FROM inference_jobs WHERE job_id=?",
+                    quote_id, deadline_at_ms, queue_depth_at_submit = db.execute(
+                        "SELECT quote_id,deadline_at_ms,queue_depth_at_submit FROM inference_jobs WHERE job_id=?",
                         (job_id,),
                     ).fetchone()
                 db.close()
@@ -461,8 +461,17 @@ class PublicInferenceSettlementTest(unittest.TestCase):
                 self.assertEqual(replay["job_id"], job_id)
                 self.assertEqual(replay["status"], "QUEUED")
                 self.assertEqual(replay["deadline_at_ms"], deadline_at_ms)
+                self.assertEqual(replay["queue_depth_at_submit"], queue_depth_at_submit)
+                self.assertEqual(queue_depth_at_submit, 1)
                 self.assertTrue(replay["replayed"])
                 service._execute_job(job_id)
+                with sqlite3.connect(database) as db:
+                    started_ms = db.execute(
+                        "SELECT started_ms FROM inference_jobs WHERE job_id=?",
+                        (job_id,),
+                    ).fetchone()[0]
+                db.close()
+                self.assertIsNotNone(started_ms)
                 completed = service.post(
                     "/api/wwm/v2/jobs",
                     {
@@ -919,7 +928,7 @@ class PublicInferenceSettlementTest(unittest.TestCase):
             finally:
                 terminal.close()
 
-    def test_restart_backfills_deadline_for_existing_database(self) -> None:
+    def test_restart_backfills_deadline_and_metric_columns_for_existing_database(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             database = Path(temporary) / "inference.sqlite3"
             first = InferenceService(
@@ -936,6 +945,8 @@ class PublicInferenceSettlementTest(unittest.TestCase):
                     "SELECT created_ms FROM inference_jobs WHERE job_id=?",
                     (job_id,),
                 ).fetchone()[0]
+                db.execute("ALTER TABLE inference_jobs DROP COLUMN started_ms")
+                db.execute("ALTER TABLE inference_jobs DROP COLUMN queue_depth_at_submit")
                 db.execute("ALTER TABLE inference_jobs DROP COLUMN deadline_at_ms")
             db.close()
 
@@ -948,15 +959,17 @@ class PublicInferenceSettlementTest(unittest.TestCase):
             )
             try:
                 with sqlite3.connect(database) as db:
-                    deadline_at_ms = db.execute(
-                        "SELECT deadline_at_ms FROM inference_jobs WHERE job_id=?",
+                    deadline_at_ms, queue_depth_at_submit, started_ms = db.execute(
+                        "SELECT deadline_at_ms,queue_depth_at_submit,started_ms FROM inference_jobs WHERE job_id=?",
                         (job_id,),
-                    ).fetchone()[0]
+                    ).fetchone()
                 db.close()
                 self.assertEqual(
                     deadline_at_ms,
                     created_ms + JOB_DEADLINE_SECONDS * 1000,
                 )
+                self.assertEqual(queue_depth_at_submit, 0)
+                self.assertIsNone(started_ms)
                 receipt = recovered.get(
                     f"/api/wwm/v2/jobs/{job_id}/receipt",
                     "",
