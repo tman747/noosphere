@@ -65,6 +65,8 @@ reflex_lane_enabled = false
 umbra_suite_enabled = false
 dream_lane_enabled = false
 class_gate_irreversible_budget = 0
+lending_reviewed_enabled = false
+bridge_reviewed_enabled = false
 
 [emission]
 # OWNER_BLOCKED (genesis-identity-v1.md §3 fields 25-32; constants-v1.toml

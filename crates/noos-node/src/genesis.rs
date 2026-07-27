@@ -57,14 +57,14 @@ pub const EMERGENCY_AUTHORITY_ACCOUNT: Hash32 = [0xE0; 32];
 /// Seed of the devnet fixture BLS proposer key (test networks only).
 pub const DEVNET_PROPOSER_SEED: [u8; 32] = [0x47; 32];
 
-/// The eight genesis controls, in manifest bit order (plan §6.8).
+/// The ten genesis controls, in manifest bit order (plan §6.8).
 ///
 /// These are the params-tree key names under `noos.control.<name>`;
 /// `noos-lumen::state::param_key` freezes full names at <= 32 bytes and
 /// `CONTROL_PREFIX` is 13 bytes, so every name here MUST be <= 19 bytes
 /// (enforced by `control_key_names_fit_frozen_param_law`). The long plan
 /// aliases are recorded next to each entry.
-pub const CONTROL_NAMES: [&str; 8] = [
+pub const CONTROL_NAMES: [&str; 10] = [
     "work_loom_credit",    // work_loom_credit_enabled
     "work_loom_weightcap", // work_loom_weight_cap != 0
     "witness_proofpower",  // witness_proofpower_bonus_enabled
@@ -73,6 +73,8 @@ pub const CONTROL_NAMES: [&str; 8] = [
     "umbra_suite",         // umbra_suite_enabled (all suites)
     "dream_lane",          // dream_lane_enabled
     "class_gate_budget",   // class_gate_irreversible_budget != 0
+    "lending_reviewed",    // exact-revision independent review gate
+    "bridge_reviewed",     // exact-revision independent review gate
 ];
 
 // ---------------------------------------------------------------------------
@@ -267,7 +269,7 @@ impl DevnetParams {
     }
 
     fn validate(&self, map: &std::collections::BTreeMap<String, String>) -> Result<(), NodeError> {
-        // The six genesis controls: ALL radical controls must be off.
+        // All ten genesis controls are fail-closed.
         for (key, expect) in [
             ("controls.work_loom_credit_enabled", "false"),
             ("controls.work_loom_weight_cap", "0"),
@@ -277,6 +279,8 @@ impl DevnetParams {
             ("controls.umbra_suite_enabled", "false"),
             ("controls.dream_lane_enabled", "false"),
             ("controls.class_gate_irreversible_budget", "0"),
+            ("controls.lending_reviewed_enabled", "false"),
+            ("controls.bridge_reviewed_enabled", "false"),
         ] {
             if req(map, key)? != expect {
                 return Err(NodeError::Config(format!(
@@ -1139,7 +1143,7 @@ mod production_proposal_refusal_tests {
         );
         assert_eq!(
             super::hex32_for_test(built.genesis_hash),
-            "4c6500d9dcfef3de56ac941797968de9d58c8fe2a21dc8aa6aa28be7742795d2"
+            "3bdf2c7be6c03dde5e707a8864ef3999c8e110896797b383d91b1a5d2f00319c"
         );
     }
 }

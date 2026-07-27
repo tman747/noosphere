@@ -124,6 +124,8 @@ pub const PARAM_EMERGENCY_AUTHORITY: &str = "noos.params.emrg-auth.v1";
 /// Feature-control key prefix: `noos.control.<name>`. Not writable by
 /// governance param updates; emergency can only write DISABLED.
 pub const CONTROL_PREFIX: &str = "noos.control.";
+pub const CONTROL_LENDING_REVIEWED: &str = "noos.control.lending_reviewed";
+pub const CONTROL_BRIDGE_REVIEWED: &str = "noos.control.bridge_reviewed";
 /// Registry key prefix for `GovernanceRegistryUpdate`.
 pub const REGISTRY_PREFIX: &str = "noos.registry.";
 
@@ -1144,6 +1146,14 @@ impl LumenLedger {
     #[must_use]
     pub fn emission_shares(&self) -> Option<EmissionSharesV1> {
         self.param_current(PARAM_SHARES)
+    }
+    /// Missing or malformed controls fail closed. Controls can only be enabled
+    /// by the exact genesis/hard-fork state; ordinary governance cannot write
+    /// the `noos.control.*` namespace.
+    #[must_use]
+    pub fn feature_enabled(&self, full_control_name: &str) -> bool {
+        self.param_current::<FeatureControlV1>(full_control_name)
+            .is_some_and(|control| control.enabled == 1)
     }
 
     fn issuance_fits_issued_supply(&self, issuance: &IssuanceParamsV1) -> bool {
@@ -2342,6 +2352,16 @@ impl LumenLedger {
                 }
                 ActionV1::SwapExactIn { trader, .. } if !signed(trader) => {
                     return Err(RejectReason::CapabilityDenied);
+                }
+                ActionV1::CreateLendingMarket { .. }
+                | ActionV1::WithdrawCollateral { .. }
+                | ActionV1::BorrowStable { .. }
+                | ActionV1::LiquidatePosition { .. }
+                | ActionV1::BackstopLiquidate { .. }
+                | ActionV1::PsmMint { .. }
+                    if !self.feature_enabled(CONTROL_LENDING_REVIEWED) =>
+                {
+                    return Err(RejectReason::GovernanceDenied);
                 }
                 ActionV1::CreateOracleFeed { .. }
                 | ActionV1::CreateLendingMarket { .. }

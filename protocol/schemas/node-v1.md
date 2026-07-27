@@ -38,7 +38,7 @@ transaction submission as an explicit disabled feature (§8.1).
   under `D-CHAIN-ID`; the final genesis hash under `D-GENESIS-FINAL`
   binds chain id, the (devnet-zero) Bitcoin anchor, the DKG fixture root,
   and the canonical final body (identity-v1.md §4).
-* The eight genesis controls are bit-packed in `CONTROL_NAMES` order and
+* The ten genesis controls are bit-packed in `CONTROL_NAMES` order and
   are all zero at genesis. **Control-name law:** controls live in the
   Lumen params tree at `noos.control.<name>`; `noos-lumen` freezes full
   param keys at ≤ 32 bytes and the prefix is 13 bytes, so every control
@@ -46,7 +46,10 @@ transaction submission as an explicit disabled feature (§8.1).
   `genesis.rs`) are:
   `work_loom_credit`, `work_loom_weightcap`, `witness_proofpower`,
   `neural_lane`, `reflex_lane`, `umbra_suite`, `dream_lane`,
-  `class_gate_budget`.
+  `class_gate_budget`, `lending_reviewed`, `bridge_reviewed`.
+  The last two are exact-revision independent-review gates: missing,
+  malformed, or disabled records reject risk-increasing operations while
+  repayment, direct redemption, and other exit paths remain available.
 * `GenesisSpec.extra_accounts` pre-provisions fixture accounts
   (`account_id` = Ed25519 pubkey bytes; `auth_descriptor` = the same
   bytes). Lumen v1 has no account-creation action — deposit targets must

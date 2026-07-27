@@ -127,11 +127,14 @@ neural_lane_enabled               = false
 
 The operational genesis registry (`protocol/spec/constants-v1.toml` `[genesis_controls]`,
 `protocol/genesis/devnet-parameters.toml` `[controls]`) additionally pins
-`reflex_lane_enabled = false` and `class_gate_irreversible_budget = 0` (plan §6.8,
-§12.12–§12.13; addendum A.3–A.4). These extensions narrow — they can never contradict or
-substitute for — the ch04 six. Turning any control off must not alter Lumen transaction
-validity, Ground proposal validity, Ring quorum arithmetic, or finalized history (ch01 §0;
-ch04 §1).
+`reflex_lane_enabled = false`, `class_gate_irreversible_budget = 0`,
+`lending_reviewed_enabled = false`, and `bridge_reviewed_enabled = false`
+(plan §6.8, §12.12–§12.13; addendum A.3–A.4; completion `APP-06`).
+These extensions narrow — they can never contradict or substitute for — the ch04 six.
+The review controls fail closed for risk-increasing application actions while
+repayment, direct redemption, and other exits remain available. Turning any
+radical consensus control off must not alter Ground proposal validity, Ring
+quorum arithmetic, or finalized history (ch01 §0; ch04 §1).
 
 **Citations.** ch04 §1 (six-control list, lines 17–24); ch01 §0 (five-control list);
 ch08 §4.4 commitment item 4; plan §1.5, §6.8.

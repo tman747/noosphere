@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 pub mod governance;
 pub mod marketplace;
+pub mod review_gate;
 use noos_lumen::wwm::{
     FundBucketTag, WwmEvidenceTier, WwmJobV1, WwmReceiptV1, WwmSettlementV1, WwmTerminalCode,
 };

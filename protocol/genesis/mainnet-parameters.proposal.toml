@@ -142,6 +142,8 @@ reflex_lane_enabled = false
 umbra_suite_enabled = false
 dream_lane_enabled = false
 class_gate_irreversible_budget = 0
+lending_reviewed_enabled = false
+bridge_reviewed_enabled = false
 
 [allocations]
 address_law_id = "noos-bech32m-v1"

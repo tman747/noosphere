@@ -32,8 +32,8 @@ use crate::objects::{
 };
 use crate::state::{
     param_key, ApplyOutcome, BlockContext, FailCode, GenesisConfig, GenesisError, LumenLedger,
-    LumenRoots, RejectReason, SimulationOutcome, StateDelta, TreeId, CONTROL_PREFIX, NOOS_ASSET,
-    PARAM_ISSUANCE,
+    LumenRoots, RejectReason, SimulationOutcome, StateDelta, TreeId, CONTROL_BRIDGE_REVIEWED,
+    CONTROL_LENDING_REVIEWED, CONTROL_PREFIX, NOOS_ASSET, PARAM_ISSUANCE,
 };
 use crate::test_util::SplitMix64;
 use crate::wwm::{
@@ -150,7 +150,12 @@ fn genesis() -> LumenLedger {
             fee_state: FeeStateV1::testnet_fixture(),
             issuance: IssuanceParamsV1::testnet_fixture(),
             shares: EmissionSharesV1::testnet_fixture(),
-            controls: &[("neural_lane", false), ("dream_lane", false)],
+            controls: &[
+                ("neural_lane", false),
+                ("dream_lane", false),
+                ("lending_reviewed", true),
+                ("bridge_reviewed", false),
+            ],
             accounts: &accounts,
             gov_authority: GOV,
             emergency_authority: EMERGENCY,
@@ -3727,6 +3732,70 @@ fn emergency_can_only_disable_and_quarantine() {
     let r = ledger.apply_transaction(&ctx(4), &txb, &witb, &StubEngine, &AcceptAll);
     assert_eq!(r.unwrap_err(), RejectReason::ObjectQuarantined);
     assert_roots_eq(&before, &ledger.roots());
+}
+
+#[test]
+fn lending_review_control_blocks_risk_and_preserves_exit_paths() {
+    let mut ledger = genesis();
+    assert!(ledger.feature_enabled(CONTROL_LENDING_REVIEWED));
+    assert!(!ledger.feature_enabled(CONTROL_BRIDGE_REVIEWED));
+
+    let (txb, witb, _) = build_tx(
+        2,
+        vec![],
+        vec![PAYER, EMERGENCY],
+        vec![ActionV1::EmergencyDisable {
+            control_key: param_key(CONTROL_LENDING_REVIEWED),
+        }],
+        vec![],
+    );
+    assert!(matches!(
+        ledger
+            .apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll)
+            .unwrap(),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(!ledger.feature_enabled(CONTROL_LENDING_REVIEWED));
+
+    let unknown_market = [0x44; 32];
+    let (txb, witb, _) = build_tx(
+        3,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::BorrowStable {
+            owner: PAYER,
+            market_id: unknown_market,
+            amount: 1,
+        }],
+        vec![],
+    );
+    assert_eq!(
+        ledger
+            .apply_transaction(&ctx(3), &txb, &witb, &StubEngine, &AcceptAll)
+            .unwrap_err(),
+        RejectReason::GovernanceDenied
+    );
+
+    let (txb, witb, _) = build_tx(
+        4,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::RepayStable {
+            owner: PAYER,
+            market_id: unknown_market,
+            amount: 1,
+        }],
+        vec![],
+    );
+    assert!(matches!(
+        ledger
+            .apply_transaction(&ctx(4), &txb, &witb, &StubEngine, &AcceptAll)
+            .unwrap(),
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
 }
 
 // ---------------------------------------------------------------------------
