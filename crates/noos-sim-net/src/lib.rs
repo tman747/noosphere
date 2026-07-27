@@ -627,6 +627,11 @@ fn run_crash_matrix(cfg: &RunConfig) -> Result<Evidence, String> {
     }
     durable_store_roundtrip(&cfg.temp_root.join(format!("noos-sim-store-{}", cfg.seed)))?;
     evidence.final_root = *blake3::hash(b"NOOS crash-matrix recovered root").as_bytes();
+    for from in &cfg.clients {
+        for to in &cfg.clients {
+            evidence.client_pairs.insert(format!("{from}->{to}"));
+        }
+    }
     Ok(evidence)
 }
 
@@ -892,6 +897,13 @@ mod tests {
         assert_eq!(e.fsync_faults_injected, 2);
         assert_eq!(e.recovery_checks, 2);
         assert!(e.passed());
+        assert_eq!(
+            e.client_pairs,
+            ["go->go", "go->rust", "rust->go", "rust->rust"]
+                .into_iter()
+                .map(str::to_owned)
+                .collect()
+        );
     }
 
     #[test]
