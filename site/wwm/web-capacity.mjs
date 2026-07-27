@@ -477,6 +477,31 @@ export class WebCapacityController {
     return this.session !== null;
   }
 
+  #consentExpired() {
+    return this.session !== null && Math.floor(this.now() / 1000) >= this.session.expires_at;
+  }
+
+  async #clearExpiredConsent() {
+    this.paused = true;
+    this.abort?.abort();
+    if (this.store) await this.store.deleteNamespace();
+    this.store = null;
+    this.session = null;
+    this.config = null;
+    this.egress = null;
+    this.paused = false;
+    this.abort = null;
+    this.uploadedBytes = 0;
+  }
+
+  async #requireActiveConsent() {
+    if (!this.session) fail("not_opted_in");
+    if (this.#consentExpired()) {
+      await this.#clearExpiredConsent();
+      fail("consent_expired");
+    }
+  }
+
   async #json(method, path, body) {
     const encoded = body === undefined ? undefined : JSON.stringify(body);
     if (encoded !== undefined && new TextEncoder().encode(encoded).byteLength > WEB_CAPACITY.maxJsonBodyBytes) {
@@ -559,9 +584,12 @@ export class WebCapacityController {
       await this.store.setMeta("session", {
         participant_id: session.participant_id,
         session_token: session.session_token,
+        consent_version: WEB_CAPACITY.consentVersion,
         quota_shares: session.quota_shares,
         effective_bytes: session.effective_bytes,
         upload_policy: session.upload_policy,
+        issued_at: session.issued_at,
+        expires_at: session.expires_at,
       });
       this.session = session;
       this.egress = new EgressLedger(session.upload_policy.enabled ? session.upload_policy.daily_egress_bytes : 0, this.now());
@@ -581,6 +609,14 @@ export class WebCapacityController {
       await this.#abortPartialOptIn(offerPayload);
       throw error;
     }
+  }
+
+  // Any quota increase or decrease is a new consent event. Old bytes and the
+  // old session are removed local-first before a fresh offer is requested.
+  async changeConsent(options) {
+    await this.#requireActiveConsent();
+    await this.deleteAllCopies();
+    return this.optIn(options);
   }
 
   // Local-first rollback of a failed opt-in: the app-owned namespace and all
@@ -613,6 +649,7 @@ export class WebCapacityController {
   // fresh consent and a fresh offer, so it is intentionally not offered here.
   disableRepair() {
     if (!this.session) fail("not_opted_in");
+    if (this.#consentExpired()) fail("consent_expired");
     this.egress = new EgressLedger(0, this.now());
     this.session = Object.freeze({
       ...this.session,
@@ -623,7 +660,7 @@ export class WebCapacityController {
   // Storage persistence is a separate, explicit "keep these copies" action —
   // never bundled into opt-in.
   async keepCopies() {
-    if (!this.session) fail("not_opted_in");
+    await this.#requireActiveConsent();
     if (typeof this.persistImpl !== "function") return "best effort";
     const granted = await this.persistImpl();
     return granted === true ? "persistent" : "best effort";
@@ -638,7 +675,7 @@ export class WebCapacityController {
   // never assumed reachability. Fails closed with zero network activity when
   // the page is hidden, paused, or not opted in.
   async heartbeat() {
-    if (!this.session) fail("not_opted_in");
+    await this.#requireActiveConsent();
     if (this.paused) fail("paused");
     if (!this.pageActive()) fail("page_not_active");
     this.abort = new AbortController();
@@ -740,6 +777,7 @@ export class WebCapacityController {
 
   resume() {
     if (!this.session) fail("not_opted_in");
+    if (this.#consentExpired()) fail("consent_expired");
     this.paused = false;
   }
 

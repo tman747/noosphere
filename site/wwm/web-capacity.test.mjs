@@ -279,6 +279,7 @@ function harness({
   shareFetch = null,
   offline = { value: false },
   pageActive = { value: true },
+  clock = { value: NOW_MS },
 } = {}) {
   const calls = { fetch: [], estimate: 0, persistRequests: 0, openStore: 0 };
   const root = new FakeDirectoryHandle("(root)");
@@ -310,9 +311,9 @@ function harness({
     persistImpl: async () => { calls.persistRequests += 1; return true; },
     pageActive: () => pageActive.value,
     expectedIdentity: { chain_id: h("1"), genesis_hash: h("2") },
-    now: () => NOW_MS,
+    now: () => clock.value,
   });
-  return { controller, calls, root, offline, pageActive };
+  return { controller, calls, root, offline, pageActive, clock };
 }
 
 // --- tests -------------------------------------------------------------------
@@ -324,6 +325,48 @@ test("constructing the panel controller causes zero pre-opt-in side effects", as
   await assert.rejects(() => controller.keepCopies(), { code: "not_opted_in" });
   assert.throws(() => controller.resume(), { code: "not_opted_in" });
   assert.deepEqual(calls, { fetch: [], estimate: 0, persistRequests: 0, openStore: 0 });
+});
+
+test("consent expiry deletes the local namespace before refusing all further work", async () => {
+  const { controller, calls, root, clock } = harness();
+  await controller.optIn({ quotaShares: 16 });
+  const metadata = await controller.store.getMeta("session");
+  assert.equal(metadata.consent_version, WEB_CAPACITY.consentVersion);
+  assert.equal(metadata.expires_at, NOW_S + 86_400);
+  const requestsBeforeExpiry = calls.fetch.length;
+  clock.value = (NOW_S + 86_401) * 1000;
+  await assert.rejects(() => controller.heartbeat(), { code: "consent_expired" });
+  assert.equal(controller.optedIn, false);
+  assert.equal(calls.fetch.length, requestsBeforeExpiry, "expiry must not emit a heartbeat or hidden revoke");
+  assert.equal(root.children.has(CAPACITY_NAMESPACE), false);
+  assert.equal(root.children.has("unrelated-origin-data"), true);
+});
+
+test("quota changes delete and revoke the old consent before requesting a fresh offer", async () => {
+  const { controller, calls } = harness();
+  const initial = await controller.optIn({ quotaShares: 16 });
+  assert.equal(initial.effectiveShares, 16);
+  const changed = await controller.changeConsent({ quotaShares: 64 });
+  assert.equal(changed.effectiveShares, 64);
+  assert.equal(controller.optedIn, true);
+  const coordinatorPaths = calls.fetch
+    .map((entry) => new URL(entry.url).pathname)
+    .filter((path) => !path.includes("/artifacts/"));
+  assert.deepEqual(
+    coordinatorPaths,
+    [
+      "/api/wwm-web-capacity/v1/config",
+      "/api/wwm-web-capacity/v1/offers",
+      "/api/wwm-web-capacity/v1/revoke",
+      "/api/wwm-web-capacity/v1/config",
+      "/api/wwm-web-capacity/v1/offers",
+    ],
+  );
+  const offers = calls.fetch
+    .filter((entry) => new URL(entry.url).pathname.endsWith("/offers"))
+    .map((entry) => JSON.parse(entry.options.body));
+  assert.deepEqual(offers.map((offer) => offer.quota_shares), [16, 64]);
+  assert.ok(offers.every((offer) => offer.consent_version === WEB_CAPACITY.consentVersion));
 });
 
 test("effective bytes follow the exact formula, boundaries, and refusal", () => {

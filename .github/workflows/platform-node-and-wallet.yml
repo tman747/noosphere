@@ -11,6 +11,11 @@ on:
       - "tools/e2e/market_gateway.py"
       - "tools/gates/check_throughput.py"
       - "tools/operations/**"
+      - "site/**"
+      - "experiments/wwm-web-capacity/**"
+      - "protocol/api/openapi-wwm-web-capacity-v1.yaml"
+      - "protocol/schemas/wwm-web-capacity-v1.schema.json"
+      - "protocol/vectors/wwm-web-capacity-v1/**"
       - "tools/lan_testnet.py"
       - ".github/workflows/platform-node-and-wallet.yml"
 
@@ -286,6 +291,74 @@ jobs:
             wallet/mobile/ios/App/**/*.png
             wallet/mobile/ios/Artifacts/MindChainWalletCoreNative.xcframework/
             wallet/mobile/ios/Artifacts/AppDerivedData/Build/Products/Release-iphonesimulator/*.app/
+          if-no-files-found: error
+          retention-days: 30
+
+  browser-capacity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.4.1"
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13.5"
+      - name: Verify browser capacity contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p browser-capacity-evidence
+          node --version | tee browser-capacity-evidence/node-version.txt
+          node --test \
+            site/wwm/client.test.mjs \
+            site/wwm/verifier-v1.test.mjs \
+            site/wwm/web-capacity.test.mjs \
+            2>&1 | tee browser-capacity-evidence/node-tests.tap
+          python --version 2>&1 | tee browser-capacity-evidence/python-version.txt
+          python -m unittest -v \
+            tools.operations.test_wwm_web_capacity \
+            tools.operations.test_wwm_web_capacity_experiment \
+            tools.operations.test_wwm_web_capacity_topology \
+            tools.operations.test_wwm_web_capacity_vectors \
+            2>&1 | tee browser-capacity-evidence/python-tests.txt
+      - name: Record exact browser capacity evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+
+          root = pathlib.Path("browser-capacity-evidence")
+          subjects = []
+          for path in sorted(root.iterdir()):
+              if path.is_file():
+                  subjects.append({
+                      "file": path.name,
+                      "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                  })
+          evidence = {
+              "schema": "noos/browser-capacity-ci-evidence/v1",
+              "source_revision": os.environ["GITHUB_SHA"],
+              "runner_os": os.environ["RUNNER_OS"],
+              "runner_arch": os.environ["RUNNER_ARCH"],
+              "subjects": subjects,
+          }
+          (root / "evidence.json").write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mindchain-browser-capacity-${{ github.sha }}
+          path: browser-capacity-evidence/
           if-no-files-found: error
           retention-days: 30
 
