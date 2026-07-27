@@ -470,13 +470,59 @@ evidence that any stronger suite is ready.
 
 | ID | State | Work and exit |
 |---|---|---|
-| `APP-01` | `READY` | Bind MindScan to durable indexer truth, exact chain identity, finality labels, bounded search, restart-safe data, and live smoke evidence. |
-| `APP-02` | `READY` | Freeze governance and treasury proposal, vote, execution, delay, emergency, delegation, accounting, and exit laws before UI activation. |
-| `APP-03` | `READY` | Freeze unique-asset identity, ownership, transfer, royalty, listing, sale, cancellation, and marketplace conservation laws. |
-| `APP-04` | `READY` | Add conservative operation-specific pricing, deviation bounds, last-good-price behavior, independent reporters, rotation, and rejected-update monitoring. |
-| `APP-05` | `READY` | Implement backstop liquidation, bad-debt reserve, direct redemption, PSM inventory, separate caps, and pause-with-redemption behavior. |
-| `APP-06` | `OWNER_BLOCKED` | Freeze lending and bridge targets only after oracle, liquidation, cross-chain verification, exposure, failure, and emergency designs receive independent review. |
-| `APP-07` | `EXTERNAL_BLOCKED` | Run conservation, oracle divergence, liquidation cascade, thin liquidity, bad debt, bridge reconciliation, wallet review, incident, and capped-value campaigns. |
+| `APP-01` | `ACTIVE` | MindScan now validates exact chain/genesis/API identity, durable index generation and finality order, labels each block, bounds canonical searches, and restarts statelessly; the exact source revision still requires deployment evidence. |
+| `APP-02` | `DONE` | Bounded governance now freezes voter/delegation snapshots, quorum and approval, proposal deposits, treasury reservation/conservation, timelock execution, emergency pause, and voter exits before UI activation. |
+| `APP-03` | `DONE` | Unique assets now have immutable identity, one owner, nonce-bound transfer history, one active listing, atomic payment settlement, bounded royalties/fees, cancellation/expiry, replay rejection, and conservation checks. |
+| `APP-04` | `DONE` | The oracle control plane enforces five independently identified reporters, provider/region concentration caps, delayed rotation, monotonic freshness/confidence checks, bounded deviation, last-good/frozen modes, rejected-update counters, and conservative operation-specific prices. |
+| `APP-05` | `DONE` | Stable reserve v2 segregates PSM redemption collateral from seized collateral, preserves direct redemption during risk pause, accounts explicit bad debt, and applies independent mint, redeem, debt, and backstop caps. |
+| `APP-06` | `EXTERNAL_BLOCKED` | Risk-increasing lending and any future bridge activation now fail closed behind exact-revision Ed25519 review targets requiring two independent organizations per required scope; repayment, redemption, and exits remain open. Independent reviews are not yet present. |
+| `APP-07` | `DONE` | The deterministic non-promoting campaign executes conservation, oracle divergence, liquidation cascade, thin redemption liquidity, explicit bad debt, zero-exposure bridge reconciliation, signed review integrity, wallet identity review, incident exits, and capped-value rejection. |
+
+Revision `8c4272349ac31515ec16151fbcf66dbc82169643` makes the
+MindScan gateway require a pinned chain and genesis, reject malformed or
+misordered durable index state, annotate blocks as unsafe/justified/finalized,
+and identity-bind transaction views. Nine MindScan/readiness tests passed.
+A local instance of that revision was browser-smoked against the live public
+indexer: it bound chain
+`0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b`,
+genesis `8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e`,
+rendered 18 blocks, showed finalized height `312832`, and returned block
+`313260`/`4949f2651b777cdf13ad6275fb21196f355e5b802aa1a27c415873ab7d2d375c`
+as `unsafe`. Exact-revision CI run
+[`30304728080`](https://github.com/tman747/noosphere/actions/runs/30304728080)
+and an exact deployed restart smoke remain before `APP-01` closes.
+
+Revision `730d0d7fa4da7eae015ea1cf3e859e6dc42564ef` freezes the
+governance/treasury and unique-asset marketplace state machines. The
+`noos-commerce` suite passed 26 tests, including duplicate replacement,
+arithmetic-failure atomicity, treasury conservation, timelocks, royalty
+distribution, listing replay, and ownership-nonce overflow.
+
+Revision `d9cb50d3a4ecd0db7ff99612d4427c84dfa6c2a5` adds the production
+oracle control plane; its seven tests cover reporter independence,
+operation-specific lower/upper prices, bounded last-good behavior, rejection
+telemetry, deviation/replay/staleness, and delayed rotation. Revision
+`57ceeefec7ecfd93978902a2152ec6e5c8f0740f` adds the segregated stable
+reserve v2 and makes the legacy safety transitions atomic on error. Nine
+safety tests and 90 Lumen tests passed.
+
+Revision `9a3542b33290dfda636749f50dce4e92fcb23b42` adds signed
+lending/bridge review targets and hard fail-closed genesis controls.
+Thirty-one commerce tests, 91 Lumen tests, and
+the 91-test single-threaded `noos-node` library suite passed. The gate rejects
+risk-increasing lending when `noos.control.lending_reviewed` is missing or
+disabled while repayment and direct-redemption classes remain available.
+Both review controls are frozen false in every current genesis parameter
+file; the resulting devnet genesis vector is
+`3bdf2c7be6c03dde5e707a8864ef3999c8e110896797b383d91b1a5d2f00319c`.
+Independent review artifacts remain the explicit `APP-06` blocker.
+
+Revision `363fd9eca0868cdde46675e5e15ac079d206ed30` adds the immutable
+application-economy campaign CLI and CI gate. The commerce suite passed 34
+tests. An exact-revision smoke with seed `20260727` passed all ten required
+scenarios and wrote
+`D:/tmp/application-economy-campaign-363fd9e.json`; the report records
+`production_authorized=false` and `promotion_effect=NONE`.
 
 ### Track L — protocol-v2 and production promotion
 
