@@ -280,7 +280,7 @@ if (-not $DashboardReady) {
 $ExplorerReady = $false
 try {
     $ExplorerHealth = Invoke-RestMethod -Uri "http://127.0.0.1:18130/api/health" -TimeoutSec 2
-    $ExplorerReady = ($ExplorerHealth.schema -eq "noos/mindscan-health/v1")
+    $ExplorerReady = ($ExplorerHealth.schema -eq "noos/mindscan-health/v1" -and $ExplorerHealth.ok -and $ExplorerHealth.chain_id -eq $Status.chain_id -and $ExplorerHealth.genesis_hash -eq $Status.genesis_hash)
 } catch {
     $ExplorerReady = $false
 }
@@ -288,6 +288,8 @@ if (-not $ExplorerReady) {
     $ExplorerArgs = @(
         (Join-Path $Repo "tools\mindscan.py"),
         "--indexer", "http://127.0.0.1:21080",
+        "--chain-id", ([string]$Status.chain_id),
+        "--genesis-hash", ([string]$Status.genesis_hash),
         "--listen", "0.0.0.0:18130"
     )
     Start-Process python -WorkingDirectory $Repo -ArgumentList $ExplorerArgs -WindowStyle Minimized
@@ -296,7 +298,7 @@ if (-not $ExplorerReady) {
         Start-Sleep -Milliseconds 300
         try {
             $ExplorerHealth = Invoke-RestMethod -Uri "http://127.0.0.1:18130/api/health" -TimeoutSec 2
-            $ExplorerReady = ($ExplorerHealth.schema -eq "noos/mindscan-health/v1")
+            $ExplorerReady = ($ExplorerHealth.schema -eq "noos/mindscan-health/v1" -and $ExplorerHealth.ok -and $ExplorerHealth.chain_id -eq $Status.chain_id -and $ExplorerHealth.genesis_hash -eq $Status.genesis_hash)
         } catch {
             $ExplorerReady = $false
         }

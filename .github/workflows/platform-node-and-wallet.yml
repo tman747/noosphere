@@ -389,6 +389,8 @@ jobs:
             tools.operations.test_wwm_inference_metrics \
             tools.operations.test_wwm_plaintext_persistence_audit \
             tools.operations.test_wwm_public_gateway \
+            tools.test_mindscan \
+            tools.test_network_readiness \
             2>&1 | tee browser-capacity-evidence/python-tests.txt
       - name: Record exact browser capacity evidence
         shell: bash
