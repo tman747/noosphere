@@ -105,6 +105,8 @@ $ToolFiles = @(
     "compute_market.py",
     "compute_workload_registry.py",
     "compute_worker.py",
+    "worker_payout_identity.py",
+    "worker_sandbox.py",
     "wallet_transfer.py",
     "network_dashboard.py",
     "fleet_telemetry.py",

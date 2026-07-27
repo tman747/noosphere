@@ -189,20 +189,35 @@ verifier, meter, operation limits, activation/retirement heights, and the
 fail-closed rejection vector set. Both `tools/compute_market.py` and
 `tools/compute_worker.py` require `--workload-registry` and an independently
 distributed `--registry-public-key`; a registry supplied by the coordinator is
-not a trust root. The invitation-host installer generates and ACL-protects this
-key, freezes the registry once, and verifies it on every reconciliation.
+not a trust root. The worker additionally requires a locally created
+`--sandbox-policy`. The invitation-host installer generates and ACL-protects
+the registry key, freezes the registry once, and verifies it on every
+reconciliation.
 
 `tools/compute_market.py` opens deterministic MIX32 shards within the signed
 limits and independently recomputes each result root before acceptance.
-`tools/compute_worker.py` keeps a worker seed local, refuses unknown, inactive,
-retired, over-meter, or commitment-mismatched jobs before execution, executes
-CPU shards, and signs claim/result transactions. The `/apps/compute-market`
+`tools/compute_worker.py` opens a password-encrypted local payout identity,
+refuses unknown, inactive, retired, over-meter, commitment-mismatched, or
+local-policy-exceeding jobs before execution, runs CPU shards in a separate
+resource-limited process, and signs claim/result transactions without placing
+seed material on the process argument vector. The `/apps/compute-market`
 browser helper uses WebGPU when available and a bounded CPU fallback.
 Browser helpers use the coordinator's explicitly custodial test-network worker
 identity, so rewards accrue to that identity rather than to a browser-held
 wallet. MIX32 is deliberately deterministic: arbitrary native code,
 neural-model rental, confidential inputs, production dispute proofs, and
 permissionless GPU kernels are not admitted.
+
+`tools/worker_sandbox.py` freezes a canonical content-addressed local policy.
+Version 1 admits only the signed MIX32 builtin and one CPU thread; workload
+filesystem, network, scratch storage, GPU, inherited secret environment, and
+subprocess capabilities are denied. POSIX rlimits or a Windows Job Object bound
+memory and CPU time, while the parent enforces wall runtime, operation count,
+UTC schedule, coordinator byte budgets, temperature, and battery policy before
+and during execution. A policy can require temperature and battery sensors;
+required but unavailable observations reject work. Result evidence records the
+policy ID, effective limits, zero scratch use, repeated host-condition checks,
+and all denied capabilities.
 
 ## Neural execution reality
 

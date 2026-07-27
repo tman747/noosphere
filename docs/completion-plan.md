@@ -256,7 +256,7 @@ those gates.
 | `NET-07` | `ACTIVE` | Signed monotonic lifecycle tooling now emits Linux systemd, macOS user launchd, and Windows limited-user Task Scheduler packages with downgrade protection, single-use rollback, repair, and data-preserving uninstall; native three-platform CI is the remaining exit check. |
 | `NET-08` | `ACTIVE` | Password-encrypted local identity custody, portable recovery, stdin-only signing, and worker/payout binding are implemented; a funded WAN job must still settle directly to the generated account. |
 | `NET-09` | `DONE` | Frozen signed MIX32 registry binds canonical identity, verifier, metering, limits, lifecycle, and executable fail-closed rejection vectors. |
-| `NET-10` | `READY` | Enforce filesystem, network, memory, runtime, storage, GPU, temperature, battery, schedule, and bandwidth policies against malicious workloads. |
+| `NET-10` | `ACTIVE` | Canonical local policies now enforce workload allowlisting, filesystem/network/GPU denial, zero scratch, memory/CPU/wall limits, operation and coordinator-byte budgets, temperature, battery, and UTC schedule; native three-platform CI remains. |
 | `NET-11` | `READY` | Implement objective result verification, timeout, dispute, penalty, cancellation, and refund paths that cannot release escrow for invalid work. |
 
 `host_lifecycle.py` implements `NET-06` and the code-controlled portion of
@@ -285,6 +285,20 @@ payout account. Contract tests cover wrong passwords, metadata/ciphertext
 tampering, KDF downgrade, chain mismatch, recovery, zeroization, secret ingress,
 and payout-account substitution. `NET-08` remains active until a funded job
 settles over the WAN and the balance transition is captured.
+
+`worker_sandbox.py` implements the code-controlled portion of `NET-10` as a
+non-extensible MIX32 child rather than an arbitrary-code runner. Canonical
+content-addressed local policy fixes one CPU thread, memory, CPU/wall runtime,
+operation, coordinator-byte, temperature, battery, and UTC schedule bounds.
+The workload process receives no inherited secrets or GPU configuration, runs
+in an empty temporary directory, and denies filesystem, network, subprocess,
+GPU-device, and scratch access. POSIX rlimits and Windows Job Objects enforce
+process limits; the parent repeats host-condition checks and kills work when a
+limit changes midflight. Adversarial tests cover policy tampering, unavailable
+sensors, thermal and battery rejection, schedule closure, oversized
+operations/payloads, bandwidth exhaustion, forbidden capabilities, zero
+scratch use, deterministic result equivalence, and runtime termination.
+`NET-10` remains active until the Linux, macOS, and Windows workflow passes.
 
 ### Track F — native clients and release supply chain
 

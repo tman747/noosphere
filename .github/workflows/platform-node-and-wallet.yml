@@ -46,8 +46,12 @@ jobs:
           python -m pip install --disable-pip-version-check --only-binary=:all: "cryptography==49.0.0"
           python -m unittest -v test_host_lifecycle.py
 
-  worker-payout-contracts:
-    runs-on: ubuntu-24.04
+  worker-security-contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, windows-2025, macos-14]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -56,12 +60,14 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.13.5"
-      - name: Verify encrypted worker payout custody
+      - name: Verify encrypted worker custody and sandbox enforcement
+        shell: bash
         run: |
           python -m pip install --disable-pip-version-check --only-binary=:all: "cryptography==49.0.0"
           python -m unittest -v \
             tools.test_worker_payout_identity \
-            tools.test_compute_worker_network
+            tools.test_compute_worker_network \
+            tools.test_worker_sandbox
 
   native:
     strategy:

@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """MindChain compute worker for the deterministic MIX32 rental workload.
 
-The worker keeps its seed local, registers capabilities on chain, claims one
-open shard at a time, computes it with a bounded thread pool, commits the result
-root on chain, and asks the requester gateway to verify/accept delivery.
+The worker keeps its seed local, registers policy-bound capabilities on chain,
+claims one open shard at a time, executes the registry-bound workload in a
+zero-capability resource-limited child, commits the result root on chain, and
+asks the requester gateway to verify and accept delivery.
 """
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
 import hashlib
 import json
-import os
 import platform
 import sys
 import time
@@ -32,6 +31,14 @@ from worker_payout_identity import (  # noqa: E402
     WorkerIdentity,
     open_identity,
     read_password,
+)
+from worker_sandbox import (  # noqa: E402
+    JobNetworkBudget,
+    SandboxPolicy,
+    execute_mix32,
+    load_policy,
+    mix32_root,
+    probe_host,
 )
 
 
@@ -93,10 +100,10 @@ def submit_action(
     action: dict,
     wait: float = 90,
 ) -> dict:
-    exe = cargo_binary("noos-cli")
     signer = identity.payout_account
     if action.get("worker") != signer:
         raise RuntimeError("worker action differs from the local payout identity")
+    exe = cargo_binary("noos-cli")
     status = live_status(profile)
     spec = transaction_spec(profile, signer, int(status["unsafe_head"]["height"]), action)
     built = cli_json(exe, "tx", "build", "--spec", json.dumps(spec, separators=(",", ":")))
@@ -141,14 +148,6 @@ def submit_action(
     raise RuntimeError(f"transaction did not settle: {txid}")
 
 
-def mix_one(seed: int, global_index: int, rounds: int) -> int:
-    value = (seed ^ global_index ^ 0x9E3779B9) & 0xFFFFFFFF
-    for _ in range(rounds):
-        value ^= (value << 13) & 0xFFFFFFFF
-        value ^= value >> 17
-        value ^= (value << 5) & 0xFFFFFFFF
-        value = (value * 0x85EBCA6B + 0xC2B2AE35) & 0xFFFFFFFF
-    return value
 
 
 def compute_root(
@@ -161,29 +160,39 @@ def compute_root(
 ) -> str:
     limits = workload.limits
     if (
-        not 1 <= units <= limits["max_units"]
+        not isinstance(threads, int)
+        or isinstance(threads, bool)
+        or threads < 1
+        or not 1 <= units <= limits["max_units"]
         or not 1 <= rounds <= limits["max_unit_size"]
         or units * rounds > limits["max_operations"]
     ):
         raise ValueError("workload bounds exceeded")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as pool:
-        values = pool.map(lambda item: mix_one(seed, item, rounds), range(start, start + units), chunksize=64)
-        digest = hashlib.sha256(workload.result_domain)
-        for value in values:
-            digest.update(value.to_bytes(4, "little"))
-    return digest.hexdigest()
+    return mix32_root(workload.result_domain, seed, start, units, rounds)
 
 
-def get_payload(market: str, job_id: str) -> dict:
+def get_payload(
+    market: str,
+    job_id: str,
+    policy: SandboxPolicy,
+    budget: JobNetworkBudget,
+) -> tuple[dict, int]:
     with urllib.request.urlopen(f"{market.rstrip('/')}/api/payload/{job_id}", timeout=10) as response:
-        value = json.load(response)
+        body = response.read(policy.max_payload_bytes + 1)
+    if not body or len(body) > policy.max_payload_bytes:
+        raise RuntimeError("market payload response exceeds the local sandbox policy")
+    budget.consume(len(body), "payload response")
+    try:
+        value = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RuntimeError("market returned malformed payload JSON") from error
     if (
         not isinstance(value, dict)
         or set(value) != {"job_id", "seed", "start", "units", "rounds"}
         or value.get("job_id") != job_id
     ):
         raise RuntimeError("market returned malformed or mismatched payload")
-    return {name: value[name] for name in ("seed", "start", "units", "rounds")}
+    return ({name: value[name] for name in ("seed", "start", "units", "rounds")}, len(body))
 
 
 def validate_payload(
@@ -203,24 +212,57 @@ def validate_payload(
     )
 
 
-def notify_result(market: str, job_id: str, result_root: str) -> dict:
+def notify_result(
+    market: str,
+    job_id: str,
+    result_root: str,
+    policy: SandboxPolicy,
+    budget: JobNetworkBudget,
+) -> dict:
+    encoded = json.dumps(
+        {"job_id": job_id, "result_root": result_root},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    budget.consume(len(encoded), "result request")
     request = urllib.request.Request(
-        f"{market.rstrip('/')}/api/result", method="POST",
-        data=json.dumps({"job_id": job_id, "result_root": result_root}).encode(),
+        f"{market.rstrip('/')}/api/result",
+        method="POST",
+        data=encoded,
         headers={"Content-Type": "application/json"},
     )
     with urllib.request.urlopen(request, timeout=120) as response:
-        return json.load(response)
+        body = response.read(policy.max_result_bytes + 1)
+    if not body or len(body) > policy.max_result_bytes:
+        raise RuntimeError("market result response exceeds the local sandbox policy")
+    budget.consume(len(body), "result response")
+    try:
+        value = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RuntimeError("market returned malformed result JSON") from error
+    if not isinstance(value, dict):
+        raise RuntimeError("market returned malformed result")
+    return value
 
 
-def register(args: argparse.Namespace, profile: dict, identity: WorkerIdentity) -> dict:
-    endpoint = hashlib.sha256(args.market.rstrip("/").encode()).hexdigest()
+def register(
+    args: argparse.Namespace,
+    profile: dict,
+    identity: WorkerIdentity,
+    policy: SandboxPolicy,
+) -> dict:
+    endpoint = hashlib.sha256(
+        b"NOOS/COMPUTE/WORKER-ENDPOINT/V1\0"
+        + args.market.rstrip("/").encode("utf-8")
+        + b"\0"
+        + bytes.fromhex(policy.policy_id)
+    ).hexdigest()
     action = {
         "type": "register_compute_worker",
         "worker": identity.payout_account,
         "capabilities": 1,
-        "cpu_threads": args.threads,
-        "memory_mb": args.memory_mb,
+        "cpu_threads": policy.cpu_threads,
+        "memory_mb": policy.memory_mb,
         "gpu_memory_mb": 0,
         "price_per_unit": str(args.price_per_unit),
         "endpoint_commitment": endpoint,
@@ -233,6 +275,7 @@ def run_worker(
     profile: dict,
     identity: WorkerIdentity,
     registry: VerifiedRegistry,
+    policy: SandboxPolicy,
 ) -> None:
     worker = identity.payout_account
     print(
@@ -244,10 +287,12 @@ def run_worker(
                 "browser_storage_used": False,
                 "coordinator_storage_used": False,
                 "platform": platform.platform(),
-                "threads": args.threads,
+                "threads": policy.cpu_threads,
+                "memory_mb": policy.memory_mb,
                 "market": args.market,
                 "workload_registry": registry.registry_id,
                 "registry_signer_key_id": registry.signer_key_id,
+                "sandbox_policy": policy.summary(),
             },
             indent=2,
         ),
@@ -255,6 +300,7 @@ def run_worker(
     )
     while True:
         try:
+            policy.enforce_host(probe_host())
             height = int(live_status(profile)["unsafe_head"]["height"])
             workload = registry.require_active(0, height)
             jobs = api_json(str(profile["api_base_url"]), "/api/v1/jobs").get("items", [])
@@ -278,13 +324,21 @@ def run_worker(
             except RuntimeError:
                 time.sleep(0.5)
                 continue
-            payload = get_payload(args.market, job_id)
+            budget = JobNetworkBudget(policy)
+            payload, payload_bytes = get_payload(args.market, job_id, policy, budget)
             workload, workload_seed, start, units, rounds = validate_payload(
-                registry, job, payload, height, args.max_operations
+                registry, job, payload, height, policy.max_operations
             )
             started = time.perf_counter()
-            result_root = compute_root(
-                workload, workload_seed, start, units, rounds, args.threads
+            execution = execute_mix32(
+                policy,
+                workload_id=workload.workload_id,
+                result_domain=workload.result_domain,
+                seed=workload_seed,
+                start=start,
+                units=units,
+                rounds=rounds,
+                payload_bytes=payload_bytes,
             )
             elapsed = time.perf_counter() - started
             submit_action(
@@ -294,14 +348,33 @@ def run_worker(
                     "type": "submit_compute_result",
                     "worker": worker,
                     "job_id": job_id,
-                    "result_root": result_root,
+                    "result_root": execution.result_root,
                     "completed_units": int(payload["units"]),
                 },
             )
-            accepted = notify_result(args.market, job_id, result_root)
-            print(json.dumps({"job_id": job_id, "units": payload["units"], "seconds": elapsed,
-                              "units_per_second": int(payload["units"]) / elapsed,
-                              "result_root": result_root, "settlement": accepted}, indent=2), flush=True)
+            accepted = notify_result(
+                args.market,
+                job_id,
+                execution.result_root,
+                policy,
+                budget,
+            )
+            print(
+                json.dumps(
+                    {
+                        "job_id": job_id,
+                        "units": payload["units"],
+                        "seconds": elapsed,
+                        "units_per_second": int(payload["units"]) / elapsed,
+                        "result_root": execution.result_root,
+                        "settlement": accepted,
+                        "sandbox": execution.evidence,
+                        "coordinator_network_bytes": budget.consumed_bytes,
+                    },
+                    indent=2,
+                ),
+                flush=True,
+            )
         except (OSError, urllib.error.URLError, RuntimeError, ValueError) as exc:
             print(f"worker error: {exc}", file=sys.stderr, flush=True)
             time.sleep(args.poll)
@@ -315,13 +388,12 @@ def main() -> int:
     parser.add_argument("--registry-public-key", type=Path, required=True)
     parser.add_argument("--identity-file", type=Path, required=True)
     parser.add_argument("--identity-password-file", type=Path)
-    parser.add_argument("--threads", type=int, default=max(1, os.cpu_count() or 1))
-    parser.add_argument("--memory-mb", type=int, default=4096)
+    parser.add_argument("--sandbox-policy", type=Path, required=True)
     parser.add_argument("--price-per-unit", type=int, default=1)
-    parser.add_argument("--max-operations", type=int, default=100_000_000)
     parser.add_argument("--poll", type=float, default=2)
     parser.add_argument("command", choices=("register", "run", "register-and-run"))
     args = parser.parse_args()
+    policy = load_policy(args.sandbox_policy)
     profile = load_profile(args.profile)
     exe = cargo_binary("noos-cli")
     password = read_password(args.identity_password_file)
@@ -344,9 +416,9 @@ def main() -> int:
             height=int(live_status(profile)["unsafe_head"]["height"]),
         )
         if args.command in {"register", "register-and-run"}:
-            print(json.dumps(register(args, profile, identity), indent=2), flush=True)
+            print(json.dumps(register(args, profile, identity, policy), indent=2), flush=True)
         if args.command in {"run", "register-and-run"}:
-            run_worker(args, profile, identity, registry)
+            run_worker(args, profile, identity, registry, policy)
     return 0
 
 
