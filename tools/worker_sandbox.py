@@ -563,17 +563,75 @@ def _posix_limit_setup(policy: SandboxPolicy) -> Callable[[], None] | None:
     def apply() -> None:
         import resource
 
-        memory = policy.memory_mb * 1024 * 1024
         cpu_seconds = max(1, policy.runtime_seconds)
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
         resource.setrlimit(resource.RLIMIT_FSIZE, (policy.max_scratch_bytes, policy.max_scratch_bytes))
-        resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
+        if sys.platform != "darwin":
+            memory = policy.memory_mb * 1024 * 1024
+            resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
         resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
         current_soft, current_hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-        descriptor_limit = min(32, current_soft, current_hard)
-        resource.setrlimit(resource.RLIMIT_NOFILE, (descriptor_limit, descriptor_limit))
+        hard_limit = 32 if current_hard == resource.RLIM_INFINITY else min(32, current_hard)
+        soft_limit = hard_limit if current_soft == resource.RLIM_INFINITY else min(hard_limit, current_soft)
+        resource.setrlimit(resource.RLIMIT_NOFILE, (soft_limit, hard_limit))
 
     return apply
+
+
+def _resident_memory_bytes(process: subprocess.Popen[bytes]) -> int | None:
+    if sys.platform.startswith("linux"):
+        try:
+            for line in Path(f"/proc/{process.pid}/status").read_text(encoding="ascii").splitlines():
+                if line.startswith("VmRSS:"):
+                    fields = line.split()
+                    if len(fields) == 3 and fields[2] == "kB":
+                        return int(fields[1]) * 1024
+                    raise SandboxError("Linux sandbox resident-memory record is malformed")
+        except FileNotFoundError:
+            return None
+        except (OSError, UnicodeDecodeError, ValueError) as error:
+            raise SandboxError(f"cannot inspect Linux sandbox memory: {error}") from error
+        raise SandboxError("Linux sandbox resident-memory record is missing")
+    if sys.platform == "darwin":
+        import ctypes
+
+        class RusageInfoV2(ctypes.Structure):
+            _fields_ = [
+                ("ri_uuid", ctypes.c_ubyte * 16),
+                ("ri_user_time", ctypes.c_uint64),
+                ("ri_system_time", ctypes.c_uint64),
+                ("ri_pkg_idle_wkups", ctypes.c_uint64),
+                ("ri_interrupt_wkups", ctypes.c_uint64),
+                ("ri_pageins", ctypes.c_uint64),
+                ("ri_wired_size", ctypes.c_uint64),
+                ("ri_resident_size", ctypes.c_uint64),
+                ("ri_phys_footprint", ctypes.c_uint64),
+                ("ri_proc_start_abstime", ctypes.c_uint64),
+                ("ri_proc_exit_abstime", ctypes.c_uint64),
+                ("ri_child_user_time", ctypes.c_uint64),
+                ("ri_child_system_time", ctypes.c_uint64),
+                ("ri_child_pkg_idle_wkups", ctypes.c_uint64),
+                ("ri_child_interrupt_wkups", ctypes.c_uint64),
+                ("ri_child_pageins", ctypes.c_uint64),
+                ("ri_child_elapsed_abstime", ctypes.c_uint64),
+            ]
+
+        try:
+            libproc = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
+            libproc.proc_pid_rusage.argtypes = [
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.POINTER(RusageInfoV2),
+            ]
+            libproc.proc_pid_rusage.restype = ctypes.c_int
+            usage = RusageInfoV2()
+            if libproc.proc_pid_rusage(process.pid, 2, ctypes.byref(usage)) == 0:
+                return int(usage.ri_resident_size)
+        except (AttributeError, OSError, ValueError) as error:
+            raise SandboxError(f"cannot inspect macOS sandbox memory: {error}") from error
+        if process.poll() is None:
+            raise SandboxError(f"cannot inspect macOS sandbox memory: errno {ctypes.get_errno()}")
+    return None
 
 
 def _assign_windows_job(process: subprocess.Popen[bytes], policy: SandboxPolicy) -> object | None:
@@ -714,6 +772,7 @@ def execute_mix32(
     stdout = b""
     stderr = b""
     scratch_bytes = 0
+    peak_resident_bytes = 0
     with tempfile.TemporaryDirectory(prefix="mindchain-worker-sandbox-") as temporary:
         scratch = Path(temporary)
         if os.name != "nt":
@@ -750,6 +809,16 @@ def execute_mix32(
                 if now >= deadline:
                     failure = SandboxError("sandbox runtime limit exceeded")
                     break
+                try:
+                    resident = _resident_memory_bytes(process)
+                except SandboxError as error:
+                    failure = error
+                    break
+                if resident is not None:
+                    peak_resident_bytes = max(peak_resident_bytes, resident)
+                    if resident > policy.memory_mb * 1024 * 1024:
+                        failure = SandboxError("sandbox memory limit exceeded")
+                        break
                 if now >= next_host_check:
                     try:
                         host_checks.append(policy.enforce_host(observation_provider()))
@@ -824,6 +893,7 @@ def execute_mix32(
             "operations": operations,
             "max_scratch_bytes": policy.max_scratch_bytes,
             "scratch_bytes": scratch_bytes,
+            "peak_resident_bytes": peak_resident_bytes,
         },
         "host_condition_checks": len(host_checks),
         "last_host_observation": host_checks[-1],

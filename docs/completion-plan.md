@@ -253,7 +253,7 @@ those gates.
 | `NET-04` | `DONE` | The v2 live soak covers multi-client NAT, measured WAN loss/latency, total bootstrap outage and redial, signed address rotation, block-equal state sync, process recovery, and loopback authenticated operator RPC. |
 | `NET-05` | `READY` | Generate signed expiring invitations, lease each voting role once, reject duplicate leases, and support revocation and reassignment. |
 | `NET-06` | `DONE` | Signed Linux x86_64/aarch64 packages render fixed-order, per-service hardened systemd units for producer, node, indexer, gateway, and dashboard; private configuration and durable state remain outside immutable releases across repair and uninstall. |
-| `NET-07` | `ACTIVE` | Signed monotonic lifecycle tooling now emits Linux systemd, macOS user launchd, and Windows limited-user Task Scheduler packages with downgrade protection, single-use rollback, repair, and data-preserving uninstall; native three-platform CI is the remaining exit check. |
+| `NET-07` | `DONE` | Signed monotonic lifecycle tooling emits Linux systemd, macOS user launchd, and Windows limited-user Task Scheduler packages with downgrade protection, single-use rollback, repair, and data-preserving uninstall; the pinned three-platform matrix passed at `009c2d269d0c387e4c4daa4d1d2764782d342d81`. |
 | `NET-08` | `ACTIVE` | Password-encrypted local identity custody, portable recovery, stdin-only signing, and worker/payout binding are implemented; a funded WAN job must still settle directly to the generated account. |
 | `NET-09` | `DONE` | Frozen signed MIX32 registry binds canonical identity, verifier, metering, limits, lifecycle, and executable fail-closed rejection vectors. |
 | `NET-10` | `ACTIVE` | Canonical local policies now enforce workload allowlisting, filesystem/network/GPU denial, zero scratch, memory/CPU/wall limits, operation and coordinator-byte budgets, temperature, battery, and UTC schedule; native three-platform CI remains. |
@@ -270,8 +270,8 @@ restricted state/configuration ACLs, and non-evaluating PowerShell wrappers.
 Twelve contract tests cover all three package formats plus tampering, secret and
 dependency rejection, update/downgrade policy, target mismatch, rollback
 expiry/replay, repair, root isolation, and exact reinstall. A native Windows CLI
-install/verify/uninstall smoke passed; the pinned Linux/macOS/Windows workflow
-must pass before `NET-07` becomes done.
+install/verify/uninstall smoke passed, and the pinned Linux/macOS/Windows
+host-lifecycle matrix passed at `009c2d269d0c387e4c4daa4d1d2764782d342d81`.
 
 `worker_payout_identity.py` implements the code-controlled portion of `NET-08`.
 It creates an OS-random seed, derives the payout account through `noos-cli`,
