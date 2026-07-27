@@ -15,6 +15,7 @@ path = "src/bin/noosd.rs"
 blake3 = "1"
 lz4_flex = "0.11"
 getrandom = "0.2"
+ed25519-dalek = "=2.2.0"
 ctrlc = "3"
 noos-braid = { path = "../noos-braid" }
 noos-contracts = { path = "../noos-contracts" }
@@ -28,7 +29,11 @@ noos-p2p = { path = "../noos-p2p" }
 noos-store = { path = "../noos-store" }
 noos-witness = { path = "../noos-witness" }
 serde_json = "1"
+sha2 = "=0.10.9"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
+
+[dev-dependencies]
+tempfile = "=3.24.0"
 
 [lints]
 workspace = true

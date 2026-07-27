@@ -12,8 +12,8 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-SCHEMA = "noos/public-network-manifest/v1"
-DOMAIN = b"NOOS/PUBLIC/NETWORK/MANIFEST/V1\0"
+SCHEMA = "noos/public-network-manifest/v2"
+DOMAIN = b"NOOS/PUBLIC/NETWORK/MANIFEST/V2\0"
 
 
 def canonical_payload(manifest: dict) -> bytes:

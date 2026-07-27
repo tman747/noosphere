@@ -73,8 +73,8 @@ pub use limits::{
     COOLDOWN_MAX_MS, DISCONNECT_SCORE,
 };
 pub use node::{
-    EmptyStore, InboundItem, P2pConfig, P2pEvent, P2pHandle, P2pNode, ProtocolStore, SendError,
-    SpawnError,
+    peer_id_from_ed25519_public, EmptyStore, InboundItem, P2pConfig, P2pEvent, P2pHandle, P2pNode,
+    ProtocolStore, SendError, SpawnError,
 };
 
 // Re-exported so embedders and tests need no direct libp2p dependency for

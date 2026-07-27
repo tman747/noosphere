@@ -263,6 +263,28 @@ cache of already durable canonical bodies.
 
 Peer readiness enables request selection; disconnect/rejection removes the
 peer immediately. The transport owns deterministic reconnect backoff.
+
+Bootstrap discovery may be supplied through
+`--bootstrap-registry <path> --bootstrap-public-key <hex32>`. The
+`noos/bootstrap-registry/v1` snapshot is canonical-body Ed25519 signed and
+binds chain ID, genesis hash, positive sequence, direct predecessor, registry
+lifetime, stable libp2p PeerIds, and one to four IP/DNS QUIC addresses per
+node. A current snapshot must expose at least two independently addressable
+active nodes. The node derives its own chain/genesis identity before opening
+the network and refuses wrong-chain, wrong-genesis, untrusted, not-yet-valid,
+expired, malformed, or under-populated snapshots.
+
+Accepted snapshots are persisted as immutable sequence-and-ID-named files
+under the node data directory. A successor must increment the sequence by one
+and name the exact accepted predecessor. A stable PeerId may rotate addresses;
+a removed PeerId must remain as an explicit revoked record, and revocation is
+irreversible. Conflicting same-sequence snapshots, skipped predecessors, and
+rollback to an older signed snapshot fail closed. `--peer` is mutually
+exclusive with signed discovery so static arguments cannot bypass revocation.
+`tools/bootstrap_registry.py` generates the offline signing key, freezes the
+first multi-bootstrap snapshot, publishes direct rotation/revocation
+successors, and verifies the same transition law before output.
+
 Every range/header response is canonically decoded, every repaired body is
 re-encoded to its committed DA root, and all resulting objects enter the
 ordinary import pipeline. Transaction pushes carry canonical transaction

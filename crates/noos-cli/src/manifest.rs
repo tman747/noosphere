@@ -2,12 +2,12 @@ use crate::{from_hex, from_hex32, to_hex, CliError, Result};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde_json::{json, Map, Value};
 
-const SCHEMA: &str = "noos/public-network-manifest/v1";
-const DOMAIN: &[u8] = b"NOOS/PUBLIC/NETWORK/MANIFEST/V1\0";
+const SCHEMA: &str = "noos/public-network-manifest/v2";
+const DOMAIN: &[u8] = b"NOOS/PUBLIC/NETWORK/MANIFEST/V2\0";
 const ALLOWED_FIELDS: &[&str] = &[
     "schema",
     "network",
-    "bootstrap_peers",
+    "bootstrap_registry",
     "api_base_url",
     "compute_market_url",
     "release",
@@ -101,25 +101,43 @@ fn validate_shape(manifest: &Value, trusted_key: &[u8; 32], now_unix_ms: u64) ->
         return Err(malformed("manifest network identity is malformed"));
     }
 
-    let peers = manifest
-        .get("bootstrap_peers")
-        .and_then(Value::as_array)
-        .ok_or_else(|| malformed("manifest bootstrap_peers must be an array"))?;
-    if peers.len() < 2 || peers.len() > 16 {
+    let bootstrap = required_object(manifest, "bootstrap_registry")?;
+    if bootstrap.len() != 5
+        || bootstrap
+            .get("registry_id")
+            .and_then(Value::as_str)
+            .map(from_hex32)
+            .transpose()?
+            .is_none()
+        || bootstrap
+            .get("signing_key")
+            .and_then(Value::as_str)
+            .map(from_hex32)
+            .transpose()?
+            .is_none()
+        || bootstrap
+            .get("sha256")
+            .and_then(Value::as_str)
+            .map(from_hex32)
+            .transpose()?
+            .is_none()
+        || bootstrap
+            .get("minimum_sequence")
+            .and_then(Value::as_u64)
+            .is_none_or(|sequence| sequence == 0)
+    {
         return Err(malformed(
-            "manifest must contain between 2 and 16 bootstrap peers",
+            "manifest bootstrap_registry binding is malformed",
         ));
     }
-    for peer in peers {
-        let peer = peer
-            .as_str()
-            .ok_or_else(|| malformed("manifest bootstrap peer must be a string"))?;
-        let address_family = peer.starts_with("/ip4/") || peer.starts_with("/ip6/");
-        if !address_family || !peer.contains("/udp/") || !peer.ends_with("/quic-v1") {
-            return Err(malformed(
-                "manifest bootstrap peer is not an IP QUIC multiaddr",
-            ));
-        }
+    let bootstrap_url = bootstrap
+        .get("url")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if !bootstrap_url.starts_with("https://") || bootstrap_url.contains('@') {
+        return Err(malformed(
+            "manifest bootstrap_registry.url must be an HTTPS URL",
+        ));
     }
 
     for field in ["api_base_url", "compute_market_url"] {
@@ -205,7 +223,7 @@ pub fn manifest_verify(
         "valid_from_unix_ms": required_u64(&manifest, "valid_from_unix_ms")?,
         "expires_unix_ms": required_u64(&manifest, "expires_unix_ms")?,
         "network": manifest["network"].clone(),
-        "bootstrap_peers": manifest["bootstrap_peers"].clone(),
+        "bootstrap_registry": manifest["bootstrap_registry"].clone(),
         "api_base_url": manifest["api_base_url"].clone(),
         "compute_market_url": manifest["compute_market_url"].clone(),
         "release": manifest["release"].clone(),
@@ -222,7 +240,7 @@ mod tests {
         let mut manifest = json!({
             "schema": SCHEMA,
             "network": {"name":"MindChain Public Testnet","chain_id":"01".repeat(32),"genesis_hash":"02".repeat(32)},
-            "bootstrap_peers": ["/ip4/203.0.113.10/udp/19701/quic-v1","/ip4/198.51.100.20/udp/19701/quic-v1"],
+            "bootstrap_registry": {"registry_id":"04".repeat(32),"signing_key":"05".repeat(32),"url":"https://bootstrap.testnet.mindchain.network/registry.json","sha256":"06".repeat(32),"minimum_sequence":1},
             "api_base_url": "https://api.testnet.mindchain.network",
             "compute_market_url": "https://compute.testnet.mindchain.network",
             "release": {"version":"0.1.0-testnet","artifacts":[{"name":"noosd","platform":"macos","architecture":"arm64","url":"https://install.testnet.mindchain.network/noosd","sha256":"03".repeat(32)}]},
@@ -248,7 +266,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result["valid"], true);
-        assert_eq!(result["bootstrap_peers"].as_array().unwrap().len(), 2);
+        assert_eq!(result["bootstrap_registry"]["minimum_sequence"], 1);
     }
 
     #[test]

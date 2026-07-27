@@ -3884,6 +3884,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "ctrlc",
+ "ed25519-dalek",
  "getrandom 0.2.17",
  "lz4_flex",
  "noos-braid",
@@ -3898,6 +3899,8 @@ dependencies = [
  "noos-store",
  "noos-witness",
  "serde_json",
+ "sha2",
+ "tempfile",
  "tokio",
 ]
 

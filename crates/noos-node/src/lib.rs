@@ -53,6 +53,7 @@
 pub mod artifact_store_port;
 pub mod auth;
 mod bonsai_fixture;
+pub mod bootstrap_registry;
 pub mod consensus;
 pub mod devnet_fixture;
 pub mod genesis;

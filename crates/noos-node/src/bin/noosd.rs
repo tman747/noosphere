@@ -7,8 +7,13 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use noos_grain::{encode_noun, Noun};
+use noos_node::bootstrap_registry::{
+    decode_public_key_hex, load_latest_accepted, persist_accepted, read_registry_file,
+    verify_transition, ACCEPTED_DIRECTORY,
+};
 use noos_node::consensus::{NodeConfig, NodeMode};
 use noos_node::genesis::{DevnetParams, GenesisSpec};
 use noos_node::network::NetworkSettings;
@@ -95,6 +100,10 @@ OPTIONS:
                            (default: /ip4/127.0.0.1/udp/0/quic-v1)
     --peer <multiaddr>     Bootstrap peer (repeatable; reconnects with
                            deterministic bounded backoff)
+    --bootstrap-registry <path>
+                           Signed chain/genesis-bound bootstrap snapshot
+    --bootstrap-public-key <hex32>
+                           Explicit Ed25519 trust root for the snapshot
     --no-network           Explicitly disable P2P (tests/maintenance only)
     --light                Light mode: headers + finality only
     --retention <blocks>   Chain-view retention window (0 = archive)
@@ -143,6 +152,8 @@ fn main() -> ExitCode {
     let mut social: Option<noos_braid::CheckpointRef> = None;
     let mut stable_safety_activation_height: Option<u64> = None;
     let mut network = NetworkSettings::default();
+    let mut bootstrap_registry_path: Option<PathBuf> = None;
+    let mut bootstrap_public_key: Option<String> = None;
     let mut mempool = noos_node::mempool::MempoolConfig::default();
 
     let mut it = args.iter();
@@ -223,6 +234,14 @@ fn main() -> ExitCode {
                     eprintln!("error: --peer expects a multiaddr");
                     return ExitCode::from(2);
                 }
+            },
+            "--bootstrap-registry" => match take("--bootstrap-registry") {
+                Some(v) => bootstrap_registry_path = Some(PathBuf::from(v)),
+                None => return ExitCode::from(2),
+            },
+            "--bootstrap-public-key" => match take("--bootstrap-public-key") {
+                Some(v) => bootstrap_public_key = Some(v),
+                None => return ExitCode::from(2),
             },
             "--no-network" => network.enabled = false,
             "--validator" => validator = true,
@@ -400,6 +419,20 @@ fn main() -> ExitCode {
         eprintln!("error: --rpc-token and --rpc-token-file are mutually exclusive");
         return ExitCode::from(2);
     }
+    if bootstrap_registry_path.is_some() != bootstrap_public_key.is_some() {
+        eprintln!(
+            "error: --bootstrap-registry and --bootstrap-public-key must be supplied together"
+        );
+        return ExitCode::from(2);
+    }
+    if bootstrap_registry_path.is_some() && !network.bootstrap.is_empty() {
+        eprintln!("error: --peer cannot bypass a signed --bootstrap-registry");
+        return ExitCode::from(2);
+    }
+    if bootstrap_registry_path.is_some() && !network.enabled {
+        eprintln!("error: --bootstrap-registry cannot be combined with --no-network");
+        return ExitCode::from(2);
+    }
     if let Some(path) = rpc_token_file {
         let raw = match std::fs::read_to_string(&path) {
             Ok(value) => value,
@@ -497,6 +530,88 @@ fn main() -> ExitCode {
     };
     spec.contract_codes = contract_codes.clone();
     spec.wwm_bonsai_fixture = devnet_bonsai_fixture;
+    if let (Some(registry_path), Some(public_key_hex)) = (
+        bootstrap_registry_path.as_ref(),
+        bootstrap_public_key.as_deref(),
+    ) {
+        let now_unix_ms = match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(duration) => match u64::try_from(duration.as_millis()) {
+                Ok(value) => value,
+                Err(_) => {
+                    eprintln!("error: system time does not fit u64 milliseconds");
+                    return ExitCode::FAILURE;
+                }
+            },
+            Err(_) => {
+                eprintln!("error: system clock precedes Unix epoch");
+                return ExitCode::FAILURE;
+            }
+        };
+        let trusted_public_key = match decode_public_key_hex(public_key_hex) {
+            Ok(value) => value,
+            Err(error) => {
+                eprintln!("error: {error}");
+                return ExitCode::FAILURE;
+            }
+        };
+        let chain_id = match spec.chain_id() {
+            Ok(value) => value,
+            Err(error) => {
+                eprintln!("error: derive chain identity for bootstrap registry: {error}");
+                return ExitCode::FAILURE;
+            }
+        };
+        let genesis_hash = match spec.genesis_hash() {
+            Ok(value) => value,
+            Err(error) => {
+                eprintln!("error: derive genesis identity for bootstrap registry: {error}");
+                return ExitCode::FAILURE;
+            }
+        };
+        let registry = match read_registry_file(
+            registry_path,
+            &trusted_public_key,
+            &chain_id,
+            &genesis_hash,
+            Some(now_unix_ms),
+        ) {
+            Ok(value) => value,
+            Err(error) => {
+                eprintln!("error: {error}");
+                return ExitCode::FAILURE;
+            }
+        };
+        let accepted_directory = data_dir.join(ACCEPTED_DIRECTORY);
+        match load_latest_accepted(
+            &accepted_directory,
+            &trusted_public_key,
+            &chain_id,
+            &genesis_hash,
+        ) {
+            Ok(Some(previous)) => {
+                if let Err(error) = verify_transition(&previous, &registry) {
+                    eprintln!("error: {error}");
+                    return ExitCode::FAILURE;
+                }
+            }
+            Ok(None) => {}
+            Err(error) => {
+                eprintln!("error: {error}");
+                return ExitCode::FAILURE;
+            }
+        }
+        if let Err(error) = persist_accepted(&accepted_directory, &registry) {
+            eprintln!("error: {error}");
+            return ExitCode::FAILURE;
+        }
+        network.bootstrap = registry.active_addresses(now_unix_ms);
+        println!(
+            "bootstrap registry accepted: sequence={} registry_id={} peers={}",
+            registry.sequence,
+            registry.registry_id_hex(),
+            network.bootstrap.len()
+        );
+    }
     let cfg = NodeConfig {
         mode: if light {
             NodeMode::Light

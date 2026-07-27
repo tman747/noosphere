@@ -2,6 +2,8 @@ param(
     [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
     [string]$RuntimeRoot = 'C:\mindchain\wwm-testnet',
     [string]$NodeBinary = 'C:\mindchain\wwm-testnet\bin\noosd.exe',
+    [string]$BootstrapRegistry = 'C:\mindchain\wwm-testnet\network\bootstrap-registry.json',
+    [string]$BootstrapPublicKeyFile = 'C:\mindchain\wwm-testnet\network\bootstrap-registry.public',
     [string]$WalletCliBinary = 'C:\mindchain\wwm-testnet\bin\noos-cli.exe',
     [string]$WalletApiBase = 'https://wwm-seed-2.mindchain.network',
     [string]$WalletFaucetDb = 'C:\mindchain\wwm-testnet\wallet\faucet.sqlite3',
@@ -68,6 +70,8 @@ foreach ($directory in @($DataDir, $LogDir, $MonitorEvidenceDir, $NeuralPublishe
 }
 foreach ($file in @(
     $NodeBinary,
+    $BootstrapRegistry,
+    $BootstrapPublicKeyFile,
     $TokenFile,
     $Seed2RpcTokenFile,
     $SshBinary,
@@ -116,6 +120,10 @@ if ($Token.Length -lt 32 -or $Token -match '\s') {
     throw 'RPC token file must contain one non-whitespace token of at least 32 characters.'
 }
 Remove-Variable Token
+$BootstrapPublicKey = (Get-Content -LiteralPath $BootstrapPublicKeyFile -Raw).Trim()
+if ($BootstrapPublicKey -notmatch '^[0-9a-f]{64}$') {
+    throw 'Bootstrap registry public key must be canonical lowercase hex32.'
+}
 $CoordinatorSeed = (Get-Content -LiteralPath $CoordinatorSeedFile -Raw).Trim()
 if ($CoordinatorSeed -notmatch '^[0-9a-f]{64}$') {
     throw 'Web-capacity coordinator seed must be canonical lowercase hex32.'
@@ -154,10 +162,8 @@ $Specs = @(
             '--rpc-token-file', $TokenFile,
             '--devnet-governance-account', $GovernanceAccount,
             '--p2p-listen', '/ip4/0.0.0.0/udp/29650/quic-v1',
-            '--peer', '/ip4/20.15.164.29/udp/31004/quic-v1',
-            '--peer', '/ip4/172.202.41.123/udp/31005/quic-v1',
-            '--peer', '/ip4/48.217.51.122/udp/31006/quic-v1',
-            '--peer', '/ip4/48.217.51.122/udp/31007/quic-v1',
+            '--bootstrap-registry', $BootstrapRegistry,
+            '--bootstrap-public-key', $BootstrapPublicKey,
             '--data-dir', $DataDir
         )
     },

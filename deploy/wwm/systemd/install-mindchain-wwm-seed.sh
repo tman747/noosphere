@@ -5,18 +5,19 @@ if [[ "${EUID}" -ne 0 ]]; then
   echo "installer must run as root" >&2
   exit 1
 fi
-if [[ "$#" -ne 7 ]]; then
-  echo "usage: $0 <role:validator|producer-witness|witness> <witness-index:0..3> <p2p-port> <comma-separated-peer-multiaddrs|-> <binary-path> <binary-sha256> <parameters-path>" >&2
+if [[ "$#" -ne 8 ]]; then
+  echo "usage: $0 <role:validator|producer-witness|witness> <witness-index:0..3> <p2p-port> <bootstrap-registry-path> <bootstrap-public-key-path> <binary-path> <binary-sha256> <parameters-path>" >&2
   exit 1
 fi
 
 NODE_ROLE="$1"
 WITNESS_INDEX="$2"
 P2P_PORT="$3"
-BOOTSTRAP_PEERS_ARG="$4"
-BINARY_SOURCE="$5"
-EXPECTED_SHA256="$6"
-PARAMS_SOURCE="$7"
+BOOTSTRAP_REGISTRY_SOURCE="$4"
+BOOTSTRAP_PUBLIC_KEY_SOURCE="$5"
+BINARY_SOURCE="$6"
+EXPECTED_SHA256="$7"
+PARAMS_SOURCE="$8"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 [[ "${NODE_ROLE}" =~ ^(validator|producer-witness|witness)$ ]] || { echo "invalid node role" >&2; exit 1; }
@@ -26,16 +27,10 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 [[ "${EXPECTED_SHA256}" =~ ^[0-9a-f]{64}$ ]] || { echo "binary SHA-256 is invalid" >&2; exit 1; }
 [[ -f "${BINARY_SOURCE}" && ! -L "${BINARY_SOURCE}" ]] || { echo "binary source is missing or symbolic" >&2; exit 1; }
 [[ -f "${PARAMS_SOURCE}" && ! -L "${PARAMS_SOURCE}" ]] || { echo "genesis parameters source is missing or symbolic" >&2; exit 1; }
-if [[ "${BOOTSTRAP_PEERS_ARG}" != "-" ]]; then
-  IFS=',' read -r -a bootstrap_peers <<< "${BOOTSTRAP_PEERS_ARG}"
-  (( ${#bootstrap_peers[@]} <= 8 )) || { echo "too many bootstrap peers" >&2; exit 1; }
-  for peer in "${bootstrap_peers[@]}"; do
-    [[ "${peer}" =~ ^/ip4/([0-9]{1,3}\.){3}[0-9]{1,3}/udp/[0-9]{4,5}/quic-v1$ ]] || {
-      echo "bootstrap peers must be numeric IPv4 QUIC multiaddrs or '-'" >&2
-      exit 1
-    }
-  done
-fi
+[[ -f "${BOOTSTRAP_REGISTRY_SOURCE}" && ! -L "${BOOTSTRAP_REGISTRY_SOURCE}" ]] || { echo "bootstrap registry source is missing or symbolic" >&2; exit 1; }
+[[ -f "${BOOTSTRAP_PUBLIC_KEY_SOURCE}" && ! -L "${BOOTSTRAP_PUBLIC_KEY_SOURCE}" ]] || { echo "bootstrap public key source is missing or symbolic" >&2; exit 1; }
+BOOTSTRAP_PUBLIC_KEY="$(tr -d '\r\n' < "${BOOTSTRAP_PUBLIC_KEY_SOURCE}")"
+[[ "${BOOTSTRAP_PUBLIC_KEY}" =~ ^[0-9a-f]{64}$ ]] || { echo "bootstrap public key is malformed" >&2; exit 1; }
 
 ACTUAL_SHA256="$(sha256sum "${BINARY_SOURCE}" | cut -d' ' -f1)"
 [[ "${ACTUAL_SHA256}" == "${EXPECTED_SHA256}" ]] || { echo "binary SHA-256 mismatch" >&2; exit 1; }
@@ -58,6 +53,8 @@ install -o root -g root -m 0755 "${SCRIPT_DIR}/create-mindchain-seed-snapshot.sh
 install -o root -g root -m 0755 "${SCRIPT_DIR}/restore-mindchain-seed-snapshot.sh" /opt/mindchain-wwm/bin/restore-mindchain-seed-snapshot.sh
 install -o root -g root -m 0644 "${PARAMS_SOURCE}" /opt/mindchain-wwm/protocol/genesis/devnet-parameters.toml
 install -o root -g root -m 0644 "${SCRIPT_DIR}/mindchain-wwm-seed.service" /etc/systemd/system/mindchain-wwm-seed.service
+install -o root -g root -m 0644 "${BOOTSTRAP_REGISTRY_SOURCE}" /etc/mindchain-wwm/bootstrap-registry.json
+install -o root -g root -m 0644 "${BOOTSTRAP_PUBLIC_KEY_SOURCE}" /etc/mindchain-wwm/bootstrap-registry.public
 install -o root -g root -m 0644 "${SCRIPT_DIR}/mindchain-wwm-external-probe.service" /etc/systemd/system/mindchain-wwm-external-probe.service
 install -o root -g root -m 0644 "${SCRIPT_DIR}/mindchain-wwm-external-probe.timer" /etc/systemd/system/mindchain-wwm-external-probe.timer
 
@@ -72,13 +69,9 @@ TOKEN_LENGTH="$(tr -d '\r\n' < /etc/mindchain-wwm/rpc-token | wc -c)"
 chown root:mindchain-wwm /etc/mindchain-wwm/rpc-token
 chmod 0640 /etc/mindchain-wwm/rpc-token
 
-BOOTSTRAP_VALUE=""
-if [[ "${BOOTSTRAP_PEERS_ARG}" != "-" ]]; then
-  BOOTSTRAP_VALUE="${BOOTSTRAP_PEERS_ARG}"
-fi
 NODE_ENV_TMP="$(mktemp /etc/mindchain-wwm/node.env.XXXXXX)"
-printf 'NODE_ROLE=%s\nWITNESS_INDEX=%s\nP2P_LISTEN=/ip4/0.0.0.0/udp/%s/quic-v1\nBOOTSTRAP_PEERS=%s\nPRODUCE_INTERVAL_MS=6000\n' \
-  "${NODE_ROLE}" "${WITNESS_INDEX}" "${P2P_PORT}" "${BOOTSTRAP_VALUE}" > "${NODE_ENV_TMP}"
+printf 'NODE_ROLE=%s\nWITNESS_INDEX=%s\nP2P_LISTEN=/ip4/0.0.0.0/udp/%s/quic-v1\nBOOTSTRAP_REGISTRY=/etc/mindchain-wwm/bootstrap-registry.json\nBOOTSTRAP_PUBLIC_KEY_FILE=/etc/mindchain-wwm/bootstrap-registry.public\nPRODUCE_INTERVAL_MS=6000\n' \
+  "${NODE_ROLE}" "${WITNESS_INDEX}" "${P2P_PORT}" > "${NODE_ENV_TMP}"
 chown root:mindchain-wwm "${NODE_ENV_TMP}"
 chmod 0640 "${NODE_ENV_TMP}"
 mv "${NODE_ENV_TMP}" /etc/mindchain-wwm/node.env

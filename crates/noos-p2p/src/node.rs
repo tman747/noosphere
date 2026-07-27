@@ -332,7 +332,7 @@ async fn exchange(
 }
 
 /// PeerId corresponding to an attested Ed25519 public key.
-fn attested_peer_id(pubkey: &[u8; 32]) -> Option<PeerId> {
+pub fn peer_id_from_ed25519_public(pubkey: &[u8; 32]) -> Option<PeerId> {
     let pk = p2p_identity::ed25519::PublicKey::try_from_bytes(pubkey).ok()?;
     Some(p2p_identity::PublicKey::from(pk).to_peer_id())
 }
@@ -357,7 +357,7 @@ impl P2pNode {
         let noos_key = noos_crypto::Keypair::from_seed(config.keypair_seed);
         let local_attestation = sign_attestation(&config.identity, &noos_key);
         debug_assert_eq!(
-            attested_peer_id(&local_attestation.peer_pubkey),
+            peer_id_from_ed25519_public(&local_attestation.peer_pubkey),
             Some(libp2p_key.public().to_peer_id()),
             "libp2p and noos-crypto must derive the same Ed25519 identity"
         );
@@ -1180,7 +1180,7 @@ fn validate_remote(
 ) -> Result<(), RejectCode> {
     verify_attestation(&shared.config.identity, &att.peer_pubkey, att)?;
     // Bind the attested key to the TLS-authenticated connection identity.
-    if attested_peer_id(&att.peer_pubkey) != Some(remote) {
+    if peer_id_from_ed25519_public(&att.peer_pubkey) != Some(remote) {
         return Err(RejectCode::AttestationInvalid);
     }
     Ok(())
