@@ -99,13 +99,19 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check --only-binary=:all: "blake3==1.0.9" "cryptography==49.0.0" "py-ecc==8.0.0"
-          python -m unittest -v tools.gates.test_cross_language_lab tools.gates.test_check_vectors
+          python -m unittest -v tools.gates.test_cross_language_lab tools.gates.test_check_vectors tools.gates.test_two_client_devnet_campaign
           python tools/gates/cross_language_lab.py run \
             --source-revision "${GITHUB_SHA}" \
             --profile smoke \
             --seed 0x4e4f4f53 \
             --cargo-target-dir "${RUNNER_TEMP}/cross-language-cargo" \
             --output "${RUNNER_TEMP}/cross-language-lab.json"
+          python tools/gates/two_client_devnet_campaign.py run \
+            --source-revision "${GITHUB_SHA}" \
+            --profile smoke \
+            --seed 0x4e4f4f53 \
+            --cargo-target-dir "${RUNNER_TEMP}/cross-language-cargo" \
+            --output "${RUNNER_TEMP}/two-client-devnet-campaign.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
@@ -113,6 +119,8 @@ jobs:
           path: |
             ${{ runner.temp }}/cross-language-lab.json
             ${{ runner.temp }}/cross-language-lab-artifacts/
+            ${{ runner.temp }}/two-client-devnet-campaign.json
+            ${{ runner.temp }}/two-client-devnet-campaign-artifacts/
           if-no-files-found: error
           retention-days: 30
 

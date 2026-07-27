@@ -94,6 +94,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--max-faults", type=positive_int, help="scoped smoke bound; public crash gate omits this")
     p.add_argument("--pairs", help="required comma-separated client matrix pairs (AA,AB,BA,BB)")
     p.add_argument("--out", type=Path)
+    p.add_argument("--raw-log-dir", type=Path, help="external immutable raw-log directory")
     return p
 
 
@@ -221,8 +222,17 @@ def main() -> int:
     ended = utc_now()
     raw_bytes = ("\n\n".join(raw_parts)).encode("utf-8")
     raw_hash = sha256_bytes(raw_bytes)
-    log_rel = Path("evidence") / "logs" / f"{args.scenario}-{raw_hash}.raw.log"
-    log_path = ROOT / log_rel
+    log_name = f"{args.scenario}-{raw_hash}.raw.log"
+    if args.raw_log_dir is None:
+        log_reference = Path("evidence") / "logs" / log_name
+        log_path = ROOT / log_reference
+        rendered_log_path = log_reference.as_posix()
+    else:
+        log_directory = args.raw_log_dir
+        if not log_directory.is_absolute():
+            log_directory = ROOT / log_directory
+        log_path = log_directory.resolve() / log_name
+        rendered_log_path = log_path.as_posix()
     log_path.parent.mkdir(parents=True, exist_ok=True)
     if log_path.exists() and log_path.read_bytes() != raw_bytes:
         raise RuntimeError(f"immutable raw log collision at {log_path}")
@@ -285,7 +295,7 @@ def main() -> int:
         },
         "timestamps": {"started_utc": started, "ended_utc": ended},
         "exit": {"wrapper": 0, "simulator": exits},
-        "raw_log": {"path": log_rel.as_posix(), "sha256": raw_hash, "bytes": len(raw_bytes)},
+        "raw_log": {"path": rendered_log_path, "sha256": raw_hash, "bytes": len(raw_bytes)},
         "thresholds": THRESHOLDS,
         "observations": {"runs": runs, "client_pairs": all_pairs},
         "rollback": {

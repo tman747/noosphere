@@ -336,10 +336,11 @@ def run_lane(
     lane_artifact = artifacts_root / "lane-evidence" / f"{lane.lane_id}.json"
     if lane.artifact:
         lane_artifact.parent.mkdir(parents=True, exist_ok=True)
-    displayed_command = [
-        lane_artifact.as_posix() if item == "{artifact}" else item
-        for item in lane.command
-    ]
+    replacements = {
+        "{artifact}": lane_artifact.as_posix(),
+        "{artifact_root}": artifacts_root.as_posix(),
+    }
+    displayed_command = [replacements.get(item, item) for item in lane.command]
     execution_command = [
         sys.executable if item == "python" else item for item in displayed_command
     ]
