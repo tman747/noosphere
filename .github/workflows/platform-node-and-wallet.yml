@@ -401,6 +401,7 @@ jobs:
             tools.operations.test_wwm_model_improvement \
             tools.operations.test_wwm_continuous_learning \
             tools.operations.test_wwm_poison_memorization_evaluation \
+            tools.g4.test_capped_value_canary \
             tools.operations.test_wwm_public_inference \
             tools.operations.test_wwm_inference_metrics \
             tools.operations.test_wwm_plaintext_persistence_audit \
