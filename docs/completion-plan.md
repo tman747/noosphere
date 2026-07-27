@@ -252,12 +252,26 @@ those gates.
 | `NET-03` | `DONE` | Signed multi-bootstrap snapshots bind stable PeerIds, chain/genesis, expiry, direct address rotation, irreversible revocation, and persisted rollback refusal. |
 | `NET-04` | `DONE` | The v2 live soak covers multi-client NAT, measured WAN loss/latency, total bootstrap outage and redial, signed address rotation, block-equal state sync, process recovery, and loopback authenticated operator RPC. |
 | `NET-05` | `READY` | Generate signed expiring invitations, lease each voting role once, reject duplicate leases, and support revocation and reassignment. |
-| `NET-06` | `READY` | Package producer, node, indexer, gateway, dashboard, and private configuration as least-privilege auto-start services with repair and uninstall. |
-| `NET-07` | `READY` | Add signed installer/update manifests, downgrade protection, rollback, repair, and data-preserving uninstall for supported desktop platforms. |
+| `NET-06` | `DONE` | Signed Linux x86_64/aarch64 packages render fixed-order, per-service hardened systemd units for producer, node, indexer, gateway, and dashboard; private configuration and durable state remain outside immutable releases across repair and uninstall. |
+| `NET-07` | `ACTIVE` | Signed monotonic lifecycle tooling now emits Linux systemd, macOS user launchd, and Windows limited-user Task Scheduler packages with downgrade protection, single-use rollback, repair, and data-preserving uninstall; native three-platform CI is the remaining exit check. |
 | `NET-08` | `READY` | Generate or recover a local worker payout identity outside browser and coordinator storage; settle a WAN job directly to it. |
 | `NET-09` | `DONE` | Frozen signed MIX32 registry binds canonical identity, verifier, metering, limits, lifecycle, and executable fail-closed rejection vectors. |
 | `NET-10` | `READY` | Enforce filesystem, network, memory, runtime, storage, GPU, temperature, battery, schedule, and bandwidth policies against malicious workloads. |
 | `NET-11` | `READY` | Implement objective result verification, timeout, dispute, penalty, cancellation, and refund paths that cannot release escrow for invalid work. |
+
+`host_lifecycle.py` implements `NET-06` and the code-controlled portion of
+`NET-07`: canonical Ed25519 release manifests, runtime platform/architecture
+binding, monotonic sequence enforcement, content-addressed immutable artifacts,
+single-use signed direct-predecessor rollback, repair, and data-preserving
+uninstall. Linux packages use per-service hardened systemd identities; macOS
+packages use current-user launchd agents and non-evaluating environment
+wrappers; Windows packages use limited-user restartable scheduled tasks,
+restricted state/configuration ACLs, and non-evaluating PowerShell wrappers.
+Twelve contract tests cover all three package formats plus tampering, secret and
+dependency rejection, update/downgrade policy, target mismatch, rollback
+expiry/replay, repair, root isolation, and exact reinstall. A native Windows CLI
+install/verify/uninstall smoke passed; the pinned Linux/macOS/Windows workflow
+must pass before `NET-07` becomes done.
 
 ### Track F — native clients and release supply chain
 
