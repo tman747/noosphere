@@ -214,6 +214,16 @@ results. The adapters and verifier are locally executable; the table remains
 `EXTERNAL_BLOCKED` until the observations come from the independently
 controlled cohort named by the signed plan.
 
+The WorkLoom transition now has a funded challenger registry. Enrollment binds
+the chain account to one operator, beneficial owner, control cluster, funding
+transaction, validity interval, and minimum bond; duplicate control identities
+do not increase the gate. Disputes require an active liquid enrollment,
+successful challenges return the bond plus the configured worker slash share,
+and frivolous challenges burn the bond while unrelated jobs continue. The
+production gate requires two simultaneously funded diverse enrollments.
+`IND-06` remains externally blocked until both entries and both outcomes are
+funded and exercised by independent beneficial owners rather than fixtures.
+
 ### Track D — formal E-WWM-23 public pilot
 
 | ID | State | Work and exit |

@@ -17,10 +17,10 @@ use noos_nel::inference::{
 use noos_nel::{distribute_executor_slash, FreivaldsProfile, Verdict};
 use noos_work_loom::{
     artifact_id, domain_hash, domains, work_commit, Assurance, AvailabilityCertificate,
-    AvailabilityPolicy, Correctness, Delivery, DeliveryRule, DemandClassification, DisputeVerdict,
-    EvaluatorPolicy, JobClass, JobState, LoomError, OpenJob, ProofProfile, Quality, Registries,
-    RegistryStatus, ResourceVector, SettlementAccounts, SettlementSplit, WorkClass, WorkReceipt,
-    WorkerCommit, WorkerProfile,
+    AvailabilityPolicy, ChallengerEnrollment, Correctness, Delivery, DeliveryRule,
+    DemandClassification, DisputeVerdict, EvaluatorPolicy, JobClass, JobState, LoomError, OpenJob,
+    ProofProfile, Quality, Registries, RegistryStatus, ResourceVector, SettlementAccounts,
+    SettlementSplit, WorkClass, WorkReceipt, WorkerCommit, WorkerProfile,
 };
 use std::collections::BTreeSet;
 
@@ -113,6 +113,18 @@ fn loom() -> noos_work_loom::WorkLoom {
     for account in [REQUESTER, CHEATER, HONEST_WORKER, CHALLENGER] {
         loom.credit_genesis(account, 1_000).unwrap();
     }
+    loom.enroll_challenger(ChallengerEnrollment {
+        account: CHALLENGER,
+        operator_id: h(60),
+        beneficial_owner_root: h(62),
+        control_cluster_id: h(63),
+        funding_tx_id: h(61),
+        funded_at_height: 1,
+        expires_at_height: 100,
+        minimum_bond: 40,
+        revoked_at_height: None,
+    })
+    .unwrap();
     loom
 }
 
@@ -436,8 +448,9 @@ fn honest_executor_survives_a_frivolous_dispute_and_settles() {
     .unwrap();
     assert_eq!(l.job(&id).unwrap().state, JobState::Settled);
     assert_eq!(l.balance(&HONEST_WORKER), 1_070, "pay plus bond back");
-    assert_eq!(l.balance(&CHALLENGER), 1_000, "frivolous bond returned");
+    assert_eq!(l.balance(&CHALLENGER), 960, "frivolous bond burned");
     assert_eq!(l.balance(&REQUESTER), 900, "escrow spent on delivery");
+    assert_eq!(l.burned(), 40, "frivolous challenger bond burned");
     l.assert_conserved().unwrap();
 }
 
