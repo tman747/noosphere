@@ -36,9 +36,10 @@ use crate::state::{
 };
 use crate::test_util::SplitMix64;
 use crate::wwm::{
-    wwm_profile_key, CapabilityProfileV1, CapabilitySetV1, CapabilityStatus, FundBucketTag,
-    ModelCapsuleV2, RegistryEpochVectorV1, SignatureEntryV1, WwmControlMode, WwmControlStateV1,
-    WwmEvidenceTier, WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmSettlementV1, WwmTerminalCode,
+    wwm_profile_key, AvailabilityPolicyV2, CapabilityProfileV1, CapabilitySetV1, CapabilityStatus,
+    CustodianCapabilitySetV1, CustodianProfileV2, FundBucketTag, ModelCapsuleV2,
+    RegistryEpochVectorV1, SignatureEntryV1, WwmControlMode, WwmControlStateV1, WwmEvidenceTier,
+    WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmSettlementV1, WwmTerminalCode,
 };
 use crate::Hash32;
 
@@ -2463,19 +2464,23 @@ fn neural_reporter_profile(
     }
 }
 
-fn install_neural_reporters(ledger: &mut LumenLedger, job: &mut WwmJobV1) -> (Hash32, [Hash32; 3]) {
-    let set_id = [0x60; 32];
-    let profile_ids = [[0x61; 32], [0x62; 32], [0x63; 32]];
+fn install_neural_reporter_set(
+    ledger: &mut LumenLedger,
+    job: &mut WwmJobV1,
+    set_id: Hash32,
+    entries: Vec<CapabilityProfileV1>,
+) -> [Hash32; 3] {
+    let profile_ids: [Hash32; 3] = entries
+        .iter()
+        .map(|profile| profile.profile_id)
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
     let executor_set = CapabilitySetV1 {
         set_id,
         prior_set_id: [0x5f; 32],
         epoch: 1,
-        entries: BoundedList::new(vec![
-            neural_reporter_profile(profile_ids[0], PAYER, 0x71),
-            neural_reporter_profile(profile_ids[1], GOV, 0x72),
-            neural_reporter_profile(profile_ids[2], EMERGENCY, 0x73),
-        ])
-        .unwrap(),
+        entries: BoundedList::new(entries).unwrap(),
     };
     assert!(executor_set.validate());
     let registry = RegistryEpochVectorV1 {
@@ -2493,7 +2498,156 @@ fn install_neural_reporters(ledger: &mut LumenLedger, job: &mut WwmJobV1) -> (Ha
     };
     ledger.install_neural_oracle_fixture_for_test(&registry, &executor_set);
     job.selected_executor_ids = BoundedList::new(profile_ids.to_vec()).unwrap();
-    (set_id, profile_ids)
+    profile_ids
+}
+
+fn install_neural_reporters(ledger: &mut LumenLedger, job: &mut WwmJobV1) -> (Hash32, [Hash32; 3]) {
+    let set_id = [0x60; 32];
+    let profile_ids = [[0x61; 32], [0x62; 32], [0x63; 32]];
+    let entries = vec![
+        neural_reporter_profile(profile_ids[0], PAYER, 0x71),
+        neural_reporter_profile(profile_ids[1], GOV, 0x72),
+        neural_reporter_profile(profile_ids[2], EMERGENCY, 0x73),
+    ];
+    let installed_ids = install_neural_reporter_set(ledger, job, set_id, entries);
+    (set_id, installed_ids)
+}
+
+#[test]
+fn capability_selection_rejects_collocated_executor_committees() {
+    for collision in 0_u8..4 {
+        let (mut ledger, mut job, _, _) = wwm_flow_fixture(WwmControlMode::Canary);
+        let profile_ids = [[0x61; 32], [0x62; 32], [0x63; 32]];
+        let mut entries = vec![
+            neural_reporter_profile(profile_ids[0], PAYER, 0x71),
+            neural_reporter_profile(profile_ids[1], GOV, 0x72),
+            neural_reporter_profile(profile_ids[2], EMERGENCY, 0x73),
+        ];
+        match collision {
+            0 => entries[1].beneficial_control_root = entries[0].beneficial_control_root,
+            1 => entries[1].provider_root = entries[0].provider_root,
+            2 => entries[1].region_id = entries[0].region_id,
+            3 => {
+                let lineage = entries[0].software_lineage_root;
+                for profile in &mut entries {
+                    profile.software_lineage_root = lineage;
+                }
+            }
+            _ => unreachable!(),
+        }
+        let set_id = [0x80_u8 + collision; 32];
+        install_neural_reporter_set(&mut ledger, &mut job, set_id, entries);
+        assert!(matches!(
+            apply_wwm_action(&mut ledger, 10, ActionV1::OpenWwmJob(job.clone())),
+            ApplyOutcome::Applied { .. }
+        ));
+        let query = NeuralOracleQueryV1 {
+            query_id: job.job_id,
+            job_id: job.job_id,
+            requester: PAYER,
+            executor_set_id: set_id,
+            executor_set_epoch: 1,
+            input_root: job.offchain_envelope_root,
+            max_response_bytes: 128,
+            threshold: 2,
+            commit_deadline: 13,
+            reveal_deadline: 18,
+        };
+        assert!(
+            matches!(
+                apply_wwm_action(&mut ledger, 11, ActionV1::OpenNeuralOracleQuery(query)),
+                ApplyOutcome::Failed {
+                    code: FailCode::PostconditionFailed,
+                    ..
+                }
+            ),
+            "collision dimension {collision} was admitted"
+        );
+    }
+}
+
+#[test]
+fn custodian_policy_rejects_concentration_and_single_lineage() {
+    let policy = AvailabilityPolicyV2 {
+        policy_id: [0x91; 32],
+        artifact_id: [0x92; 32],
+        manifest_root: [0x93; 32],
+        assignment_root: [0x94; 32],
+        geometry_root: [0x95; 32],
+        position_count: 12,
+        reconstruction_threshold: 8,
+        schedulable_minimum: 9,
+        required_regions: 4,
+        max_positions_per_region: 3,
+        max_positions_per_asn: 2,
+        max_positions_per_provider: 3,
+        challenge_period: 10,
+        response_deadline: 5,
+        max_probe_age: 20,
+        repair_horizon: 30,
+        evidence_retention_horizon: 40,
+        samples_per_challenge: 1,
+        verifier_sample_size: 8,
+        verifier_threshold: 5,
+        verifier_capability_bitmap: 1,
+        reconstructor_sample_size: 5,
+        reconstructor_threshold: 3,
+        policy_start_height: 1,
+        policy_end_height: 100,
+    };
+    let entries = (0_u8..12)
+        .map(|index| CustodianProfileV2 {
+            profile_id: [index + 1; 32],
+            status: CapabilityStatus::Active,
+            beneficial_control_root: [0x10 + index; 32],
+            region_id: [0x30 + index % 4; 32],
+            asn: 64_000 + u32::from(index),
+            provider_root: [0x40 + index % 6; 32],
+            software_lineage_root: [0x50 + index % 2; 32],
+            attestation_epoch: 1,
+            attestation_expiry: 100,
+            capability_bitmap: 1,
+            selection_weight: 1,
+            endpoint_root: [0x60 + index; 32],
+            staging_bytes: 1,
+            capacity_bytes: 4,
+            headroom_bytes: 1,
+            operator_id: [0x70 + index; 32],
+            signing_key: [0x80 + index; 32],
+            reviewer_id: [0x90 + index; 32],
+            reviewer_signature: BoundedBytes::new(vec![index + 1]).unwrap(),
+        })
+        .collect::<Vec<_>>();
+    let set = CustodianCapabilitySetV1 {
+        set_id: [0xa0; 32],
+        prior_set_id: [0; 32],
+        epoch: 1,
+        entries: BoundedList::new(entries.clone()).unwrap(),
+    };
+    assert!(set.policy_independent(&policy, 80, true));
+
+    let mut concentrated = entries.clone();
+    let provider = concentrated[0].provider_root;
+    for profile in &mut concentrated[..4] {
+        profile.provider_root = provider;
+    }
+    let concentrated = CustodianCapabilitySetV1 {
+        entries: BoundedList::new(concentrated).unwrap(),
+        ..set.clone()
+    };
+    assert!(!concentrated.policy_independent(&policy, 80, true));
+
+    let mut single_lineage = entries;
+    let lineage = single_lineage[0].software_lineage_root;
+    for profile in &mut single_lineage {
+        profile.software_lineage_root = lineage;
+    }
+    let single_lineage = CustodianCapabilitySetV1 {
+        entries: BoundedList::new(single_lineage).unwrap(),
+        ..set
+    };
+    assert!(!single_lineage.policy_independent(&policy, 80, true));
+    assert!(single_lineage.policy_independent(&policy, 80, false));
 }
 
 #[test]

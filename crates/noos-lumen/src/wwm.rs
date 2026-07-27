@@ -11,6 +11,7 @@ use crate::{
     Hash32,
 };
 use noos_codec::{define_object, CodecError, NoosDecode, NoosEncode, Reader, Writer};
+use smallvec::SmallVec;
 
 pub const MAX_PROFILE_BYTES: usize = 512;
 pub const MAX_CAPABILITY_SET_BYTES: usize = 18_432;
@@ -173,6 +174,31 @@ define_object! {
 }
 pub type ExecutorProfileV1 = CapabilityProfileV1;
 
+fn distinct_count_by<P, T: PartialEq, F: Fn(&P) -> T>(profiles: &[&P], field: F) -> usize {
+    profiles
+        .iter()
+        .enumerate()
+        .filter(|(index, profile)| {
+            let value = field(profile);
+            profiles[..*index].iter().all(|prior| field(prior) != value)
+        })
+        .count()
+}
+
+fn max_concentration_by<P, T: PartialEq, F: Fn(&P) -> T>(profiles: &[&P], field: F) -> usize {
+    profiles
+        .iter()
+        .map(|profile| {
+            let value = field(profile);
+            profiles
+                .iter()
+                .filter(|candidate| field(candidate) == value)
+                .count()
+        })
+        .max()
+        .unwrap_or(0)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CapabilitySetV1 {
     pub set_id: Hash32,
@@ -191,6 +217,62 @@ impl CapabilitySetV1 {
                 .iter()
                 .all(|p| p.encode_canonical().len() <= MAX_PROFILE_BYTES)
             && self.encode_canonical().len() <= MAX_CAPABILITY_SET_BYTES
+    }
+
+    /// Validates the only two executor committee shapes currently admitted by
+    /// consensus: a three-reporter oracle quorum and an eight-verifier
+    /// availability quorum. The concentration caps preserve quorum after loss
+    /// of the largest represented region, provider, or ASN.
+    #[must_use]
+    pub fn selected_independent(
+        &self,
+        selected_ids: &[Hash32],
+        valid_until: u64,
+        require_lineage_diversity: bool,
+    ) -> bool {
+        let (minimum_regions, max_per_region, max_per_provider, max_per_asn) =
+            match selected_ids.len() {
+                3 => (3, 1, 1, 1),
+                8 => (4, 3, 3, 2),
+                _ => return false,
+            };
+        if !selected_ids.windows(2).all(|window| window[0] < window[1]) {
+            return false;
+        }
+        let profiles: Option<SmallVec<[&CapabilityProfileV1; 8]>> = selected_ids
+            .iter()
+            .map(|profile_id| {
+                self.entries
+                    .iter()
+                    .find(|profile| profile.profile_id == *profile_id)
+            })
+            .collect();
+        let Some(profiles) = profiles else {
+            return false;
+        };
+        if profiles.iter().any(|profile| {
+            profile.status != CapabilityStatus::Active
+                || profile.attestation_expiry < valid_until
+                || profile.beneficial_control_root == [0; 32]
+                || profile.region_id == [0; 32]
+                || profile.asn == 0
+                || profile.provider_root == [0; 32]
+                || profile.software_lineage_root == [0; 32]
+                || profile.operator_id == [0; 32]
+                || profile.signing_key == [0; 32]
+        }) {
+            return false;
+        }
+        let profiles = profiles.as_slice();
+        distinct_count_by(profiles, |profile| profile.beneficial_control_root) == profiles.len()
+            && distinct_count_by(profiles, |profile| profile.operator_id) == profiles.len()
+            && distinct_count_by(profiles, |profile| profile.signing_key) == profiles.len()
+            && distinct_count_by(profiles, |profile| profile.region_id) >= minimum_regions
+            && max_concentration_by(profiles, |profile| profile.region_id) <= max_per_region
+            && max_concentration_by(profiles, |profile| profile.provider_root) <= max_per_provider
+            && max_concentration_by(profiles, |profile| profile.asn) <= max_per_asn
+            && (!require_lineage_diversity
+                || distinct_count_by(profiles, |profile| profile.software_lineage_root) >= 2)
     }
 }
 impl NoosEncode for CapabilitySetV1 {
@@ -236,6 +318,59 @@ impl CustodianCapabilitySetV1 {
                 .iter()
                 .all(|p| p.encode_canonical().len() <= MAX_PROFILE_BYTES)
             && self.encode_canonical().len() <= MAX_CAPABILITY_SET_BYTES
+    }
+
+    /// Checks that every active custodian is attested through the certificate
+    /// lifetime and that the active set satisfies the policy's loss-domain
+    /// bounds. Suspended and retired historical entries do not count.
+    #[must_use]
+    pub fn policy_independent(
+        &self,
+        policy: &AvailabilityPolicyV2,
+        valid_until: u64,
+        require_lineage_diversity: bool,
+    ) -> bool {
+        let profiles: SmallVec<[&CustodianProfileV2; 32]> = self
+            .entries
+            .iter()
+            .filter(|profile| profile.status == CapabilityStatus::Active)
+            .collect();
+        if profiles.len() < usize::from(policy.schedulable_minimum)
+            || policy.required_regions == 0
+            || policy.max_positions_per_region == 0
+            || policy.max_positions_per_asn == 0
+            || policy.max_positions_per_provider == 0
+            || profiles.iter().any(|profile| {
+                profile.attestation_expiry < valid_until
+                    || profile.beneficial_control_root == [0; 32]
+                    || profile.region_id == [0; 32]
+                    || profile.asn == 0
+                    || profile.provider_root == [0; 32]
+                    || profile.software_lineage_root == [0; 32]
+                    || profile.operator_id == [0; 32]
+                    || profile.signing_key == [0; 32]
+                    || profile
+                        .staging_bytes
+                        .checked_add(profile.headroom_bytes)
+                        .is_none_or(|reserved| profile.capacity_bytes < reserved)
+            })
+        {
+            return false;
+        }
+        let profiles = profiles.as_slice();
+        distinct_count_by(profiles, |profile| profile.beneficial_control_root) == profiles.len()
+            && distinct_count_by(profiles, |profile| profile.operator_id) == profiles.len()
+            && distinct_count_by(profiles, |profile| profile.signing_key) == profiles.len()
+            && distinct_count_by(profiles, |profile| profile.region_id)
+                >= usize::from(policy.required_regions)
+            && max_concentration_by(profiles, |profile| profile.region_id)
+                <= usize::from(policy.max_positions_per_region)
+            && max_concentration_by(profiles, |profile| profile.asn)
+                <= usize::from(policy.max_positions_per_asn)
+            && max_concentration_by(profiles, |profile| profile.provider_root)
+                <= usize::from(policy.max_positions_per_provider)
+            && (!require_lineage_diversity
+                || distinct_count_by(profiles, |profile| profile.software_lineage_root) >= 2)
     }
 }
 impl NoosEncode for CustodianCapabilitySetV1 {
@@ -944,6 +1079,16 @@ impl TestnetModelRegistrationV1 {
             && self.custodian_set.entries.len() == 12
             && self.executor_set.validate()
             && self.custodian_set.validate()
+            && self.executor_set.selected_independent(
+                selected,
+                self.availability_certificate.valid_until,
+                false,
+            )
+            && self.custodian_set.policy_independent(
+                &self.availability_policy,
+                self.availability_certificate.valid_until,
+                false,
+            )
             && self
                 .executor_set
                 .entries

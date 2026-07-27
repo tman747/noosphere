@@ -47,13 +47,13 @@ use crate::objects::{
 };
 use crate::smt::{ReceiptSmt, Smt};
 use crate::wwm::{
-    genesis_fund_ledger, wwm_fixed_key, wwm_profile_key, CapabilityMutationV1, CapabilitySetV1,
-    CapabilityStatus, CustodianCapabilityMutationV2, CustodianCapabilitySetV1, FundBucketTag,
-    FundLedgerStatus, FundMutationLockRefV1, FundMutationLockStatus, FundMutationLockV1,
-    FundProfileV1, ModelCapsuleV2, RegisterFundProfilePayloadV1, RegistryEpochVectorV1,
-    ResolutionProofV1, TestnetModelRegistrationV1, TransitionWwmControlPayloadV1, WwmControlMode,
-    WwmControlStateV1, WwmEvidenceTier, WwmFundLedgerV1, WwmJobV1, WwmLeafKind, WwmReceiptV1,
-    WwmTerminalCode,
+    genesis_fund_ledger, wwm_fixed_key, wwm_profile_key, AvailabilityPolicyV2,
+    CapabilityMutationV1, CapabilitySetV1, CapabilityStatus, CustodianCapabilityMutationV2,
+    CustodianCapabilitySetV1, FundBucketTag, FundLedgerStatus, FundMutationLockRefV1,
+    FundMutationLockStatus, FundMutationLockV1, FundProfileV1, ModelCapsuleV2,
+    RegisterFundProfilePayloadV1, RegistryEpochVectorV1, ResolutionProofV1,
+    TestnetModelRegistrationV1, TransitionWwmControlPayloadV1, WwmControlMode, WwmControlStateV1,
+    WwmEvidenceTier, WwmFundLedgerV1, WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmTerminalCode,
 };
 use crate::Hash32;
 
@@ -4440,6 +4440,17 @@ impl LumenLedger {
                     if v.position_count != 12
                         || v.reconstruction_threshold != 8
                         || v.schedulable_minimum != 9
+                        || v.required_regions == 0
+                        || v.required_regions > v.position_count
+                        || v.max_positions_per_region == 0
+                        || v.max_positions_per_region > v.position_count
+                        || v.max_positions_per_asn == 0
+                        || v.max_positions_per_asn > v.position_count
+                        || v.max_positions_per_provider == 0
+                        || v.max_positions_per_provider > v.position_count
+                        || u16::from(v.required_regions)
+                            .checked_mul(u16::from(v.max_positions_per_region))
+                            .is_none_or(|capacity| capacity < u16::from(v.schedulable_minimum))
                         || v.samples_per_challenge == 0
                         || v.verifier_sample_size != 8
                         || v.verifier_threshold != 5
@@ -4458,12 +4469,43 @@ impl LumenLedger {
                 }
                 ActionV1::CommitCustodyPositions(v) => {
                     require_wwm(&ov, self, WwmLeafKind::Artifact, &v.artifact_id)?;
-                    require_wwm(&ov, self, WwmLeafKind::AvailabilityPolicy, &v.policy_id)?;
+                    let policy_raw =
+                        require_wwm(&ov, self, WwmLeafKind::AvailabilityPolicy, &v.policy_id)?;
+                    let policy = AvailabilityPolicyV2::decode_canonical(&policy_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
                     let registry = current_registry(&ov, self)?;
-                    if v.position >= 12
+                    let custodian_set = custodian_capability_set(
+                        &ov,
+                        self,
+                        &registry.custodian_set_id,
+                        registry.custodian_epoch,
+                    )?;
+                    let profile = custodian_set
+                        .entries
+                        .iter()
+                        .find(|profile| profile.profile_id == v.custodian_profile_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let reserved_capacity = profile
+                        .staging_bytes
+                        .checked_add(profile.headroom_bytes)
+                        .ok_or(FailCode::Overflow)?;
+                    let available_capacity = profile
+                        .capacity_bytes
+                        .checked_sub(reserved_capacity)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    if v.artifact_id != policy.artifact_id
+                        || v.position >= policy.position_count
                         || v.custodian_set_id != registry.custodian_set_id
                         || v.custodian_set_epoch != registry.custodian_epoch
+                        || profile.status != CapabilityStatus::Active
+                        || profile.attestation_expiry < v.valid_until
+                        || v.committed_bytes == 0
+                        || v.committed_bytes > available_capacity
+                        || v.valid_from < policy.policy_start_height
+                        || v.valid_until > policy.policy_end_height
                         || v.valid_from >= v.valid_until
+                        || v.valid_until <= ctx.height
+                        || v.signature.is_empty()
                     {
                         return Err(FailCode::PostconditionFailed);
                     }
@@ -4500,15 +4542,93 @@ impl LumenLedger {
                     )?;
                 }
                 ActionV1::IssueAvailabilityCertificate(v) => {
-                    require_wwm(&ov, self, WwmLeafKind::AvailabilityPolicy, &v.policy_id)?;
-                    if v.availability_state > 2 {
+                    let policy_raw =
+                        require_wwm(&ov, self, WwmLeafKind::AvailabilityPolicy, &v.policy_id)?;
+                    let policy = AvailabilityPolicyV2::decode_canonical(&policy_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let registry = current_registry(&ov, self)?;
+                    let executor_set = executor_capability_set(
+                        &ov,
+                        self,
+                        &v.executor_set_id,
+                        v.executor_set_epoch,
+                    )?;
+                    let custodian_set = custodian_capability_set(
+                        &ov,
+                        self,
+                        &v.custodian_set_id,
+                        v.custodian_set_epoch,
+                    )?;
+                    let control = current_control(&ov, self)?;
+                    if !matches!(
+                        control.mode,
+                        WwmControlMode::Testnet
+                            | WwmControlMode::Canary
+                            | WwmControlMode::Production
+                    ) {
                         return Err(FailCode::PostconditionFailed);
                     }
-                    if v.selected_verifiers.len() != 8
-                        || v.signer_ids.len() != 5
+                    let require_lineage_diversity = control.mode != WwmControlMode::Testnet;
+                    let executor_root = crate::domain_hash(
+                        "NOOS/WWM/CAPABILITY-SET-ROOT/V1",
+                        &[&executor_set.encode_canonical()],
+                    );
+                    let custodian_root = crate::domain_hash(
+                        "NOOS/WWM/CUSTODIAN-CAPABILITY-SET-ROOT/V1",
+                        &[&custodian_set.encode_canonical()],
+                    );
+                    if v.certificate_id == [0; 32]
+                        || v.artifact_id != policy.artifact_id
+                        || v.assignment_root != policy.assignment_root
+                        || v.custodian_set_id != registry.custodian_set_id
+                        || v.custodian_set_epoch != registry.custodian_epoch
+                        || v.custodian_set_root != custodian_root
+                        || v.executor_set_id != registry.executor_set_id
+                        || v.executor_set_epoch != registry.executor_epoch
+                        || v.executor_set_root != executor_root
+                        || v.availability_state > 2
+                        || v.selected_verifiers.len() != usize::from(policy.verifier_sample_size)
+                        || v.signer_ids.len() != usize::from(policy.verifier_threshold)
+                        || v.signatures.len() != v.signer_ids.len()
                         || !strict_hashes(v.selected_verifiers.as_slice())
                         || !strict_hashes(v.signer_ids.as_slice())
-                        || v.valid_until <= v.issued_height
+                        || v.signer_ids
+                            .iter()
+                            .any(|signer| !v.selected_verifiers.as_slice().contains(signer))
+                        || v.signatures.iter().zip(v.signer_ids.iter()).any(
+                            |(signature, signer_id)| {
+                                signature.signer_id != *signer_id || signature.signature.is_empty()
+                            },
+                        )
+                        || v.result_root == [0; 32]
+                        || v.diversity_root == [0; 32]
+                        || v.challenge_root == [0; 32]
+                        || v.issued_height < policy.policy_start_height
+                        || v.issued_height > ctx.height
+                        || v.valid_until > policy.policy_end_height
+                        || v.valid_until <= ctx.height
+                        || !executor_set.selected_independent(
+                            v.selected_verifiers.as_slice(),
+                            v.valid_until,
+                            require_lineage_diversity,
+                        )
+                        || executor_set
+                            .entries
+                            .iter()
+                            .filter(|profile| {
+                                v.selected_verifiers
+                                    .as_slice()
+                                    .contains(&profile.profile_id)
+                            })
+                            .any(|profile| {
+                                profile.capability_bitmap & policy.verifier_capability_bitmap
+                                    != policy.verifier_capability_bitmap
+                            })
+                        || !custodian_set.policy_independent(
+                            &policy,
+                            v.valid_until,
+                            require_lineage_diversity,
+                        )
                     {
                         return Err(FailCode::PostconditionFailed);
                     }
@@ -4888,14 +5008,26 @@ impl LumenLedger {
                     {
                         return Err(FailCode::PostconditionFailed);
                     }
-                    let mut control_roots = BTreeSet::new();
-                    let mut operator_accounts = BTreeSet::new();
+                    let executor_set = executor_capability_set(
+                        &ov,
+                        self,
+                        &v.executor_set_id,
+                        v.executor_set_epoch,
+                    )?;
+                    if !executor_set.selected_independent(
+                        selected,
+                        v.reveal_deadline,
+                        control.mode != WwmControlMode::Testnet,
+                    ) {
+                        return Err(FailCode::PostconditionFailed);
+                    }
                     for profile_id in selected {
-                        let profile = neural_reporter_profile(&ov, self, v, profile_id)?;
-                        if overlay_account(&ov, self, &profile.operator_id).is_none()
-                            || !control_roots.insert(profile.beneficial_control_root)
-                            || !operator_accounts.insert(profile.operator_id)
-                        {
+                        let profile = executor_set
+                            .entries
+                            .iter()
+                            .find(|profile| profile.profile_id == *profile_id)
+                            .ok_or(FailCode::PostconditionFailed)?;
+                        if overlay_account(&ov, self, &profile.operator_id).is_none() {
                             return Err(FailCode::PostconditionFailed);
                         }
                     }
@@ -5362,6 +5494,35 @@ fn require_wwm(
     overlay_object(ov, base, &wwm_profile_key(kind, id)).ok_or(FailCode::PostconditionFailed)
 }
 
+fn executor_capability_set(
+    ov: &Overlay,
+    base: &LumenLedger,
+    set_id: &Hash32,
+    epoch: u64,
+) -> Result<CapabilitySetV1, FailCode> {
+    let raw = require_wwm(ov, base, WwmLeafKind::ExecutorCapabilitySet, set_id)?;
+    let set = CapabilitySetV1::decode_canonical(&raw).map_err(|_| FailCode::PostconditionFailed)?;
+    if set.set_id != *set_id || set.epoch != epoch {
+        return Err(FailCode::PostconditionFailed);
+    }
+    Ok(set)
+}
+
+fn custodian_capability_set(
+    ov: &Overlay,
+    base: &LumenLedger,
+    set_id: &Hash32,
+    epoch: u64,
+) -> Result<CustodianCapabilitySetV1, FailCode> {
+    let raw = require_wwm(ov, base, WwmLeafKind::CustodianCapabilitySet, set_id)?;
+    let set = CustodianCapabilitySetV1::decode_canonical(&raw)
+        .map_err(|_| FailCode::PostconditionFailed)?;
+    if set.set_id != *set_id || set.epoch != epoch {
+        return Err(FailCode::PostconditionFailed);
+    }
+    Ok(set)
+}
+
 fn neural_job_for_query(
     ov: &Overlay,
     base: &LumenLedger,
@@ -5393,16 +5554,7 @@ fn neural_reporter_profile(
     {
         return Err(FailCode::PostconditionFailed);
     }
-    let raw = require_wwm(
-        ov,
-        base,
-        WwmLeafKind::ExecutorCapabilitySet,
-        &query.executor_set_id,
-    )?;
-    let set = CapabilitySetV1::decode_canonical(&raw).map_err(|_| FailCode::PostconditionFailed)?;
-    if set.set_id != query.executor_set_id || set.epoch != query.executor_set_epoch {
-        return Err(FailCode::PostconditionFailed);
-    }
+    let set = executor_capability_set(ov, base, &query.executor_set_id, query.executor_set_epoch)?;
     let profile = set
         .entries
         .iter()
