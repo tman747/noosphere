@@ -231,9 +231,17 @@ funded and exercised by independent beneficial owners rather than fixtures.
 | `PILOT-01` | `READY` | Freeze exact revision, deployment, signer, browser cohort, authorized origins, consent version, and non-promoting policy before the clock starts. |
 | `PILOT-02` | `EXTERNAL_BLOCKED` | Enroll at least 30 independently authorized origins with signed ownership, software, policy, and retention identity. |
 | `PILOT-03` | `EXTERNAL_BLOCKED` | Complete the registered cross-browser, device, storage, private-mode, low-storage, and eviction matrix with at least 300 opt-in participants. |
-| `PILOT-04` | `READY` | Automate consent grant, expiry, withdrawal, quota change, churn, repair, and no-hidden-work negative paths. |
-| `PILOT-05` | `READY` | Automate queue saturation, key rotation, backup, restore, retention deletion, telemetry outage, and incident recovery evidence. |
+| `PILOT-04` | `DONE` | Signed consent automation covers grant, expiry, withdrawal, quota change, churn, repair, and no-hidden-work negative paths. |
+| `PILOT-05` | `DONE` | Digest-pinned signed adapters automate queue saturation, key rotation, backup, restore, retention deletion, telemetry outage, and incident recovery evidence. |
 | `PILOT-06` | `DURATION_BLOCKED` | Produce a validator-accepted immutable 30-day E-WWM-23 candidate bundle. Rewards, production custody, scheduling effect, and certificate effect remain disabled. |
+
+The pilot freeze, 30-origin cohort, full browser/device/storage matrix, and
+candidate-bundle assembler are implemented in
+`wwm_web_capacity_pilot.py`; the recovery suite is implemented in
+`wwm_web_capacity_resilience.py`. `PILOT-01` remains ready until the real
+cohort is frozen. `PILOT-02`, `PILOT-03`, and `PILOT-06` remain blocked on
+independent participants and real elapsed time; fixture output cannot satisfy
+those gates.
 
 ### Track E — permissionless network and paid compute
 
