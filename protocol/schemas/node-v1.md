@@ -83,11 +83,13 @@ activation and emission run as implicit block-start system steps (§4).
 
 ch01 §4.3 fixes `proposal_commitment` (which includes `body_da_root`)
 BEFORE the Ground nonce search, so the DA-committed bytes MUST be
-ticket-independent: the DA form is the canonical `BlockBodyV1` with
-`ground_ticket` canonicalized to the all-zero ticket. The real ticket
-travels with the header and is bound by `ground_ticket_root` — header
-field 24, the ONE root excluded from the proposal commitment — plus the
-ticket law itself.
+ticket-independent. The DA form is `"NOOSLZ41"` followed by deterministic LZ4
+block compression (with prepended raw size) of canonical `BlockBodyV1` after
+`ground_ticket` is replaced by the all-zero ticket. The raw size is rejected
+above 512 MiB before allocation; the compressed frame is rejected above
+128 MiB. The real ticket travels with the header and is bound by
+`ground_ticket_root` — header field 24, the ONE root excluded from the proposal
+commitment — plus the ticket law itself.
 
 **Ticket search (devnet):** the deterministic miner derives its
 `extra_nonce` from the per-block challenge (which binds parent, slot, and
@@ -174,7 +176,7 @@ Indices  CF:  b"n/" ++ height u64 BE               -> block hash (canonical chai
               b"m/final"                           -> finalized CheckpointRef (canonical)
               b"m/just"                            -> justified CheckpointRef (canonical)
 Receipts CF:  txid(32)                             -> height u64 LE ++ canonical ReceiptV1
-Blobs      :  body_da_root                         -> served canonical body bytes
+Blobs      :  body_da_root                         -> exact compressed DA-form bytes
 Safety     :  kind 1 (SAFETY_KIND_WITNESS_BEACON)  -> BeaconSafetyRecordV1
               kind 2 (SAFETY_KIND_VOTE)            -> VoteSafetyRecordV1
 ```
@@ -246,7 +248,7 @@ transport callbacks never mutate consensus state directly.
 | node abstraction                    | noos-p2p surface |
 |-------------------------------------|------------------|
 | `NetworkEdge::request_headers`      | `request_range` (`/noos/sync/range/1`) |
-| targeted body repair                | `request_body` (`/noos/braid/body/1`) and derived shard service (`/noos/blob/shard/1`) |
+| targeted body repair                | chunked `request_body` (`/noos/braid/body/2`) and derived shard service (`/noos/blob/shard/1`) |
 | `announce_header/tx/vote`           | `announce_header` / `push_tx` / `push_vote` |
 | inbound gossip                      | `P2pEvent::Inbound` decoded and sent through the bounded `ConsensusMsg` inbox |
 | serving side                        | `NodeProtocolStore` round trips to the sole store task |

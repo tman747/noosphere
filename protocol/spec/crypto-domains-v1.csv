@@ -217,3 +217,13 @@ D-SIG-WWM-WEB-ASSIGNMENT-V1,ED25519_PREFIX,NOOS/SIG/WWM-WEB-ASSIGNMENT/V1,Ed2551
 D-SIG-WWM-WEB-RESTORE-TASK-V1,ED25519_PREFIX,NOOS/SIG/WWM-WEB-RESTORE-TASK/V1,Ed25519,noos-mind-gateway,ASSIGNED E-WWM-23; coordinator signed single-share restore task
 D-SIG-WWM-WEB-RESTORE-IMPORT-INDEX-V1,ED25519_PREFIX,NOOS/SIG/WWM-WEB-RESTORE-IMPORT-INDEX/V1,Ed25519,noos-mind-gateway,ASSIGNED E-WWM-23; coordinator signed closed completed-position quarantine export index; off-chain non-promoting evidence only
 D-SIG-WWM-WEB-EVIDENCE-V1,ED25519_PREFIX,NOOS/SIG/WWM-WEB-EVIDENCE/V1,Ed25519,noos-mind-gateway,ASSIGNED E-WWM-23; aggregate non-promoting web capacity evidence summary signature
+D-NEURAL-ORACLE-PROGRAM-V1,BLAKE3_CONTEXT,NOOS/NEURAL-ORACLE/PROGRAM/V1,BLAKE3-256,noos-lumen,ASSIGNED neural-oracle extension; immutable bounded trinary program identity
+D-NEURAL-ORACLE-INPUT-V1,BLAKE3_CONTEXT,NOOS/NEURAL-ORACLE/INPUT/V1,BLAKE3-256,noos-lumen,ASSIGNED neural-oracle extension; exact deterministic input commitment
+D-NEURAL-ORACLE-TRANSCRIPT-V1,BLAKE3_CONTEXT,NOOS/NEURAL-ORACLE/TRANSCRIPT/V1,BLAKE3-256,noos-lumen,ASSIGNED neural-oracle extension; exact raw response transcript commitment
+D-NEURAL-ORACLE-REPLY-COMMIT-V1,BLAKE3_CONTEXT,NOOS/NEURAL-ORACLE/REPLY-COMMIT/V1,BLAKE3-256,noos-lumen,ASSIGNED neural-oracle extension; query reporter output transcript and nonce binding
+D-NEURAL-ORACLE-RESULT-V1,BLAKE3_CONTEXT,NOOS/NEURAL-ORACLE/RESULT/V1,BLAKE3-256,noos-lumen,ASSIGNED neural-oracle extension; terminal result identity
+D-NEURAL-ORACLE-PROGRAM-KEY-V1,BLAKE3_CONTEXT,NOOS/NEURAL-ORACLE/PROGRAM-KEY/V1,BLAKE3-256,noos-lumen,ASSIGNED neural-oracle extension; program object-tree key
+D-NEURAL-ORACLE-QUERY-KEY-V1,BLAKE3_CONTEXT,NOOS/NEURAL-ORACLE/QUERY-KEY/V1,BLAKE3-256,noos-lumen,ASSIGNED neural-oracle extension; query object-tree key
+D-NEURAL-ORACLE-COMMIT-KEY-V1,BLAKE3_CONTEXT,NOOS/NEURAL-ORACLE/COMMIT-KEY/V1,BLAKE3-256,noos-lumen,ASSIGNED neural-oracle extension; reporter commit object-tree key
+D-NEURAL-ORACLE-REVEAL-KEY-V1,BLAKE3_CONTEXT,NOOS/NEURAL-ORACLE/REVEAL-KEY/V1,BLAKE3-256,noos-lumen,ASSIGNED neural-oracle extension; reporter reveal object-tree key
+D-NEURAL-ORACLE-RESULT-KEY-V1,BLAKE3_CONTEXT,NOOS/NEURAL-ORACLE/RESULT-KEY/V1,BLAKE3-256,noos-lumen,ASSIGNED neural-oracle extension; terminal result object-tree key

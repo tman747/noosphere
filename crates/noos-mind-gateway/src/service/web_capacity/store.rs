@@ -125,8 +125,7 @@ impl WebCapacityStoreLimits {
             || self.max_quarantine_bytes == 0
             || self.max_quarantine_bytes > super::config::HARD_MAX_QUARANTINE_BYTES
             || self.max_concurrent_restore_verifications == 0
-            || self.max_concurrent_restore_verifications
-                > hard.max_concurrent_restore_verifications
+            || self.max_concurrent_restore_verifications > hard.max_concurrent_restore_verifications
         {
             return Err(WebCapacityError::Config(
                 "web-capacity store limits must be nonzero and within hard maxima".to_owned(),
@@ -168,7 +167,6 @@ impl StoreBenchmarkSnapshot {
             .saturating_add(self.rate_limit_rows)
     }
 }
-
 
 #[derive(Clone)]
 pub struct WebCapacityStore {
@@ -576,7 +574,6 @@ impl WebCapacityStore {
         })
     }
 
-
     pub fn deactivate_expired_hosts(&self, now: u64) -> Result<usize> {
         self.with_connection(|connection| {
             connection
@@ -802,9 +799,7 @@ impl WebCapacityStore {
             .iter()
             .copied()
             .collect::<BTreeSet<_>>();
-        let selection_limit = maximum
-            .saturating_add(excluded.len())
-            .min(5_448);
+        let selection_limit = maximum.saturating_add(excluded.len()).min(5_448);
         let verification_cutoff = now.saturating_sub(HOST_VERIFICATION_MAX_AGE_SECONDS);
         self.with_connection(|connection| {
             let mut statement = connection
@@ -974,12 +969,8 @@ impl WebCapacityStore {
         let _reservation = self.assignment_lock.lock().map_err(|_| {
             WebCapacityError::Store("assignment reservation lock is poisoned".to_owned())
         })?;
-        let rows = self.select_assignment_rows(
-            token_hash,
-            now,
-            maximum,
-            excluded_protocol_share_digests,
-        )?;
+        let rows =
+            self.select_assignment_rows(token_hash, now, maximum, excluded_protocol_share_digests)?;
         if rows.is_empty() {
             return Ok(None);
         }

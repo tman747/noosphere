@@ -24,7 +24,7 @@ use std::path::Path;
 use noos_braid::{
     BlockHeaderV1, CheckpointRef, FinalityCertificateV1, EPOCH_LENGTH, MAX_FINALITY_CERTIFICATES,
 };
-use noos_codec::{NoosDecode, NoosEncode};
+use noos_codec::NoosDecode;
 use noos_crypto::{BlsPublicKey, BlsSignature};
 use noos_da::{BodyDaClaimV1, ShardCandidateV1};
 use noos_ground::{GroundTicketV1, TICKET_ENCODED_BYTES};
@@ -149,7 +149,7 @@ pub fn full_sync_round<P: StorePort>(
             Ok(r) => r,
             Err(_) => continue,
         };
-        match core.import_block(&header, &ticket, &claim, &shards) {
+        match core.import_block_owned(&header, &ticket, &claim, shards) {
             Ok(ImportOutcome::Executed { .. }) => progressed = progressed.saturating_add(1),
             Ok(_) => {}
             Err(NodeError::Dag(noos_braid::DagError::DuplicateBlock)) => {}

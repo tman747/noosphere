@@ -1,0 +1,27 @@
+{
+  "schema": "noos/mobile-network-endpoints/v1",
+  "environment": "public-valueless-testnet",
+  "enabled": true,
+  "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+  "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+  "api_version": "v1",
+  "maximum_freshness_ms": 15000,
+  "minimum_control_cluster_quorum": 2,
+  "endpoints": [
+    {
+      "base_url": "https://wwm-seed.mindchain.network",
+      "endpoint_id": "f0e54bf134bf677831de506b5e024008d6ffbdd20e6f942649655a879d715d63",
+      "control_cluster": "bd6512c9cf0b5ec30b6a291fed05f4f1a7bf5a934cc1178be07673c114a90e83"
+    },
+    {
+      "base_url": "https://wwm-seed-2.mindchain.network",
+      "endpoint_id": "d664ff01b08859aa05c11bcdc3aeca4658201fe004aceef61122a39d16ae54f7",
+      "control_cluster": "38e963246407e0752a3e95716076f9c13c511a0fecd6e1f34ce65b3733ccdf74"
+    },
+    {
+      "base_url": "https://mindchain-seed-3.eastus.cloudapp.azure.com",
+      "endpoint_id": "470d9754cc1f9541ef3578213dfb46a0f4243b3fe694452c3a756c05cb38e1f6",
+      "control_cluster": "f439120c0cffb07e9ceae0d4fc9d5d4cb540fdf818b007ff4f7e844db4341a0e"
+    }
+  ]
+}

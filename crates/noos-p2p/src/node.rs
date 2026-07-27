@@ -4,9 +4,9 @@
 //!
 //! Architecture: one swarm task owns the [`libp2p::Swarm`]; one accept task
 //! per registered protocol serves inbound substreams; one worker task per
-//! peer drains the two-lane outbox with a single in-flight request (so lane
-//! order is wire order). All shared state lives in [`Shared`] behind
-//! non-async mutexes that are never held across an `.await`.
+//! peer drains the two-lane outbox with a single in-flight request, except
+//! bounded concurrent body-chunk streams. All shared state lives in [`Shared`]
+//! behind non-async mutexes that are never held across an `.await`.
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -19,7 +19,7 @@ use libp2p::swarm::SwarmEvent;
 use libp2p::{identity as p2p_identity, Multiaddr, PeerId, StreamProtocol};
 use libp2p_stream as stream;
 use noos_codec::{NoosDecode, NoosEncode};
-use tokio::sync::{mpsc, oneshot, watch, Notify};
+use tokio::sync::{mpsc, oneshot, watch, Notify, Semaphore};
 
 use crate::backoff::ReconnectBackoff;
 use crate::envelope::{
@@ -27,8 +27,9 @@ use crate::envelope::{
     HandshakeMsgV1, HeaderMsgV1, HeaderReplyV1, LightUpdateItemV1, LightUpdateReplyV1,
     LightUpdateRequestV1, LoomReceiptPushV1, Protocol, PushReplyV1, RangeReplyV1, RangeRequestV1,
     RejectCode, ShardReplyV1, ShardRequestV1, SnapshotChunkRequestV1, SnapshotReplyV1, TxPushV1,
-    VotePushV1, APP_PROTOCOLS, MAX_LIGHT_UPDATE_ITEMS, MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES,
-    MAX_RANGE_HEADERS, RANGE_REPLY_BYTE_BUDGET,
+    VotePushV1, APP_PROTOCOLS, MAX_BODY_BYTES, MAX_LIGHT_UPDATE_ITEMS,
+    MAX_LIGHT_UPDATE_REPLY_ENCODED_BYTES, MAX_RANGE_HEADERS, MAX_REASSEMBLED_BODY_BYTES,
+    RANGE_REPLY_BYTE_BUDGET,
 };
 use crate::frame::{
     read_frame, write_frame, FrameError, MAX_FRAME_BYTES, MAX_HANDSHAKE_FRAME_BYTES,
@@ -45,10 +46,9 @@ const READY_GRACE_MS: u64 = 3_000;
 
 /// Delivery attempts per queued request across reconnects.
 const SEND_ATTEMPTS: u8 = 2;
-
-/// Hard ceiling for one outbound substream exchange. A silent peer must not
-/// block every other peer's sync and gossip work indefinitely.
-const OUTBOUND_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+/// Concurrent body chunks across this handle. Keeps RTT from serializing a
+/// macroblock while bounding per-peer memory and bandwidth pressure.
+const BODY_CHUNK_CONCURRENCY: usize = 8;
 
 /// End-to-end ceiling from enqueue through reconnect and reply delivery.
 /// Per-exchange timeouts cannot bound time spent waiting in the outbox.
@@ -108,7 +108,14 @@ pub trait ProtocolStore: Send + Sync + 'static {
     fn header(&self, _header_hash: &[u8; 32]) -> Option<Vec<u8>> {
         None
     }
-    fn body(&self, _block_hash: &[u8; 32]) -> Option<Vec<u8>> {
+    /// A bounded slice of one stored compressed DA form. Implementations
+    /// return `(total_bytes, bytes_at_offset)` without cloning the whole body.
+    fn body_chunk(
+        &self,
+        _block_hash: &[u8; 32],
+        _offset: u64,
+        _max_bytes: u32,
+    ) -> Option<(u64, Vec<u8>)> {
         None
     }
     /// Ascending encoded headers from `start_height`, plus a `more` flag.
@@ -281,6 +288,7 @@ struct Shared {
     events: mpsc::UnboundedSender<P2pEvent>,
     cmds: mpsc::UnboundedSender<SwarmCmd>,
     store: Arc<dyn ProtocolStore>,
+    body_streams: Semaphore,
     start: Instant,
     listen_tx: watch::Sender<Option<Multiaddr>>,
 }
@@ -301,6 +309,26 @@ impl Shared {
 
 fn sp(protocol: Protocol) -> StreamProtocol {
     StreamProtocol::new(protocol.id())
+}
+
+async fn exchange(
+    mut control: stream::Control,
+    peer: PeerId,
+    protocol: Protocol,
+    payload: &[u8],
+) -> Result<Vec<u8>, SendError> {
+    let mut stream = control
+        .open_stream(peer, sp(protocol))
+        .await
+        .map_err(|_| SendError::Disconnected)?;
+    write_frame(&mut stream, payload, MAX_FRAME_BYTES)
+        .await
+        .map_err(|_| SendError::Disconnected)?;
+    let reply = read_frame(&mut stream, MAX_FRAME_BYTES)
+        .await
+        .map_err(|_| SendError::Disconnected)?;
+    let _ = futures::io::AsyncWriteExt::close(&mut stream).await;
+    Ok(reply)
 }
 
 /// PeerId corresponding to an attested Ed25519 public key.
@@ -383,6 +411,7 @@ impl P2pNode {
             events: event_tx,
             cmds: cmd_tx,
             store,
+            body_streams: Semaphore::new(BODY_CHUNK_CONCURRENCY),
             start: Instant::now(),
             listen_tx,
         });
@@ -486,19 +515,108 @@ impl P2pHandle {
         async move { await_reply::<HeaderReplyV1>(rx).await }
     }
 
-    /// Targeted repair: ask THIS peer for THIS body hash
-    /// (`/noos/braid/body/1`, priority lane).
-    pub fn request_body(
+    /// Targeted repair: assemble THIS body from bounded, concurrently fetched
+    /// priority-lane chunks.
+    pub async fn request_body(
         &self,
         peer: PeerId,
         block_hash: [u8; 32],
-    ) -> impl Future<Output = Result<BodyReplyV1, SendError>> {
-        let env = BodyRequestV1 {
+    ) -> Result<Option<Vec<u8>>, SendError> {
+        tokio::time::timeout(
+            OUTBOUND_DELIVERY_TIMEOUT,
+            self.request_body_inner(peer, block_hash),
+        )
+        .await
+        .map_err(|_| SendError::Timeout)?
+    }
+
+    async fn request_body_inner(
+        &self,
+        peer: PeerId,
+        block_hash: [u8; 32],
+    ) -> Result<Option<Vec<u8>>, SendError> {
+        let first_reply = self.request_body_chunk(peer, block_hash, 0).await?;
+        let Some((total_bytes, first)) = validate_body_chunk(first_reply, None, 0)? else {
+            return Ok(None);
+        };
+        let total = usize::try_from(total_bytes).map_err(|_| SendError::BadReply)?;
+        let mut assembled = Vec::new();
+        assembled
+            .try_reserve_exact(total)
+            .map_err(|_| SendError::BadReply)?;
+        assembled.resize(total, 0);
+        assembled[..first.len()].copy_from_slice(&first);
+        if first.len() == total {
+            return Ok(Some(assembled));
+        }
+
+        let offsets = (first.len()..total).step_by(MAX_BODY_BYTES as usize);
+        let this = self.clone();
+        let chunks = futures::stream::iter(offsets)
+            .map(move |offset| {
+                let handle = this.clone();
+                async move {
+                    let reply = handle
+                        .request_body_chunk(peer, block_hash, offset as u64)
+                        .await?;
+                    validate_body_chunk(reply, Some(total_bytes), offset as u64)?
+                        .ok_or(SendError::BadReply)
+                        .map(|(_, bytes)| (offset, bytes))
+                }
+            })
+            .buffer_unordered(BODY_CHUNK_CONCURRENCY);
+        futures::pin_mut!(chunks);
+        while let Some(chunk) = chunks.next().await {
+            let (offset, bytes) = chunk?;
+            let end = offset.checked_add(bytes.len()).ok_or(SendError::BadReply)?;
+            assembled
+                .get_mut(offset..end)
+                .ok_or(SendError::BadReply)?
+                .copy_from_slice(&bytes);
+        }
+        Ok(Some(assembled))
+    }
+
+    async fn request_body_chunk(
+        &self,
+        peer: PeerId,
+        block_hash: [u8; 32],
+        offset: u64,
+    ) -> Result<BodyReplyV1, SendError> {
+        let _permit = self
+            .shared
+            .body_streams
+            .acquire()
+            .await
+            .map_err(|_| SendError::NodeShutdown)?;
+        wait_request_ready(&self.shared, peer).await?;
+        let request = BodyRequestV1 {
             chain_id: self.chain_id(),
             block_hash,
-        };
-        let rx = self.enqueue(peer, Protocol::BraidBody, env.encode_canonical());
-        async move { await_reply::<BodyReplyV1>(rx).await }
+            offset,
+            max_bytes: MAX_BODY_BYTES,
+        }
+        .encode_canonical();
+        let mut last_error = SendError::Disconnected;
+        for attempt in 0..SEND_ATTEMPTS {
+            match exchange(
+                self.shared.control.clone(),
+                peer,
+                Protocol::BraidBody,
+                &request,
+            )
+            .await
+            {
+                Ok(reply) => {
+                    return BodyReplyV1::decode_canonical(&reply).map_err(|_| SendError::BadReply)
+                }
+                Err(error) => last_error = error,
+            }
+            if attempt + 1 < SEND_ATTEMPTS {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        }
+        Err(last_error)
     }
 
     /// Push a checkpoint vote (priority lane).
@@ -668,6 +786,33 @@ impl P2pHandle {
         }
         rx
     }
+}
+
+fn validate_body_chunk(
+    reply: BodyReplyV1,
+    expected_total: Option<u64>,
+    expected_offset: u64,
+) -> Result<Option<(u64, Vec<u8>)>, SendError> {
+    let BodyReplyV1::Chunk {
+        total_bytes,
+        offset,
+        bytes,
+    } = reply
+    else {
+        return Ok(None);
+    };
+    let remaining = total_bytes
+        .checked_sub(expected_offset)
+        .ok_or(SendError::BadReply)?;
+    let expected_len = remaining.min(u64::from(MAX_BODY_BYTES));
+    if offset != expected_offset
+        || total_bytes > MAX_REASSEMBLED_BODY_BYTES
+        || expected_total.is_some_and(|expected| expected != total_bytes)
+        || u64::try_from(bytes.0.len()).map_err(|_| SendError::BadReply)? != expected_len
+    {
+        return Err(SendError::BadReply);
+    }
+    Ok(Some((total_bytes, bytes.0)))
 }
 
 fn decode_reply<T: NoosDecode>(
@@ -1176,6 +1321,27 @@ async fn accept_loop(
     }
 }
 
+/// Waits for an outbound target to become handshake-ready. The public
+/// request's end-to-end deadline bounds this wait across reconnects.
+async fn wait_request_ready(shared: &Arc<Shared>, peer: PeerId) -> Result<(), SendError> {
+    let rx = {
+        let peers = lock(&shared.peers);
+        peers.get(&peer).map(|entry| entry.ready_tx.subscribe())
+    };
+    let Some(mut rx) = rx else {
+        std::future::pending::<()>().await;
+        return Err(SendError::Disconnected);
+    };
+    loop {
+        match *rx.borrow() {
+            ReadyState::Ready => return Ok(()),
+            ReadyState::Rejected => return Err(SendError::PeerRejected),
+            ReadyState::Pending => {}
+        }
+        rx.changed().await.map_err(|_| SendError::NodeShutdown)?;
+    }
+}
+
 /// Waits (with grace) for the peer's handshake to complete.
 async fn wait_ready(shared: &Arc<Shared>, peer: PeerId) -> bool {
     let rx = {
@@ -1306,8 +1472,41 @@ fn dispatch(
             let req = BodyRequestV1::decode_canonical(payload)
                 .map_err(|_| Violation::MalformedEnvelope)?;
             check_chain(shared, &req.chain_id)?;
-            let reply = match shared.store.body(&req.block_hash) {
-                Some(bytes) => BodyReplyV1::Body(Bounded(bytes)),
+            if req.max_bytes == 0
+                || req.max_bytes > MAX_BODY_BYTES
+                || req.offset > MAX_REASSEMBLED_BODY_BYTES
+            {
+                return Err(Violation::MalformedEnvelope);
+            }
+            let reply = match shared
+                .store
+                .body_chunk(&req.block_hash, req.offset, req.max_bytes)
+            {
+                Some((total_bytes, bytes)) => {
+                    let chunk_len =
+                        u64::try_from(bytes.len()).map_err(|_| Violation::MalformedEnvelope)?;
+                    let expected_len = total_bytes
+                        .checked_sub(req.offset)
+                        .map(|remaining| remaining.min(u64::from(req.max_bytes)))
+                        .ok_or(Violation::MalformedEnvelope)?;
+                    if total_bytes > MAX_REASSEMBLED_BODY_BYTES
+                        || req.offset > total_bytes
+                        || bytes.len() > req.max_bytes as usize
+                        || chunk_len != expected_len
+                        || req
+                            .offset
+                            .checked_add(chunk_len)
+                            .is_none_or(|end| end > total_bytes)
+                        || (req.offset < total_bytes && bytes.is_empty())
+                    {
+                        return Err(Violation::MalformedEnvelope);
+                    }
+                    BodyReplyV1::Chunk {
+                        total_bytes,
+                        offset: req.offset,
+                        bytes: Bounded(bytes),
+                    }
+                }
                 None => BodyReplyV1::NotFound,
             };
             Ok(reply.encode_canonical())
@@ -1494,31 +1693,9 @@ async fn outbox_worker(
             }
             continue;
         };
-        // One in-flight request: open, write, await reply.
-        let mut control = shared.control.clone();
-        let outcome: Result<Vec<u8>, SendError> =
-            match tokio::time::timeout(OUTBOUND_REQUEST_TIMEOUT, async {
-                let mut s = control
-                    .open_stream(peer, sp(item.protocol))
-                    .await
-                    .map_err(|_| SendError::Disconnected)?;
-                write_frame(&mut s, &item.payload, MAX_FRAME_BYTES)
-                    .await
-                    .map_err(|_| SendError::Disconnected)?;
-                let reply = read_frame(&mut s, MAX_FRAME_BYTES)
-                    .await
-                    .map_err(|_| SendError::Disconnected)?;
-                let _ = futures::io::AsyncWriteExt::close(&mut s).await;
-                Ok(reply)
-            })
-            .await
-            {
-                Ok(outcome) => outcome,
-                Err(_) => {
-                    shared.cmd(SwarmCmd::Disconnect(peer));
-                    Err(SendError::Timeout)
-                }
-            };
+        // One in-flight queued request. Body chunk repair uses the same
+        // exchange primitive through its separately bounded semaphore.
+        let outcome = exchange(shared.control.clone(), peer, item.protocol, &item.payload).await;
         match outcome {
             Ok(reply) => {
                 let _ = item.reply.send(Ok(reply));

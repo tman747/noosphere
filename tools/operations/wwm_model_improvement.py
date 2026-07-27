@@ -40,7 +40,7 @@ SUCCESSOR_SCHEMA = "noos.wwm.immutable-successor-evidence.v1"
 ROUNDTRIP_SCHEMA = "noos.wwm.real-parent-roundtrip-gate.v1"
 ACTIVATION_SCHEMA = "noos.wwm.activation-evidence.v1"
 
-FROZEN_V2_SHA256 = "68c6799ec95194379b8e5325d4307abe65eac8f14e8ebd8e4d6856b569641837"
+FROZEN_V2_SHA256 = "eb6fbd2bb818c60b922d607b7e9a82989d11319e7eb847841b18025af6e01d51"
 FROZEN_Q1_SHA256 = "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0"
 FROZEN_Q1_BYTES = 3_803_452_480
 REAL_PARENT_NAME = "Bonsai-27B-F16.gguf"
@@ -1000,8 +1000,9 @@ def run_workflow(config: Mapping[str, Any], evidence_root: Path) -> dict[str, An
     summary = {
         "schema": EVIDENCE_SCHEMA,
         "passed": final_pass,
-        "weight_training_gate_passed": True,
-        "promotion_gate_passed": final_pass,
+        "shadow_training_workflow_passed": True,
+        "shadow_canary_passed": final_pass,
+        "production_promotion_authorized": False,
         "feature_flags": flags,
         "frozen_wwm_v2_sha256": frozen,
         "dataset_id": dataset["object_id"], "recipe_id": recipe["object_id"], "job_id": job["object_id"],

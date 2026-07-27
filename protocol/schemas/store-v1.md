@@ -90,14 +90,14 @@ Distinct from the engine's internal WAL. Record wire form:
 ```
 len:u32-LE ‖ checksum:32 ‖ payload:len
 checksum = BLAKE3-dk("NOOS/STORE/WAL/V1", payload)
-len ≤ 64 MiB
+len ≤ 512 MiB
 ```
 
 Payload = canonical `WalRecordV1` under noos-codec law (fixed-width LE,
 u32-length collections, exact version, no trailing bytes):
 
 ```
-WalRecordV1 { version:u16 = 1, seq:u64, ops: list<OpV1> (≤ 10^6) }
+WalRecordV1 { version:u16 = 1, seq:u64, ops: list<OpV1> (≤ 4,000,000) }
 OpV1        { cf:u8 (§3), key: bytes ≤ 4096,
               tag:u8 ∈ {0 = delete, 1 ‖ value: bytes ≤ 32 MiB} }
 ```
@@ -136,6 +136,11 @@ cannot starve consensus IO. Stored record:
 len:u32-LE ‖ content_hash:32 ‖ checksum:32 ‖ bytes:len
 checksum = BLAKE3-dk("NOOS/STORE/SEGMENT/V1", bytes)
 ```
+
+Default node storage accepts one compressed DA-form blob up to 128 MiB and
+rotates blob segments at 256 MiB. The WAL ceiling is sized for the corresponding
+atomic macroblock receipt/state/index write set; it does not relax the 32 MiB
+bound on any individual value.
 
 Location metadata lives in `blob_index` and travels through the protocol
 WAL like any other write. Ordering law: segment bytes are appended and

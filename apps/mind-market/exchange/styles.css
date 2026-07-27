@@ -115,7 +115,7 @@ body {
   width: 7px; height: 7px;
   border-radius: 50%;
   background: var(--acid);
-  box-shadow: 0 0 6px rgba(168, 214, 94, 0.55);
+  box-shadow: 0 0 0 3px rgba(184, 52, 15, 0.14);
 }
 
 .net-dot.off { background: var(--bone-faint); box-shadow: none; }
@@ -196,12 +196,12 @@ body {
               transform 90ms var(--ease);
 }
 
-.pool-item:hover { border-color: var(--line); background: #1e211c; }
+.pool-item:hover { border-color: var(--line); background: var(--charcoal-raise); }
 .pool-item:active { transform: scale(0.985); }
 
 .pool-item[aria-selected="true"] {
   border-color: var(--acid-dim);
-  background: linear-gradient(0deg, rgba(168, 214, 94, 0.06), rgba(168, 214, 94, 0.06)), var(--charcoal-raise);
+  background: linear-gradient(0deg, rgba(184, 52, 15, 0.05), rgba(184, 52, 15, 0.05)), var(--charcoal-raise);
 }
 
 .pool-pair {
@@ -446,7 +446,7 @@ body {
 }
 
 .detail-row dd.warn { color: var(--danger); }
-.detail-row dd.ok { color: var(--acid); }
+.detail-row dd.ok { color: #6b7562; }
 
 /* ---------- hints / status ---------- */
 
@@ -509,7 +509,7 @@ body {
 
 .status-card.success {
   border-color: var(--acid-dim);
-  background: rgba(168, 214, 94, 0.07);
+  background: rgba(184, 52, 15, 0.05);
 }
 
 .status-card.error {
@@ -524,7 +524,7 @@ body {
   margin-bottom: 3px;
 }
 
-.status-card.success .status-title { color: var(--acid); }
+.status-card.success .status-title { color: #6b7562; }
 .status-card.error .status-title { color: var(--danger); }
 
 .status-card .status-detail {

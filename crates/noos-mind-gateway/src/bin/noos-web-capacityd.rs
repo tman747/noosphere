@@ -155,10 +155,7 @@ fn queue_restore(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let request_bytes = fs::read(request_path)?;
     if request_bytes.len() > ADMIN_REQUEST_LIMIT {
-        return Err(format!(
-            "queue-restore request exceeds {ADMIN_REQUEST_LIMIT} bytes"
-        )
-        .into());
+        return Err(format!("queue-restore request exceeds {ADMIN_REQUEST_LIMIT} bytes").into());
     }
     let request: QueueRestoreAdminRequest = serde_json::from_slice(&request_bytes)?;
     let config = WebCapacityConfig::load(config_path)?;
@@ -193,11 +190,7 @@ fn export_restored_position(
     let config = WebCapacityConfig::load(config_path)?;
     let service = WebCapacityService::new(config)?;
     let mut output_file = reserve_report(output_path)?;
-    let index = match service.export_restored_position_index(
-        position,
-        generated_at,
-        expires_at,
-    ) {
+    let index = match service.export_restored_position_index(position, generated_at, expires_at) {
         Ok(index) => index,
         Err(error) => {
             drop(output_file);
@@ -245,10 +238,7 @@ fn release_restored_position(
 
 fn read_bounded_regular(path: &Path, maximum: usize) -> std::io::Result<Vec<u8>> {
     let metadata = fs::symlink_metadata(path)?;
-    if metadata.file_type().is_symlink()
-        || !metadata.is_file()
-        || metadata.len() > maximum as u64
-    {
+    if metadata.file_type().is_symlink() || !metadata.is_file() || metadata.len() > maximum as u64 {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!(
@@ -275,7 +265,6 @@ fn write_reserved_report<T: Serialize>(file: &mut File, report: &T) -> std::io::
 mod tests {
     use super::*;
     use tempfile::tempdir;
-
 
     #[test]
     fn command_parser_is_closed_and_preserves_serve_compatibility() {

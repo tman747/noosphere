@@ -296,7 +296,7 @@ fn main() -> ExitCode {
                 }
             }
             "--template-byte-budget" => {
-                let maximum = noos_da::MAX_BLOCK_BODY_BYTES.saturating_sub(65_536);
+                let maximum = noos_node::roots::MAX_DA_FORM_RAW_BYTES.saturating_sub(65_536);
                 match take("--template-byte-budget").and_then(|v| v.parse().ok()) {
                     Some(value) if (1..=maximum).contains(&value) => {
                         mempool.template_byte_budget = value;

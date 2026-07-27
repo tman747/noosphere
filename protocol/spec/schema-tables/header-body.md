@@ -98,8 +98,8 @@ ODR-DA-002); ch01 §9.1 requires explicit maxima, numbers none.
 
 | # | Field | Element | Collection max | Notes |
 |---:|---|---|---|---|
-| 0 | `transactions[]` | TransactionV1 | 16384 (PROPOSED-G0) | |
-| 1 | `segregated_witnesses[]` | witness bundle keyed by txid | 16384 (PROPOSED-G0) | |
+| 0 | `transactions[]` | TransactionV1 | 1048576 (PROPOSED-G0 high-throughput macroblock) | |
+| 1 | `segregated_witnesses[]` | witness bundle keyed by txid | 1048576 (PROPOSED-G0 high-throughput macroblock) | |
 | 2 | `system_transitions[]` | typed system transition | 256 (PROPOSED-G0) | applied before transactions (ch01 §9.3) |
 | 3 | `finality_certificates[]` | FinalityCertificateV1 | 8 (PROPOSED-G0) | |
 | 4 | `ground_ticket` | GroundTicketV1 | exactly 1 | mandatory on every block (ch01 §4.2) |

@@ -3,7 +3,7 @@
 //! cryptography to noos-crypto, and WorkJob escrow to noos-work-loom. Each
 //! sits behind a trait so this crate stays storage- and crypto-agnostic.
 
-use crate::objects::TransactionWitnessesV1;
+use crate::objects::{TransactionV1, TransactionWitnessesV1};
 use crate::Hash32;
 
 /// Outcome of one contract call.
@@ -54,6 +54,14 @@ pub trait AuthVerifier {
         message: &Hash32,
         signature: &[u8],
     ) -> bool;
+
+    /// Return a transaction id already computed while verifying this exact
+    /// transaction, if available. Implementations MUST return the canonical
+    /// [`crate::objects::txid`] value for `transaction`; the default forces
+    /// Lumen to compute it locally.
+    fn precomputed_transaction_id(&self, _transaction: &TransactionV1) -> Option<Hash32> {
+        None
+    }
 
     /// Verify one revealed lock branch + sibling path against a note's
     /// `lock_root` (balanced lock Merkle tree; wallet-side structure whose

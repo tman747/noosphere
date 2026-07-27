@@ -50,7 +50,7 @@ struct Acked {
 fn run_workload(vfs: Arc<dyn Vfs>, root: PathBuf, acked: &mut Acked) -> Result<(), StoreError> {
     let mut store = Store::open(test_cfg(root), vfs)?;
     for marker in [1u8, 2] {
-        let seq = store.commit(&ws(marker))?;
+        let seq = store.commit(ws(marker))?;
         acked.markers.push(marker);
         acked.last_seq = seq;
     }
@@ -58,12 +58,12 @@ fn run_workload(vfs: Arc<dyn Vfs>, root: PathBuf, acked: &mut Acked) -> Result<(
     acked.safety = true;
     acked.last_seq = seq;
     acked.snapshots.push(store.create_snapshot()?);
-    let seq = store.commit(&ws(3))?;
+    let seq = store.commit(ws(3))?;
     acked.markers.push(3);
     acked.last_seq = seq;
     acked.snapshots.push(store.create_snapshot()?);
     store.prune()?;
-    let seq = store.commit(&ws(4))?;
+    let seq = store.commit(ws(4))?;
     acked.markers.push(4);
     acked.last_seq = seq;
     store.barrier()?;
@@ -250,7 +250,7 @@ fn crash_injection_matrix_recovers_at_every_boundary() {
             ..WriteSet::default()
         };
         store
-            .commit(&probe)
+            .commit(probe)
             .unwrap_or_else(|e| panic!("boundary {k}: post-recovery commit failed: {e}"));
         assert_eq!(
             store.get_state(TreeId::Nullifiers, &h(250), None).unwrap(),

@@ -29,6 +29,15 @@
       <button id="import-seed-btn" type="button">Import into OS vault</button>
       <button id="delete-wallet-btn" type="button">Delete from OS vault</button>
       <output id="vault-out" for="import-seed-btn delete-wallet-btn" role="status" aria-live="polite"></output>
+      <fieldset class="recovery">
+        <legend>Encrypted recovery package</legend>
+        <p>The package is encrypted before it leaves the native process and is bound to this wallet id, chain id, and genesis hash. Use a unique password of at least 12 characters.</p>
+        <label>Recovery password <input id="recovery-password" type="password" minlength="12" maxlength="1024" autocomplete="new-password" /></label>
+        <label>Encrypted package JSON <textarea id="recovery-package" rows="7" spellcheck="false" autocomplete="off"></textarea></label>
+        <button id="export-recovery-btn" type="button">Export encrypted package</button>
+        <button id="import-recovery-btn" type="button">Recover into OS vault</button>
+        <output id="recovery-out" for="export-recovery-btn import-recovery-btn" role="status" aria-live="polite"></output>
+      </fieldset>
       <label>Purpose
         <select id="purpose">
           <option value="sign">sign</option>

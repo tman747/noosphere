@@ -38,9 +38,7 @@ use noos_lumen::objects::{
 };
 use noos_lumen::state::LumenRoots;
 use noos_lumen::wwm::{FinalizedModelResolutionV1, ResolutionSelectorV1};
-use noos_p2p::{
-    BodyReplyV1, ChainIdentity, InboundItem, Multiaddr, P2pConfig, P2pEvent, P2pHandle, P2pNode,
-};
+use noos_p2p::{ChainIdentity, InboundItem, Multiaddr, P2pConfig, P2pEvent, P2pHandle, P2pNode};
 use noos_store::WriteSet;
 use noos_witness::vote::FinalityVoteV1;
 use tokio::runtime::Handle;
@@ -49,7 +47,7 @@ use crate::consensus::{ImportOutcome, NodeConfig, NodeCore, NodeMode};
 use crate::genesis::GenesisSpec;
 use crate::mempool::AdmitError;
 use crate::metrics::Metrics;
-use crate::network::{decode_header_announce, decode_tx_push, NodeProtocolStore, P2pNetworkEdge};
+use crate::network::{decode_header_announce, decode_tx_pushes, NodeProtocolStore, P2pNetworkEdge};
 use crate::store_port::{key_header, key_height, InProcStore, StorePort};
 use crate::view::{BlockSummary, TxStatus, ViewLookup};
 use crate::{Hash32, NodeError};
@@ -147,11 +145,6 @@ impl StoreClient {
             .map_err(store_err)
     }
 
-    pub(crate) fn protocol_blob(&self, hash: &Hash32) -> Result<Option<Vec<u8>>, NodeError> {
-        self.priority_round_trip(|r| StoreMsg::GetBlob(*hash, r))?
-            .map_err(store_err)
-    }
-
     pub(crate) fn protocol_header_range(
         &self,
         start_height: u64,
@@ -162,8 +155,8 @@ impl StoreClient {
 }
 
 impl StorePort for StoreClient {
-    fn commit(&mut self, ws: &WriteSet) -> Result<u64, NodeError> {
-        self.round_trip(|r| StoreMsg::Commit(Box::new(ws.clone()), r))?
+    fn commit(&mut self, ws: WriteSet) -> Result<u64, NodeError> {
+        self.round_trip(|reply| StoreMsg::Commit(Box::new(ws), reply))?
             .map_err(store_err)
     }
     fn persist_safety(&mut self, kind: u16, payload: &[u8]) -> Result<u64, NodeError> {
@@ -283,7 +276,7 @@ fn store_task(mut store: InProcStore, rx: &Receiver<StoreMsg>, priority_rx: &Rec
     while let Some(msg) = recv_store_msg(rx, priority_rx, &mut priority_streak) {
         match msg {
             StoreMsg::Commit(ws, reply) => {
-                let _ = reply.send(store.commit(&ws).map_err(|e| e.to_string()));
+                let _ = reply.send(store.commit(*ws).map_err(|e| e.to_string()));
             }
             StoreMsg::PersistSafety(kind, payload, reply) => {
                 let _ = reply.send(
@@ -371,6 +364,10 @@ pub enum ConsensusMsg {
         source: u64,
         reply: Reply<Result<Hash32, AdmitError>>,
     },
+    SubmitTxBatch {
+        submissions: Vec<(Vec<u8>, Vec<u8>, u64)>,
+        reply: Reply<Vec<Result<Hash32, AdmitError>>>,
+    },
     SimulateTx {
         tx_bytes: Vec<u8>,
         wit_bytes: Vec<u8>,
@@ -420,6 +417,24 @@ pub enum ConsensusMsg {
         kind: noos_lumen::wwm::WwmLeafKind,
         id: Hash32,
         reply: Reply<Result<(u64, Hash32, noos_lumen::wwm::ResolutionProofV1), String>>,
+    },
+    GetNeuralOracleResult {
+        query_id: Hash32,
+        reply: Reply<Result<(u64, Hash32, noos_lumen::wwm::ResolutionProofV1), String>>,
+    },
+    GetNeuralEvaluation {
+        query_id: Hash32,
+        reply: Reply<
+            Result<
+                (
+                    u64,
+                    Hash32,
+                    noos_lumen::wwm::ResolutionProofV1,
+                    Option<noos_lumen::wwm::ResolutionProofV1>,
+                ),
+                String,
+            >,
+        >,
     },
     Status {
         reply: Reply<StatusSnapshot>,
@@ -494,6 +509,7 @@ pub enum ConsensusMsg {
 pub enum OutboundGossip {
     Header(Box<BlockHeaderV1>, GroundTicketV1),
     Tx(Vec<u8>, Vec<u8>),
+    TxBatch(Vec<(Vec<u8>, Vec<u8>)>),
     Vote(FinalityVoteV1),
 }
 
@@ -550,6 +566,30 @@ fn core_loop<P: StorePort>(
                 }
                 let _ = reply.send(result);
             }
+            ConsensusMsg::SubmitTxBatch { submissions, reply } => {
+                let results = {
+                    let borrowed = submissions
+                        .iter()
+                        .map(|(tx_bytes, wit_bytes, source)| {
+                            (tx_bytes.as_slice(), wit_bytes.as_slice(), *source)
+                        })
+                        .collect::<Vec<_>>();
+                    core.submit_tx_batch(&borrowed)
+                };
+                if let Some(gossip) = gossip {
+                    let accepted = submissions
+                        .into_iter()
+                        .zip(&results)
+                        .filter_map(|((tx_bytes, wit_bytes, _), result)| {
+                            result.as_ref().ok().map(|_| (tx_bytes, wit_bytes))
+                        })
+                        .collect::<Vec<_>>();
+                    if !accepted.is_empty() {
+                        let _ = gossip.try_send(OutboundGossip::TxBatch(accepted));
+                    }
+                }
+                let _ = reply.send(results);
+            }
             ConsensusMsg::SimulateTx {
                 tx_bytes,
                 wit_bytes,
@@ -566,7 +606,7 @@ fn core_loop<P: StorePort>(
                 reply,
             } => {
                 let result = core
-                    .import_block(&header, &ticket, &claim, &shards)
+                    .import_block_owned(&header, &ticket, &claim, shards)
                     .map_err(|e| e.to_string());
                 // Live next-block gossip may cross one more hop. Pull recovery
                 // must not amplify historical pages into rate-limited gossip.
@@ -651,6 +691,18 @@ fn core_loop<P: StorePort>(
                         .map_err(|error| error.to_string()),
                 );
             }
+            ConsensusMsg::GetNeuralOracleResult { query_id, reply } => {
+                let _ = reply.send(
+                    core.finalized_neural_oracle_result(query_id)
+                        .map_err(|error| error.to_string()),
+                );
+            }
+            ConsensusMsg::GetNeuralEvaluation { query_id, reply } => {
+                let _ = reply.send(
+                    core.finalized_neural_evaluation(query_id)
+                        .map_err(|error| error.to_string()),
+                );
+            }
             ConsensusMsg::Status { reply } => {
                 let _ = reply.send(status_of(
                     core,
@@ -677,12 +729,9 @@ fn core_loop<P: StorePort>(
                 });
             }
             ConsensusMsg::GetReceipt { txid, reply } => {
-                let lookup = match core.view.tx_status(&txid) {
+                let lookup = match core.tx_status(&txid) {
                     ViewLookup::Found(status) => {
-                        let receipt = match core.view.receipt(&txid) {
-                            ViewLookup::Found(r) => Some(r.clone()),
-                            _ => None,
-                        };
+                        let receipt = core.ledger().get_receipt(&txid);
                         ViewLookup::Found((status, receipt))
                     }
                     ViewLookup::Pruned => ViewLookup::Pruned,
@@ -771,19 +820,13 @@ async fn import_wire_block(
 ) -> Result<ImportOutcome, String> {
     let (header, ticket) = decode_header_announce(announced)
         .map_err(|error| format!("decode header announce: {error:?}"))?;
-    let BodyReplyV1::Body(body) = p2p
+    let body = p2p
         .request_body(peer, header.body_da_root)
         .await
         .map_err(|error| format!("request body: {error}"))?
-    else {
-        return Err("body not found".to_owned());
-    };
-    // The blob lane serves the CANONICAL body encoding; the DA commitment
-    // is over the padded DA form (ch01 §4.3 step 5) — re-derive it exactly.
-    let body_v1 = noos_braid::BlockBodyV1::decode_canonical(&body.0)
-        .map_err(|error| format!("decode canonical body: {error}"))?;
-    let encoded = encode_body(&crate::roots::da_form_bytes(&body_v1))
-        .map_err(|error| format!("encode DA body: {error}"))?;
+        .ok_or_else(|| "body not found".to_owned())?;
+    // The body lane serves the exact compressed, ticket-independent DA form.
+    let encoded = encode_body(&body).map_err(|error| format!("encode DA body: {error}"))?;
     if encoded.shard_root().as_bytes() != &header.body_da_root {
         return Err("DA root mismatch".to_owned());
     }
@@ -828,14 +871,12 @@ async fn import_wire_header(
     let certificates = if header.finality_certificate_root == empty_root {
         empty
     } else {
-        let BodyReplyV1::Body(body) = p2p
+        let body = p2p
             .request_body(peer, header.body_da_root)
             .await
             .map_err(|error| format!("request certificate body: {error}"))?
-        else {
-            return Err("certificate body not found".to_owned());
-        };
-        noos_braid::BlockBodyV1::decode_canonical(&body.0)
+            .ok_or_else(|| "certificate body not found".to_owned())?;
+        crate::roots::decode_da_form(&body)
             .map_err(|error| format!("decode certificate body: {error}"))?
             .finality_certificates
     };
@@ -1081,6 +1122,9 @@ fn spawn_network(
                                 Some(OutboundGossip::Tx(tx_bytes, wit_bytes)) => {
                                     edge.push_tx(&tx_bytes, &wit_bytes).await;
                                 }
+                                Some(OutboundGossip::TxBatch(envelopes)) => {
+                                    edge.push_tx_batch(&envelopes).await;
+                                }
                                 Some(OutboundGossip::Vote(vote)) => {
                                     edge.push_vote(&vote).await;
                                 }
@@ -1142,7 +1186,7 @@ fn spawn_network(
                                         }
                                     }
                                     InboundItem::Tx { tx } => {
-                                        if let Ok((tx_bytes, wit_bytes)) = decode_tx_push(&tx) {
+                                        if let Ok(envelopes) = decode_tx_pushes(&tx) {
                                             let (reply, _) = sync_channel(1);
                                             let source = peer
                                                 .to_bytes()
@@ -1150,12 +1194,22 @@ fn spawn_network(
                                                 .and_then(|bytes| bytes.try_into().ok())
                                                 .map(u64::from_le_bytes)
                                                 .unwrap_or(0);
-                                            let _ = consensus.try_send(ConsensusMsg::SubmitTx {
-                                                tx_bytes: tx_bytes.to_vec(),
-                                                wit_bytes: wit_bytes.to_vec(),
-                                                source,
-                                                reply,
-                                            });
+                                            let submissions = envelopes
+                                                .into_iter()
+                                                .map(|(tx_bytes, wit_bytes)| {
+                                                    (
+                                                        tx_bytes.to_vec(),
+                                                        wit_bytes.to_vec(),
+                                                        source,
+                                                    )
+                                                })
+                                                .collect();
+                                            let _ = consensus.try_send(
+                                                ConsensusMsg::SubmitTxBatch {
+                                                    submissions,
+                                                    reply,
+                                                },
+                                            );
                                         }
                                     }
                                     InboundItem::Vote { vote } => {

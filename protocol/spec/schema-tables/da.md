@@ -5,8 +5,9 @@ Source: `C:/tmp/noosphere/01-architecture.md` §10.1–10.2, ch04 §3.1 A-DA, ch
 
 ## Consensus-body coding law (ch01 §10.1)
 
-- Proposers Reed–Solomon encode the block body into **fixed-size shards** and
-  commit a Merkle root (`body_da_root`, header field 11 in header-body.md).
+- Proposers deterministically compress the canonical block body, Reed–Solomon
+  encode that DA form into a body-specific canonical shard size, and commit a
+  Merkle root (`body_da_root`, header field 11 in header-body.md).
 - Full nodes reconstruct and verify the entire body before accepting the block.
 - Witnesses MUST NOT vote a checkpoint containing an unreconstructed ancestor.
 - Light-client sampling is a probabilistic availability opinion only; it never
@@ -25,13 +26,32 @@ distribution, **not** consensus DA. Proposed engineering values for review
 
 | Parameter | Proposed value | Status |
 |---|---:|---|
-| `body_shard_bytes` | 65,536 (64 KiB) | PROPOSED-G0 |
+| `body_min_shard_bytes` | 65,536 (64 KiB) | PROPOSED-G0 high-throughput profile |
+| `body_max_shard_bytes` | 8,388,608 (8 MiB) | PROPOSED-G0 high-throughput profile |
+| shard selection | smallest power of two ≥ `ceil(da_form_bytes / 16)`, clamped to 64 KiB–8 MiB | deterministic |
 | `body_data_shards` | 16 | PROPOSED-G0 |
 | `body_parity_shards` | 16 | PROPOSED-G0 (rate 1/2; reconstruct from any 16 of 32) |
-| `max_block_body_bytes` | 1,048,576 (16 × 64 KiB data) | PROPOSED-G0, must co-freeze with fee capacity ODR-FEES-002 |
+| `max_block_da_form_bytes` | 134,217,728 (16 × 8 MiB) | PROPOSED-G0, must co-freeze with fee capacity ODR-FEES-002 |
+| raw canonical body ceiling | 536,870,912 (512 MiB) | fail-closed decompression bound |
 | `max_blob_bytes` | 262,144 per descriptor | PROPOSED-G0 |
 | `max_consensus_blob_descriptors_per_block` | 64 | PROPOSED-G0 (mirrors header-body.md body field 6) |
-| `p2p_max_frame_bytes` | 1,048,576 (1 MiB) | plan §7.4 (ported Ascent bound) |
+| `p2p_max_frame_bytes` | 1,048,576 (1 MiB) | unchanged; body transfer is chunked |
+| `p2p_max_reassembled_body_bytes` | 134,217,728 (128 MiB) | compressed-body requester bound |
+
+### Ticket-independent compressed DA form
+
+The only committed body form is
+`"NOOSLZ41" || lz4_block_compress_prepend_size(canonical_body)`, where
+`canonical_body` is `BlockBodyV1` with `ground_ticket` replaced by the all-zero
+ticket before encoding. LZ4 block compression is deterministic. The prepended
+uncompressed length is checked against the 512 MiB ceiling before allocation.
+The real Ground ticket travels with the header and is committed separately by
+`ground_ticket_root`, so nonce search cannot change `body_da_root`.
+
+`BodyDaClaimV1.original_bytes` is the compressed framed length. It determines
+the unique adaptive shard size and is bound into `content_root`. Full nodes
+reconstruct and verify the exact compressed bytes before decompression and
+canonical body decoding.
 
 ## BlobDescriptor (ch01 §10.2; field list src, widths PROPOSED-G0)
 

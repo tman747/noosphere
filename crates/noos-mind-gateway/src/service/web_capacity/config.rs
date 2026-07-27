@@ -20,7 +20,6 @@ pub const HARD_MAX_QUARANTINE_BYTES: u64 = 475_588_608;
 pub const CONSERVATIVE_MAX_QUARANTINE_BYTES: u64 = 268_173_312;
 pub const HARD_MAX_CONCURRENT_RESTORE_VERIFICATIONS: u32 = 8;
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SourceRegistration {
@@ -393,8 +392,7 @@ fn validate_quarantine_profile(
     if full_position_repair {
         if max_quarantine_bytes != HARD_MAX_QUARANTINE_BYTES {
             return Err(WebCapacityError::Config(
-                "full-position repair requires the exact one-position quarantine cap"
-                    .to_owned(),
+                "full-position repair requires the exact one-position quarantine cap".to_owned(),
             ));
         }
     } else if max_quarantine_bytes > CONSERVATIVE_MAX_QUARANTINE_BYTES {
@@ -510,14 +508,7 @@ mod tests {
             (1, 1, HARD_MAX_ACTIVE_ASSIGNMENTS + 1, 1, 1, 1),
             (1, 1, 1, HARD_MAX_PENDING_RESTORE_TASKS + 1, 1, 1),
             (1, 1, 1, 1, HARD_MAX_QUARANTINE_BYTES + 1, 1),
-            (
-                1,
-                1,
-                1,
-                1,
-                1,
-                HARD_MAX_CONCURRENT_RESTORE_VERIFICATIONS + 1,
-            ),
+            (1, 1, 1, 1, 1, HARD_MAX_CONCURRENT_RESTORE_VERIFICATIONS + 1),
         ] {
             assert!(
                 validate_resource_caps(
@@ -660,11 +651,31 @@ mod tests {
         .is_none());
 
         for (listen, source_origin, mutation_origin) in [
-            ("0.0.0.0:9770", "https://127.0.0.1:8443", "https://127.0.0.1:9443"),
-            ("127.0.0.1:9770", "https://127.0.0.2:8443", "https://127.0.0.1:9443"),
-            ("127.0.0.1:9770", "https://10.0.0.1:8443", "https://127.0.0.1:9443"),
-            ("127.0.0.1:9770", "https://localhost:8443", "https://127.0.0.1:9443"),
-            ("127.0.0.1:9770", "https://127.0.0.1:8443", "https://example.com:9443"),
+            (
+                "0.0.0.0:9770",
+                "https://127.0.0.1:8443",
+                "https://127.0.0.1:9443",
+            ),
+            (
+                "127.0.0.1:9770",
+                "https://127.0.0.2:8443",
+                "https://127.0.0.1:9443",
+            ),
+            (
+                "127.0.0.1:9770",
+                "https://10.0.0.1:8443",
+                "https://127.0.0.1:9443",
+            ),
+            (
+                "127.0.0.1:9770",
+                "https://localhost:8443",
+                "https://127.0.0.1:9443",
+            ),
+            (
+                "127.0.0.1:9770",
+                "https://127.0.0.1:8443",
+                "https://example.com:9443",
+            ),
         ] {
             let error = validate_loopback_test_transport(
                 Some(document()),
@@ -680,25 +691,18 @@ mod tests {
                 "unsafe combination was not rejected clearly: {error}"
             );
         }
-        assert!(validate_quarantine_profile(
-            CONSERVATIVE_MAX_QUARANTINE_BYTES,
-            enabled.as_ref(),
-        )
-        .is_ok());
-        assert!(validate_quarantine_profile(
-            HARD_MAX_QUARANTINE_BYTES,
-            enabled.as_ref(),
-        )
-        .is_err());
+        assert!(
+            validate_quarantine_profile(CONSERVATIVE_MAX_QUARANTINE_BYTES, enabled.as_ref(),)
+                .is_ok()
+        );
+        assert!(validate_quarantine_profile(HARD_MAX_QUARANTINE_BYTES, enabled.as_ref(),).is_err());
         let full_position = LoopbackTestTransport {
             ca_certificate_pem: Vec::new(),
             full_position_repair: true,
         };
-        assert!(validate_quarantine_profile(
-            HARD_MAX_QUARANTINE_BYTES,
-            Some(&full_position),
-        )
-        .is_ok());
+        assert!(
+            validate_quarantine_profile(HARD_MAX_QUARANTINE_BYTES, Some(&full_position),).is_ok()
+        );
         assert!(validate_quarantine_profile(
             CONSERVATIVE_MAX_QUARANTINE_BYTES,
             Some(&full_position),

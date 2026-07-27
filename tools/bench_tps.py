@@ -19,7 +19,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from wallet_transfer import action, balance, cargo_binary, checked_status, cli_json, derive, load_profile, read_seed  # noqa: E402
+from wallet_transfer import USER_AGENT, action, balance, cargo_binary, checked_status, cli_json, derive, load_profile, read_seed  # noqa: E402
 
 ZERO_ASSET = "00" * 32
 
@@ -32,7 +32,7 @@ def post(base: str, envelope: dict, retry_seconds: float = 120) -> dict:
             base.rstrip("/") + "/api/v1/transactions",
             method="POST",
             data=body,
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": USER_AGENT},
         )
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
@@ -47,14 +47,22 @@ def post(base: str, envelope: dict, retry_seconds: float = 120) -> dict:
 def tx_record(base: str, txid: str) -> dict | None:
     root = base.rstrip("/")
     try:
-        with urllib.request.urlopen(root + f"/api/v1/transactions/{txid}", timeout=5) as response:
+        transaction_request = urllib.request.Request(
+            root + f"/api/v1/transactions/{txid}",
+            headers={"Accept": "application/json", "User-Agent": USER_AGENT},
+        )
+        with urllib.request.urlopen(transaction_request, timeout=5) as response:
             value = json.load(response)
         return value if isinstance(value, dict) else None
     except urllib.error.HTTPError as exc:
         if exc.code != 404:
             raise
     try:
-        with urllib.request.urlopen(root + f"/api/v1/receipts/{txid}", timeout=5) as response:
+        receipt_request = urllib.request.Request(
+            root + f"/api/v1/receipts/{txid}",
+            headers={"Accept": "application/json", "User-Agent": USER_AGENT},
+        )
+        with urllib.request.urlopen(receipt_request, timeout=5) as response:
             receipt = json.load(response)
     except urllib.error.HTTPError as exc:
         if exc.code == 404:

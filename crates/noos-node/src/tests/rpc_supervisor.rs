@@ -11,6 +11,9 @@ use std::sync::Arc;
 
 use crate::rpc::{self, hex, RpcConfig};
 use crate::supervisor::{self, NodeHandle};
+use noos_braid::EPOCH_LENGTH;
+use noos_lumen::neural_oracle::{neural_program_id, EvaluateNeuralProgramV1, NeuralProgramV1};
+use noos_lumen::objects::{ActionV1, BoundedBytes};
 
 use super::util::*;
 
@@ -114,6 +117,29 @@ fn rpc_status_reports_the_three_heads_separately_and_auth_gates_routes() {
     assert_eq!(safety_status, 200, "{safety_body}");
     assert!(safety_body.contains(r#""items":[]"#), "{safety_body}");
 
+    // Neural-oracle reads are finalized-state only. A missing result returns
+    // typed 404 after its local sparse-Merkle non-membership proof verifies.
+    let query_id = hex(&[0x6a; 32]);
+    let (neural_status, neural_body) = http_request(
+        addr,
+        "GET",
+        &format!("/neural-oracle/{query_id}"),
+        token,
+        None,
+    );
+    assert_eq!(neural_status, 404, "{neural_body}");
+    assert!(
+        neural_body.contains(r#""code":"not_found""#),
+        "{neural_body}"
+    );
+    let (malformed_status, malformed_body) =
+        http_request(addr, "GET", "/neural-oracle/not-hex", token, None);
+    assert_eq!(malformed_status, 400, "{malformed_body}");
+    assert!(
+        malformed_body.contains(r#""code":"malformed""#),
+        "{malformed_body}"
+    );
+
     // Wallets can resolve the authoritative nonce and authorization descriptor.
     let faucet = hex(&faucet_key().public_key().into_bytes());
     let (account_status, account_body) =
@@ -129,6 +155,118 @@ fn rpc_status_reports_the_three_heads_separately_and_auth_gates_routes() {
     let (nf, body) = http_request(addr, "GET", "/nope", token, None);
     assert_eq!(nf, 404);
     assert!(body.contains(r#""code":"unknown_route""#));
+
+    rpc_handle.shutdown();
+    handle.shutdown();
+}
+
+#[test]
+fn finalized_neural_evaluation_exposes_exact_program_and_replay_proof() {
+    let dir = test_dir("rpc-neural-evaluation");
+    let key = faucet_key();
+    let mut genesis = spec();
+    genesis.wwm_bonsai_fixture = true;
+    genesis.gov_authority = key.public_key().into_bytes();
+    let mut cfg = node_config();
+    cfg.devnet_fixture_finality = true;
+    let handle = supervisor::start(cfg, genesis, dir).expect("supervisor start");
+    let rpc_handle = rpc::start(
+        RpcConfig {
+            bind: "127.0.0.1:0".parse().expect("loopback"),
+            token: "operator-secret".into(),
+            observer: false,
+        },
+        handle.consensus_tx.clone(),
+        Arc::clone(&handle.metrics),
+    )
+    .expect("rpc start");
+    let addr = rpc_handle.addr;
+    let token = Some("operator-secret");
+
+    let mut program = NeuralProgramV1 {
+        program_id: [0; 32],
+        input_width: 2,
+        hidden_width: 2,
+        output_width: 1,
+        hidden_weights: BoundedBytes::new(vec![2, 0, 0, 2]).expect("hidden weights"),
+        hidden_biases: BoundedBytes::new(vec![0, 0]).expect("hidden biases"),
+        output_weights: BoundedBytes::new(vec![2, 2]).expect("output weights"),
+        output_biases: BoundedBytes::new(vec![0]).expect("output biases"),
+    };
+    program.program_id = neural_program_id(&program);
+    let query_id = [0x6b; 32];
+    let actions = vec![
+        ActionV1::RegisterNeuralProgram(program.clone()),
+        ActionV1::EvaluateNeuralProgram(EvaluateNeuralProgramV1 {
+            query_id,
+            program_id: program.program_id,
+            requester: key.public_key().into_bytes(),
+            input: BoundedBytes::new(vec![2, 0]).expect("input"),
+        }),
+    ];
+    let status = handle.status().expect("status");
+    let (tx, witnesses, txid) = build_signed_tx(status.chain_id, 1_000, &key, actions, vec![]);
+    let payload = format!(
+        r#"{{"tx":"{}","witnesses":"{}"}}"#,
+        hex(&tx),
+        hex(&witnesses)
+    );
+    let (submit_status, submit_body) =
+        http_request(addr, "POST", "/submit_tx", token, Some(&payload));
+    assert_eq!(submit_status, 200, "{submit_body}");
+    assert!(submit_body.contains(&hex(&txid)), "{submit_body}");
+
+    for height in 1..=EPOCH_LENGTH.saturating_mul(2) {
+        handle
+            .set_now(GENESIS_TIME_MS.saturating_add(height.saturating_mul(6_000)))
+            .expect("advance clock");
+        handle.produce_block().expect("produce block");
+        if height == 1 {
+            let (receipt_status, receipt_body) = http_request(
+                addr,
+                "GET",
+                &format!("/receipt/{}", hex(&txid)),
+                token,
+                None,
+            );
+            assert_eq!(receipt_status, 200, "{receipt_body}");
+            assert!(
+                receipt_body.contains(r#""status_code":0"#),
+                "{receipt_body}"
+            );
+        }
+        if height.is_multiple_of(EPOCH_LENGTH) {
+            assert!(handle.devnet_finality_tick().expect("finality tick"));
+        }
+    }
+
+    let path = format!("/neural-evaluation/{}/0200", hex(&query_id));
+    let (evaluation_status, evaluation_body) = http_request(addr, "GET", &path, token, None);
+    assert_eq!(evaluation_status, 200, "{evaluation_body}");
+    let value: serde_json::Value = serde_json::from_str(&evaluation_body).expect("evaluation JSON");
+    assert_eq!(value["schema"], "noos/finalized-neural-evaluation/v1");
+    assert_eq!(value["program_id"], hex(&program.program_id));
+    assert_eq!(value["query_id"], hex(&query_id));
+    assert_eq!(
+        value["shape"],
+        serde_json::json!({"input":2,"hidden":2,"output":1})
+    );
+    assert_eq!(
+        value["evaluation"]["input_encoded"],
+        serde_json::json!([2, 0])
+    );
+    assert_eq!(value["evaluation"]["operations"], 9);
+    assert_eq!(value["evaluation"]["replay_verified"], true);
+    assert_eq!(value["proofs_verified"], true);
+    assert_eq!(value["weights_on_chain"], true);
+
+    let wrong_input_path = format!("/neural-evaluation/{}/0000", hex(&query_id));
+    let (wrong_status, wrong_body) = http_request(addr, "GET", &wrong_input_path, token, None);
+    assert_eq!(wrong_status, 422, "{wrong_body}");
+    assert!(
+        wrong_body.contains(r#""code":"input_commitment_mismatch""#),
+        "{wrong_body}"
+    );
 
     rpc_handle.shutdown();
     handle.shutdown();
@@ -221,6 +359,50 @@ fn rpc_submission_settles_and_receipts_are_served() {
     );
     assert_eq!(code, 404);
     assert!(body.contains(r#""code":"not_found""#));
+
+    rpc_handle.shutdown();
+    handle.shutdown();
+}
+
+#[test]
+fn rpc_batch_submission_returns_input_aligned_results() {
+    let (handle, rpc_handle) = start_node("rpc-submit-batch", false);
+    let addr = rpc_handle.addr;
+    let token = Some("operator-secret");
+    let chain_id = handle.status().expect("status").chain_id;
+    let (tx_a, wit_a, txid_a) =
+        signed_transfer(chain_id, 40, &faucet_key(), operator_account(1), 1_001);
+    let (tx_b, wit_b, txid_b) =
+        signed_transfer(chain_id, 40, &faucet_key(), operator_account(2), 1_002);
+    let payload = format!(
+        concat!(
+            r#"{{"transactions":["#,
+            r#"{{"tx":"{}","witnesses":"{}"}},"#,
+            r#"{{"tx":"{}","witnesses":"{}"}}"#,
+            r#"]}}"#
+        ),
+        hex(&tx_a),
+        hex(&wit_a),
+        hex(&tx_b),
+        hex(&wit_b),
+    );
+    let (code, body) = http_request(addr, "POST", "/submit_tx_batch", token, Some(&payload));
+    assert_eq!(code, 200, "{body}");
+    assert!(body.contains(r#""accepted":2"#), "{body}");
+    assert!(body.contains(r#""rejected":0"#), "{body}");
+    assert!(body.contains(&hex(&txid_a)), "{body}");
+    assert!(body.contains(&hex(&txid_b)), "{body}");
+    assert_eq!(handle.status().expect("status").mempool_txs, 2);
+
+    let (code, body) = http_request(
+        addr,
+        "POST",
+        "/submit_tx_batch",
+        token,
+        Some(r#"{"transactions":[]}"#),
+    );
+    assert_eq!(code, 400, "{body}");
+    assert!(body.contains(r#""code":"malformed""#), "{body}");
 
     rpc_handle.shutdown();
     handle.shutdown();

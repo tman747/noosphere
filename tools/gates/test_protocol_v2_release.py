@@ -83,14 +83,14 @@ class ProtocolV2ReleaseTests(unittest.TestCase):
                 "controls_enabled": False,
                 "promotion_effect": "NONE",
                 "dns_cutover": "PROHIBITED",
-                "model_execution": "OFF_CHAIN_ONLY",
+                "model_execution": "LARGE_MODELS_OFF_CHAIN_BOUNDED_L1_NEURAL_ONLY",
             },
             "contracts": {
                 "wwm_v2_schema_sha256": "4" * 64,
                 "crypto_domains_sha256": "5" * 64,
                 "promotion_ledger_v2_sha256": "6" * 64,
-                "action_variant_count": 60,
-                "action_discriminants": list(range(40, 60)),
+                "action_variant_count": 66,
+                "action_discriminants": list(range(40, 66)),
                 "payload_tags": {
                     "41": ["InstallProfile", "TransitionCapability"],
                     "50": ["InstallProfile", "TransitionCapability"],
@@ -98,7 +98,13 @@ class ProtocolV2ReleaseTests(unittest.TestCase):
                     "58": ["TransitionServingAlias"],
                     "59": ["Activate", "EmergencyDisable", "AuthorizeOperationalConfig", "ApplyOperationalConfig", "Recover"],
                 },
-                "resolver": {"normal_max_bytes": 262144, "normal_max_proofs": 17, "authorized_max_bytes": 393216},
+                "resolver": {
+                    "normal_max_bytes": 262144,
+                    "normal_max_proofs": 17,
+                    "authorized_max_bytes": 393216,
+                    "neural_target": "/neural-oracle/<query_id>",
+                    "neural_response_max_bytes": 16384,
+                },
                 "light_update": {"protocol": "/noos/sync/light-update/2", "min_items": 1, "max_items": 128, "max_item_bytes": 262144},
                 "transaction_bounds": {"action_call_max_bytes": 65536, "tx_plus_witness_max_bytes": 65532, "tx_push_prefix_bytes": 4, "tx_push_max_bytes": 65536},
                 "v1_wwm_decode": "REJECT",
@@ -170,7 +176,7 @@ class ProtocolV2ReleaseTests(unittest.TestCase):
             document["protocol_binding"][field] = value
             mutations.append(document)
         unknown_action = copy.deepcopy(self.v2)
-        unknown_action["contracts"]["action_registry"]["last_discriminant"] = 60
+        unknown_action["contracts"]["action_registry"]["last_discriminant"] = 66
         mutations.append(unknown_action)
         unknown_tag = copy.deepcopy(self.v2)
         unknown_tag["contracts"]["payload_tags"]["action_59"].append("GenericGovernanceEnable")

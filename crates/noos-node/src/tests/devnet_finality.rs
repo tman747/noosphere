@@ -24,6 +24,12 @@ fn devnet_finality_tick_advances_two_epoch_ladder_only_when_enabled() {
     assert!(enabled.devnet_finality_tick().expect("justify epoch 2"));
     assert_eq!(enabled.justified().epoch, 2);
     assert_eq!(enabled.finalized().epoch, 1);
+    assert!(
+        enabled.dag().len()
+            <= usize::try_from(EPOCH_LENGTH).expect("epoch length fits usize")
+                + noos_ground::MEDIAN_TIME_PAST_BLOCKS.saturating_mul(2),
+        "finality must bound the cloned in-memory DAG"
+    );
     assert!(!enabled
         .devnet_finality_tick()
         .expect("epoch 3 boundary is not available"));

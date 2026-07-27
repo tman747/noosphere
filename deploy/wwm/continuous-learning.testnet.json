@@ -1,0 +1,39 @@
+{
+  "schema": "noos/wwm-continuous-learning-config/v1",
+  "environment": "testnet",
+  "production": false,
+  "monitoring_enabled": true,
+  "execution_enabled": false,
+  "chain_id": "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+  "genesis_hash": "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+  "status_endpoints": [
+    {
+      "url": "http://127.0.0.1:29652/status",
+      "control_cluster": "094c3e2bad0d5570a52780ce1867e12b9765cc7464a66183f403ac32e322d5d8",
+      "bearer_token_file": "/etc/mindchain-wwm/rpc-token"
+    },
+    {
+      "url": "https://wwm-rpc.mindchain.network/healthz",
+      "control_cluster": "19eecdae83c591277f798d1686a0dec66f9601402c3cdf3f0d45bc159f3648a5"
+    },
+    {
+      "url": "http://127.0.0.1:39652/status",
+      "control_cluster": "b435fbba69d0edf6b712f5be3583c26d42dcddd2a478d68a7b0de02ecac7853f",
+      "bearer_token_file": "/etc/mindchain-wwm/seed-2-rpc-token"
+    }
+  ],
+  "request_dir": "/var/lib/mindchain-wwm/continuous-learning/requests",
+  "evidence_root": "/var/lib/mindchain-wwm/continuous-learning/evidence",
+  "state_db": "/var/lib/mindchain-wwm/continuous-learning/state/coordinator.sqlite3",
+  "status_file": "/var/lib/mindchain-wwm/continuous-learning/state/status.json",
+  "gate_config": "/opt/mindchain-wwm/deploy/wwm/model-improvement.json",
+  "role_key_files": {},
+  "poll_seconds": 60,
+  "request_timeout_seconds": 10,
+  "minimum_finalized_advance": 256,
+  "maximum_queued_cycles": 8,
+  "listen": {
+    "host": "127.0.0.1",
+    "port": 29790
+  }
+}

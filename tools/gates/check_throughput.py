@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import math
 import statistics
 import subprocess
 import sys
@@ -55,6 +56,34 @@ def run_sample(
         raise ThroughputError("benchmark report is not a JSON object")
     return report
 
+def run_internal_sample(
+    binary: Path,
+    equivalents: int,
+    accounts: int,
+    threads: int | None,
+    output: Path,
+) -> dict[str, Any]:
+    command = [
+        str(binary),
+        "--pipeline", "internal-accounting",
+        "--transactions", str(equivalents),
+        "--accounts", str(accounts),
+        "--output", str(output),
+    ]
+    if threads is not None:
+        command.extend(("--threads", str(threads)))
+    completed = subprocess.run(command, capture_output=True, text=True, timeout=300)
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        raise ThroughputError(f"internal benchmark process failed: {detail}")
+    try:
+        report = json.loads(output.read_text("utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ThroughputError(f"internal benchmark report unavailable: {error}") from error
+    if not isinstance(report, dict):
+        raise ThroughputError("internal benchmark report is not a JSON object")
+    return report
+
 
 def evaluate_reports(
     validator_reports: list[dict[str, Any]],
@@ -75,15 +104,25 @@ def evaluate_reports(
     for report in validator_reports:
         environment = report.get("environment", {})
         result = report.get("result", {})
-        if environment.get("release_build") is not True or environment.get("authorization") != "ed25519-production":
-            raise ThroughputError("validator sample is not a release build with production authorization")
+        if (
+            environment.get("release_build") is not True
+            or environment.get("authorization") != "sequential-ed25519-production"
+        ):
+            raise ThroughputError(
+                "validator sample is not a release build with sequential production authorization"
+            )
         if result.get("applied") != transactions or result.get("failed") != 0:
             raise ThroughputError("validator sample did not apply the complete workload")
     for report in producer_reports:
         environment = report.get("environment", {})
         result = report.get("result", {})
-        if environment.get("release_build") is not True or environment.get("authorization") != "mempool-preverified-signatures":
-            raise ThroughputError("producer sample did not exercise the preverified signature path")
+        if (
+            environment.get("release_build") is not True
+            or environment.get("authorization") != "parallel-ed25519-production-precheck"
+        ):
+            raise ThroughputError(
+                "producer sample did not exercise the parallel production precheck path"
+            )
         if result.get("applied") != transactions or result.get("failed") != 0:
             raise ThroughputError("producer sample did not apply the complete workload")
 
@@ -209,6 +248,103 @@ def evaluate_durable_reports(
         },
     }
 
+def evaluate_internal_reports(
+    reports: list[dict[str, Any]],
+    equivalents: int,
+    accounts: int,
+    minimum_rate: float,
+    minimum_sample_seconds: float,
+    maximum_sample_spread: float,
+) -> dict[str, Any]:
+    if not reports:
+        raise ThroughputError("internal accounting sample set must be non-empty")
+    commitments = {canonical_json(report.get("state_commitment")) for report in reports}
+    workload_hashes = {
+        report.get("workload", {}).get("workload_blake3") for report in reports
+    }
+    if len(commitments) != 1 or len(workload_hashes) != 1 or None in workload_hashes:
+        raise ThroughputError("internal accounting samples produced different commitments")
+    rates: list[float] = []
+    durations: list[float] = []
+    for report in reports:
+        if (
+            report.get("schema") != "noos/internal-transfer-equivalent-benchmark/v1"
+            or report.get("metric") != "logical_transfer_equivalents_per_second"
+        ):
+            raise ThroughputError("internal accounting report has an unsupported metric contract")
+        claim = report.get("claim", {})
+        if claim.get("network_tps") is not False or claim.get("protocol_transactions") is not False:
+            raise ThroughputError("internal accounting report mislabels the kernel as transaction TPS")
+        environment = report.get("environment", {})
+        if (
+            environment.get("release_build") is not True
+            or environment.get("authorization") != "none-accounting-kernel-only"
+        ):
+            raise ThroughputError("internal accounting sample is not a release kernel measurement")
+        workload = report.get("workload", {})
+        if (
+            workload.get("kind") != "deterministic-netted-transfer-accounting"
+            or workload.get("logical_transfer_equivalents") != equivalents
+            or workload.get("accounts") != accounts
+        ):
+            raise ThroughputError("internal accounting sample used the wrong workload")
+        result = report.get("result", {})
+        if (
+            result.get("processed") != equivalents
+            or result.get("failed") != 0
+            or result.get("conservation_verified") is not True
+            or result.get("all_account_deltas_zero") is not True
+            or result.get("total_account_delta") != "0"
+        ):
+            raise ThroughputError("internal accounting sample failed exact processing invariants")
+        try:
+            duration = float(result["execution_seconds"])
+            rate = float(result["logical_transfer_equivalents_per_second"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ThroughputError("internal accounting sample has malformed measurements") from error
+        if not math.isfinite(duration) or not math.isfinite(rate) or duration <= 0 or rate <= 0:
+            raise ThroughputError("internal accounting sample has non-finite measurements")
+        durations.append(duration)
+        rates.append(rate)
+
+    def spread(values: list[float]) -> float:
+        median = statistics.median(values)
+        return (max(values) - min(values)) / median if median > 0 else float("inf")
+
+    median_rate = statistics.median(rates)
+    sample_spread = spread(rates)
+    checks = {
+        "internal_accounting_median_equivalents_per_second": {
+            "observed": median_rate,
+            "minimum": minimum_rate,
+            "pass": median_rate >= minimum_rate,
+        },
+        "internal_accounting_minimum_sample_seconds": {
+            "observed": min(durations),
+            "minimum": minimum_sample_seconds,
+            "pass": min(durations) >= minimum_sample_seconds,
+        },
+        "internal_accounting_sample_spread": {
+            "observed": sample_spread,
+            "maximum": maximum_sample_spread,
+            "pass": sample_spread <= maximum_sample_spread,
+        },
+        "internal_accounting_deterministic_commitment": {"pass": True},
+        "internal_accounting_non_network_claim": {"pass": True},
+    }
+    return {
+        "checks": checks,
+        "failures": [name for name, value in checks.items() if not value["pass"]],
+        "samples": {
+            "internal_accounting_equivalents_per_second": rates,
+            "internal_accounting_seconds": durations,
+        },
+        "workload": reports[0]["workload"],
+        "state_commitment": reports[0]["state_commitment"],
+        "claim": reports[0]["claim"],
+        "environment": reports[0]["environment"],
+    }
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -225,6 +361,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--minimum-producer-tps", type=float, default=10_000)
     parser.add_argument("--maximum-root-share", type=float, default=0.15)
     parser.add_argument("--maximum-sample-spread", type=float, default=0.30)
+    parser.add_argument("--internal-equivalents", type=int, default=0)
+    parser.add_argument("--internal-accounts", type=int, default=65_536)
+    parser.add_argument("--internal-threads", type=int)
+    parser.add_argument(
+        "--minimum-internal-equivalents-per-second",
+        type=float,
+        default=200_000_000,
+    )
+    parser.add_argument("--minimum-internal-sample-seconds", type=float, default=0.5)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
     if (
@@ -240,6 +385,20 @@ def main(argv: list[str] | None = None) -> int:
         or args.minimum_producer_tps <= 0
         or not 0 < args.maximum_root_share < 1
         or not 0 < args.maximum_sample_spread < 1
+        or args.internal_equivalents < 0
+        or (
+            args.internal_equivalents > 0
+            and (
+                args.internal_accounts < 2
+                or args.internal_accounts > 65_536
+                or args.internal_accounts & (args.internal_accounts - 1) != 0
+                or args.internal_equivalents % args.internal_accounts != 0
+                or args.minimum_internal_equivalents_per_second <= 0
+                or args.minimum_internal_sample_seconds <= 0
+                or args.internal_threads is not None
+                and not 1 <= args.internal_threads <= 256
+            )
+        )
     ):
         print("RESULT check_throughput=FAIL reason=invalid option", file=sys.stderr)
         return 1
@@ -302,6 +461,34 @@ def main(argv: list[str] | None = None) -> int:
             report["checks"].update(durable["checks"])
             report["failures"].extend(durable["failures"])
             report["samples"].update(durable["samples"])
+            if args.internal_equivalents > 0:
+                internal_reports = [
+                    run_internal_sample(
+                        args.binary,
+                        args.internal_equivalents,
+                        args.internal_accounts,
+                        args.internal_threads,
+                        root / f"internal-{index}.json",
+                    )
+                    for index in range(args.samples)
+                ]
+                internal = evaluate_internal_reports(
+                    internal_reports,
+                    args.internal_equivalents,
+                    args.internal_accounts,
+                    args.minimum_internal_equivalents_per_second,
+                    args.minimum_internal_sample_seconds,
+                    args.maximum_sample_spread,
+                )
+                report["checks"].update(internal["checks"])
+                report["failures"].extend(internal["failures"])
+                report["samples"].update(internal["samples"])
+                report["internal_accounting"] = {
+                    "workload": internal["workload"],
+                    "state_commitment": internal["state_commitment"],
+                    "claim": internal["claim"],
+                    "environment": internal["environment"],
+                }
             if report["failures"]:
                 report["verdict"] = "FAIL"
     except (ThroughputError, OSError, subprocess.SubprocessError) as error:

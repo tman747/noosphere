@@ -57,7 +57,7 @@ impl Protocol {
         match self {
             Protocol::Handshake => "/noos/handshake/1",
             Protocol::BraidHeader => "/noos/braid/header/1",
-            Protocol::BraidBody => "/noos/braid/body/1",
+            Protocol::BraidBody => "/noos/braid/body/2",
             Protocol::BraidVote => "/noos/braid/vote/1",
             Protocol::LumenTx => "/noos/lumen/tx/1",
             Protocol::SyncRange => "/noos/sync/range/1",
@@ -107,6 +107,8 @@ impl Protocol {
 pub const MAX_HEADER_BYTES: u32 = 64 * 1024;
 /// Encoded block body bound: fits the 1 MiB frame with envelope overhead.
 pub const MAX_BODY_BYTES: u32 = 1024 * 1024 - 1024;
+/// Maximum assembled compressed DA form; chunks stay below 1 MiB frames.
+pub const MAX_REASSEMBLED_BODY_BYTES: u64 = 128 * 1024 * 1024;
 /// Encoded checkpoint vote bound.
 pub const MAX_VOTE_BYTES: u32 = 8 * 1024;
 /// Encoded transaction bound.
@@ -410,33 +412,43 @@ impl NoosDecode for HeaderReplyV1 {
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// /noos/braid/body/1
+// /noos/braid/body/2
 // ---------------------------------------------------------------------------
 
 define_object! {
-    /// Body request by block hash (also the targeted-repair primitive).
+    /// Chunked body request by block hash (also targeted repair).
     pub struct BodyRequestV1 {
-        version: 1;
+        version: 2;
         1 => chain_id: [u8; 32],
         2 => block_hash: [u8; 32],
+        3 => offset: u64,
+        4 => max_bytes: u32,
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BodyReplyV1 {
-    Body(Bounded<MAX_BODY_BYTES>),
+    Chunk {
+        total_bytes: u64,
+        offset: u64,
+        bytes: Bounded<MAX_BODY_BYTES>,
+    },
     NotFound,
 }
 
 impl NoosEncode for BodyReplyV1 {
     fn encode(&self, w: &mut Writer) {
-        w.put_u16(1);
+        w.put_u16(2);
         match self {
-            BodyReplyV1::Body(b) => {
+            BodyReplyV1::Chunk {
+                total_bytes,
+                offset,
+                bytes,
+            } => {
                 w.put_u16(0);
-                b.encode(w);
+                w.put_u64(*total_bytes);
+                w.put_u64(*offset);
+                bytes.encode(w);
             }
             BodyReplyV1::NotFound => w.put_u16(1),
         }
@@ -445,9 +457,13 @@ impl NoosEncode for BodyReplyV1 {
 
 impl NoosDecode for BodyReplyV1 {
     fn decode(r: &mut Reader<'_>) -> Result<Self, CodecError> {
-        r.expect_version(&[1])?;
+        r.expect_version(&[2])?;
         match r.get_discriminant(2)? {
-            0 => Ok(BodyReplyV1::Body(Bounded::decode(r)?)),
+            0 => Ok(BodyReplyV1::Chunk {
+                total_bytes: r.get_u64()?,
+                offset: r.get_u64()?,
+                bytes: Bounded::decode(r)?,
+            }),
             _ => Ok(BodyReplyV1::NotFound),
         }
     }
@@ -1306,7 +1322,12 @@ mod tests {
             HeaderReplyV1::Ack.encode_canonical(),
             HeaderReplyV1::Header(Bounded(vec![9; 40])).encode_canonical(),
             HeaderReplyV1::NotFound.encode_canonical(),
-            BodyReplyV1::Body(Bounded(vec![1; 10])).encode_canonical(),
+            BodyReplyV1::Chunk {
+                total_bytes: 10,
+                offset: 0,
+                bytes: Bounded(vec![1; 10]),
+            }
+            .encode_canonical(),
             BodyReplyV1::NotFound.encode_canonical(),
             PushReplyV1::Accepted.encode_canonical(),
             PushReplyV1::FeatureDisabled.encode_canonical(),

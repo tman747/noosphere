@@ -1,0 +1,2938 @@
+{
+  "crate": "noos-wallet-sdk",
+  "files": [
+    {
+      "bytes": 26517,
+      "path": "wallet/mobile/android/app/build/intermediates/android_test_lint_model/debug/generateDebugAndroidTestLintModel/debug-artifact-dependencies.xml",
+      "sha256": "68e3254ee98736be59a5581d64a3d9cc083966dcdc843b403cc04ca4b2501a8a"
+    },
+    {
+      "bytes": 54833,
+      "path": "wallet/mobile/android/app/build/intermediates/android_test_lint_model/debug/generateDebugAndroidTestLintModel/debug-artifact-libraries.xml",
+      "sha256": "284a90db0b4f7a3533966f6016b1b09cefd90f0e1ae8c7572e4fecd7af722526"
+    },
+    {
+      "bytes": 1423,
+      "path": "wallet/mobile/android/app/build/intermediates/android_test_lint_model/debug/generateDebugAndroidTestLintModel/debug.xml",
+      "sha256": "25560dcb72ac9d911fc8ff1bf9bc36d0db86e62f736db069d45f89ed897049bc"
+    },
+    {
+      "bytes": 653,
+      "path": "wallet/mobile/android/app/build/intermediates/android_test_lint_model/debug/generateDebugAndroidTestLintModel/module.xml",
+      "sha256": "5275b02c9ded05646da866fac31cd8e38472c6c158fff97eaa47ef96e9930561"
+    },
+    {
+      "bytes": 221,
+      "path": "wallet/mobile/android/app/build/intermediates/android_test_lint_partial_results/debug/lintAnalyzeDebugAndroidTest/out/lint-partial.xml",
+      "sha256": "7b36f6f440a473a77ee39b5d7bcf941d29025074c66a759043ff4570a83f94db"
+    },
+    {
+      "bytes": 2,
+      "path": "wallet/mobile/android/app/build/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json",
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+    },
+    {
+      "bytes": 2,
+      "path": "wallet/mobile/android/app/build/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json",
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+    },
+    {
+      "bytes": 210,
+      "path": "wallet/mobile/android/app/build/intermediates/compatible_screen_manifest/debug/createDebugCompatibleScreenManifests/output-metadata.json",
+      "sha256": "3a19d51afd1545485608c9e6c91bcc60fe5c89a98f34039e52ee07aa81ba5ea3"
+    },
+    {
+      "bytes": 212,
+      "path": "wallet/mobile/android/app/build/intermediates/compatible_screen_manifest/release/createReleaseCompatibleScreenManifests/output-metadata.json",
+      "sha256": "2f51c21c7479f855f62c1f32c84506606247ec5eb0ea01fdcd0975e109f88477"
+    },
+    {
+      "bytes": 175330,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values/values.xml",
+      "sha256": "69d467769fe7891817776d43aa74f3b4c6e2a11c348bd55884e91a9bbd9388c9"
+    },
+    {
+      "bytes": 13090,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-af/values-af.xml",
+      "sha256": "7317cc2e14377d97c8bc323a2aa64c6deb132b748b87f663166752f15c6f3827"
+    },
+    {
+      "bytes": 14553,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-am/values-am.xml",
+      "sha256": "4f9a12d8c480f5d6a0c9c7c9eac27e65d2ed8bd540e4af9e1c00649ca34804ed"
+    },
+    {
+      "bytes": 14775,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ar/values-ar.xml",
+      "sha256": "32cd1dc4732a3ae22dd8c074c005412a0e4ba8c4fba57c156e447e0e07ac37f1"
+    },
+    {
+      "bytes": 16972,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-as/values-as.xml",
+      "sha256": "868aee43023cb842a260824fc5ce8f55ccffd2067c65409815ad68572f71529c"
+    },
+    {
+      "bytes": 13520,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-az/values-az.xml",
+      "sha256": "90ae5b3fafe57ea965e31a121d4cbd50ef10a85b6dd531a905c12798899af834"
+    },
+    {
+      "bytes": 13319,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-b+sr+Latn/values-b+sr+Latn.xml",
+      "sha256": "68b1685d1a30b2084df19fdd4aa955b682ecff4bbbfb553e9e944e3fb35a447d"
+    },
+    {
+      "bytes": 15416,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-be/values-be.xml",
+      "sha256": "104bdce3b51af3fd7b294aa38e44d602d256f0c731eff2976656c425dafeb094"
+    },
+    {
+      "bytes": 15442,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-bg/values-bg.xml",
+      "sha256": "53b815ea9d46a1559f00a3e262b59f7d05d01b74b3398adafc6edc4c5255bdc8"
+    },
+    {
+      "bytes": 17060,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-bn/values-bn.xml",
+      "sha256": "8e7a5efe8e8a9b99f28d13d925ec5df69e7ff907b87a717f56ebdefe1e51e24d"
+    },
+    {
+      "bytes": 13364,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-bs/values-bs.xml",
+      "sha256": "e8fbee93226fd7d44b7bb527ff6261ff45d301311c5b69b6f4e08cf4ef171f19"
+    },
+    {
+      "bytes": 13539,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ca/values-ca.xml",
+      "sha256": "c622aeed1bd12d2ec34a8005a2d57d6e99674bc360eb1b7da5d96890ca41cec6"
+    },
+    {
+      "bytes": 13346,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-cs/values-cs.xml",
+      "sha256": "fdd2fe006d3172d3f85ee8f457f9fdfa2d288b287a0d82ec18d5af82a415f967"
+    },
+    {
+      "bytes": 13084,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-da/values-da.xml",
+      "sha256": "9ed8b6119f7dacf9a5e90a32f63c08184f2f779cfb0382c8bc8a80db0842a9b9"
+    },
+    {
+      "bytes": 13479,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-de/values-de.xml",
+      "sha256": "477cbabfefb29a40e266e0d6fe2923d239d28d37af340f61498af4a4d84076e5"
+    },
+    {
+      "bytes": 15822,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-el/values-el.xml",
+      "sha256": "d7ed82c65dc7afe54ce05c42a00a217aab1be030436244a6edfeaa4934165945"
+    },
+    {
+      "bytes": 12916,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-en-rAU/values-en-rAU.xml",
+      "sha256": "715eb3389560d28ae301ec458f915b81a01bdf7cabcdf4da81f9b2841809fdae"
+    },
+    {
+      "bytes": 12904,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-en-rCA/values-en-rCA.xml",
+      "sha256": "55a43b8cfd1ffff5e86f4781567b589a51a1f90083f53f3f866bb24ee92be6ea"
+    },
+    {
+      "bytes": 12916,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-en-rGB/values-en-rGB.xml",
+      "sha256": "715eb3389560d28ae301ec458f915b81a01bdf7cabcdf4da81f9b2841809fdae"
+    },
+    {
+      "bytes": 12916,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-en-rIN/values-en-rIN.xml",
+      "sha256": "715eb3389560d28ae301ec458f915b81a01bdf7cabcdf4da81f9b2841809fdae"
+    },
+    {
+      "bytes": 51238,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-en-rXC/values-en-rXC.xml",
+      "sha256": "7d20945395ea34506371e6a976e195e35c03ee923dc207b5f1faf7f66dc6b688"
+    },
+    {
+      "bytes": 13570,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-es/values-es.xml",
+      "sha256": "29e71f26845ef149f3fa1e1468161e68ad58d72c7ae61fe5aa0575ada90a6afa"
+    },
+    {
+      "bytes": 13488,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-es-rUS/values-es-rUS.xml",
+      "sha256": "9ba5fb3854cf8949b36814043ad43e4af3199b1b00cd183371b347869fef9bde"
+    },
+    {
+      "bytes": 13232,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-et/values-et.xml",
+      "sha256": "7ac25769dfe3cdd0253f7ab80b80d3a4e7484c33ad713329236ec4fc0fd6cc53"
+    },
+    {
+      "bytes": 13489,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-eu/values-eu.xml",
+      "sha256": "f5fd1a2ab37f493a3911c96af5d6917dcc93ef0c427101864afb4c61ff442119"
+    },
+    {
+      "bytes": 14600,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-fa/values-fa.xml",
+      "sha256": "59bce6d3b266c2fbe63c8ab50439813259bf94c9c2a0144e4ee61d7c2801f045"
+    },
+    {
+      "bytes": 13351,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-fi/values-fi.xml",
+      "sha256": "e59bf37b8313019876ff0650085be7b6128b7c24cd571192feac29796c9a13c7"
+    },
+    {
+      "bytes": 13647,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-fr/values-fr.xml",
+      "sha256": "bb8232f2483f9c7d54c8e4e56eef98bd68f3aa7447142ae2014bd10ddedf7a26"
+    },
+    {
+      "bytes": 13824,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-fr-rCA/values-fr-rCA.xml",
+      "sha256": "ab675308d0437006af22be938213940c589f1334f94759bfdd0ff08d6355ea25"
+    },
+    {
+      "bytes": 13612,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-gl/values-gl.xml",
+      "sha256": "42082dffb6604c10e6cb4945418abe70ae45b92ca140cade80de3d7fdab519ca"
+    },
+    {
+      "bytes": 16421,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-gu/values-gu.xml",
+      "sha256": "93b54e4706d17611cc412cac84f5384afdbae634b931d8d69a80a07def59a851"
+    },
+    {
+      "bytes": 130,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-h720dp-v13/values-h720dp-v13.xml",
+      "sha256": "2098413653006b4122994b881b7f230feaab06ee5b423551c8fa075f7ed7a262"
+    },
+    {
+      "bytes": 340,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-hdpi-v4/values-hdpi-v4.xml",
+      "sha256": "aeb3e3cc14cfe8aab64b2c16c7752c5eb5cdcca6f7ccbbeb58239e79d9ce3278"
+    },
+    {
+      "bytes": 16753,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-hi/values-hi.xml",
+      "sha256": "01b5f48cb7ff80ee1f84b12f30d0156fb146e11db91a42361417d54d849b0a04"
+    },
+    {
+      "bytes": 13307,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-hr/values-hr.xml",
+      "sha256": "a0c7ed24765dd8800dfad404c03c6c884852356f7950fbbdff1b32eb3606d445"
+    },
+    {
+      "bytes": 13695,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-hu/values-hu.xml",
+      "sha256": "35ba3f4011760f531f1e0c9cd390a3ee7beae0ce780c331aa6161edeaba33a5e"
+    },
+    {
+      "bytes": 15017,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-hy/values-hy.xml",
+      "sha256": "d30b0bbec67af48b2c49e4e2d65eaa0b37c209b07bc1c3bc4565124810aa1ea0"
+    },
+    {
+      "bytes": 13208,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-in/values-in.xml",
+      "sha256": "8400eecce0c6e558abf576890e81a45e4d5c0d7fc024eaa2b1f42a8aa5998af6"
+    },
+    {
+      "bytes": 13186,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-is/values-is.xml",
+      "sha256": "0674fd838cb5b3e4f1ef9c5799853e493ada370f7df499f109cb1741cf5eb056"
+    },
+    {
+      "bytes": 13510,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-it/values-it.xml",
+      "sha256": "2c6f48e78eac49a1fc61e596486b5fd23574598c15633c629caf76399625d8d5"
+    },
+    {
+      "bytes": 14243,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-iw/values-iw.xml",
+      "sha256": "37551284ad4723e1115b22ca73f39b5b9aa06ff9f30dc68b5f59391d7709621c"
+    },
+    {
+      "bytes": 13958,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ja/values-ja.xml",
+      "sha256": "3e6162bcc73344fb95a9dee9ebba2d7dcb68f075326baddf2cdd46867196b91c"
+    },
+    {
+      "bytes": 17016,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ka/values-ka.xml",
+      "sha256": "5d4795462adfbaa95a325d2bea115691640f1e0d59620f51489116be58b41184"
+    },
+    {
+      "bytes": 14954,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-kk/values-kk.xml",
+      "sha256": "ffb277eb8d8cabb028071b623a059bb0a0ce171790a51c86c405294725cd13c6"
+    },
+    {
+      "bytes": 17220,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-km/values-km.xml",
+      "sha256": "832168bb4957989f18f40db8599b98c176f34b30d2f249b212c8e900316da61b"
+    },
+    {
+      "bytes": 17656,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-kn/values-kn.xml",
+      "sha256": "8d0453b0208a83f95bdb552e39f080619872c0e73f63e8865844a445a76b69fb"
+    },
+    {
+      "bytes": 13352,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ko/values-ko.xml",
+      "sha256": "16369f4e69c3885ffc512257f21116d42b821363b5021cb0b1dc4548c395fc84"
+    },
+    {
+      "bytes": 15403,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ky/values-ky.xml",
+      "sha256": "93547f72a5c3939110357a288da4272373b3b3289f0bf19464e578ead34b2df4"
+    },
+    {
+      "bytes": 272,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-land/values-land.xml",
+      "sha256": "99fb73fdec57aaa5778382b4cde6feaf4d72a611d5f23bc12a767d8f1f99f1ec"
+    },
+    {
+      "bytes": 760,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-large-v4/values-large-v4.xml",
+      "sha256": "d1136a7b2276c95db98b2064c18b01956460c1b97291568f7a4b80f904bf8149"
+    },
+    {
+      "bytes": 176,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ldltr-v21/values-ldltr-v21.xml",
+      "sha256": "fc3931b74bba07b71cf99cf47e26ba59656a9d0ba1ec1d7188e47f16d6a13415"
+    },
+    {
+      "bytes": 16224,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-lo/values-lo.xml",
+      "sha256": "409569b579dc3927aec82a6d3cefdb8a4196c883e5073beeceeefcec2f1e4991"
+    },
+    {
+      "bytes": 13633,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-lt/values-lt.xml",
+      "sha256": "79a75648736e465ed1d34576d52a6b3f5cb6a140402487aab755f10b277d8de9"
+    },
+    {
+      "bytes": 13807,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-lv/values-lv.xml",
+      "sha256": "094bb5f360188955db8c2f3b010590d0a40fa5029500eb9221b0ab6e101705d0"
+    },
+    {
+      "bytes": 15104,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-mk/values-mk.xml",
+      "sha256": "965dbcb71c9cc18dc82f8173c36c6d12d8d43279b75d23e009ee46d11656813c"
+    },
+    {
+      "bytes": 17902,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ml/values-ml.xml",
+      "sha256": "4980d528b9d820652502c85a5f65371a00dbcada31713bcc8d2e83a0a5d06976"
+    },
+    {
+      "bytes": 14965,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-mn/values-mn.xml",
+      "sha256": "d19f0aa33ab905014276ee4b5ef7a87324a1d85988d78f28a248393ab944e8d3"
+    },
+    {
+      "bytes": 16543,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-mr/values-mr.xml",
+      "sha256": "df2dc63b0b69c30013bd3fdfd495e02d4e1103cf476a541564c6d0bd81884252"
+    },
+    {
+      "bytes": 13226,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ms/values-ms.xml",
+      "sha256": "7687f7a957f74ae8bdfaeb1095e690879429f13ac70978275948e85ca26ae492"
+    },
+    {
+      "bytes": 17789,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-my/values-my.xml",
+      "sha256": "b07cc80d494dc80016f91ea002bf476b09fd3f3e17add069d48fd57a3f227561"
+    },
+    {
+      "bytes": 13042,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-nb/values-nb.xml",
+      "sha256": "d418ecf3e3b7127be1dbcf777a443e9d5fe9ea9ee1afab68a97ff0df39324d1f"
+    },
+    {
+      "bytes": 17584,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ne/values-ne.xml",
+      "sha256": "1aed44e80362cfda51dea4954b1749af3d06aa9827583cbbd70f625e16f63fb5"
+    },
+    {
+      "bytes": 784,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-night-v8/values-night-v8.xml",
+      "sha256": "4a95c4d0c3f1f26025471c0d2ff2c14c9a3d5dec1ce9f2efd580363085f44080"
+    },
+    {
+      "bytes": 13262,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-nl/values-nl.xml",
+      "sha256": "fea50594bd07db4c0a44cd8e1c2fadcf323e4b7b3aa477a2b61bd238ee26c975"
+    },
+    {
+      "bytes": 17236,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-or/values-or.xml",
+      "sha256": "3506ac4ebe414a77fc1a7bcc1256129bb4cc4239df1d8fe56dabcb269ae61836"
+    },
+    {
+      "bytes": 16193,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-pa/values-pa.xml",
+      "sha256": "4f0983f3d8a0ed424b8417f7be4d13d4ac88b30fa7b8c8f18a6778b64ee85999"
+    },
+    {
+      "bytes": 13374,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-pl/values-pl.xml",
+      "sha256": "0ae55f955e182f49b94582d57f8d6e37f2f1eda142ce974271727c05b39621a0"
+    },
+    {
+      "bytes": 119,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-port/values-port.xml",
+      "sha256": "363da4851cb03c92728e0c29fd5dc417af0ad79d573353173be7999f4fd8c8d6"
+    },
+    {
+      "bytes": 13334,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-pt/values-pt.xml",
+      "sha256": "aaf78f1d68c09395582383bc0136601d0834702d45b813bd2f801447899e18be"
+    },
+    {
+      "bytes": 13334,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-pt-rBR/values-pt-rBR.xml",
+      "sha256": "aaf78f1d68c09395582383bc0136601d0834702d45b813bd2f801447899e18be"
+    },
+    {
+      "bytes": 13552,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-pt-rPT/values-pt-rPT.xml",
+      "sha256": "271715096da788a562dc26faecb72bf507222660c363e1497ad487c1f9ab6e6e"
+    },
+    {
+      "bytes": 13517,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ro/values-ro.xml",
+      "sha256": "cdbafbc3c8b3c3c205f5d278258a434cd4cd57ce3d273f452cb0a8dec49fef39"
+    },
+    {
+      "bytes": 15104,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ru/values-ru.xml",
+      "sha256": "a26e75ac28db2e511269038b07245db942bd0daa80fc2562249b57dd670b923a"
+    },
+    {
+      "bytes": 16337,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-si/values-si.xml",
+      "sha256": "c0f47354cc34ec7e039ef90bbadd47131efd2327397d18f95bd22b6f671e29b4"
+    },
+    {
+      "bytes": 13347,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-sk/values-sk.xml",
+      "sha256": "33a53e04c34a7458bffa127b2be6e7e78659eb203bf6a7be99d3e3f94f1100ef"
+    },
+    {
+      "bytes": 13314,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-sl/values-sl.xml",
+      "sha256": "98bf1c2a5e3aa3b4f048666357a572761a89f1463bcf0812bd1d2ee07bbdb8e4"
+    },
+    {
+      "bytes": 13505,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-sq/values-sq.xml",
+      "sha256": "8399207a502cd2ac86872af49800cfcda09b4fd68b3038c100a980a67fcad968"
+    },
+    {
+      "bytes": 15010,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-sr/values-sr.xml",
+      "sha256": "f055ff04df6bacdb7e460919f3ce23f0a89eeb77b722477f2e8da755b4583d5d"
+    },
+    {
+      "bytes": 13306,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-sv/values-sv.xml",
+      "sha256": "eb6c839e28d6f534268fcd75cdc16c460750bd1a6666efbc615703573ecf21ad"
+    },
+    {
+      "bytes": 13234,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-sw/values-sw.xml",
+      "sha256": "5e07da2d7aca343b3908f5627057f0554873e3faf775ba5337f64300548b5d9a"
+    },
+    {
+      "bytes": 619,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-sw600dp-v13/values-sw600dp-v13.xml",
+      "sha256": "9c5a313d915de1f10233103a0645777147e5bda9a2a81d96273f40408790d5cc"
+    },
+    {
+      "bytes": 18182,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ta/values-ta.xml",
+      "sha256": "6c607da32afbd296e92be0a65707ee397333edfaaa2a9d5c21004a16b7cc183e"
+    },
+    {
+      "bytes": 17701,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-te/values-te.xml",
+      "sha256": "8772433eebb83d1e37ed5ddf9e6f2de9ed372e2aeeb75762577f941a457133cc"
+    },
+    {
+      "bytes": 16059,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-th/values-th.xml",
+      "sha256": "4b65ae6711af9ae21948412066ada20d61183c4a19491ff0e57b7f5d3b73a7c4"
+    },
+    {
+      "bytes": 13528,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-tl/values-tl.xml",
+      "sha256": "50c1cb941127ee5f0313a647fc3ed017a6eb2cdea75077f870ec9456ea212acb"
+    },
+    {
+      "bytes": 13233,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-tr/values-tr.xml",
+      "sha256": "e0d48cafb984ba3b9cd3cb64c05bcadaba2518aea0e6ddb21db449ddb52f7fdd"
+    },
+    {
+      "bytes": 15078,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-uk/values-uk.xml",
+      "sha256": "7db1ad1923f765f54811136f2ed1d7a0b444abb38e84a8f000a6be9abe35b8ac"
+    },
+    {
+      "bytes": 14943,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-ur/values-ur.xml",
+      "sha256": "4b19c9bf4e9289f018fceabe47648c5327b47e4b452aa357c9a5a31e2d2bbdb8"
+    },
+    {
+      "bytes": 13263,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-uz/values-uz.xml",
+      "sha256": "aed1fb874b1dbd035e046cd8eb12c4d6e145dcd60aa7629b78913295f31cff63"
+    },
+    {
+      "bytes": 236,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-v16/values-v16.xml",
+      "sha256": "037f04b118e652961e8fd9d02ae2b0fd99fc288d3480158e560e2a629d98835a"
+    },
+    {
+      "bytes": 3553,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-v17/values-v17.xml",
+      "sha256": "cb64d32badb9ca8e75516890df3f4c551b4fe8e8c95eda029a11985ed9d306f8"
+    },
+    {
+      "bytes": 112,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-v18/values-v18.xml",
+      "sha256": "14211cb9c56f886ea3425aaacdcae8da116bc30c3004ca97e4b55e872c19ccfd"
+    },
+    {
+      "bytes": 19683,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-v21/values-v21.xml",
+      "sha256": "84107576432e7a4ebe3b4b736eea17fb21828204f78e8d1ed08a2ba69ff7adb3"
+    },
+    {
+      "bytes": 777,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-v22/values-v22.xml",
+      "sha256": "762c8de596a9f70939a3b381c6391c65b58dca95e225e40bef43f2ee518c2aec"
+    },
+    {
+      "bytes": 3369,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-v23/values-v23.xml",
+      "sha256": "03502c2deffadcbb734dc2a34e5d1cfbdab57b68954efdb4bfcd8899b55e936d"
+    },
+    {
+      "bytes": 355,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-v24/values-v24.xml",
+      "sha256": "5a7385456339004068cb489069ff7ce713c0bd0021f1e09e6ffe5a3a2bf0a7d9"
+    },
+    {
+      "bytes": 427,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-v25/values-v25.xml",
+      "sha256": "c916b7f852bd7ff7ede47eb2ce3ffa2d2337ce42fb343cf05f0f547f5c7c324c"
+    },
+    {
+      "bytes": 897,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-v26/values-v26.xml",
+      "sha256": "2426553c6ef0acf78efcc94591ed878b82529c819f358bdebf099fc171159a2c"
+    },
+    {
+      "bytes": 597,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-v28/values-v28.xml",
+      "sha256": "80491a68f63906acb7e45fa58cef72aad3c17e94d30445e883a22c6b308b4679"
+    },
+    {
+      "bytes": 136,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-v30/values-v30.xml",
+      "sha256": "4258eaddaefd31db394fa4a52e369de54aed80b4734d6cc7d000b8914b93d186"
+    },
+    {
+      "bytes": 13759,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-vi/values-vi.xml",
+      "sha256": "cf143295066e4079181c27a90ce27a58383cc0911b8f94d62ba41e2b534232ca"
+    },
+    {
+      "bytes": 566,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-watch-v20/values-watch-v20.xml",
+      "sha256": "9ead46493c852e3e2d73f9223c9f9138df75053524ba3f34f4313b7cd22101dd"
+    },
+    {
+      "bytes": 737,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-watch-v21/values-watch-v21.xml",
+      "sha256": "e64deafab9fde5b450c9e169865c5469f312596e4f293f84698935f2b99ad826"
+    },
+    {
+      "bytes": 481,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-xlarge-v4/values-xlarge-v4.xml",
+      "sha256": "2a6e6021e3d12bc2b4454138a1c840c17031422e809a99e24e30613cc3d019c6"
+    },
+    {
+      "bytes": 12927,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-zh-rCN/values-zh-rCN.xml",
+      "sha256": "72baadf6e5e2c70ee252c72be33893cec2715af99b36d975acf6a3b535184ac1"
+    },
+    {
+      "bytes": 12853,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-zh-rHK/values-zh-rHK.xml",
+      "sha256": "bc99953de07e14e9c2f08adb95a9fd6a2410148ebf8facec95653ac8961e34fa"
+    },
+    {
+      "bytes": 12956,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-zh-rTW/values-zh-rTW.xml",
+      "sha256": "a0d3c9cb159f75ed514f4322ebfc006a083d7189575c0c3de48347d74b838cec"
+    },
+    {
+      "bytes": 13372,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values-zu/values-zu.xml",
+      "sha256": "0be5b4d8fe5971290926a4aab9eb7fb0a30430a29ef2ee72cd4bbb81e818c9a3"
+    },
+    {
+      "bytes": 1597927,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/mergeDebugResources/merger.xml",
+      "sha256": "831d9140b54ff527cf83d8873f111cc5a42186dd85696b3746d530019431238a"
+    },
+    {
+      "bytes": 2985,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/debug/packageDebugResources/merger.xml",
+      "sha256": "04f80d7da8ecfaf4569069cfc9b1df44feb54296477083dda6ce15826c16c3f2"
+    },
+    {
+      "bytes": 29040,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeDebug/debug-artifact-dependencies.xml",
+      "sha256": "6e6ffd9e567f30986ee9f0db022abe3791b76fc9ae88a57339afa2562337dd16"
+    },
+    {
+      "bytes": 55568,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeDebug/debug-artifact-libraries.xml",
+      "sha256": "7a978b376c80f0294357c02f5c30e2982081b9a56b7eac01133b7e7682b2c1c9"
+    },
+    {
+      "bytes": 1779,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeDebug/debug.xml",
+      "sha256": "ca21a06fa8ac5305e37c5f18704617bd2768a6000ef3f1ef17cfd8ae602e7db4"
+    },
+    {
+      "bytes": 653,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeDebug/module.xml",
+      "sha256": "5275b02c9ded05646da866fac31cd8e38472c6c158fff97eaa47ef96e9930561"
+    },
+    {
+      "bytes": 26517,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeDebugAndroidTest/debug-artifact-dependencies.xml",
+      "sha256": "68e3254ee98736be59a5581d64a3d9cc083966dcdc843b403cc04ca4b2501a8a"
+    },
+    {
+      "bytes": 54833,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeDebugAndroidTest/debug-artifact-libraries.xml",
+      "sha256": "284a90db0b4f7a3533966f6016b1b09cefd90f0e1ae8c7572e4fecd7af722526"
+    },
+    {
+      "bytes": 1505,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeDebugAndroidTest/debug.xml",
+      "sha256": "f73fcb7383c98fbdfe0a1ba36214092dae57d2d0ac8578e3c19b9a6304708181"
+    },
+    {
+      "bytes": 653,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeDebugAndroidTest/module.xml",
+      "sha256": "5275b02c9ded05646da866fac31cd8e38472c6c158fff97eaa47ef96e9930561"
+    },
+    {
+      "bytes": 29142,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeDebugUnitTest/debug-artifact-dependencies.xml",
+      "sha256": "7833f8db2a53c4e07e0e21b86b7cd6acdbcc2c8c3350c80a1fb8954917119690"
+    },
+    {
+      "bytes": 55359,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeDebugUnitTest/debug-artifact-libraries.xml",
+      "sha256": "579ff5f40bd890048de0045963b4fc89b63909a88784e0fc85b01a22e507d7a9"
+    },
+    {
+      "bytes": 1057,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeDebugUnitTest/debug.xml",
+      "sha256": "70a7cd41f7699049ee69119e60d1fb95cc98c14ae1266abfdd6521763f0bea1b"
+    },
+    {
+      "bytes": 653,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeDebugUnitTest/module.xml",
+      "sha256": "5275b02c9ded05646da866fac31cd8e38472c6c158fff97eaa47ef96e9930561"
+    },
+    {
+      "bytes": 655,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeRelease/module.xml",
+      "sha256": "bb42c0cbba4d17bc3762c7e810c56d0557736c33cf74a24574330c53f35becfd"
+    },
+    {
+      "bytes": 27668,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeRelease/release-artifact-dependencies.xml",
+      "sha256": "7fc3084cbb858be9f24adaab836cafb36423c74b734af37cefee3b38a75f162a"
+    },
+    {
+      "bytes": 52824,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeRelease/release-artifact-libraries.xml",
+      "sha256": "d6a1a090d64adc43e1c07b16af4c8690f0642e19c058fb86c571a9173e6a8f8e"
+    },
+    {
+      "bytes": 1818,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeRelease/release.xml",
+      "sha256": "d1eb9384cd7e8f48de2c76fb4d8c55cfead8f6da5b209348b4e697e66c10aef5"
+    },
+    {
+      "bytes": 655,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeReleaseUnitTest/module.xml",
+      "sha256": "bb42c0cbba4d17bc3762c7e810c56d0557736c33cf74a24574330c53f35becfd"
+    },
+    {
+      "bytes": 27774,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeReleaseUnitTest/release-artifact-dependencies.xml",
+      "sha256": "3c79f86549313b155dab9069f7326e003544498ef0aaf055a599d086966b4811"
+    },
+    {
+      "bytes": 52609,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeReleaseUnitTest/release-artifact-libraries.xml",
+      "sha256": "2d1f2808e0f4c67944a149d04ee6e628c8748fd8b5a803c9ab484bf742d6cd7c"
+    },
+    {
+      "bytes": 1050,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintAnalyzeReleaseUnitTest/release.xml",
+      "sha256": "a3b545756b48939212b0522ce7b2d817f5ee6e4665ef06eccdb851c607502ddc"
+    },
+    {
+      "bytes": 655,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintVitalAnalyzeRelease/module.xml",
+      "sha256": "bb42c0cbba4d17bc3762c7e810c56d0557736c33cf74a24574330c53f35becfd"
+    },
+    {
+      "bytes": 27668,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml",
+      "sha256": "7fc3084cbb858be9f24adaab836cafb36423c74b734af37cefee3b38a75f162a"
+    },
+    {
+      "bytes": 52846,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml",
+      "sha256": "76fe9e672c4ff4299e0af1944d6e13c61d3f22367ba25c787f00e66786f4f4f0"
+    },
+    {
+      "bytes": 1829,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/lintVitalAnalyzeRelease/release.xml",
+      "sha256": "3ef935cf4deb876fc2225744f8da528b613f7f527df42bb396e53d5830ff8f0c"
+    },
+    {
+      "bytes": 1188,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/mergeDebugAssets/merger.xml",
+      "sha256": "d17a6d9d6de6b8cdefea15da8749104674131cd19cd22839388ccd9159d7132d"
+    },
+    {
+      "bytes": 466,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/mergeDebugJniLibFolders/merger.xml",
+      "sha256": "245b59613d37ab7f321a0ab08c783ef68090907ed81fc6866799d70a82785e15"
+    },
+    {
+      "bytes": 466,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/mergeDebugShaders/merger.xml",
+      "sha256": "063d9a5f6794d2b3d1ec86311097a3bf3a2043f8730bf51491178c04645e3732"
+    },
+    {
+      "bytes": 1204,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/mergeReleaseAssets/merger.xml",
+      "sha256": "c5977d3ec30c9e5e0a0c1dae9e90fb0f788fdaeadadbd012b68ca0f02593d889"
+    },
+    {
+      "bytes": 470,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml",
+      "sha256": "cc625e095550b4db37aadaff116e12dd7e8fae8652f0a0dd6016bcbf0ec2b099"
+    },
+    {
+      "bytes": 470,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/mergeReleaseShaders/merger.xml",
+      "sha256": "4c08cccc55cf47c2d240872ecf6da355073e5e1381f14a0e6c9b1a2d5a1ab699"
+    },
+    {
+      "bytes": 175330,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values/values.xml",
+      "sha256": "69d467769fe7891817776d43aa74f3b4c6e2a11c348bd55884e91a9bbd9388c9"
+    },
+    {
+      "bytes": 13090,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-af/values-af.xml",
+      "sha256": "7317cc2e14377d97c8bc323a2aa64c6deb132b748b87f663166752f15c6f3827"
+    },
+    {
+      "bytes": 14553,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-am/values-am.xml",
+      "sha256": "4f9a12d8c480f5d6a0c9c7c9eac27e65d2ed8bd540e4af9e1c00649ca34804ed"
+    },
+    {
+      "bytes": 14775,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ar/values-ar.xml",
+      "sha256": "32cd1dc4732a3ae22dd8c074c005412a0e4ba8c4fba57c156e447e0e07ac37f1"
+    },
+    {
+      "bytes": 16972,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-as/values-as.xml",
+      "sha256": "868aee43023cb842a260824fc5ce8f55ccffd2067c65409815ad68572f71529c"
+    },
+    {
+      "bytes": 13520,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-az/values-az.xml",
+      "sha256": "90ae5b3fafe57ea965e31a121d4cbd50ef10a85b6dd531a905c12798899af834"
+    },
+    {
+      "bytes": 13319,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-b+sr+Latn/values-b+sr+Latn.xml",
+      "sha256": "68b1685d1a30b2084df19fdd4aa955b682ecff4bbbfb553e9e944e3fb35a447d"
+    },
+    {
+      "bytes": 15416,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-be/values-be.xml",
+      "sha256": "104bdce3b51af3fd7b294aa38e44d602d256f0c731eff2976656c425dafeb094"
+    },
+    {
+      "bytes": 15442,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-bg/values-bg.xml",
+      "sha256": "53b815ea9d46a1559f00a3e262b59f7d05d01b74b3398adafc6edc4c5255bdc8"
+    },
+    {
+      "bytes": 17060,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-bn/values-bn.xml",
+      "sha256": "8e7a5efe8e8a9b99f28d13d925ec5df69e7ff907b87a717f56ebdefe1e51e24d"
+    },
+    {
+      "bytes": 13364,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-bs/values-bs.xml",
+      "sha256": "e8fbee93226fd7d44b7bb527ff6261ff45d301311c5b69b6f4e08cf4ef171f19"
+    },
+    {
+      "bytes": 13539,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ca/values-ca.xml",
+      "sha256": "c622aeed1bd12d2ec34a8005a2d57d6e99674bc360eb1b7da5d96890ca41cec6"
+    },
+    {
+      "bytes": 13346,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-cs/values-cs.xml",
+      "sha256": "fdd2fe006d3172d3f85ee8f457f9fdfa2d288b287a0d82ec18d5af82a415f967"
+    },
+    {
+      "bytes": 13084,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-da/values-da.xml",
+      "sha256": "9ed8b6119f7dacf9a5e90a32f63c08184f2f779cfb0382c8bc8a80db0842a9b9"
+    },
+    {
+      "bytes": 13479,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-de/values-de.xml",
+      "sha256": "477cbabfefb29a40e266e0d6fe2923d239d28d37af340f61498af4a4d84076e5"
+    },
+    {
+      "bytes": 15822,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-el/values-el.xml",
+      "sha256": "d7ed82c65dc7afe54ce05c42a00a217aab1be030436244a6edfeaa4934165945"
+    },
+    {
+      "bytes": 12916,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-en-rAU/values-en-rAU.xml",
+      "sha256": "715eb3389560d28ae301ec458f915b81a01bdf7cabcdf4da81f9b2841809fdae"
+    },
+    {
+      "bytes": 12904,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-en-rCA/values-en-rCA.xml",
+      "sha256": "55a43b8cfd1ffff5e86f4781567b589a51a1f90083f53f3f866bb24ee92be6ea"
+    },
+    {
+      "bytes": 12916,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-en-rGB/values-en-rGB.xml",
+      "sha256": "715eb3389560d28ae301ec458f915b81a01bdf7cabcdf4da81f9b2841809fdae"
+    },
+    {
+      "bytes": 12916,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-en-rIN/values-en-rIN.xml",
+      "sha256": "715eb3389560d28ae301ec458f915b81a01bdf7cabcdf4da81f9b2841809fdae"
+    },
+    {
+      "bytes": 51238,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-en-rXC/values-en-rXC.xml",
+      "sha256": "7d20945395ea34506371e6a976e195e35c03ee923dc207b5f1faf7f66dc6b688"
+    },
+    {
+      "bytes": 13570,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-es/values-es.xml",
+      "sha256": "29e71f26845ef149f3fa1e1468161e68ad58d72c7ae61fe5aa0575ada90a6afa"
+    },
+    {
+      "bytes": 13488,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-es-rUS/values-es-rUS.xml",
+      "sha256": "9ba5fb3854cf8949b36814043ad43e4af3199b1b00cd183371b347869fef9bde"
+    },
+    {
+      "bytes": 13232,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-et/values-et.xml",
+      "sha256": "7ac25769dfe3cdd0253f7ab80b80d3a4e7484c33ad713329236ec4fc0fd6cc53"
+    },
+    {
+      "bytes": 13489,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-eu/values-eu.xml",
+      "sha256": "f5fd1a2ab37f493a3911c96af5d6917dcc93ef0c427101864afb4c61ff442119"
+    },
+    {
+      "bytes": 14600,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-fa/values-fa.xml",
+      "sha256": "59bce6d3b266c2fbe63c8ab50439813259bf94c9c2a0144e4ee61d7c2801f045"
+    },
+    {
+      "bytes": 13351,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-fi/values-fi.xml",
+      "sha256": "e59bf37b8313019876ff0650085be7b6128b7c24cd571192feac29796c9a13c7"
+    },
+    {
+      "bytes": 13647,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-fr/values-fr.xml",
+      "sha256": "bb8232f2483f9c7d54c8e4e56eef98bd68f3aa7447142ae2014bd10ddedf7a26"
+    },
+    {
+      "bytes": 13824,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-fr-rCA/values-fr-rCA.xml",
+      "sha256": "ab675308d0437006af22be938213940c589f1334f94759bfdd0ff08d6355ea25"
+    },
+    {
+      "bytes": 13612,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-gl/values-gl.xml",
+      "sha256": "42082dffb6604c10e6cb4945418abe70ae45b92ca140cade80de3d7fdab519ca"
+    },
+    {
+      "bytes": 16421,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-gu/values-gu.xml",
+      "sha256": "93b54e4706d17611cc412cac84f5384afdbae634b931d8d69a80a07def59a851"
+    },
+    {
+      "bytes": 130,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-h720dp-v13/values-h720dp-v13.xml",
+      "sha256": "2098413653006b4122994b881b7f230feaab06ee5b423551c8fa075f7ed7a262"
+    },
+    {
+      "bytes": 340,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-hdpi-v4/values-hdpi-v4.xml",
+      "sha256": "aeb3e3cc14cfe8aab64b2c16c7752c5eb5cdcca6f7ccbbeb58239e79d9ce3278"
+    },
+    {
+      "bytes": 16753,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-hi/values-hi.xml",
+      "sha256": "01b5f48cb7ff80ee1f84b12f30d0156fb146e11db91a42361417d54d849b0a04"
+    },
+    {
+      "bytes": 13307,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-hr/values-hr.xml",
+      "sha256": "a0c7ed24765dd8800dfad404c03c6c884852356f7950fbbdff1b32eb3606d445"
+    },
+    {
+      "bytes": 13695,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-hu/values-hu.xml",
+      "sha256": "35ba3f4011760f531f1e0c9cd390a3ee7beae0ce780c331aa6161edeaba33a5e"
+    },
+    {
+      "bytes": 15017,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-hy/values-hy.xml",
+      "sha256": "d30b0bbec67af48b2c49e4e2d65eaa0b37c209b07bc1c3bc4565124810aa1ea0"
+    },
+    {
+      "bytes": 13208,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-in/values-in.xml",
+      "sha256": "8400eecce0c6e558abf576890e81a45e4d5c0d7fc024eaa2b1f42a8aa5998af6"
+    },
+    {
+      "bytes": 13186,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-is/values-is.xml",
+      "sha256": "0674fd838cb5b3e4f1ef9c5799853e493ada370f7df499f109cb1741cf5eb056"
+    },
+    {
+      "bytes": 13510,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-it/values-it.xml",
+      "sha256": "2c6f48e78eac49a1fc61e596486b5fd23574598c15633c629caf76399625d8d5"
+    },
+    {
+      "bytes": 14243,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-iw/values-iw.xml",
+      "sha256": "37551284ad4723e1115b22ca73f39b5b9aa06ff9f30dc68b5f59391d7709621c"
+    },
+    {
+      "bytes": 13958,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ja/values-ja.xml",
+      "sha256": "3e6162bcc73344fb95a9dee9ebba2d7dcb68f075326baddf2cdd46867196b91c"
+    },
+    {
+      "bytes": 17016,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ka/values-ka.xml",
+      "sha256": "5d4795462adfbaa95a325d2bea115691640f1e0d59620f51489116be58b41184"
+    },
+    {
+      "bytes": 14954,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-kk/values-kk.xml",
+      "sha256": "ffb277eb8d8cabb028071b623a059bb0a0ce171790a51c86c405294725cd13c6"
+    },
+    {
+      "bytes": 17220,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-km/values-km.xml",
+      "sha256": "832168bb4957989f18f40db8599b98c176f34b30d2f249b212c8e900316da61b"
+    },
+    {
+      "bytes": 17656,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-kn/values-kn.xml",
+      "sha256": "8d0453b0208a83f95bdb552e39f080619872c0e73f63e8865844a445a76b69fb"
+    },
+    {
+      "bytes": 13352,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ko/values-ko.xml",
+      "sha256": "16369f4e69c3885ffc512257f21116d42b821363b5021cb0b1dc4548c395fc84"
+    },
+    {
+      "bytes": 15403,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ky/values-ky.xml",
+      "sha256": "93547f72a5c3939110357a288da4272373b3b3289f0bf19464e578ead34b2df4"
+    },
+    {
+      "bytes": 272,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-land/values-land.xml",
+      "sha256": "99fb73fdec57aaa5778382b4cde6feaf4d72a611d5f23bc12a767d8f1f99f1ec"
+    },
+    {
+      "bytes": 760,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-large-v4/values-large-v4.xml",
+      "sha256": "d1136a7b2276c95db98b2064c18b01956460c1b97291568f7a4b80f904bf8149"
+    },
+    {
+      "bytes": 176,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ldltr-v21/values-ldltr-v21.xml",
+      "sha256": "fc3931b74bba07b71cf99cf47e26ba59656a9d0ba1ec1d7188e47f16d6a13415"
+    },
+    {
+      "bytes": 16224,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-lo/values-lo.xml",
+      "sha256": "409569b579dc3927aec82a6d3cefdb8a4196c883e5073beeceeefcec2f1e4991"
+    },
+    {
+      "bytes": 13633,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-lt/values-lt.xml",
+      "sha256": "79a75648736e465ed1d34576d52a6b3f5cb6a140402487aab755f10b277d8de9"
+    },
+    {
+      "bytes": 13807,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-lv/values-lv.xml",
+      "sha256": "094bb5f360188955db8c2f3b010590d0a40fa5029500eb9221b0ab6e101705d0"
+    },
+    {
+      "bytes": 15104,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-mk/values-mk.xml",
+      "sha256": "965dbcb71c9cc18dc82f8173c36c6d12d8d43279b75d23e009ee46d11656813c"
+    },
+    {
+      "bytes": 17902,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ml/values-ml.xml",
+      "sha256": "4980d528b9d820652502c85a5f65371a00dbcada31713bcc8d2e83a0a5d06976"
+    },
+    {
+      "bytes": 14965,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-mn/values-mn.xml",
+      "sha256": "d19f0aa33ab905014276ee4b5ef7a87324a1d85988d78f28a248393ab944e8d3"
+    },
+    {
+      "bytes": 16543,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-mr/values-mr.xml",
+      "sha256": "df2dc63b0b69c30013bd3fdfd495e02d4e1103cf476a541564c6d0bd81884252"
+    },
+    {
+      "bytes": 13226,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ms/values-ms.xml",
+      "sha256": "7687f7a957f74ae8bdfaeb1095e690879429f13ac70978275948e85ca26ae492"
+    },
+    {
+      "bytes": 17789,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-my/values-my.xml",
+      "sha256": "b07cc80d494dc80016f91ea002bf476b09fd3f3e17add069d48fd57a3f227561"
+    },
+    {
+      "bytes": 13042,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-nb/values-nb.xml",
+      "sha256": "d418ecf3e3b7127be1dbcf777a443e9d5fe9ea9ee1afab68a97ff0df39324d1f"
+    },
+    {
+      "bytes": 17584,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ne/values-ne.xml",
+      "sha256": "1aed44e80362cfda51dea4954b1749af3d06aa9827583cbbd70f625e16f63fb5"
+    },
+    {
+      "bytes": 784,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-night-v8/values-night-v8.xml",
+      "sha256": "4a95c4d0c3f1f26025471c0d2ff2c14c9a3d5dec1ce9f2efd580363085f44080"
+    },
+    {
+      "bytes": 13262,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-nl/values-nl.xml",
+      "sha256": "fea50594bd07db4c0a44cd8e1c2fadcf323e4b7b3aa477a2b61bd238ee26c975"
+    },
+    {
+      "bytes": 17236,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-or/values-or.xml",
+      "sha256": "3506ac4ebe414a77fc1a7bcc1256129bb4cc4239df1d8fe56dabcb269ae61836"
+    },
+    {
+      "bytes": 16193,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-pa/values-pa.xml",
+      "sha256": "4f0983f3d8a0ed424b8417f7be4d13d4ac88b30fa7b8c8f18a6778b64ee85999"
+    },
+    {
+      "bytes": 13374,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-pl/values-pl.xml",
+      "sha256": "0ae55f955e182f49b94582d57f8d6e37f2f1eda142ce974271727c05b39621a0"
+    },
+    {
+      "bytes": 119,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-port/values-port.xml",
+      "sha256": "363da4851cb03c92728e0c29fd5dc417af0ad79d573353173be7999f4fd8c8d6"
+    },
+    {
+      "bytes": 13334,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-pt/values-pt.xml",
+      "sha256": "aaf78f1d68c09395582383bc0136601d0834702d45b813bd2f801447899e18be"
+    },
+    {
+      "bytes": 13334,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-pt-rBR/values-pt-rBR.xml",
+      "sha256": "aaf78f1d68c09395582383bc0136601d0834702d45b813bd2f801447899e18be"
+    },
+    {
+      "bytes": 13552,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-pt-rPT/values-pt-rPT.xml",
+      "sha256": "271715096da788a562dc26faecb72bf507222660c363e1497ad487c1f9ab6e6e"
+    },
+    {
+      "bytes": 13517,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ro/values-ro.xml",
+      "sha256": "cdbafbc3c8b3c3c205f5d278258a434cd4cd57ce3d273f452cb0a8dec49fef39"
+    },
+    {
+      "bytes": 15104,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ru/values-ru.xml",
+      "sha256": "a26e75ac28db2e511269038b07245db942bd0daa80fc2562249b57dd670b923a"
+    },
+    {
+      "bytes": 16337,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-si/values-si.xml",
+      "sha256": "c0f47354cc34ec7e039ef90bbadd47131efd2327397d18f95bd22b6f671e29b4"
+    },
+    {
+      "bytes": 13347,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sk/values-sk.xml",
+      "sha256": "33a53e04c34a7458bffa127b2be6e7e78659eb203bf6a7be99d3e3f94f1100ef"
+    },
+    {
+      "bytes": 13314,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sl/values-sl.xml",
+      "sha256": "98bf1c2a5e3aa3b4f048666357a572761a89f1463bcf0812bd1d2ee07bbdb8e4"
+    },
+    {
+      "bytes": 13505,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sq/values-sq.xml",
+      "sha256": "8399207a502cd2ac86872af49800cfcda09b4fd68b3038c100a980a67fcad968"
+    },
+    {
+      "bytes": 15010,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sr/values-sr.xml",
+      "sha256": "f055ff04df6bacdb7e460919f3ce23f0a89eeb77b722477f2e8da755b4583d5d"
+    },
+    {
+      "bytes": 13306,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sv/values-sv.xml",
+      "sha256": "eb6c839e28d6f534268fcd75cdc16c460750bd1a6666efbc615703573ecf21ad"
+    },
+    {
+      "bytes": 13234,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sw/values-sw.xml",
+      "sha256": "5e07da2d7aca343b3908f5627057f0554873e3faf775ba5337f64300548b5d9a"
+    },
+    {
+      "bytes": 619,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sw600dp-v13/values-sw600dp-v13.xml",
+      "sha256": "9c5a313d915de1f10233103a0645777147e5bda9a2a81d96273f40408790d5cc"
+    },
+    {
+      "bytes": 18182,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ta/values-ta.xml",
+      "sha256": "6c607da32afbd296e92be0a65707ee397333edfaaa2a9d5c21004a16b7cc183e"
+    },
+    {
+      "bytes": 17701,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-te/values-te.xml",
+      "sha256": "8772433eebb83d1e37ed5ddf9e6f2de9ed372e2aeeb75762577f941a457133cc"
+    },
+    {
+      "bytes": 16059,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-th/values-th.xml",
+      "sha256": "4b65ae6711af9ae21948412066ada20d61183c4a19491ff0e57b7f5d3b73a7c4"
+    },
+    {
+      "bytes": 13528,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-tl/values-tl.xml",
+      "sha256": "50c1cb941127ee5f0313a647fc3ed017a6eb2cdea75077f870ec9456ea212acb"
+    },
+    {
+      "bytes": 13233,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-tr/values-tr.xml",
+      "sha256": "e0d48cafb984ba3b9cd3cb64c05bcadaba2518aea0e6ddb21db449ddb52f7fdd"
+    },
+    {
+      "bytes": 15078,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-uk/values-uk.xml",
+      "sha256": "7db1ad1923f765f54811136f2ed1d7a0b444abb38e84a8f000a6be9abe35b8ac"
+    },
+    {
+      "bytes": 14943,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ur/values-ur.xml",
+      "sha256": "4b19c9bf4e9289f018fceabe47648c5327b47e4b452aa357c9a5a31e2d2bbdb8"
+    },
+    {
+      "bytes": 13263,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-uz/values-uz.xml",
+      "sha256": "aed1fb874b1dbd035e046cd8eb12c4d6e145dcd60aa7629b78913295f31cff63"
+    },
+    {
+      "bytes": 236,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v16/values-v16.xml",
+      "sha256": "037f04b118e652961e8fd9d02ae2b0fd99fc288d3480158e560e2a629d98835a"
+    },
+    {
+      "bytes": 3553,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v17/values-v17.xml",
+      "sha256": "cb64d32badb9ca8e75516890df3f4c551b4fe8e8c95eda029a11985ed9d306f8"
+    },
+    {
+      "bytes": 112,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v18/values-v18.xml",
+      "sha256": "14211cb9c56f886ea3425aaacdcae8da116bc30c3004ca97e4b55e872c19ccfd"
+    },
+    {
+      "bytes": 19683,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v21/values-v21.xml",
+      "sha256": "84107576432e7a4ebe3b4b736eea17fb21828204f78e8d1ed08a2ba69ff7adb3"
+    },
+    {
+      "bytes": 777,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v22/values-v22.xml",
+      "sha256": "762c8de596a9f70939a3b381c6391c65b58dca95e225e40bef43f2ee518c2aec"
+    },
+    {
+      "bytes": 3369,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v23/values-v23.xml",
+      "sha256": "03502c2deffadcbb734dc2a34e5d1cfbdab57b68954efdb4bfcd8899b55e936d"
+    },
+    {
+      "bytes": 355,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v24/values-v24.xml",
+      "sha256": "5a7385456339004068cb489069ff7ce713c0bd0021f1e09e6ffe5a3a2bf0a7d9"
+    },
+    {
+      "bytes": 427,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v25/values-v25.xml",
+      "sha256": "c916b7f852bd7ff7ede47eb2ce3ffa2d2337ce42fb343cf05f0f547f5c7c324c"
+    },
+    {
+      "bytes": 897,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v26/values-v26.xml",
+      "sha256": "2426553c6ef0acf78efcc94591ed878b82529c819f358bdebf099fc171159a2c"
+    },
+    {
+      "bytes": 597,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v28/values-v28.xml",
+      "sha256": "80491a68f63906acb7e45fa58cef72aad3c17e94d30445e883a22c6b308b4679"
+    },
+    {
+      "bytes": 136,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v30/values-v30.xml",
+      "sha256": "4258eaddaefd31db394fa4a52e369de54aed80b4734d6cc7d000b8914b93d186"
+    },
+    {
+      "bytes": 13759,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-vi/values-vi.xml",
+      "sha256": "cf143295066e4079181c27a90ce27a58383cc0911b8f94d62ba41e2b534232ca"
+    },
+    {
+      "bytes": 566,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-watch-v20/values-watch-v20.xml",
+      "sha256": "9ead46493c852e3e2d73f9223c9f9138df75053524ba3f34f4313b7cd22101dd"
+    },
+    {
+      "bytes": 737,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-watch-v21/values-watch-v21.xml",
+      "sha256": "e64deafab9fde5b450c9e169865c5469f312596e4f293f84698935f2b99ad826"
+    },
+    {
+      "bytes": 481,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-xlarge-v4/values-xlarge-v4.xml",
+      "sha256": "2a6e6021e3d12bc2b4454138a1c840c17031422e809a99e24e30613cc3d019c6"
+    },
+    {
+      "bytes": 12927,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-zh-rCN/values-zh-rCN.xml",
+      "sha256": "72baadf6e5e2c70ee252c72be33893cec2715af99b36d975acf6a3b535184ac1"
+    },
+    {
+      "bytes": 12853,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-zh-rHK/values-zh-rHK.xml",
+      "sha256": "bc99953de07e14e9c2f08adb95a9fd6a2410148ebf8facec95653ac8961e34fa"
+    },
+    {
+      "bytes": 12956,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-zh-rTW/values-zh-rTW.xml",
+      "sha256": "a0d3c9cb159f75ed514f4322ebfc006a083d7189575c0c3de48347d74b838cec"
+    },
+    {
+      "bytes": 13372,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-zu/values-zu.xml",
+      "sha256": "0be5b4d8fe5971290926a4aab9eb7fb0a30430a29ef2ee72cd4bbb81e818c9a3"
+    },
+    {
+      "bytes": 1593839,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/mergeReleaseResources/merger.xml",
+      "sha256": "8c3927f7686baaa4bea9034bd9753b123b28fd343ba43242c95d7aedecc5e2eb"
+    },
+    {
+      "bytes": 2999,
+      "path": "wallet/mobile/android/app/build/intermediates/incremental/release/packageReleaseResources/merger.xml",
+      "sha256": "1d823add0f9e9e6cbe7360c2ea42994060f475981adc2fed146e3bb600630a49"
+    },
+    {
+      "bytes": 627,
+      "path": "wallet/mobile/android/app/build/intermediates/java_res/release/processReleaseJavaRes/out/kotlin-tooling-metadata.json",
+      "sha256": "18ca523e707ec62e6d72f1ef36bf934cdc60b8066ca1d930964a579c0ca996cc"
+    },
+    {
+      "bytes": 440,
+      "path": "wallet/mobile/android/app/build/intermediates/linked_resources_binary_format/debug/processDebugResources/output-metadata.json",
+      "sha256": "a943b349f4a2416b2662b7bfabae22666080e82908b932707bb585d4a9bff0d4"
+    },
+    {
+      "bytes": 444,
+      "path": "wallet/mobile/android/app/build/intermediates/linked_resources_binary_format/release/processReleaseResources/output-metadata.json",
+      "sha256": "49c27b3fdaaf7130cab201fb6d6db616702c18ad9ea5552a931fb8d835d3116a"
+    },
+    {
+      "bytes": 4457,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeDebug/maven.google/androidx/activity/group-index.xml",
+      "sha256": "a4e5dd55377cc3a6c0b130a6f0bb22fbca23c20e078b754caa1d17ad8c451dd1"
+    },
+    {
+      "bytes": 654,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeDebug/maven.google/androidx/biometric/group-index.xml",
+      "sha256": "17e622fdad72ae8a2f2dd80e3f7c3f358f124c9ab41922e7c0a903259bc63a76"
+    },
+    {
+      "bytes": 2390,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeDebug/maven.google/androidx/compose/group-index.xml",
+      "sha256": "0497fa33fb899177c921485384d77d149eb69fb696795c71e404e15c233b6ae3"
+    },
+    {
+      "bytes": 5831,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeDebug/maven.google/androidx/core/group-index.xml",
+      "sha256": "e041ddb463e449c6e06e65d02088c9c2a065c6cbec8c1a74a5b1fe5dab98fc71"
+    },
+    {
+      "bytes": 5175,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeDebug/maven.google/androidx/fragment/group-index.xml",
+      "sha256": "458108152701fab29bdb247b359b5f06608ad8caaf3a4f6b94858d2ff614dc63"
+    },
+    {
+      "bytes": 82113,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeDebug/maven.google/androidx/lifecycle/group-index.xml",
+      "sha256": "d3f2d24645b3456be3b7053423e0e1c23fa6246499f07a36d90ef52cb388f8f3"
+    },
+    {
+      "bytes": 2370,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeDebug/maven.google/androidx/test/ext/group-index.xml",
+      "sha256": "12adbf9da5972eb0c0cc867aa0371b39889d626048cec527e2a104302ddb74d9"
+    },
+    {
+      "bytes": 6404,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeDebug/maven.google/androidx/work/group-index.xml",
+      "sha256": "14b479261cc2fc42cf20edd023ff5078ceaa30bea79507ba4e7d1e4ef91a0d04"
+    },
+    {
+      "bytes": 9997,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeDebug/maven.google/master-index.xml",
+      "sha256": "f76dff8e18731b8271e5c76dd426be4583de27954446cd9b75687424d43cf015"
+    },
+    {
+      "bytes": 4457,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeRelease/maven.google/androidx/activity/group-index.xml",
+      "sha256": "a4e5dd55377cc3a6c0b130a6f0bb22fbca23c20e078b754caa1d17ad8c451dd1"
+    },
+    {
+      "bytes": 654,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeRelease/maven.google/androidx/biometric/group-index.xml",
+      "sha256": "17e622fdad72ae8a2f2dd80e3f7c3f358f124c9ab41922e7c0a903259bc63a76"
+    },
+    {
+      "bytes": 2390,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeRelease/maven.google/androidx/compose/group-index.xml",
+      "sha256": "0497fa33fb899177c921485384d77d149eb69fb696795c71e404e15c233b6ae3"
+    },
+    {
+      "bytes": 5831,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeRelease/maven.google/androidx/core/group-index.xml",
+      "sha256": "e041ddb463e449c6e06e65d02088c9c2a065c6cbec8c1a74a5b1fe5dab98fc71"
+    },
+    {
+      "bytes": 5175,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeRelease/maven.google/androidx/fragment/group-index.xml",
+      "sha256": "458108152701fab29bdb247b359b5f06608ad8caaf3a4f6b94858d2ff614dc63"
+    },
+    {
+      "bytes": 82113,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeRelease/maven.google/androidx/lifecycle/group-index.xml",
+      "sha256": "d3f2d24645b3456be3b7053423e0e1c23fa6246499f07a36d90ef52cb388f8f3"
+    },
+    {
+      "bytes": 2370,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeRelease/maven.google/androidx/test/ext/group-index.xml",
+      "sha256": "12adbf9da5972eb0c0cc867aa0371b39889d626048cec527e2a104302ddb74d9"
+    },
+    {
+      "bytes": 6404,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeRelease/maven.google/androidx/work/group-index.xml",
+      "sha256": "14b479261cc2fc42cf20edd023ff5078ceaa30bea79507ba4e7d1e4ef91a0d04"
+    },
+    {
+      "bytes": 9997,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintAnalyzeRelease/maven.google/master-index.xml",
+      "sha256": "f76dff8e18731b8271e5c76dd426be4583de27954446cd9b75687424d43cf015"
+    },
+    {
+      "bytes": 4457,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/activity/group-index.xml",
+      "sha256": "a4e5dd55377cc3a6c0b130a6f0bb22fbca23c20e078b754caa1d17ad8c451dd1"
+    },
+    {
+      "bytes": 654,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/biometric/group-index.xml",
+      "sha256": "17e622fdad72ae8a2f2dd80e3f7c3f358f124c9ab41922e7c0a903259bc63a76"
+    },
+    {
+      "bytes": 2390,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/compose/group-index.xml",
+      "sha256": "0497fa33fb899177c921485384d77d149eb69fb696795c71e404e15c233b6ae3"
+    },
+    {
+      "bytes": 5831,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/core/group-index.xml",
+      "sha256": "e041ddb463e449c6e06e65d02088c9c2a065c6cbec8c1a74a5b1fe5dab98fc71"
+    },
+    {
+      "bytes": 5175,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/fragment/group-index.xml",
+      "sha256": "458108152701fab29bdb247b359b5f06608ad8caaf3a4f6b94858d2ff614dc63"
+    },
+    {
+      "bytes": 82113,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/lifecycle/group-index.xml",
+      "sha256": "d3f2d24645b3456be3b7053423e0e1c23fa6246499f07a36d90ef52cb388f8f3"
+    },
+    {
+      "bytes": 2370,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/test/ext/group-index.xml",
+      "sha256": "12adbf9da5972eb0c0cc867aa0371b39889d626048cec527e2a104302ddb74d9"
+    },
+    {
+      "bytes": 6404,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/work/group-index.xml",
+      "sha256": "14b479261cc2fc42cf20edd023ff5078ceaa30bea79507ba4e7d1e4ef91a0d04"
+    },
+    {
+      "bytes": 9997,
+      "path": "wallet/mobile/android/app/build/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/master-index.xml",
+      "sha256": "f76dff8e18731b8271e5c76dd426be4583de27954446cd9b75687424d43cf015"
+    },
+    {
+      "bytes": 7464,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_partial_results/debug/lintAnalyzeDebug/out/lint-definite.xml",
+      "sha256": "6e7549f55159dcba82238700926c3aa0fe00e93e7463af91209b2b8475ad94ee"
+    },
+    {
+      "bytes": 579,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_partial_results/debug/lintAnalyzeDebug/out/lint-partial.xml",
+      "sha256": "03868980a7034d6357e1e27246730c2cec2328dbd04cb55cb5126e43ef0444f7"
+    },
+    {
+      "bytes": 809,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_partial_results/debug/lintAnalyzeDebug/out/lint-resources.xml",
+      "sha256": "10ce5b0392ff1070d5c0281a797fe853e62b0ec0a05cf9e069381b469a2b88e9"
+    },
+    {
+      "bytes": 7466,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_partial_results/release/lintAnalyzeRelease/out/lint-definite.xml",
+      "sha256": "fbce29bb02b94588e466c21c3a958c33cad89a3a3192c6c8090f0b04bcf8d2bf"
+    },
+    {
+      "bytes": 579,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_partial_results/release/lintAnalyzeRelease/out/lint-partial.xml",
+      "sha256": "03868980a7034d6357e1e27246730c2cec2328dbd04cb55cb5126e43ef0444f7"
+    },
+    {
+      "bytes": 819,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_partial_results/release/lintAnalyzeRelease/out/lint-resources.xml",
+      "sha256": "e7c4b6b961a6d0db33112e8ccdc2395f7f596a7c86ecbf20c9c807ac5469f304"
+    },
+    {
+      "bytes": 28996,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_report_lint_model/debug/generateDebugLintReportModel/debug-artifact-dependencies.xml",
+      "sha256": "0d6981765688d3abcdd9e445394aace78b61612f091d36afbb83a59d5a2feef3"
+    },
+    {
+      "bytes": 53964,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_report_lint_model/debug/generateDebugLintReportModel/debug-artifact-libraries.xml",
+      "sha256": "01205240be1ddff711e2988954f27134883b1f21ae32695cf1e31f14237e3488"
+    },
+    {
+      "bytes": 1697,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_report_lint_model/debug/generateDebugLintReportModel/debug.xml",
+      "sha256": "3e25fc5f31996c61033699f8eca8fefc09cfd8d2d89bbe3a69783fa3dc1e1075"
+    },
+    {
+      "bytes": 653,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_report_lint_model/debug/generateDebugLintReportModel/module.xml",
+      "sha256": "5275b02c9ded05646da866fac31cd8e38472c6c158fff97eaa47ef96e9930561"
+    },
+    {
+      "bytes": 655,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_report_lint_model/release/generateReleaseLintReportModel/module.xml",
+      "sha256": "bb42c0cbba4d17bc3762c7e810c56d0557736c33cf74a24574330c53f35becfd"
+    },
+    {
+      "bytes": 27624,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_report_lint_model/release/generateReleaseLintReportModel/release-artifact-dependencies.xml",
+      "sha256": "9463526e73e0e7c88b8759500be0e3355b0c1d8c54c3eba69e2e79577ad44d67"
+    },
+    {
+      "bytes": 51212,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_report_lint_model/release/generateReleaseLintReportModel/release-artifact-libraries.xml",
+      "sha256": "ebfb7a1213b65593173ba3f8b86d797ebe33f871e255af69260ee019855a60fa"
+    },
+    {
+      "bytes": 1738,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_report_lint_model/release/generateReleaseLintReportModel/release.xml",
+      "sha256": "5481e3a91ef6754c63785de0668e97c696551f76a83984f916c6e64afb2cf329"
+    },
+    {
+      "bytes": 819,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml",
+      "sha256": "e7c4b6b961a6d0db33112e8ccdc2395f7f596a7c86ecbf20c9c807ac5469f304"
+    },
+    {
+      "bytes": 655,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_vital_report_lint_model/release/generateReleaseLintVitalReportModel/module.xml",
+      "sha256": "bb42c0cbba4d17bc3762c7e810c56d0557736c33cf74a24574330c53f35becfd"
+    },
+    {
+      "bytes": 27624,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_vital_report_lint_model/release/generateReleaseLintVitalReportModel/release-artifact-dependencies.xml",
+      "sha256": "9463526e73e0e7c88b8759500be0e3355b0c1d8c54c3eba69e2e79577ad44d67"
+    },
+    {
+      "bytes": 51212,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_vital_report_lint_model/release/generateReleaseLintVitalReportModel/release-artifact-libraries.xml",
+      "sha256": "ebfb7a1213b65593173ba3f8b86d797ebe33f871e255af69260ee019855a60fa"
+    },
+    {
+      "bytes": 1749,
+      "path": "wallet/mobile/android/app/build/intermediates/lint_vital_report_lint_model/release/generateReleaseLintVitalReportModel/release.xml",
+      "sha256": "8a7a2f344247f8f49d204399fced0aa1c118af014fe5925fe73c59fbfb9af5d9"
+    },
+    {
+      "bytes": 8793,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml",
+      "sha256": "fe6a9aff625b48de95fae696d544ddd5f135a114ebc4a40aa2c47fc0ef9fe3dc"
+    },
+    {
+      "bytes": 8500,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml",
+      "sha256": "73f1ce16ac1714984b9cbfd6b8be2c802575a1c2439dd9981df07611b6255478"
+    },
+    {
+      "bytes": 8793,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml",
+      "sha256": "fe6a9aff625b48de95fae696d544ddd5f135a114ebc4a40aa2c47fc0ef9fe3dc"
+    },
+    {
+      "bytes": 405,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_manifests/debug/processDebugManifest/output-metadata.json",
+      "sha256": "669f556a2796e3c9c4db95f516ee7cf0e42ab165ff5abdc758c545e9c7303c3c"
+    },
+    {
+      "bytes": 8500,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml",
+      "sha256": "73f1ce16ac1714984b9cbfd6b8be2c802575a1c2439dd9981df07611b6255478"
+    },
+    {
+      "bytes": 407,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_manifests/release/processReleaseManifest/output-metadata.json",
+      "sha256": "380c15a9df43f14206849c496b63a1e4c403de54b1c6bd60b10a793c8fe96e84"
+    },
+    {
+      "bytes": 857834,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/mergeDebugResources.json",
+      "sha256": "00c0f8e72f53d8e056805a7644c291b3a7f73ddcec917702d3fc23f18b6153d5"
+    },
+    {
+      "bytes": 9181,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-af.json",
+      "sha256": "3e5ce270c74182e043ec782e7b2f0da9e052b39fe0f40877ef0513d5537f45b0"
+    },
+    {
+      "bytes": 9143,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-am.json",
+      "sha256": "ce94f1d6d7eb2a9030f1cec8bf665a348211ecfca30c9745bc30bd2cc3e3bf22"
+    },
+    {
+      "bytes": 9189,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ar.json",
+      "sha256": "c1497c8dc943f8deccf6043f5e78dc5be459ab20b3c5997e094704cdd648407f"
+    },
+    {
+      "bytes": 9203,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-as.json",
+      "sha256": "8db213570861cd4f493b4c91078fae8ac29e0f06c8d4bf7e2db894f016152c98"
+    },
+    {
+      "bytes": 9206,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-az.json",
+      "sha256": "afadd9ab4a81eb599a069b4475308be61b718e4edcc6c807d342eebf3ba2b1e3"
+    },
+    {
+      "bytes": 9292,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-b+sr+Latn.json",
+      "sha256": "9187311f01d28d02de4a2931d096594676f5d337d38d5869d429df9ae214fe4a"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-be.json",
+      "sha256": "a9aaee0b6cd1023a26e6a34f39deca58dd17177e3e1a3a2a4243d00a9a0385f5"
+    },
+    {
+      "bytes": 9211,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-bg.json",
+      "sha256": "03201fae0f601748e4cdb18fce65bf1b0a8fa08d8e8bfa83b57df61ae62704b5"
+    },
+    {
+      "bytes": 9213,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-bn.json",
+      "sha256": "cb14f3890055d34499eab8210214229655b859573dd3becb7d5d919556513f95"
+    },
+    {
+      "bytes": 9194,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-bs.json",
+      "sha256": "0f77883ddc0d06061cfc8154079b7fb69c2b836237d4c8e551644fee44070a18"
+    },
+    {
+      "bytes": 9217,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ca.json",
+      "sha256": "e53cf9ef57a6a8c41ff96646578ce072a2bd6c590bcce76099a6de9db5c36098"
+    },
+    {
+      "bytes": 9191,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-cs.json",
+      "sha256": "217a017194b02a2ce872f98a7303890c136160b9aa33f02bb5585da47b3dd904"
+    },
+    {
+      "bytes": 9177,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-da.json",
+      "sha256": "310c45a8e370b1ff3aa3a7fd961064890c6dccb5e93170293892d52843c5c9df"
+    },
+    {
+      "bytes": 9209,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-de.json",
+      "sha256": "a9764e63aaaf1186993fbd4f9f1caab675174789acf7e0bc3d7c75cc0a120fd4"
+    },
+    {
+      "bytes": 9223,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-el.json",
+      "sha256": "db66c728f9d3a7b5a2d4603005acbb2fa95a95155dde0b14e3e98635981cb56f"
+    },
+    {
+      "bytes": 9233,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-en-rAU.json",
+      "sha256": "d7835d02c3921e93a9603620f7b0ab4d7e9519496ea2867fa85632290c5b43c3"
+    },
+    {
+      "bytes": 9233,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-en-rCA.json",
+      "sha256": "6ec3df5cfa2b208294c7ed282d6ca66f4461ab0686fa02b35b4d76ba357daa9c"
+    },
+    {
+      "bytes": 9233,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-en-rGB.json",
+      "sha256": "ad79c9eaf8cd0a24d7053b454b11701104f6ef7c96a8aeb09e5306bde4969000"
+    },
+    {
+      "bytes": 9233,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-en-rIN.json",
+      "sha256": "cd5d64592514a7c98abdd0d080bcd25cc454f16105849e99578a3643d4b93c29"
+    },
+    {
+      "bytes": 9525,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-en-rXC.json",
+      "sha256": "4d2736afca480283789910d060dc87facc5f157008d9633d3f0841473200fcb3"
+    },
+    {
+      "bytes": 9263,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-es-rUS.json",
+      "sha256": "15e547b30b9a119e795366bf3eb49b1e20322aebbf5c2ef45ba6c16e98deb2df"
+    },
+    {
+      "bytes": 9211,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-es.json",
+      "sha256": "dfaa7e883a88cb833ba89d04f1efbc89ac24e2730f7e5833c1ee47c920c8015a"
+    },
+    {
+      "bytes": 9203,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-et.json",
+      "sha256": "ecc8c59d01f81d1c1efa7aa9abb1550c52943c686c2958c87bee90f70f788a55"
+    },
+    {
+      "bytes": 9201,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-eu.json",
+      "sha256": "a488260a2686514ad0b3611c08e182a48a385af7e04dfe30e56364b77264d73d"
+    },
+    {
+      "bytes": 9191,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-fa.json",
+      "sha256": "6de2225ef36afa2a9eb7ab69cc3b615dbd731fde5eb3bcdd26b056b65b74e749"
+    },
+    {
+      "bytes": 9191,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-fi.json",
+      "sha256": "66bbcaa61fc5e35c8d363aa8b8160cb6d0dcecf4c39476b445093365624ef931"
+    },
+    {
+      "bytes": 9283,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-fr-rCA.json",
+      "sha256": "73a0612035ca1826747d54687f4581b6350f214cb7962663a354b7c3fb704506"
+    },
+    {
+      "bytes": 9213,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-fr.json",
+      "sha256": "323083be73fd9153b0a5bbff3e5390839ebc918cef45e83e0333027a73501915"
+    },
+    {
+      "bytes": 9219,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-gl.json",
+      "sha256": "9770d023cd3a35f29cdd8276035d78d7dc545c32670ba79f65023237c8b7edd8"
+    },
+    {
+      "bytes": 9186,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-gu.json",
+      "sha256": "5b97f27428700c9888f713ad31b37eaf0e0ef05b019e263a828be8ca0bd6b33b"
+    },
+    {
+      "bytes": 708,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-h720dp-v13.json",
+      "sha256": "3b2a497880d7d16d316a10715044c6719e1560e4d1b6953b837b21221a2a39c3"
+    },
+    {
+      "bytes": 737,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-hdpi-v4.json",
+      "sha256": "185b3314478ae81a0577e657b1d98d1e11f7b5e9f3d36274ab54fbb727fcfb6a"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-hi.json",
+      "sha256": "b7902eb56a4a29183275fff5fd190a23a36598ee587972f604c13d2db18c9b34"
+    },
+    {
+      "bytes": 9186,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-hr.json",
+      "sha256": "8afa3af163bde68a9db2a2d2cd85ce0dab110a8f5c1c5d561a0bf9deab819124"
+    },
+    {
+      "bytes": 9203,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-hu.json",
+      "sha256": "5a794b85e54b7cdc957b934fa0ced563914406a41571c8ef630c288294487938"
+    },
+    {
+      "bytes": 9188,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-hy.json",
+      "sha256": "971eee59d5e993b2f5a96d16c24aca1a823bb6dc68c5c466e318374d7db2ef2b"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-in.json",
+      "sha256": "be30a4004dde7f0cc2996955655615423e04b053296d78417e9a598b0e21491c"
+    },
+    {
+      "bytes": 9188,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-is.json",
+      "sha256": "8d71ca5d45126d51ba8446c051a8d8d97558d72090db464a24e4495349125081"
+    },
+    {
+      "bytes": 9211,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-it.json",
+      "sha256": "12f22c59075e252f81bbf639f9ae994567ba11587d6667dc7cba1a57058508f3"
+    },
+    {
+      "bytes": 9171,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-iw.json",
+      "sha256": "7a6c5213a029e4b56b24ace566bfa8df5e05f52b093f67d8f9051f14a4d24805"
+    },
+    {
+      "bytes": 9127,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ja.json",
+      "sha256": "faef8264563dbbddbee8596a587bce727d569cae185b3f22fa48429b141c9b9c"
+    },
+    {
+      "bytes": 9201,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ka.json",
+      "sha256": "8f869a465c0a164aa1cd6b6cb5c9d62b51faf1823f41537ac8e9b159d0e1c4c6"
+    },
+    {
+      "bytes": 9198,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-kk.json",
+      "sha256": "bdad3ed775ac62de3aed1f7be97d88a3ded3dc141b9f3f140aa430e4f28c413a"
+    },
+    {
+      "bytes": 9203,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-km.json",
+      "sha256": "50a209a63923a3c0269362a56cd739ec8b1c75b867ab1b7520d806f9f6429033"
+    },
+    {
+      "bytes": 9213,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-kn.json",
+      "sha256": "d734243f6a91bd341aa01eb667447fc0ebe635a6a54f6a7bcd47099605a273cc"
+    },
+    {
+      "bytes": 9114,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ko.json",
+      "sha256": "a7c29ca7496c76c83bee657e5328e5ec8c05216e2b7f0167c724b81d692fadb8"
+    },
+    {
+      "bytes": 9205,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ky.json",
+      "sha256": "cdc456522d5d72fa0bb32a85f44488a79200b2def5ad27a5f0f35ee01f2de2dc"
+    },
+    {
+      "bytes": 714,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-land.json",
+      "sha256": "c9d6f22a1596be2d75dd0ea678a90146334162b79742b14b9015b3f529b751d6"
+    },
+    {
+      "bytes": 823,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-large-v4.json",
+      "sha256": "0721bc21147a6990b3f22e9be139d6ef5347b7bfd553e6081cab70a73c092e6e"
+    },
+    {
+      "bytes": 705,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ldltr-v21.json",
+      "sha256": "d4001bf7249d271ff56473311e3bd57b6f17aac78ed4ae1010ec231f816ce7d9"
+    },
+    {
+      "bytes": 9179,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-lo.json",
+      "sha256": "f2204ae3be10883c1c4565591737daf1c3b08642f13daf6b933b6236ea19c297"
+    },
+    {
+      "bytes": 9205,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-lt.json",
+      "sha256": "0f8cec9dcb67f94712647228029c376b80e0adbd4e7c42f3350c33430eb98fb3"
+    },
+    {
+      "bytes": 9227,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-lv.json",
+      "sha256": "a387a2bcb6d25c7f324b1dbeeffc428b67589d6e6bbab713620db54d55a71bab"
+    },
+    {
+      "bytes": 9195,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-mk.json",
+      "sha256": "5154dde3a3ac3c8312dd1a8328c5f2645f427f0a998cebbaf5872e3df88cc69d"
+    },
+    {
+      "bytes": 9221,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ml.json",
+      "sha256": "1a11af6e0c5cb43df5899c4156ca782f0d1a3c4229b501e286f21062f1c658f9"
+    },
+    {
+      "bytes": 9187,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-mn.json",
+      "sha256": "76756a5bbfc4dd19ece3f9444781da32bfd8430c2743d85e9b2eb753c10b8d11"
+    },
+    {
+      "bytes": 9191,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-mr.json",
+      "sha256": "fa43cce1f7c8f73ffada192cdb4453473380e36752b0e39acc4d1413f14d571a"
+    },
+    {
+      "bytes": 9198,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ms.json",
+      "sha256": "5af84e654dfbe29d96245f29d5ca68e34ad9ba836508774c04429fa6a981b2af"
+    },
+    {
+      "bytes": 9221,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-my.json",
+      "sha256": "a11ebe473287a9324027023c935439d2aa90078875183e87959ddd23525428c3"
+    },
+    {
+      "bytes": 9175,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-nb.json",
+      "sha256": "c28af3f12195cd1c103845b5107e647be073b1812f381ce5c165105cc2b432fb"
+    },
+    {
+      "bytes": 9215,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ne.json",
+      "sha256": "4db5bc2eb72177f8322b9253aa0132c80320442d26105d1c2a4637d496688fcc"
+    },
+    {
+      "bytes": 807,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-night-v8.json",
+      "sha256": "918778f3457076375bb3182abd7f1c6b409afc43832dd0f99009ad2a030c462f"
+    },
+    {
+      "bytes": 9195,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-nl.json",
+      "sha256": "9b50afd34938e04e406716b51565aec1e58507455d989ec644f1469a23e4e30f"
+    },
+    {
+      "bytes": 9213,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-or.json",
+      "sha256": "d9ea7bfd133843df28f45adfa1f43f98b190b6df9876fb872fdda01a082af62a"
+    },
+    {
+      "bytes": 9182,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-pa.json",
+      "sha256": "8ad4973a5d82246b0323d89bc95a9b0d9646d36382082c194cfead8a731e7d6f"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-pl.json",
+      "sha256": "d2613691f3a1508a9e4281d78e4031431c0d93ccfdbde090253fd1975949e96b"
+    },
+    {
+      "bytes": 684,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-port.json",
+      "sha256": "3d399ba05e7c404c13b0f652c182f9b68f2a4fa201ae2e1f74b42d6b037a6275"
+    },
+    {
+      "bytes": 9257,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-pt-rBR.json",
+      "sha256": "a0e8b6b27c3df51cf1d593c1a0a6fb9ec5a0107a78c15020886624995359e9b4"
+    },
+    {
+      "bytes": 9262,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-pt-rPT.json",
+      "sha256": "bba04101b03713badfdf32a0cb7c0fb9f5f01cef18a3c6d9db96d59d05e7faf4"
+    },
+    {
+      "bytes": 9201,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-pt.json",
+      "sha256": "c6b671d3a1a3393eb85cb5f32eef0c733bcda337b87760acde5601804cec0c7f"
+    },
+    {
+      "bytes": 9209,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ro.json",
+      "sha256": "f3bda636c950ab50e95032a0e04e0c6a159f771a7fd9bc99c9d39ce846005f01"
+    },
+    {
+      "bytes": 9186,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ru.json",
+      "sha256": "c066f51aa265e2257bd46599d904b504617ffb5b6fe5b48677b9791f44d5124e"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-si.json",
+      "sha256": "785e4e462d275ba3662c472629eb71ae865242e6e36b88e853d3972278874000"
+    },
+    {
+      "bytes": 9188,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-sk.json",
+      "sha256": "f52f73c0cbc8bfb79b09bad00468b8714baca58681471ff3ac1126c509d9a74e"
+    },
+    {
+      "bytes": 9191,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-sl.json",
+      "sha256": "b9c59e1e9a3f4eea0cc3eab15233caa57023ed12589d7ae55ee1f2fac354e8db"
+    },
+    {
+      "bytes": 9194,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-sq.json",
+      "sha256": "21097eb76d039b8dbee52d1f2048b10550b468f4793eb9c41412f081cb1bc895"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-sr.json",
+      "sha256": "182880315b600f08cd3ceabe2ad025a4c587008ca4188e59c4b880b31659f90d"
+    },
+    {
+      "bytes": 9191,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-sv.json",
+      "sha256": "0baf2f16c852ad1addce65bbdd9199cf1d09a7aef292a0de01b89d0dddb2d090"
+    },
+    {
+      "bytes": 9197,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-sw.json",
+      "sha256": "b5434fc637dc9f49aceafa3a475e56fae132ae4abae048dec849c475b85abe7e"
+    },
+    {
+      "bytes": 817,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-sw600dp-v13.json",
+      "sha256": "e10eb7d7948cdb645e9d516810314a10aa6935378ffe71edb1e2541ec9ddf011"
+    },
+    {
+      "bytes": 9229,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ta.json",
+      "sha256": "2264de2f5cdc036ac9d3d667f03fde59871b7e5affff43c20006fa6d0be3842e"
+    },
+    {
+      "bytes": 9219,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-te.json",
+      "sha256": "9331b06ca4f67abe5426bef1bfa9e4c63047418037e8ef4b67beed7a4afb3dd5"
+    },
+    {
+      "bytes": 9177,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-th.json",
+      "sha256": "54cec28aff5f2a17a0d615ecb16e22f769b803f59f5cb320755633a8f3b72737"
+    },
+    {
+      "bytes": 9208,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-tl.json",
+      "sha256": "ec7cd334e5b74acc047b671793eb25f4df3af92f770fffbe094432ef57c28a11"
+    },
+    {
+      "bytes": 9181,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-tr.json",
+      "sha256": "fe770e20ee79d5ce88a20520ae40155a56a88f22b6a2d20d2d38e9ab9961235e"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-uk.json",
+      "sha256": "fd42c2f872ae372a5b6c5b2a93052b9d28ccfe105c2c3c539a75a76cdd6a853d"
+    },
+    {
+      "bytes": 9203,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-ur.json",
+      "sha256": "85898aa420e6f3f7022b48a457a8ba528124e770d96ca5f9bd57bff2d73a9b96"
+    },
+    {
+      "bytes": 9199,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-uz.json",
+      "sha256": "1f14c523eac3625f84a372f5d4070f81d0ae9fdc05222047cf853e272b723bf5"
+    },
+    {
+      "bytes": 721,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-v16.json",
+      "sha256": "40d3dba9735e257ad42ab89aa0ab7bce436458cbb2385e9f627d1b2aa16e84be"
+    },
+    {
+      "bytes": 1045,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-v17.json",
+      "sha256": "94e6c5d7b8d000c5b5ffcc463e8ca45be2f8b4b3ac921d7086d425df1ecf399e"
+    },
+    {
+      "bytes": 679,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-v18.json",
+      "sha256": "c525291f5fac99903ba7f3347eafaa8b2c9ad31aa4634f2ed0b7c400b12aeca0"
+    },
+    {
+      "bytes": 6375,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-v21.json",
+      "sha256": "fb34cfd41aeb5cec7bd895f2ccc409dc83d314e3c4b039711e6670ef0d0158aa"
+    },
+    {
+      "bytes": 1139,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-v22.json",
+      "sha256": "948efa07894719596f95db331d2ce6a51e589c35182fb13f7f15ff11bfd55f0c"
+    },
+    {
+      "bytes": 2087,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-v23.json",
+      "sha256": "057cdbe63591afddbf8b7cfd4b18bc22792ca34ed1ca0e3a7178490d5a634131"
+    },
+    {
+      "bytes": 697,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-v24.json",
+      "sha256": "4dbd7e0adbed4ef40df558736890e6f3c557bfb10ef31b47e5182da17c253a05"
+    },
+    {
+      "bytes": 772,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-v25.json",
+      "sha256": "c5f6ad5773b93bdfe14002dacc416cdf393d8163d2fb94c3f3c7c63de5015c43"
+    },
+    {
+      "bytes": 1215,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-v26.json",
+      "sha256": "b7a7df834be9d09e9697a41482694d8f1dd2ef94dd20e52889292eb5c26106c5"
+    },
+    {
+      "bytes": 1139,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-v28.json",
+      "sha256": "143eca84148b6e5119583bf29205c7da56950b482ec4c13155a53fcba8afd2c6"
+    },
+    {
+      "bytes": 682,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-v30.json",
+      "sha256": "854efdb0fdab059801d984a6655892985f98c6572680a2abfc4c400b47d389fc"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-vi.json",
+      "sha256": "13559f8b92a2aafd1bd0dc3f0d2f10bf4395cd2f4f4efa11e94709557d2c2bdd"
+    },
+    {
+      "bytes": 780,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-watch-v20.json",
+      "sha256": "55a4947e4c0fa8862a92226fbb4cfd95b5c022777e4581bcaac2f29f502dd491"
+    },
+    {
+      "bytes": 781,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-watch-v21.json",
+      "sha256": "ba9a4f5e121ccc0b6f4d615f3b4c3980a79c812b6b35a4c1197673743f843fdd"
+    },
+    {
+      "bytes": 779,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-xlarge-v4.json",
+      "sha256": "60dd76721d3b5f1f095e7624fbccbec9a794ef14720ed72f5ed7ab7370cd12c0"
+    },
+    {
+      "bytes": 9155,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-zh-rCN.json",
+      "sha256": "6cdbe1313853a23451b5f56b34abdcaa545188900ae8d19d3c9f3b0e20a081ef"
+    },
+    {
+      "bytes": 9155,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-zh-rHK.json",
+      "sha256": "ac6e011c359c7e6d88aa05be46baddf73ce839d68b5d55fef2334842438583ba"
+    },
+    {
+      "bytes": 9153,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-zh-rTW.json",
+      "sha256": "c9c277c0c146fa93331d95012c02a1d65b8ca83e8a75fcefcd467c0dd71fe9ff"
+    },
+    {
+      "bytes": 9207,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values-zu.json",
+      "sha256": "b99870167582f2b8f704f71f75b451157d5bec3b46bf1d6ed33e2729b37c8a86"
+    },
+    {
+      "bytes": 53781,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/values.json",
+      "sha256": "e089d97dbe820a1da0cd08c04e2004aaf736be1e4b8aae0e64012c7ca1d1accb"
+    },
+    {
+      "bytes": 736,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/single/mergeDebugResources.json",
+      "sha256": "4e9793851a4532bcdb483800b6c48065d44349f957a9663464374463ac63f016"
+    },
+    {
+      "bytes": 858050,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/mergeReleaseResources.json",
+      "sha256": "597b7b3790ff49bf32addfe67eb3eee742e8ecd7cf495eba74b8ddd4cf73a7cf"
+    },
+    {
+      "bytes": 9183,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-af.json",
+      "sha256": "a99781b3d25079829a5ef88403c15409571c6116b0c01dfc281f2e28b062401a"
+    },
+    {
+      "bytes": 9145,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-am.json",
+      "sha256": "c9502aeb7790ad21d4bb24de5348265076f309ff93efdf2c4c6a2d007d17ef31"
+    },
+    {
+      "bytes": 9191,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ar.json",
+      "sha256": "177ecc63f6a051c5a996f1d07b40eef615e27d5a3407914fdc6c6492c40522f3"
+    },
+    {
+      "bytes": 9205,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-as.json",
+      "sha256": "2b168734ff45434bc5eb10eaba41f89eab9abffe95e2ff02603457966b641181"
+    },
+    {
+      "bytes": 9208,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-az.json",
+      "sha256": "081bc3c2443e45b654b0f1555086ad6093f1b90ae695373f2575100ab08cb2a0"
+    },
+    {
+      "bytes": 9294,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-b+sr+Latn.json",
+      "sha256": "2f9e4d6519bc9662feedd8a7959604465c7e25774fb5629c850e9e8452e41a39"
+    },
+    {
+      "bytes": 9195,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-be.json",
+      "sha256": "aa00f7c83d20d1f4cd97c2a1f7eef5d6c1188255ec01726837266647d29f605f"
+    },
+    {
+      "bytes": 9213,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-bg.json",
+      "sha256": "c91c28420f0b720a16cffc55c5655c395b9205867a7f2a8d38ab1302851a67ee"
+    },
+    {
+      "bytes": 9215,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-bn.json",
+      "sha256": "36f3952382870c64a942336a34d0874d23a6eb8fddedcaa06b7207ea07b42580"
+    },
+    {
+      "bytes": 9196,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-bs.json",
+      "sha256": "8539df3656f8689f5c61cb047f0b992cb17862707e50ef4c40a4b97ed2ba84b7"
+    },
+    {
+      "bytes": 9219,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ca.json",
+      "sha256": "1cf0a621d72232e1e7c02c41ceb7063d99a1f0d1bbf19be5333c931c6a8965f9"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-cs.json",
+      "sha256": "ddc5f48e359e95f0589967c7b77752670877728bb1c644c98817e914a757f02e"
+    },
+    {
+      "bytes": 9179,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-da.json",
+      "sha256": "b036606240d1e096296c1f73d6048404be21f993c69c4d7a0ce8fd66bfa2dd04"
+    },
+    {
+      "bytes": 9211,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-de.json",
+      "sha256": "b8cbb4b21fcd1d2c708e416221c22bc644124002d375c18e1ca925e4d9850d91"
+    },
+    {
+      "bytes": 9225,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-el.json",
+      "sha256": "522066a503d7bf38a71307f8adb23dd5223ed32aa65579f04bd74c8d3244c474"
+    },
+    {
+      "bytes": 9235,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-en-rAU.json",
+      "sha256": "67cf17f6188b3e55ccfe56b9a27b1c2ae7b9babccecea8a526cb657ddf17c572"
+    },
+    {
+      "bytes": 9235,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-en-rCA.json",
+      "sha256": "eaca3009fd1f3e5fc846d1f91175486d2681f5068f572fa4b757abd66b8e208c"
+    },
+    {
+      "bytes": 9235,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-en-rGB.json",
+      "sha256": "40964cd25b966011a826226b8ac0d3ec3ceaf226dee093b99fc020cac66fb5a8"
+    },
+    {
+      "bytes": 9235,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-en-rIN.json",
+      "sha256": "bd5cd310c24f96ae0c5b78b22041c2ea4cc3d19e6533687d45e80919c81f45ab"
+    },
+    {
+      "bytes": 9527,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-en-rXC.json",
+      "sha256": "3024727577f808ed105f9ea90137d553dbbff04eee4d4a21a0b8364e44fad8e2"
+    },
+    {
+      "bytes": 9265,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-es-rUS.json",
+      "sha256": "fec7fb49931185e5124ea4a92d375e24cc761bc09a28949b574877e44b9d00c5"
+    },
+    {
+      "bytes": 9213,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-es.json",
+      "sha256": "995255550229b13a9dd8aa9ff963f6d6684676adbcb27c1209731a1d2bcf62a9"
+    },
+    {
+      "bytes": 9205,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-et.json",
+      "sha256": "54daf92c10a5785d5a4c808701ad0ea8e35c0778065c0a72f4c9fdc3ebfab2a1"
+    },
+    {
+      "bytes": 9203,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-eu.json",
+      "sha256": "647017efc89c4889288833cae49f91d4af73f3860a30d21af307c53b6eaafded"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-fa.json",
+      "sha256": "ed7add27b35324e8860e2d477daafc9259dfdc690fd5d643c526dd29eaba3399"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-fi.json",
+      "sha256": "8c9bcfc5345af27a46db3b950c088e5760f539a5434db3ca420e58e595e8f809"
+    },
+    {
+      "bytes": 9285,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-fr-rCA.json",
+      "sha256": "46f42f157550b90ee15e9420e9b53593a04d32332caa660235553c2c9bc13011"
+    },
+    {
+      "bytes": 9215,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-fr.json",
+      "sha256": "24dfc2762af23a58a9da92943eeb28e8afca69a124946f13821540002b9b41df"
+    },
+    {
+      "bytes": 9221,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-gl.json",
+      "sha256": "98f3609826e7128f7c8ec7c4e67771ae6912477e28105b2e1587a20e06f1e86e"
+    },
+    {
+      "bytes": 9188,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-gu.json",
+      "sha256": "976f99db8532cdba0df938ec8d58f14646a6b4b67e888d2a0bfadb9ef16a23e0"
+    },
+    {
+      "bytes": 710,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-h720dp-v13.json",
+      "sha256": "d32383c2cc0d7686cafac157ac749a9921729fc3a64d0112098f3591ee22b534"
+    },
+    {
+      "bytes": 739,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-hdpi-v4.json",
+      "sha256": "974e5c5468bc14759278a5d513a5b39e46f77135bc702fa38dec7ba1ba8ffac9"
+    },
+    {
+      "bytes": 9195,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-hi.json",
+      "sha256": "465ff284bdaba91296081e36fd54b372841dff17408181b546cf94c8096166bb"
+    },
+    {
+      "bytes": 9188,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-hr.json",
+      "sha256": "70fc5ef7e9cbb07488083f8a7efa711a54a4103ba21b009e7b1fe0cdaa7d101e"
+    },
+    {
+      "bytes": 9205,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-hu.json",
+      "sha256": "9673d6356df3f0372f0ab68e1f2514b07e6ef655f7dbf44a6ba64bbf127f4d3c"
+    },
+    {
+      "bytes": 9190,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-hy.json",
+      "sha256": "71a658cb8ed788c7da7523f570aec89dd44183d578de277046c22d8cb6bb2722"
+    },
+    {
+      "bytes": 9195,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-in.json",
+      "sha256": "a43f530bb5efaa5302aea09ef0f7b7fc6a9c3819c6c9ef759185d9fb7a6662b8"
+    },
+    {
+      "bytes": 9190,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-is.json",
+      "sha256": "e58e69e1ef887d89a7a573276dcfb91572f5f0dfbaa20f96165369dd1c72d174"
+    },
+    {
+      "bytes": 9213,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-it.json",
+      "sha256": "212710b69821c2b58f9399812bfc1fcefabcd292f8e9de6a7ac012daf54b077d"
+    },
+    {
+      "bytes": 9173,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-iw.json",
+      "sha256": "0cd91d7595a0efdd06a0ac9a4dc11902d8acd93b14dcaae526ed8ad930fffe2c"
+    },
+    {
+      "bytes": 9129,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ja.json",
+      "sha256": "434e92e0929ade8b9550396388c095170c75a6bfa1517775be6a4983601b33f2"
+    },
+    {
+      "bytes": 9203,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ka.json",
+      "sha256": "8086835bc8e46f1f67a1c11efef82ffb3a7680987b9fd28ea5e027fddb61329b"
+    },
+    {
+      "bytes": 9200,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-kk.json",
+      "sha256": "b15755a351652af5d3bdbb6a444a96518c81abc12279253e65063e4df697ad55"
+    },
+    {
+      "bytes": 9205,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-km.json",
+      "sha256": "0c135cef4d450e2b8221e6539b54f26a1d78b70c41d2475ba305a551a7f70186"
+    },
+    {
+      "bytes": 9215,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-kn.json",
+      "sha256": "7ffdb5757c99811b2cfec776cc80d53ada8b95a2a05aa96ae8d2aa9550928542"
+    },
+    {
+      "bytes": 9116,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ko.json",
+      "sha256": "5b1310da12d3f315bd9d30af33ad45e8f88464d5c468ada9de9c682a211e084c"
+    },
+    {
+      "bytes": 9207,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ky.json",
+      "sha256": "9522a5c7a41900a17d78157b58dfdbc5d74a8fb5e552ba907c60050d0ff15281"
+    },
+    {
+      "bytes": 716,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-land.json",
+      "sha256": "285d9ef1cacf3286b9af7e4c6e30af4a7b196d6f2f6485a7610a2f8f6f77abcc"
+    },
+    {
+      "bytes": 825,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-large-v4.json",
+      "sha256": "cb15c5f406778679f37891b0e1fe5e138992184e0a4197a35ab70508832570f8"
+    },
+    {
+      "bytes": 707,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ldltr-v21.json",
+      "sha256": "0a3796fc83d72b26acdf744f54c10345198ba03ad41e55463979afee38d38214"
+    },
+    {
+      "bytes": 9181,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-lo.json",
+      "sha256": "07c2a0ccf4e5848d6d5c8a8c9ca88f882e638350948bdb9151ab7c1686067060"
+    },
+    {
+      "bytes": 9207,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-lt.json",
+      "sha256": "242e67c34eb83538fcfc4001c4ef2ebee82e797f0f467991f44fcf1b00fa91b1"
+    },
+    {
+      "bytes": 9229,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-lv.json",
+      "sha256": "b932fe14f17d4fbae9ca3950a46aebd4aa3ba533c38f4f47b1e5dbafda3192b4"
+    },
+    {
+      "bytes": 9197,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-mk.json",
+      "sha256": "aa6507422403f2393998dc7b0f06a912a7be8bc04b72b00a49427fe8b16f6573"
+    },
+    {
+      "bytes": 9223,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ml.json",
+      "sha256": "a5c88844e872cf87f2af97aa300dd41f2c4de9fa0272b4273d3fe7998f38f9ad"
+    },
+    {
+      "bytes": 9189,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-mn.json",
+      "sha256": "40090114ab3405ee5e0dc616e4397fd6e926636c90755b7eabb8e4aac9dd53a9"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-mr.json",
+      "sha256": "2b2b073a5632df428e92246a6b8f7206fc3693dde6096ac36c5292a6a6bbe63e"
+    },
+    {
+      "bytes": 9200,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ms.json",
+      "sha256": "30a62f45c69dfd0891743e0662628d2ab280ff6b5fadded78396fafc889a688c"
+    },
+    {
+      "bytes": 9223,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-my.json",
+      "sha256": "b437251dbcf6de2c8c13c75ac491bb7930874c7641e0ee0bb732a9d5d4569306"
+    },
+    {
+      "bytes": 9177,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-nb.json",
+      "sha256": "7edc1817eb79912a646f1172a5f43892383dd82cce8830ffb2784c680963e14b"
+    },
+    {
+      "bytes": 9217,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ne.json",
+      "sha256": "c4a972d033d634ecb101618c2c4421c46e8ace051e6e5b9fdcb31196a4350e8a"
+    },
+    {
+      "bytes": 809,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-night-v8.json",
+      "sha256": "bcb18b6b4465987bb338b8350b2e7d01953a0b7685486db1d95f28c931d90040"
+    },
+    {
+      "bytes": 9197,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-nl.json",
+      "sha256": "5f8caf1517374294ae897dc50eb0fc6665ea157ccd6a8ff64c46274f5d478beb"
+    },
+    {
+      "bytes": 9215,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-or.json",
+      "sha256": "dc738ed75bb3f6d87800277958d7844435530eb323e566f3ba37e9876e86e771"
+    },
+    {
+      "bytes": 9184,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-pa.json",
+      "sha256": "791310245cec9f2f9c6402cc9d3a689d1bf68e4b25b1585d93411586194a14f1"
+    },
+    {
+      "bytes": 9195,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-pl.json",
+      "sha256": "e35b428b912145df60f3e058e2c20287592e9abb3478595aaf8baab54555d14c"
+    },
+    {
+      "bytes": 686,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-port.json",
+      "sha256": "3b795c0f5668d5c6f50bf0e66e15a161111a10551e9928497f5eea543d72a0ad"
+    },
+    {
+      "bytes": 9259,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-pt-rBR.json",
+      "sha256": "492432ee42f9352ed6c5d80eeb3dd2ffc682bf59d3112abe4ac0544ba98d6b08"
+    },
+    {
+      "bytes": 9264,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-pt-rPT.json",
+      "sha256": "bcd7114d73bb13f4ec3bd40304b6777156cbac1a572c24b75fb121a99432ff5e"
+    },
+    {
+      "bytes": 9203,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-pt.json",
+      "sha256": "597d4d0194e30b77bc0fa490a1fd900745342949a440a54916ef412b8fea4b03"
+    },
+    {
+      "bytes": 9211,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ro.json",
+      "sha256": "654a21c05d8a2d27e071d468bf30656606b13a33dca62c77fc591952d472abf2"
+    },
+    {
+      "bytes": 9188,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ru.json",
+      "sha256": "73f4885d69ed19defc8fd1d792c8514f1571596deace3c4374cfc23dc4c95a65"
+    },
+    {
+      "bytes": 9195,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-si.json",
+      "sha256": "8c7c83ab43a57edac03c9de199abf7489f2ced05b410ef8939dff8f1a895f0bf"
+    },
+    {
+      "bytes": 9190,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sk.json",
+      "sha256": "683e5c1ff5653c5a5155d2d2e663600b3e26d9afbe12ea2a1e36c93ccb708578"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sl.json",
+      "sha256": "a9a607f568f8f2524a8138dfe092bb09281488fcb2bc642243cfc77c1e8a3e43"
+    },
+    {
+      "bytes": 9196,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sq.json",
+      "sha256": "9ebf07520dacfe6a0343f954fce965865a1a99da95633281dde12094410afc76"
+    },
+    {
+      "bytes": 9195,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sr.json",
+      "sha256": "c29dff0752a69f7320e924dff46beea02f0a3f935995c22ba43ae4ca02fb2611"
+    },
+    {
+      "bytes": 9193,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sv.json",
+      "sha256": "b5993f7e840a0f7aba8882441d8ca73c6aaafd073c5197bf0c95dab450d82c2e"
+    },
+    {
+      "bytes": 9199,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sw.json",
+      "sha256": "de76029481ea9250209d993862994b9d5df8e877050f56861f9ca23de1731c21"
+    },
+    {
+      "bytes": 819,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sw600dp-v13.json",
+      "sha256": "8fdeea65efbeca4d6fc220246ebd5887cd79b512f643108b1c6077e4c4b03f96"
+    },
+    {
+      "bytes": 9231,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ta.json",
+      "sha256": "ebca2bdf2fd0fb73e0cda3a750f4baa8a54150312dbcb3b3f935fe103f7b740d"
+    },
+    {
+      "bytes": 9221,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-te.json",
+      "sha256": "fd61285b1610bf6792d4454e2dc1a58793959890c2644e9dfe9e0d3c1960e4c5"
+    },
+    {
+      "bytes": 9179,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-th.json",
+      "sha256": "efef01b8fabdf064122d257ea68f41b57f7934128bea1ea6685d1c3da662dd39"
+    },
+    {
+      "bytes": 9210,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-tl.json",
+      "sha256": "01892a9b2d33509ade9f804f64f8bd418575c9c7cff74427bde349b2978ac50f"
+    },
+    {
+      "bytes": 9183,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-tr.json",
+      "sha256": "6073b889e036a7d71ab286a88ba59d12b105446a7787a2f9a94cc211ce0be40c"
+    },
+    {
+      "bytes": 9195,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-uk.json",
+      "sha256": "a561dcc9d1e5ed98888b7fde352f3a212f8021d35347b28fb305df2d52b5c365"
+    },
+    {
+      "bytes": 9205,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ur.json",
+      "sha256": "f661fce6507ca3c26de5e7036990463e027b35ff096c11c45de64eef6d3f54c1"
+    },
+    {
+      "bytes": 9201,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-uz.json",
+      "sha256": "01ca9e165860aabede635f97af896a106c0715bf85463ef45ac546cc1e106a48"
+    },
+    {
+      "bytes": 723,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v16.json",
+      "sha256": "ab6769a45bb3534c67aa0121df7eff7c5c153f88e94763f94f3fa6a7b776d3ce"
+    },
+    {
+      "bytes": 1047,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v17.json",
+      "sha256": "aecae1f7e53896868d8f29cbca1fe7151ea7c4d22c78e5c61de3ba971db6d078"
+    },
+    {
+      "bytes": 681,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v18.json",
+      "sha256": "3675f74c160670e4816c68be5947240672051046756e2d1997d9a1fd8832cec0"
+    },
+    {
+      "bytes": 6377,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v21.json",
+      "sha256": "b6fd983bc0a7edb30eb40ba5015236db0ea395ee06f9bbee3bb424edd2f6816b"
+    },
+    {
+      "bytes": 1141,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v22.json",
+      "sha256": "6f694a7290b9146199f1814563335d40317e086f6194cb5f774d6d2c39551b7f"
+    },
+    {
+      "bytes": 2089,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v23.json",
+      "sha256": "db642832aa6270230b0be547c4dd60e08cf8611c852d2f88bc5b6c10ac3edd28"
+    },
+    {
+      "bytes": 699,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v24.json",
+      "sha256": "48d470d153dadbfbe869e8da6ee9fe8d13c11953054960ec2b0c71780664c265"
+    },
+    {
+      "bytes": 774,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v25.json",
+      "sha256": "01fa91fc4c87a0fa1a5d37674718eefbe0f6f2fc94129d4276ad5518b85bd7ee"
+    },
+    {
+      "bytes": 1217,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v26.json",
+      "sha256": "f88977b1ea68d8903efba9884ceb3c12c168ff88632390f7eabc91028bc4b0ee"
+    },
+    {
+      "bytes": 1141,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v28.json",
+      "sha256": "63fa0aa0904dbfdcc549b5145bf0cfa0f3a137245da3d0135f28d7bef0bada1d"
+    },
+    {
+      "bytes": 684,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v30.json",
+      "sha256": "65a2e045902eb3dc6e020387ace290866ec467eb5c75cd6a8e4f4ebe2e278ac8"
+    },
+    {
+      "bytes": 9195,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-vi.json",
+      "sha256": "f9155c8b7049f6e65a815de6c423a3f6b4a951f2820645a5c2b73aad5a6623b8"
+    },
+    {
+      "bytes": 782,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-watch-v20.json",
+      "sha256": "a4a70e9803d2272cf45619baaa34be2b1abf49e6a2150566a3a8b51fcc57e4b9"
+    },
+    {
+      "bytes": 783,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-watch-v21.json",
+      "sha256": "ca53070c85329bbfb99e05c132662bae75edc788396c23cc01e963b6227832c6"
+    },
+    {
+      "bytes": 781,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-xlarge-v4.json",
+      "sha256": "3df602255d7303035b789c753692c38d5bd70555d7507fc31028b1705b21869b"
+    },
+    {
+      "bytes": 9157,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-zh-rCN.json",
+      "sha256": "3d5d56f0753b13f68d4c724bc7a36f642d2e7fee7fd22c843fa62a36969c093c"
+    },
+    {
+      "bytes": 9157,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-zh-rHK.json",
+      "sha256": "675b214df4a737549b24b0f2754bfa466146141819c9d248093e596827e4756c"
+    },
+    {
+      "bytes": 9155,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-zh-rTW.json",
+      "sha256": "f5750326f81de161d845fa42f096663041a6c8202162c1dfa631ed08872058c6"
+    },
+    {
+      "bytes": 9209,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-zu.json",
+      "sha256": "8b90cef8a6e53c3c9618c194a99ade51bde769e22a8c0f6fb361c694bfae882f"
+    },
+    {
+      "bytes": 53783,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values.json",
+      "sha256": "0452ee777afeefee4425676c8b0fc863ad99600d8b5ffeb7e1940525aa9c36b1"
+    },
+    {
+      "bytes": 744,
+      "path": "wallet/mobile/android/app/build/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/single/mergeReleaseResources.json",
+      "sha256": "7ce717b374dfd357daa49ca9db65bced29008e7b09e144b08b0d307ffa9ba902"
+    },
+    {
+      "bytes": 2,
+      "path": "wallet/mobile/android/app/build/intermediates/navigation_json/debug/extractDeepLinksDebug/navigation.json",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "bytes": 2,
+      "path": "wallet/mobile/android/app/build/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "bytes": 425,
+      "path": "wallet/mobile/android/app/build/intermediates/optimized_processed_res/release/optimizeReleaseResources/output-metadata.json",
+      "sha256": "15783a5a51549f9dffeb786fd7b0eac7b49c73f9961852e9322e4ac5a8c21d45"
+    },
+    {
+      "bytes": 8793,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_manifests/debug/processDebugManifestForPackage/AndroidManifest.xml",
+      "sha256": "fe6a9aff625b48de95fae696d544ddd5f135a114ebc4a40aa2c47fc0ef9fe3dc"
+    },
+    {
+      "bytes": 407,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_manifests/debug/processDebugManifestForPackage/output-metadata.json",
+      "sha256": "b49d20aaa58ecad213037780f2751aa1380ff0047d53f235da1299ac6ba55006"
+    },
+    {
+      "bytes": 8500,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_manifests/release/processReleaseManifestForPackage/AndroidManifest.xml",
+      "sha256": "73f1ce16ac1714984b9cbfd6b8be2c802575a1c2439dd9981df07611b6255478"
+    },
+    {
+      "bytes": 409,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_manifests/release/processReleaseManifestForPackage/output-metadata.json",
+      "sha256": "60be98cbeaee2cc1f76ff951d3432e5887b00c92bf04ec131c3c789209dcbe4b"
+    },
+    {
+      "bytes": 412,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_res/debug/packageDebugResources/drawable/ic_mindchain.xml",
+      "sha256": "e62f2ada4f77f3ac19c04ec406f2341fde83b208cae2d277bf9a89b4f1f8dc3b"
+    },
+    {
+      "bytes": 1167,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_res/debug/packageDebugResources/raw/network_endpoints.json",
+      "sha256": "614887413d99379ae67ac9170afd8e79153e1fa43b0de0ee03cbeaf60e28e16d"
+    },
+    {
+      "bytes": 524,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_res/debug/packageDebugResources/values/values.xml",
+      "sha256": "b070c0391139a80907392cac4bd2aa24e850c16bc68d9cf541c421aab64baa20"
+    },
+    {
+      "bytes": 997,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_res/debug/packageDebugResources/xml/data_extraction_rules.xml",
+      "sha256": "7a74930f72025f22015e9ddad16be9fa44f80d46215381302116501f307bcd57"
+    },
+    {
+      "bytes": 254,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_res/debug/packageDebugResources/xml/network_security_config.xml",
+      "sha256": "dbc726438a7e99c69fdfc39146cd51ef8300dacb236843bbce3ecd2a1712a80f"
+    },
+    {
+      "bytes": 412,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_res/release/packageReleaseResources/drawable/ic_mindchain.xml",
+      "sha256": "e62f2ada4f77f3ac19c04ec406f2341fde83b208cae2d277bf9a89b4f1f8dc3b"
+    },
+    {
+      "bytes": 1167,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_res/release/packageReleaseResources/raw/network_endpoints.json",
+      "sha256": "614887413d99379ae67ac9170afd8e79153e1fa43b0de0ee03cbeaf60e28e16d"
+    },
+    {
+      "bytes": 524,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_res/release/packageReleaseResources/values/values.xml",
+      "sha256": "b070c0391139a80907392cac4bd2aa24e850c16bc68d9cf541c421aab64baa20"
+    },
+    {
+      "bytes": 997,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_res/release/packageReleaseResources/xml/data_extraction_rules.xml",
+      "sha256": "7a74930f72025f22015e9ddad16be9fa44f80d46215381302116501f307bcd57"
+    },
+    {
+      "bytes": 254,
+      "path": "wallet/mobile/android/app/build/intermediates/packaged_res/release/packageReleaseResources/xml/network_security_config.xml",
+      "sha256": "dbc726438a7e99c69fdfc39146cd51ef8300dacb236843bbce3ecd2a1712a80f"
+    },
+    {
+      "bytes": 96,
+      "path": "wallet/mobile/android/app/build/intermediates/signing_config_versions/debug/writeDebugSigningConfigVersions/signing-config-versions.json",
+      "sha256": "d31e2c0c006d0991d24ed5c92b3c0bf3a8d1c06869f419f2676c81b0b38f2ffa"
+    },
+    {
+      "bytes": 96,
+      "path": "wallet/mobile/android/app/build/intermediates/signing_config_versions/release/writeReleaseSigningConfigVersions/signing-config-versions.json",
+      "sha256": "d31e2c0c006d0991d24ed5c92b3c0bf3a8d1c06869f419f2676c81b0b38f2ffa"
+    },
+    {
+      "bytes": 29142,
+      "path": "wallet/mobile/android/app/build/intermediates/unit_test_lint_model/debug/generateDebugUnitTestLintModel/debug-artifact-dependencies.xml",
+      "sha256": "7833f8db2a53c4e07e0e21b86b7cd6acdbcc2c8c3350c80a1fb8954917119690"
+    },
+    {
+      "bytes": 55359,
+      "path": "wallet/mobile/android/app/build/intermediates/unit_test_lint_model/debug/generateDebugUnitTestLintModel/debug-artifact-libraries.xml",
+      "sha256": "579ff5f40bd890048de0045963b4fc89b63909a88784e0fc85b01a22e507d7a9"
+    },
+    {
+      "bytes": 975,
+      "path": "wallet/mobile/android/app/build/intermediates/unit_test_lint_model/debug/generateDebugUnitTestLintModel/debug.xml",
+      "sha256": "52b0bf4fab29c2999c588e3b88851232b2f2a7cd5ac187cd42bd7c05fde677fc"
+    },
+    {
+      "bytes": 653,
+      "path": "wallet/mobile/android/app/build/intermediates/unit_test_lint_model/debug/generateDebugUnitTestLintModel/module.xml",
+      "sha256": "5275b02c9ded05646da866fac31cd8e38472c6c158fff97eaa47ef96e9930561"
+    },
+    {
+      "bytes": 655,
+      "path": "wallet/mobile/android/app/build/intermediates/unit_test_lint_model/release/generateReleaseUnitTestLintModel/module.xml",
+      "sha256": "bb42c0cbba4d17bc3762c7e810c56d0557736c33cf74a24574330c53f35becfd"
+    },
+    {
+      "bytes": 27774,
+      "path": "wallet/mobile/android/app/build/intermediates/unit_test_lint_model/release/generateReleaseUnitTestLintModel/release-artifact-dependencies.xml",
+      "sha256": "3c79f86549313b155dab9069f7326e003544498ef0aaf055a599d086966b4811"
+    },
+    {
+      "bytes": 52609,
+      "path": "wallet/mobile/android/app/build/intermediates/unit_test_lint_model/release/generateReleaseUnitTestLintModel/release-artifact-libraries.xml",
+      "sha256": "2d1f2808e0f4c67944a149d04ee6e628c8748fd8b5a803c9ab484bf742d6cd7c"
+    },
+    {
+      "bytes": 970,
+      "path": "wallet/mobile/android/app/build/intermediates/unit_test_lint_model/release/generateReleaseUnitTestLintModel/release.xml",
+      "sha256": "f06e34c1af149f18a2b34db8f2b00cee4ba3ac679db34158be144f720269935d"
+    },
+    {
+      "bytes": 221,
+      "path": "wallet/mobile/android/app/build/intermediates/unit_test_lint_partial_results/debug/lintAnalyzeDebugUnitTest/out/lint-partial.xml",
+      "sha256": "7b36f6f440a473a77ee39b5d7bcf941d29025074c66a759043ff4570a83f94db"
+    },
+    {
+      "bytes": 221,
+      "path": "wallet/mobile/android/app/build/intermediates/unit_test_lint_partial_results/release/lintAnalyzeReleaseUnitTest/out/lint-partial.xml",
+      "sha256": "7b36f6f440a473a77ee39b5d7bcf941d29025074c66a759043ff4570a83f94db"
+    },
+    {
+      "bytes": 627,
+      "path": "wallet/mobile/android/app/build/kotlinToolingMetadata/kotlin-tooling-metadata.json",
+      "sha256": "18ca523e707ec62e6d72f1ef36bf934cdc60b8066ca1d930964a579c0ca996cc"
+    },
+    {
+      "bytes": 418,
+      "path": "wallet/mobile/android/app/build/outputs/apk/debug/output-metadata.json",
+      "sha256": "574feb631a5e23b0b5963fd4dcb112984662b3307ee924d9ddbbdbe21edb1d9c"
+    },
+    {
+      "bytes": 751,
+      "path": "wallet/mobile/android/app/build/outputs/apk/release/output-metadata.json",
+      "sha256": "d3f30200bc36536d5aee8f8b26d5cc0ba183fd70c5c8a19a73f58a27c9800b44"
+    },
+    {
+      "bytes": 12393,
+      "path": "wallet/mobile/android/app/build/reports/lint-results-debug.xml",
+      "sha256": "7e2b6f2ab2cfd97c9a56279af5594df6c1368b03646118221d43c4c44dc9b4d3"
+    },
+    {
+      "bytes": 12393,
+      "path": "wallet/mobile/android/app/build/reports/lint-results-release.xml",
+      "sha256": "7e2b6f2ab2cfd97c9a56279af5594df6c1368b03646118221d43c4c44dc9b4d3"
+    },
+    {
+      "bytes": 2036,
+      "path": "wallet/mobile/android/app/build.gradle.kts",
+      "sha256": "19933871314c775fa4f449f7e43ecf7e079c626720c2d593fb4f4da21ec729e4"
+    },
+    {
+      "bytes": 1004,
+      "path": "wallet/mobile/android/app/src/main/AndroidManifest.xml",
+      "sha256": "404ca1913f1a2bcf85570864f09f1771313648cb71989cdb7d0031ff1be40781"
+    },
+    {
+      "bytes": 5218,
+      "path": "wallet/mobile/android/app/src/main/java/org/noosphere/wallet/MainActivity.kt",
+      "sha256": "92eb0bf8fcbaa07f78684e9b258c19bfb6b7287b42a210c29ac8ce2df9bb031b"
+    },
+    {
+      "bytes": 3278,
+      "path": "wallet/mobile/android/app/src/main/java/org/noosphere/wallet/MindChainNetwork.kt",
+      "sha256": "774e61604180ec527d19d85c6b8ce85d776e521c64a43dbd638600985de46a72"
+    },
+    {
+      "bytes": 3054,
+      "path": "wallet/mobile/android/app/src/main/java/org/noosphere/wallet/MobileNodeWork.kt",
+      "sha256": "471f2fc30ab8e28b2753f93393d898fc609b3ac03677f5f554950b2d84d41c4c"
+    },
+    {
+      "bytes": 17990,
+      "path": "wallet/mobile/android/app/src/main/java/org/noosphere/wallet/WalletAppViewModel.kt",
+      "sha256": "b136dbd940d6b9e2374b452b69018ed144bf076df440c688b79e8590604d58e3"
+    },
+    {
+      "bytes": 22946,
+      "path": "wallet/mobile/android/app/src/main/java/org/noosphere/wallet/WalletScreen.kt",
+      "sha256": "a48f542a244b5ba29c4b4a811b396a043a5e70156eb8da390d40c53637be4fe7"
+    },
+    {
+      "bytes": 412,
+      "path": "wallet/mobile/android/app/src/main/res/drawable/ic_mindchain.xml",
+      "sha256": "e62f2ada4f77f3ac19c04ec406f2341fde83b208cae2d277bf9a89b4f1f8dc3b"
+    },
+    {
+      "bytes": 1167,
+      "path": "wallet/mobile/android/app/src/main/res/raw/network_endpoints.json",
+      "sha256": "614887413d99379ae67ac9170afd8e79153e1fa43b0de0ee03cbeaf60e28e16d"
+    },
+    {
+      "bytes": 486,
+      "path": "wallet/mobile/android/app/src/main/res/values/styles.xml",
+      "sha256": "0625ddef61a3e9131ea2a41047c2c13b3538db2570a5bdec3f87ea8846788e2e"
+    },
+    {
+      "bytes": 997,
+      "path": "wallet/mobile/android/app/src/main/res/xml/data_extraction_rules.xml",
+      "sha256": "7a74930f72025f22015e9ddad16be9fa44f80d46215381302116501f307bcd57"
+    },
+    {
+      "bytes": 254,
+      "path": "wallet/mobile/android/app/src/main/res/xml/network_security_config.xml",
+      "sha256": "dbc726438a7e99c69fdfc39146cd51ef8300dacb236843bbce3ecd2a1712a80f"
+    },
+    {
+      "bytes": 7680,
+      "path": "wallet/mobile/android/core/src/main/java/org/noosphere/wallet/core/MobileNodeSynchronizer.kt",
+      "sha256": "df4f84374ee2be6291fb64076ac96dfc3c5589abc67b42f3f500b6c77db9616c"
+    },
+    {
+      "bytes": 113699,
+      "path": "wallet/mobile/android/core/src/main/java/org/noosphere/wallet/core/noos_wallet_sdk.kt",
+      "sha256": "5aba5a1474319e1a876b0fe420bf7e714c0f9362d28a9f99fca148e7aac5ca23"
+    },
+    {
+      "bytes": 10768,
+      "path": "wallet/mobile/android/core/src/main/java/org/noosphere/wallet/core/WalletApiTransport.kt",
+      "sha256": "9166227d12230d9c0f7c97f55f9cb02f054a0fa1f03c251df3044e034c0ccb93"
+    },
+    {
+      "bytes": 1607992,
+      "path": "wallet/mobile/android/core/src/main/jniLibs/arm64-v8a/libnoos_wallet_sdk.so",
+      "sha256": "0d48786eae788e3e1dafa2812d1a7bbea2fccffa532f53b48cbfce4488dd2261"
+    },
+    {
+      "bytes": 1086880,
+      "path": "wallet/mobile/android/core/src/main/jniLibs/armeabi-v7a/libnoos_wallet_sdk.so",
+      "sha256": "86d53289394f8b3b7192bb2fb13794cb3822dd621883536048dc665d2ccefe26"
+    },
+    {
+      "bytes": 1663152,
+      "path": "wallet/mobile/android/core/src/main/jniLibs/x86_64/libnoos_wallet_sdk.so",
+      "sha256": "d9a1d3bc521201b0e8c18fc38b483c1771d8e2edfd935263e6417501485eca68"
+    }
+  ],
+  "platform": "android",
+  "profile": "release",
+  "schema": "noos/mobile-wallet-bindings/v1"
+}

@@ -6,6 +6,10 @@
 //! order, canonical `u32`-length-delimited bounded collections, strict
 //! whole-input decode.
 
+use crate::neural_oracle::{
+    EvaluateNeuralProgramV1, FinalizeNeuralOracleQueryV1, NeuralOracleCommitV1,
+    NeuralOracleQueryV1, NeuralOracleRevealV1, NeuralProgramV1,
+};
 use crate::wwm::{
     ArtifactDescriptorV1, ArtifactRepairPayloadV1, AvailabilityCertificateV2, AvailabilityPolicyV2,
     CapabilityMutationV1, CustodianCapabilityMutationV2, CustodyChallengeV2,
@@ -1122,8 +1126,8 @@ pub enum ActionV1 {
         stable_in: u128,
         min_collateral_out: u128,
     },
-    /// 40–59 — protocol-v2 WWM application state. Every payload is bounded
-    /// and typed; raw weights, prompts, token streams, and output are absent.
+    /// 40–59 — frozen protocol-v2 WWM core. Every payload is bounded and
+    /// typed; raw weights, prompts, token streams, and output are absent.
     RegisterArtifactDescriptor(ArtifactDescriptorV1),
     RegisterCustodianProfile(CustodianCapabilityMutationV2),
     RegisterAvailabilityPolicy(AvailabilityPolicyV2),
@@ -1144,10 +1148,18 @@ pub enum ActionV1 {
     SettleWwmJob(WwmSettlementV1),
     TransitionServingAlias(ServingAliasTransitionV1),
     TransitionWwmControl(TransitionWwmControlPayloadV1),
+    /// 60–65 — neutral neural-oracle application state. These actions have no
+    /// proposal, issuance, validator-membership, or finality weight.
+    RegisterNeuralProgram(NeuralProgramV1),
+    EvaluateNeuralProgram(EvaluateNeuralProgramV1),
+    OpenNeuralOracleQuery(NeuralOracleQueryV1),
+    CommitNeuralOracleReply(NeuralOracleCommitV1),
+    RevealNeuralOracleReply(NeuralOracleRevealV1),
+    FinalizeNeuralOracleQuery(FinalizeNeuralOracleQueryV1),
 }
 
 impl ActionV1 {
-    pub const VARIANT_COUNT: u16 = 60;
+    pub const VARIANT_COUNT: u16 = 66;
 }
 
 impl NoosEncode for ActionV1 {
@@ -1679,6 +1691,30 @@ impl NoosEncode for ActionV1 {
                 w.put_u16(59);
                 v.encode(w);
             }
+            ActionV1::RegisterNeuralProgram(v) => {
+                w.put_u16(60);
+                v.encode(w);
+            }
+            ActionV1::EvaluateNeuralProgram(v) => {
+                w.put_u16(61);
+                v.encode(w);
+            }
+            ActionV1::OpenNeuralOracleQuery(v) => {
+                w.put_u16(62);
+                v.encode(w);
+            }
+            ActionV1::CommitNeuralOracleReply(v) => {
+                w.put_u16(63);
+                v.encode(w);
+            }
+            ActionV1::RevealNeuralOracleReply(v) => {
+                w.put_u16(64);
+                v.encode(w);
+            }
+            ActionV1::FinalizeNeuralOracleQuery(v) => {
+                w.put_u16(65);
+                v.encode(w);
+            }
         }
     }
 }
@@ -1969,6 +2005,22 @@ impl NoosDecode for ActionV1 {
             )),
             59 => Ok(ActionV1::TransitionWwmControl(
                 TransitionWwmControlPayloadV1::decode(r)?,
+            )),
+            60 => Ok(ActionV1::RegisterNeuralProgram(NeuralProgramV1::decode(r)?)),
+            61 => Ok(ActionV1::EvaluateNeuralProgram(
+                EvaluateNeuralProgramV1::decode(r)?,
+            )),
+            62 => Ok(ActionV1::OpenNeuralOracleQuery(
+                NeuralOracleQueryV1::decode(r)?,
+            )),
+            63 => Ok(ActionV1::CommitNeuralOracleReply(
+                NeuralOracleCommitV1::decode(r)?,
+            )),
+            64 => Ok(ActionV1::RevealNeuralOracleReply(
+                NeuralOracleRevealV1::decode(r)?,
+            )),
+            65 => Ok(ActionV1::FinalizeNeuralOracleQuery(
+                FinalizeNeuralOracleQueryV1::decode(r)?,
             )),
             _ => Err(CodecError::UnknownDiscriminant),
         }

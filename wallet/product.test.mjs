@@ -14,6 +14,8 @@ const historicalDataRootEntries = [
 const productRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const productPages = ["site/index.html", "site/404.html", "explorer/index.html"];
 const anchors = (html) => [...html.matchAll(/<a\b[^>]*\bhref="([^"]+)"/g)].map((match) => match[1]);
+const trustedExternalLinks = new Set(["https://wwm-status.mindchain.network"]);
+const isExternalLink = (href) => /^[a-z]+:\/\//i.test(href);
 const readProductPage = async (page) => readFile(resolve(productRoot, page), "utf8");
 test("wallet identity is side by side and exact",()=>{ assert.equal(PRODUCT.bundleId,"network.mindchain.noosphere.wallet"); assert.equal(PRODUCT.scheme,"mindchain-noos://"); assert.equal(PRODUCT.scope,"/noosphere-wallet-v1/"); assert.equal(PRODUCT.cachePrefix,"mindchain-noosphere-v1"); for (const entry of historicalDataRootEntries) assert.throws(()=>assertFreshDataRoot([entry]),/historical_overwrite_forbidden/); });
 test("wallet rejects wrong chain before authorization",()=>{ assert.throws(()=>requireStatus(expected,{...expected,chain_id:"c".repeat(64)}),/wrong_protocol_identity/); });
@@ -29,7 +31,11 @@ test("static product pages prevent navigation dead ends",async()=>{
     assert.ok(links.some((href) => href === "index.html" || href === "../site/"), `${page} must link home`);
     assert.ok(links.filter((href) => !href.startsWith("#")).length >= 3, `${page} must offer recovery paths`);
     assert.equal(links.includes("#"), false, `${page} must not contain a placeholder link`);
-    assert.equal(links.some((href) => /^[a-z]+:\/\//i.test(href)), false, `${page} must not depend on external DNS`);
+    assert.deepEqual(
+      links.filter(isExternalLink).filter((href) => !trustedExternalLinks.has(href)),
+      [],
+      `${page} must not depend on untrusted external DNS`,
+    );
     if (html.includes("NOOSPHERE")) assert.match(html, /Technical provenance: NOOSPHERE research corpus/, `${page} may use NOOSPHERE only as technical provenance`);
   }
 });
@@ -37,6 +43,10 @@ test("every static product link resolves to a checked-in target",async()=>{
   for (const page of productPages) {
     const html = await readProductPage(page);
     for (const href of anchors(html)) {
+      if (isExternalLink(href)) {
+        assert.ok(trustedExternalLinks.has(href), `${page} has untrusted external target ${href}`);
+        continue;
+      }
       if (href.startsWith("#")) {
         assert.match(html, new RegExp(`\\bid="${href.slice(1)}"`), `${page} has missing fragment ${href}`);
         continue;

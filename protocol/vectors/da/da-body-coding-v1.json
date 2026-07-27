@@ -35,21 +35,21 @@
       "note": "body exactly fills data shard 0; shards 1..16 all zero"
     },
     {
-      "name": "coding-exact-max",
+      "name": "coding-64mib-adaptive",
       "kind": "positive",
       "bytes": "",
-      "content_root": "598a888c1fc117159ce36dadf24c436f1680674dbb5f28ce9b88e54d1440bd66",
-      "shard_root": "84f6105b1231904f32a604b9d5c8dcaa8f3f3cd568a60ce21c18833785d5588b",
-      "body_len": "1048576",
-      "note": "body exactly fills all 16 data shards; zero padding bytes"
+      "content_root": "234da6dc33f41c8a15f9cab6ed13af6514a1ee0f34a16a0b10c2c8c92228d8d7",
+      "shard_root": "2c2ff609b0eab3d4f69c0ac435c283feca935e015b0bcc3e149bfb96754b31c6",
+      "body_len": "67108864",
+      "note": "body fills 16 adaptive 4 MiB data shards below the 128 MiB cap"
     },
     {
       "name": "coding-max-plus-one",
       "kind": "negative",
       "bytes": "",
-      "body_len": "1048577",
+      "body_len": "134217729",
       "error_class": "body_too_large",
-      "note": "1,048,577 bytes exceed the 16 x 64 KiB data capacity"
+      "note": "one byte exceeds the adaptive 16 x 8 MiB data capacity"
     }
   ]
 }

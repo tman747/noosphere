@@ -25,6 +25,7 @@
 pub mod engine;
 pub mod fees;
 pub mod issuance;
+pub mod neural_oracle;
 pub mod objects;
 pub mod smt;
 pub mod state;
@@ -60,6 +61,26 @@ pub mod domains {
     /// D-OBJECT-ID:
     /// `object_id = H(ctx || creating_txid || action_index_u32_le || class_id_u32_le)`.
     pub const OBJECT_ID: &str = "NOOS/OBJECT/ID/V1";
+    /// D-NEURAL-ORACLE-PROGRAM-V1: immutable bounded trinary program identity.
+    pub const NEURAL_ORACLE_PROGRAM: &str = "NOOS/NEURAL-ORACLE/PROGRAM/V1";
+    /// D-NEURAL-ORACLE-INPUT-V1: exact neural input commitment.
+    pub const NEURAL_ORACLE_INPUT: &str = "NOOS/NEURAL-ORACLE/INPUT/V1";
+    /// D-NEURAL-ORACLE-TRANSCRIPT-V1: exact raw response transcript commitment.
+    pub const NEURAL_ORACLE_TRANSCRIPT: &str = "NOOS/NEURAL-ORACLE/TRANSCRIPT/V1";
+    /// D-NEURAL-ORACLE-REPLY-COMMIT-V1: reporter commit/reveal binding.
+    pub const NEURAL_ORACLE_REPLY_COMMIT: &str = "NOOS/NEURAL-ORACLE/REPLY-COMMIT/V1";
+    /// D-NEURAL-ORACLE-RESULT-V1: terminal result identity.
+    pub const NEURAL_ORACLE_RESULT: &str = "NOOS/NEURAL-ORACLE/RESULT/V1";
+    /// D-NEURAL-ORACLE-PROGRAM-KEY-V1: program object-tree key.
+    pub const NEURAL_ORACLE_PROGRAM_KEY: &str = "NOOS/NEURAL-ORACLE/PROGRAM-KEY/V1";
+    /// D-NEURAL-ORACLE-QUERY-KEY-V1: query object-tree key.
+    pub const NEURAL_ORACLE_QUERY_KEY: &str = "NOOS/NEURAL-ORACLE/QUERY-KEY/V1";
+    /// D-NEURAL-ORACLE-COMMIT-KEY-V1: reporter commit object-tree key.
+    pub const NEURAL_ORACLE_COMMIT_KEY: &str = "NOOS/NEURAL-ORACLE/COMMIT-KEY/V1";
+    /// D-NEURAL-ORACLE-REVEAL-KEY-V1: reporter reveal object-tree key.
+    pub const NEURAL_ORACLE_REVEAL_KEY: &str = "NOOS/NEURAL-ORACLE/REVEAL-KEY/V1";
+    /// D-NEURAL-ORACLE-RESULT-KEY-V1: terminal result object-tree key.
+    pub const NEURAL_ORACLE_RESULT_KEY: &str = "NOOS/NEURAL-ORACLE/RESULT-KEY/V1";
 }
 
 /// Domain-bound BLAKE3-256: `H(context_string || parts[0] || parts[1] || ...)`.

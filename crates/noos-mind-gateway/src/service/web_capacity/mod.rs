@@ -1,5 +1,5 @@
-mod config;
 pub mod benchmark;
+mod config;
 mod host;
 mod model;
 mod security;
@@ -18,12 +18,12 @@ use self::{
     model::{
         Acknowledgement, BrowserSession, Ed25519Signature, ErrorBody, ErrorResponse,
         HeartbeatRequest, HeartbeatResponse, HostRegistrationRequest, HostRegistrationResponse,
-        OfferRequest, ParticipantReport, RestoreReceipt, RestoreTask,
-        RestoredPositionImportPair, RevocationRequest, RevocationResponse, ShareAssignment,
-        StaticCacheLifecycleDisclosure, ACCESS_LOG_RETENTION_SECONDS,
-        ASSIGNMENT_SIGNATURE_DOMAIN, HOST_VERIFICATION_MAX_AGE_SECONDS, JSON_BODY_LIMIT,
-        MAX_ASSIGNMENT_ROWS, RESTORE_IMPORT_INDEX_RECORD_KIND,
-        RESTORE_IMPORT_INDEX_SIGNATURE_DOMAIN, RESTORE_TASK_SIGNATURE_DOMAIN, SCHEMA, SHARE_BYTES,
+        OfferRequest, ParticipantReport, RestoreReceipt, RestoreTask, RestoredPositionImportPair,
+        RevocationRequest, RevocationResponse, ShareAssignment, StaticCacheLifecycleDisclosure,
+        ACCESS_LOG_RETENTION_SECONDS, ASSIGNMENT_SIGNATURE_DOMAIN,
+        HOST_VERIFICATION_MAX_AGE_SECONDS, JSON_BODY_LIMIT, MAX_ASSIGNMENT_ROWS,
+        RESTORE_IMPORT_INDEX_RECORD_KIND, RESTORE_IMPORT_INDEX_SIGNATURE_DOMAIN,
+        RESTORE_TASK_SIGNATURE_DOMAIN, SCHEMA, SHARE_BYTES,
     },
     security::{
         canonical_https_origin, canonical_json, decode_hex32, domain_hash, domain_hash_hex,
@@ -125,7 +125,9 @@ pub struct HostRefreshReport {
 }
 
 enum HostRefreshOutcome {
-    Renewed { updated: bool },
+    Renewed {
+        updated: bool,
+    },
     AuthorizationRemoved {
         deactivated: bool,
     },
@@ -193,8 +195,7 @@ impl WebCapacityService {
                 max_active_assignments: config.max_active_assignments,
                 max_pending_restore_tasks: config.max_pending_restore_tasks,
                 max_quarantine_bytes: config.max_quarantine_bytes,
-                max_concurrent_restore_verifications:
-                    config.max_concurrent_restore_verifications,
+                max_concurrent_restore_verifications: config.max_concurrent_restore_verifications,
             },
         )?;
         let signer = Keypair::from_seed(config.coordinator_seed);
@@ -405,7 +406,6 @@ impl WebCapacityService {
         }
     }
 
-
     pub fn queue_restore(
         &self,
         session_token: &str,
@@ -472,8 +472,7 @@ impl WebCapacityService {
         }
         let now = now_seconds()?;
         if request.expires_at <= now
-            || request.expires_at
-                > now.saturating_add(self.inner.config.restore_lifetime_seconds)
+            || request.expires_at > now.saturating_add(self.inner.config.restore_lifetime_seconds)
         {
             return Err(WebCapacityError::InvalidRecord(
                 "admin restore expiry is outside the configured bounded lifetime".to_owned(),
@@ -544,9 +543,7 @@ impl WebCapacityService {
         generated_at: u64,
         expires_at: u64,
     ) -> Result<SignedRestoredPositionImportIndex> {
-        if target_position as usize >= noos_da::ARTIFACT_POSITIONS
-            || generated_at >= expires_at
-        {
+        if target_position as usize >= noos_da::ARTIFACT_POSITIONS || generated_at >= expires_at {
             return Err(WebCapacityError::InvalidRecord(
                 "restore import index position or validity interval is invalid".to_owned(),
             ));
@@ -563,8 +560,8 @@ impl WebCapacityService {
                 completed.len()
             )));
         }
-        let quarantine_metadata = fs::symlink_metadata(&self.inner.config.quarantine_dir)
-            .map_err(|error| {
+        let quarantine_metadata =
+            fs::symlink_metadata(&self.inner.config.quarantine_dir).map_err(|error| {
                 WebCapacityError::Store(format!("inspect quarantine root: {error}"))
             })?;
         if quarantine_metadata.file_type().is_symlink() || !quarantine_metadata.is_dir() {
@@ -572,8 +569,8 @@ impl WebCapacityService {
                 "quarantine root must be a non-symlink directory".to_owned(),
             ));
         }
-        let quarantine_root = fs::canonicalize(&self.inner.config.quarantine_dir)
-            .map_err(|error| {
+        let quarantine_root =
+            fs::canonicalize(&self.inner.config.quarantine_dir).map_err(|error| {
                 WebCapacityError::Store(format!("canonicalize quarantine root: {error}"))
             })?;
         let artifact_id = &self.inner.config.chain_binding.artifact_id;
@@ -808,9 +805,7 @@ impl WebCapacityService {
         unsigned_index
             .as_object_mut()
             .ok_or_else(|| {
-                WebCapacityError::InvalidRecord(
-                    "restore release index is not an object".to_owned(),
-                )
+                WebCapacityError::InvalidRecord("restore release index is not an object".to_owned())
             })?
             .remove("signature");
         verify_json_signature(
@@ -819,13 +814,9 @@ impl WebCapacityService {
             &index.signature.signature,
             &unsigned_index,
         )?;
-        let canonical_index = canonical_json(
-            &serde_json::to_value(index).map_err(|error| {
-                WebCapacityError::InvalidRecord(format!(
-                    "encode signed restore release index: {error}"
-                ))
-            })?,
-        )?;
+        let canonical_index = canonical_json(&serde_json::to_value(index).map_err(|error| {
+            WebCapacityError::InvalidRecord(format!("encode signed restore release index: {error}"))
+        })?)?;
         let import_index_sha256 = sha256_hex(&canonical_index);
         let manifest = &self.inner.canonical_manifest;
         let expected_bytes = (manifest.stripes.len() as u64)
@@ -914,9 +905,7 @@ impl WebCapacityService {
                 return Err(WebCapacityError::InvalidSignature);
             }
             let mut unsigned_task = serde_json::to_value(&row.task).map_err(|error| {
-                WebCapacityError::InvalidRecord(format!(
-                    "encode restore release task: {error}"
-                ))
+                WebCapacityError::InvalidRecord(format!("encode restore release task: {error}"))
             })?;
             unsigned_task
                 .as_object_mut()
@@ -973,10 +962,7 @@ impl WebCapacityService {
                 }
             }
             paths.push(expected_path);
-            release_pairs.push((
-                row.task.task_id.clone(),
-                row.receipt.quarantine_id.clone(),
-            ));
+            release_pairs.push((row.task.task_id.clone(), row.receipt.quarantine_id.clone()));
         }
         if !stored_by_stripe.is_empty() {
             return Err(WebCapacityError::Conflict(
@@ -1019,7 +1005,6 @@ impl WebCapacityService {
             insert_once: true,
         })
     }
-
 
     fn config_response(&self) -> CoordinatorConfigResponse {
         CoordinatorConfigResponse {
@@ -1129,8 +1114,7 @@ impl WebCapacityService {
                     DomainId::WwmWebAssignmentIdV1,
                     &[&session.token_hash, &now.to_le_bytes(), &rows_bytes],
                 )?;
-                let expires_at =
-                    now.saturating_add(self.inner.config.assignment_lifetime_seconds);
+                let expires_at = now.saturating_add(self.inner.config.assignment_lifetime_seconds);
                 let unsigned = json!({
                     "schema": SCHEMA,
                     "record_kind": "SHARE_ASSIGNMENT",
@@ -1170,9 +1154,7 @@ impl WebCapacityService {
                     );
                 let assignment: ShareAssignment =
                     serde_json::from_value(signed.clone()).map_err(|error| {
-                        WebCapacityError::Internal(format!(
-                            "decode signed assignment: {error}"
-                        ))
+                        WebCapacityError::Internal(format!("decode signed assignment: {error}"))
                     })?;
                 let body_json = serde_json::to_string(&signed).map_err(|error| {
                     WebCapacityError::Internal(format!("encode signed assignment: {error}"))
@@ -1828,11 +1810,7 @@ async fn restore_handler(
     }
 }
 
-fn validate_offer(
-    config: &WebCapacityConfig,
-    request: &OfferRequest,
-    origin: &str,
-) -> Result<()> {
+fn validate_offer(config: &WebCapacityConfig, request: &OfferRequest, origin: &str) -> Result<()> {
     if request.schema != SCHEMA
         || request.record_kind != "OFFER_REQUEST"
         || request.canonical_origin != origin
@@ -1889,7 +1867,6 @@ fn validate_revocation(request: &RevocationRequest, origin: &str) -> Result<()> 
     }
     Ok(())
 }
-
 
 fn validate_report(report: &ParticipantReport, origin: &str) -> Result<()> {
     if report.schema != SCHEMA

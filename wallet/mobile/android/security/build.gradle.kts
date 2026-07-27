@@ -1,15 +1,16 @@
 plugins {
-    id("com.android.library") version "8.5.2"
-    kotlin("android") version "2.0.20"
+    id("com.android.library")
+    kotlin("android")
 }
 
 android {
     namespace = "org.noosphere.wallet.security"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 31
         consumerProguardFiles("consumer-rules.pro")
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -20,4 +21,7 @@ android {
 
 dependencies {
     implementation("androidx.annotation:annotation:1.9.1")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }

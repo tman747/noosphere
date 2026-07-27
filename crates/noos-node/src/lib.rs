@@ -89,7 +89,6 @@ pub const RELEASE_VERSION: &str = match option_env!("NOOS_RELEASE_VERSION") {
     None => env!("CARGO_PKG_VERSION"),
 };
 
-
 /// 32-byte digest alias matching `noos_lumen::Hash32` (plain array).
 pub type Hash32 = [u8; 32];
 

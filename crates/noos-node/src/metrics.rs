@@ -32,6 +32,10 @@ impl Metrics {
         counter.fetch_add(1, Ordering::Relaxed);
     }
 
+    pub fn add(&self, counter: &AtomicU64, value: u64) {
+        counter.fetch_add(value, Ordering::Relaxed);
+    }
+
     /// Renders the Prometheus text exposition (every series `noos_*`).
     #[must_use]
     pub fn render(&self) -> String {

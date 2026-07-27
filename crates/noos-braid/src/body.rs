@@ -5,9 +5,9 @@
 //! a decode-level bound (`LengthExceedsBound` past it). Element families
 //! owned by other layers are reused, never re-declared:
 //!
-//! * `transactions[]` — `noos_lumen::objects::TransactionV1` (max 16384);
+//! * `transactions[]` — `noos_lumen::objects::TransactionV1` (max 1048576);
 //! * `segregated_witnesses[]` — `noos_lumen::objects::TransactionWitnessesV1`
-//!   (max 16384), positionally corresponding to `transactions[]`; the
+//!   (max 1048576), positionally corresponding to `transactions[]`; the
 //!   "keyed by txid" phrasing of ch01 §9.2 is realized by the `witness_root`
 //!   commitment, not by a redundant wire key;
 //! * `system_transitions[]` — opaque canonical bytes (max 256 elements,
@@ -33,10 +33,10 @@ use noos_lumen::objects::{
 
 use crate::header::{Bytes96, CheckpointRef};
 
-/// Maximum transactions per block (PROPOSED-G0).
-pub const MAX_TRANSACTIONS: u32 = 16384;
-/// Maximum segregated witness bundles per block (PROPOSED-G0).
-pub const MAX_SEGREGATED_WITNESSES: u32 = 16384;
+/// Maximum transactions per macroblock (PROPOSED-G0 high-throughput profile).
+pub const MAX_TRANSACTIONS: u32 = 1_048_576;
+/// Maximum segregated witness bundles per macroblock.
+pub const MAX_SEGREGATED_WITNESSES: u32 = 1_048_576;
 /// Maximum system transitions per block (PROPOSED-G0).
 pub const MAX_SYSTEM_TRANSITIONS: u32 = 256;
 /// Maximum finality certificates per block (PROPOSED-G0).
@@ -135,6 +135,35 @@ define_object! {
         5 => ground_ticket: GroundTicketWire,
         6 => loom_credit_claims: BoundedList<BoundedBytes<4096>, MAX_LOOM_CREDIT_CLAIMS>,
         7 => consensus_blob_descriptors: BoundedList<BlobDescriptorV1, MAX_CONSENSUS_BLOB_DESCRIPTORS>,
+    }
+}
+
+impl BlockBodyV1 {
+    /// Canonically encodes this body while substituting only the Ground
+    /// ticket. This preserves the exact object wire law without deep-cloning
+    /// high-throughput transaction and witness collections.
+    #[must_use]
+    pub fn encode_canonical_with_ground_ticket(&self, ticket: GroundTicketV1) -> Vec<u8> {
+        let estimated = 128_usize
+            .saturating_add(self.transactions.len().saturating_mul(384))
+            .saturating_add(self.segregated_witnesses.len().saturating_mul(192));
+        let mut writer = Writer::with_capacity(estimated);
+        writer.put_u16(Self::VERSION);
+        writer.put_mandatory_tag(1);
+        self.transactions.encode(&mut writer);
+        writer.put_mandatory_tag(2);
+        self.segregated_witnesses.encode(&mut writer);
+        writer.put_mandatory_tag(3);
+        self.system_transitions.encode(&mut writer);
+        writer.put_mandatory_tag(4);
+        self.finality_certificates.encode(&mut writer);
+        writer.put_mandatory_tag(5);
+        GroundTicketWire(ticket).encode(&mut writer);
+        writer.put_mandatory_tag(6);
+        self.loom_credit_claims.encode(&mut writer);
+        writer.put_mandatory_tag(7);
+        self.consensus_blob_descriptors.encode(&mut writer);
+        writer.into_bytes()
     }
 }
 

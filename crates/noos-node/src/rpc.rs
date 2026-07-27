@@ -10,12 +10,19 @@
 //! POST /submit_tx   {"tx":"<hex>","witnesses":"<hex>"} → txid;
 //!                   observer mode → 409 feature_disabled with the
 //!                   mechanism id, never empty success
+//! POST /submit_tx_batch
+//!                   {"transactions":[{"tx":"<hex>","witnesses":"<hex>"},...]}
+//!                   → input-aligned acceptance results
 //! GET  /model-resolution/<alias>
 //!                   finalized 17-leaf WWM graph plus canonical proof bytes;
 //!                   full model weights are never returned or stored on chain
 //! GET  /block/<height|hash-hex>
 //! GET  /wwm-record/<job|receipt|settlement>/<id>
 //!                   one canonical lifecycle record and its finalized object proof
+//! GET  /neural-oracle/<query-id>
+//!                   finalized raw neural result and its object proof
+//! GET  /neural-evaluation/<query-id>/<input-hex>
+//!                   finalized L1 program + result proofs and deterministic replay
 //! GET  /blocks/<start-height>/<limit> (authenticated, limit 1..64)
 //! GET  /receipt/<txid-hex>
 //! GET  /assets      fixed-supply user asset registry
@@ -45,11 +52,15 @@ use crate::view::{TxStatus, ViewLookup};
 use crate::Hash32;
 use noos_braid::EPOCH_LENGTH;
 use noos_codec::{NoosDecode, NoosEncode};
+use noos_lumen::neural_oracle::{
+    evaluate_neural_program, neural_input_root, neural_output_root, neural_program_key,
+    neural_result_id, neural_result_key, neural_transcript_root, validate_neural_program,
+    NeuralOracleMode, NeuralOracleResultV1, NeuralOracleStatus, NeuralProgramV1,
+};
 use noos_lumen::objects::BoundedBytes;
 use noos_lumen::wwm::{
     carrier_len_valid, ResolutionSelectorKind, ResolutionSelectorV1, ResolutionValueV1,
-    WwmControlMode, WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmSettlementV1,
-    MAX_TX_WITNESS_BYTES,
+    WwmControlMode, WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmSettlementV1, MAX_TX_WITNESS_BYTES,
 };
 
 /// RPC configuration.
@@ -125,6 +136,7 @@ pub fn start(
 // ---------------------------------------------------------------------------
 
 const MAX_REQUEST_BYTES: usize = 512 * 1024;
+const MAX_SUBMIT_BATCH: usize = 256;
 
 fn http(status: &str, content_type: &str, body: &str) -> String {
     format!(
@@ -228,12 +240,19 @@ fn handle_connection(
     match (method.as_str(), path.as_str()) {
         ("GET", "/status") => status_route(consensus_tx),
         ("POST", "/submit_tx") => submit_route(cfg, consensus_tx, &body),
+        ("POST", "/submit_tx_batch") => submit_batch_route(cfg, consensus_tx, &body),
         ("POST", "/simulate_tx") => simulate_route(consensus_tx, &body),
         _ if method == "GET" && path.starts_with("/model-resolution/") => {
             model_resolution_route(consensus_tx, &path["/model-resolution/".len()..])
         }
         _ if method == "GET" && path.starts_with("/wwm-record/") => {
             wwm_record_route(consensus_tx, &path["/wwm-record/".len()..])
+        }
+        _ if method == "GET" && path.starts_with("/neural-evaluation/") => {
+            neural_evaluation_route(consensus_tx, &path["/neural-evaluation/".len()..])
+        }
+        _ if method == "GET" && path.starts_with("/neural-oracle/") => {
+            neural_oracle_result_route(consensus_tx, &path["/neural-oracle/".len()..])
         }
         _ if method == "GET" && path.starts_with("/blocks/") => {
             blocks_route(consensus_tx, &path["/blocks/".len()..])
@@ -564,13 +583,7 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
         "job" => WwmLeafKind::Job,
         "receipt" => WwmLeafKind::Receipt,
         "settlement" => WwmLeafKind::Settlement,
-        _ => {
-            return json_error(
-                "400 Bad Request",
-                "malformed",
-                "unknown WWM record kind",
-            )
-        }
+        _ => return json_error("400 Bad Request", "malformed", "unknown WWM record kind"),
     };
     let Some(id) = unhex32(id_raw) else {
         return json_error("400 Bad Request", "malformed", "bad WWM record id");
@@ -593,9 +606,7 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
             "finalized WWM record lookup failed",
         );
     };
-    if !proof.verify()
-        || proof.state_key != noos_lumen::wwm::wwm_profile_key(kind, &id)
-    {
+    if !proof.verify() || proof.state_key != noos_lumen::wwm::wwm_profile_key(kind, &id) {
         return json_error(
             "500 Internal Server Error",
             "invalid_local_proof",
@@ -615,7 +626,13 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
                 "fund_profile_id": hex(&job.fund_profile_id),
                 "deadline_height": job.deadline_height,
             }),
-            _ => return json_error("500 Internal Server Error", "invalid_local_record", "job decode failed"),
+            _ => {
+                return json_error(
+                    "500 Internal Server Error",
+                    "invalid_local_record",
+                    "job decode failed",
+                )
+            }
         },
         WwmLeafKind::Receipt => match WwmReceiptV1::decode_canonical(value.as_slice()) {
             Ok(receipt) if receipt.receipt_id == id => serde_json::json!({
@@ -630,20 +647,30 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
                 "anchor_block": hex(&receipt.anchor_block),
                 "terminal_code": receipt.terminal_code as u8,
             }),
-            _ => return json_error("500 Internal Server Error", "invalid_local_record", "receipt decode failed"),
-        },
-        WwmLeafKind::Settlement => {
-            match WwmSettlementV1::decode_canonical(value.as_slice()) {
-                Ok(settlement) if settlement.settlement_id == id => serde_json::json!({
-                    "settlement_id": hex(&settlement.settlement_id),
-                    "job_id": hex(&settlement.job_id),
-                    "receipt_id": hex(&settlement.receipt_id),
-                    "fund_profile_id": hex(&settlement.fund_profile_id),
-                    "settled_height": settlement.settled_height,
-                }),
-                _ => return json_error("500 Internal Server Error", "invalid_local_record", "settlement decode failed"),
+            _ => {
+                return json_error(
+                    "500 Internal Server Error",
+                    "invalid_local_record",
+                    "receipt decode failed",
+                )
             }
-        }
+        },
+        WwmLeafKind::Settlement => match WwmSettlementV1::decode_canonical(value.as_slice()) {
+            Ok(settlement) if settlement.settlement_id == id => serde_json::json!({
+                "settlement_id": hex(&settlement.settlement_id),
+                "job_id": hex(&settlement.job_id),
+                "receipt_id": hex(&settlement.receipt_id),
+                "fund_profile_id": hex(&settlement.fund_profile_id),
+                "settled_height": settlement.settled_height,
+            }),
+            _ => {
+                return json_error(
+                    "500 Internal Server Error",
+                    "invalid_local_record",
+                    "settlement decode failed",
+                )
+            }
+        },
         _ => unreachable!("kind is closed above"),
     };
     let body = serde_json::json!({
@@ -668,6 +695,353 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
     }
 }
 
+fn neural_oracle_result_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> String {
+    let Some(query_id) = unhex32(raw) else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "expected /neural-oracle/<hex32>",
+        );
+    };
+    let Some(result) = round_trip(consensus_tx, |reply| ConsensusMsg::GetNeuralOracleResult {
+        query_id,
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "consensus task did not answer",
+        );
+    };
+    let Ok((height, finalized_hash, proof)) = result else {
+        return json_error(
+            "409 Conflict",
+            "finalized_state_unavailable",
+            "finalized neural-oracle result lookup failed",
+        );
+    };
+    if !proof.verify() || proof.state_key != neural_result_key(&query_id) {
+        return json_error(
+            "500 Internal Server Error",
+            "invalid_local_proof",
+            "local finalized neural-oracle proof failed verification",
+        );
+    }
+    let ResolutionValueV1::Present(value) = &proof.value else {
+        return json_error(
+            "404 Not Found",
+            "not_found",
+            "neural-oracle result is not finalized",
+        );
+    };
+    let result = match NeuralOracleResultV1::decode_canonical(value.as_slice()) {
+        Ok(result) if result.query_id == query_id => result,
+        _ => {
+            return json_error(
+                "500 Internal Server Error",
+                "invalid_local_record",
+                "neural-oracle result decode failed",
+            )
+        }
+    };
+    let mode = match result.mode {
+        NeuralOracleMode::L1Deterministic => "L1_DETERMINISTIC",
+        NeuralOracleMode::WwmQuorum => "WWM_QUORUM",
+    };
+    let status = match result.status {
+        NeuralOracleStatus::Success => "SUCCESS",
+        NeuralOracleStatus::NoQuorum => "NO_QUORUM",
+    };
+    let signer_profile_ids = result
+        .signer_profile_ids
+        .as_slice()
+        .iter()
+        .map(|profile_id| hex(profile_id))
+        .collect::<Vec<_>>();
+    let body = serde_json::json!({
+        "schema": "noos/finalized-neural-oracle-result/v1",
+        "trust_scope": "LOCAL_FULL_NODE_FINALIZED_STATE",
+        "query_id": hex(&result.query_id),
+        "result_id": hex(&result.result_id),
+        "mode": mode,
+        "status": status,
+        "source_id": hex(&result.source_id),
+        "execution_profile_id": hex(&result.execution_profile_id),
+        "input_root": hex(&result.input_root),
+        "raw_response_hex": hex(result.response.as_slice()),
+        "response_bytes": result.response.len(),
+        "output_root": hex(&result.output_root),
+        "transcript_root": hex(&result.transcript_root),
+        "signer_profile_ids": signer_profile_ids,
+        "result_finalized_height": result.finalized_height,
+        "finalized_height": height,
+        "finalized_hash": hex(&finalized_hash),
+        "objects_root": hex(&proof.objects_root),
+        "canonical_result_hex": hex(value.as_slice()),
+        "proof_hex": hex(&proof.encode_canonical()),
+    });
+    match serde_json::to_string(&body) {
+        Ok(body) => http("200 OK", "application/json", &body),
+        Err(_) => json_error(
+            "500 Internal Server Error",
+            "serialization_failed",
+            "neural-oracle result serialization failed",
+        ),
+    }
+}
+
+fn neural_evaluation_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> String {
+    let Some((raw_query_id, raw_input)) = raw.split_once('/') else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "expected /neural-evaluation/<hex32>/<input-hex>",
+        );
+    };
+    if raw_input.is_empty()
+        || raw_input.len() > 64
+        || raw_input.contains('/')
+        || !raw_input
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "input must be 1..32 lowercase hexadecimal bytes",
+        );
+    }
+    let Some(query_id) = unhex32(raw_query_id) else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "query id must be lowercase hex32",
+        );
+    };
+    let Some(input) = unhex(raw_input) else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "input must contain complete hexadecimal bytes",
+        );
+    };
+    let Some(result) = round_trip(consensus_tx, |reply| ConsensusMsg::GetNeuralEvaluation {
+        query_id,
+        reply,
+    }) else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "consensus task did not answer",
+        );
+    };
+    let Ok((height, finalized_hash, result_proof, program_proof)) = result else {
+        return json_error(
+            "409 Conflict",
+            "finalized_state_unavailable",
+            "finalized neural evaluation lookup failed",
+        );
+    };
+    if !result_proof.verify() || result_proof.state_key != neural_result_key(&query_id) {
+        return json_error(
+            "500 Internal Server Error",
+            "invalid_local_proof",
+            "local finalized neural result proof failed verification",
+        );
+    }
+    let ResolutionValueV1::Present(result_value) = &result_proof.value else {
+        return json_error(
+            "404 Not Found",
+            "not_found",
+            "neural evaluation result is not finalized",
+        );
+    };
+    let result = match NeuralOracleResultV1::decode_canonical(result_value.as_slice()) {
+        Ok(result) if result.query_id == query_id => result,
+        _ => {
+            return json_error(
+                "500 Internal Server Error",
+                "invalid_local_record",
+                "neural evaluation result failed canonical decoding",
+            )
+        }
+    };
+    if result.mode != NeuralOracleMode::L1Deterministic
+        || result.status != NeuralOracleStatus::Success
+    {
+        return json_error(
+            "409 Conflict",
+            "not_l1_deterministic",
+            "query is not a successful deterministic L1 neural evaluation",
+        );
+    }
+    let Some(program_proof) = program_proof else {
+        return json_error(
+            "500 Internal Server Error",
+            "invalid_local_record",
+            "deterministic result has no finalized program proof",
+        );
+    };
+    if !program_proof.verify()
+        || program_proof.objects_root != result_proof.objects_root
+        || program_proof.state_key != neural_program_key(&result.source_id)
+    {
+        return json_error(
+            "500 Internal Server Error",
+            "invalid_local_proof",
+            "local finalized neural program proof failed verification",
+        );
+    }
+    let ResolutionValueV1::Present(program_value) = &program_proof.value else {
+        return json_error(
+            "500 Internal Server Error",
+            "invalid_local_record",
+            "deterministic result names an absent neural program",
+        );
+    };
+    let program = match NeuralProgramV1::decode_canonical(program_value.as_slice()) {
+        Ok(program)
+            if program.program_id == result.source_id
+                && validate_neural_program(&program).is_ok() =>
+        {
+            program
+        }
+        _ => {
+            return json_error(
+                "500 Internal Server Error",
+                "invalid_local_record",
+                "finalized neural program failed validation",
+            )
+        }
+    };
+    if neural_input_root(&input) != result.input_root {
+        return json_error(
+            "422 Unprocessable Entity",
+            "input_commitment_mismatch",
+            "supplied input does not match the finalized input root",
+        );
+    }
+    let evaluation = match evaluate_neural_program(&program, &input) {
+        Ok(evaluation) => evaluation,
+        Err(_) => {
+            return json_error(
+                "422 Unprocessable Entity",
+                "invalid_input",
+                "supplied input does not satisfy the finalized program shape",
+            )
+        }
+    };
+    if evaluation.output.as_slice() != result.response.as_slice()
+        || neural_output_root(result.response.as_slice()) != result.output_root
+        || neural_transcript_root(result.response.as_slice()) != result.transcript_root
+        || neural_result_id(&query_id, &result.output_root, &result.transcript_root)
+            != result.result_id
+    {
+        return json_error(
+            "500 Internal Server Error",
+            "replay_mismatch",
+            "finalized neural result did not reproduce exactly",
+        );
+    }
+
+    let mut weight_counts = [0_u32; 3];
+    for weight in program
+        .hidden_weights
+        .as_slice()
+        .iter()
+        .chain(program.output_weights.as_slice())
+    {
+        let Some(count) = weight_counts.get_mut(usize::from(*weight)) else {
+            return json_error(
+                "500 Internal Server Error",
+                "invalid_local_record",
+                "finalized neural program contains an invalid trit",
+            );
+        };
+        *count = count.saturating_add(1);
+    }
+    let hidden_biases = program
+        .hidden_biases
+        .as_slice()
+        .iter()
+        .map(|value| i16::from(*value as i8))
+        .collect::<Vec<_>>();
+    let output_biases = program
+        .output_biases
+        .as_slice()
+        .iter()
+        .map(|value| i16::from(*value as i8))
+        .collect::<Vec<_>>();
+    let input_trits = input
+        .iter()
+        .map(|value| i16::from(*value) - 1)
+        .collect::<Vec<_>>();
+    let output_trits = result
+        .response
+        .as_slice()
+        .iter()
+        .map(|value| i16::from(*value) - 1)
+        .collect::<Vec<_>>();
+    let body = serde_json::json!({
+        "schema": "noos/finalized-neural-evaluation/v1",
+        "trust_scope": "LOCAL_FULL_NODE_FINALIZED_STATE",
+        "mode": "L1_DETERMINISTIC",
+        "status": "SUCCESS",
+        "query_id": hex(&result.query_id),
+        "result_id": hex(&result.result_id),
+        "program_id": hex(&program.program_id),
+        "shape": {
+            "input": program.input_width,
+            "hidden": program.hidden_width,
+            "output": program.output_width,
+        },
+        "program": {
+            "hidden_weights_hex": hex(program.hidden_weights.as_slice()),
+            "hidden_biases": hidden_biases,
+            "output_weights_hex": hex(program.output_weights.as_slice()),
+            "output_biases": output_biases,
+            "weight_counts": {
+                "negative": weight_counts[0],
+                "zero": weight_counts[1],
+                "positive": weight_counts[2],
+            },
+            "trit_encoding": {"0": -1, "1": 0, "2": 1},
+        },
+        "evaluation": {
+            "input_encoded": input,
+            "input_trits": input_trits,
+            "output_encoded": result.response.as_slice(),
+            "output_trits": output_trits,
+            "operations": evaluation.operations,
+            "replay_verified": true,
+            "input_verified": true,
+        },
+        "commitments": {
+            "input_root": hex(&result.input_root),
+            "output_root": hex(&result.output_root),
+            "transcript_root": hex(&result.transcript_root),
+        },
+        "evaluation_height": result.finalized_height,
+        "finalized_height": height,
+        "finalized_hash": hex(&finalized_hash),
+        "objects_root": hex(&result_proof.objects_root),
+        "proofs_verified": true,
+        "weights_on_chain": true,
+        "consensus_effect": "NONE",
+        "canonical_program_hex": hex(program_value.as_slice()),
+        "canonical_result_hex": hex(result_value.as_slice()),
+        "program_proof_hex": hex(&program_proof.encode_canonical()),
+        "result_proof_hex": hex(&result_proof.encode_canonical()),
+    });
+    match serde_json::to_string(&body) {
+        Ok(body) => http("200 OK", "application/json", &body),
+        Err(_) => json_error(
+            "500 Internal Server Error",
+            "serialization_failed",
+            "neural evaluation serialization failed",
+        ),
+    }
+}
 
 fn submit_route(cfg: &RpcConfig, consensus_tx: &SyncSender<ConsensusMsg>, body: &[u8]) -> String {
     if cfg.observer {
@@ -700,6 +1074,68 @@ fn submit_route(cfg: &RpcConfig, consensus_tx: &SyncSender<ConsensusMsg>, body: 
             "503 Service Unavailable",
             "consensus_unavailable",
             "no reply",
+        ),
+    }
+}
+
+fn submit_batch_route(
+    cfg: &RpcConfig,
+    consensus_tx: &SyncSender<ConsensusMsg>,
+    body: &[u8],
+) -> String {
+    if cfg.observer {
+        return feature_disabled(
+            "node.tx_submission.observer",
+            "observer mode: transaction submission is disabled on this node",
+        );
+    }
+    let Ok(envelopes) = decode_envelope_batch(body) else {
+        return json_error(
+            "400 Bad Request",
+            "malformed",
+            "expected 1..256 canonical hex transaction envelopes",
+        );
+    };
+    let submissions = envelopes
+        .into_iter()
+        .map(|(tx_bytes, wit_bytes)| (tx_bytes, wit_bytes, 1))
+        .collect();
+    let result = round_trip(consensus_tx, |reply| ConsensusMsg::SubmitTxBatch {
+        submissions,
+        reply,
+    });
+    let Some(results) = result else {
+        return json_error(
+            "503 Service Unavailable",
+            "consensus_unavailable",
+            "no reply",
+        );
+    };
+    let accepted = results.iter().filter(|result| result.is_ok()).count();
+    let items = results
+        .into_iter()
+        .map(|result| match result {
+            Ok(txid) => serde_json::json!({
+                "accepted": true,
+                "txid": hex(&txid),
+            }),
+            Err(error) => serde_json::json!({
+                "accepted": false,
+                "error": { "code": error.code() },
+            }),
+        })
+        .collect::<Vec<_>>();
+    let response = serde_json::json!({
+        "accepted": accepted,
+        "rejected": items.len().saturating_sub(accepted),
+        "results": items,
+    });
+    match serde_json::to_string(&response) {
+        Ok(body) => http("200 OK", "application/json", &body),
+        Err(_) => json_error(
+            "500 Internal Server Error",
+            "serialization_failed",
+            "batch response serialization failed",
         ),
     }
 }
@@ -756,10 +1192,7 @@ fn simulate_route(consensus_tx: &SyncSender<ConsensusMsg>, body: &[u8]) -> Strin
     }
 }
 
-fn decode_envelope(body: &[u8]) -> Result<(Vec<u8>, Vec<u8>), ()> {
-    let text = std::str::from_utf8(body).map_err(|_| ())?;
-    let tx_hex = json_str_field(text, "tx").ok_or(())?;
-    let witness_hex = json_str_field(text, "witnesses").ok_or(())?;
+fn decode_hex_envelope(tx_hex: &str, witness_hex: &str) -> Result<(Vec<u8>, Vec<u8>), ()> {
     if tx_hex
         .len()
         .checked_add(witness_hex.len())
@@ -767,12 +1200,42 @@ fn decode_envelope(body: &[u8]) -> Result<(Vec<u8>, Vec<u8>), ()> {
     {
         return Err(());
     }
-    let tx_bytes = unhex(&tx_hex).ok_or(())?;
-    let witness_bytes = unhex(&witness_hex).ok_or(())?;
+    let tx_bytes = unhex(tx_hex).ok_or(())?;
+    let witness_bytes = unhex(witness_hex).ok_or(())?;
     if !carrier_len_valid(tx_bytes.len(), witness_bytes.len()) {
         return Err(());
     }
     Ok((tx_bytes, witness_bytes))
+}
+
+fn decode_envelope(body: &[u8]) -> Result<(Vec<u8>, Vec<u8>), ()> {
+    let text = std::str::from_utf8(body).map_err(|_| ())?;
+    let tx_hex = json_str_field(text, "tx").ok_or(())?;
+    let witness_hex = json_str_field(text, "witnesses").ok_or(())?;
+    decode_hex_envelope(&tx_hex, &witness_hex)
+}
+
+fn decode_envelope_batch(body: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, ()> {
+    let value: serde_json::Value = serde_json::from_slice(body).map_err(|_| ())?;
+    let items = value
+        .get("transactions")
+        .and_then(serde_json::Value::as_array)
+        .filter(|items| (1..=MAX_SUBMIT_BATCH).contains(&items.len()))
+        .ok_or(())?;
+    items
+        .iter()
+        .map(|item| {
+            let tx_hex = item
+                .get("tx")
+                .and_then(serde_json::Value::as_str)
+                .ok_or(())?;
+            let witness_hex = item
+                .get("witnesses")
+                .and_then(serde_json::Value::as_str)
+                .ok_or(())?;
+            decode_hex_envelope(tx_hex, witness_hex)
+        })
+        .collect()
 }
 
 fn block_route(consensus_tx: &SyncSender<ConsensusMsg>, id_raw: &str) -> String {

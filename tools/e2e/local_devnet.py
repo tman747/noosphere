@@ -40,6 +40,12 @@ from live_smoke import (  # noqa: E402
 DEFAULT_RUNTIME = Path(os.environ.get("NOOS_LOCAL_DEVNET_DIR", "C:/tmp/noosphere-local-devnet"))
 DEFAULT_GENESIS_TIME_MS = 1_783_834_564_049
 PRODUCE_INTERVAL_MS = 6000
+MEMPOOL_MAX_TRANSACTIONS = 65_536
+MEMPOOL_MAX_BYTES = 64 * 1024 * 1024
+MEMPOOL_PER_SOURCE_PENDING = 65_536
+MEMPOOL_PER_ACCOUNT_PENDING = 65_536
+TEMPLATE_BYTE_BUDGET = 32 * 1024 * 1024
+TEMPLATE_MAX_TRANSACTIONS = 32_768
 RECIPIENT_SEED = hashlib.blake2b(
     b"noos-local-devnet/developer-account", digest_size=32
 ).hexdigest()
@@ -291,6 +297,18 @@ def run(runtime: Path, *, build: bool) -> int:
                 "--validator",
                 "--produce-interval-ms",
                 str(PRODUCE_INTERVAL_MS),
+                "--mempool-max-transactions",
+                str(MEMPOOL_MAX_TRANSACTIONS),
+                "--mempool-max-bytes",
+                str(MEMPOOL_MAX_BYTES),
+                "--mempool-per-source-pending",
+                str(MEMPOOL_PER_SOURCE_PENDING),
+                "--mempool-per-account-pending",
+                str(MEMPOOL_PER_ACCOUNT_PENDING),
+                "--template-byte-budget",
+                str(TEMPLATE_BYTE_BUDGET),
+                "--template-max-transactions",
+                str(TEMPLATE_MAX_TRANSACTIONS),
                 "--devnet-account",
                 recipient,
                 "--devnet-contract-fixture",
@@ -409,6 +427,14 @@ def run(runtime: Path, *, build: bool) -> int:
             "p2p": peer_addr,
             "rpc_token": TOKEN,
             "produce_interval_ms": PRODUCE_INTERVAL_MS,
+            "throughput": {
+                "mempool_max_transactions": MEMPOOL_MAX_TRANSACTIONS,
+                "mempool_max_bytes": MEMPOOL_MAX_BYTES,
+                "mempool_per_source_pending": MEMPOOL_PER_SOURCE_PENDING,
+                "mempool_per_account_pending": MEMPOOL_PER_ACCOUNT_PENDING,
+                "template_byte_budget": TEMPLATE_BYTE_BUDGET,
+                "template_max_transactions": TEMPLATE_MAX_TRANSACTIONS,
+            },
         }
         metadata_path.write_text(
             json.dumps(metadata, indent=2, sort_keys=True) + "\n",

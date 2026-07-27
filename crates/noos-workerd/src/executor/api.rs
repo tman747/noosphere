@@ -2,6 +2,7 @@
 
 use crate::config::ExecutorConfig;
 use crate::executor::availability::{AvailabilityGate, AvailabilitySnapshot};
+use crate::executor::neural_oracle::NeuralOracleJob;
 use crate::executor::residency::{Residency, ResidencyState};
 use crate::executor::scheduler::{AdmissionError, Cancellation, Scheduler};
 use crate::executor::security::token_matches;
@@ -18,6 +19,9 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use futures_util::stream::{self, Stream, StreamExt};
+use noos_lumen::neural_oracle::{
+    MAX_NEURAL_ORACLE_REPORTERS, MAX_NEURAL_ORACLE_RESPONSE_BYTES, NEURAL_ORACLE_QUORUM_THRESHOLD,
+};
 use serde::Deserialize;
 use serde_json::json;
 use std::collections::HashMap;
@@ -73,11 +77,7 @@ impl ApiState {
 
     #[cfg(test)]
     fn new_for_tests(config: ExecutorConfig, residency: Residency) -> Self {
-        Self::with_availability(
-            config,
-            residency,
-            AvailabilityGate::schedulable_fixture(),
-        )
+        Self::with_availability(config, residency, AvailabilityGate::schedulable_fixture())
     }
 }
 
@@ -185,6 +185,13 @@ async fn capabilities(
         "residency":residency, "max_context_tokens":state.config.scheduler.max_context_tokens,
         "max_output_tokens":state.config.scheduler.max_output_tokens,
         "max_concurrent":state.config.scheduler.max_concurrent,
+        "neural_oracle":{
+            "schema":"noos/neural-oracle-worker-artifacts/v1",
+            "commit_reveal":true,
+            "reporters":MAX_NEURAL_ORACLE_REPORTERS,
+            "threshold":NEURAL_ORACLE_QUORUM_THRESHOLD,
+            "max_response_bytes":MAX_NEURAL_ORACLE_RESPONSE_BYTES,
+        },
     })))
 }
 
@@ -227,22 +234,51 @@ async fn capacity_quote(
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct NeuralOracleRequest {
+    query_id: String,
+    reporter_profile_id: String,
+    nonce_hex: String,
+    max_response_bytes: u32,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct JobRequest {
     job_id: String,
     prompt: String,
     prompt_token_ids: Vec<u32>,
     runtime_token_ids: Vec<u32>,
     max_output_tokens: u32,
+    neural_oracle: Option<NeuralOracleRequest>,
 }
 
 async fn submit_job(
     State(state): State<ApiState>,
     headers: HeaderMap,
-    Json(request): Json<JobRequest>,
+    Json(mut request): Json<JobRequest>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
     authorize(&state, &headers)?;
     require_ready(&state)?;
-    decode_hex32(&request.job_id).ok_or(ApiError::BadRequest)?;
+    let job_id_bytes = decode_hex32(&request.job_id).ok_or(ApiError::BadRequest)?;
+    let neural_oracle = if let Some(context) = request.neural_oracle.as_mut() {
+        let query_id = decode_hex32(&context.query_id).ok_or(ApiError::BadRequest)?;
+        let reporter_profile_id =
+            decode_hex32(&context.reporter_profile_id).ok_or(ApiError::BadRequest)?;
+        let nonce = decode_hex32(&context.nonce_hex);
+        context.nonce_hex.zeroize();
+        Some(
+            NeuralOracleJob::new(
+                job_id_bytes,
+                query_id,
+                reporter_profile_id,
+                nonce.ok_or(ApiError::BadRequest)?,
+                context.max_response_bytes,
+            )
+            .map_err(|_| ApiError::BadRequest)?,
+        )
+    } else {
+        None
+    };
     LlamaCppAdapter::require_tokenizer_match(&request.prompt_token_ids, &request.runtime_token_ids)
         .map_err(|_| ApiError::BadRequest)?;
     let prompt_tokens =
@@ -314,27 +350,79 @@ async fn submit_job(
             }
         };
         let (chunks_tx, mut chunks_rx) = mpsc::channel(16);
-        let cancel = running.cancellation();
+        let child_cancel = running.cancellation();
+        let overflow_cancel = child_cancel.clone();
         let mut prompt = request.prompt.into_bytes();
         let execution = tokio::spawn(async move {
-            let result = run_child(&spec, &prompt, cancel, chunks_tx).await;
+            let result = run_child(&spec, &prompt, child_cancel, chunks_tx).await;
             prompt.zeroize();
             result
         });
+        let mut neural_response = neural_oracle
+            .as_ref()
+            .map(|context| Vec::with_capacity(context.max_response_bytes()));
+        let mut neural_response_oversized = false;
         while let Some(chunk) = chunks_rx.recv().await {
+            if let (Some(context), Some(response)) =
+                (neural_oracle.as_ref(), neural_response.as_mut())
+            {
+                if response
+                    .len()
+                    .checked_add(chunk.bytes.len())
+                    .is_none_or(|len| len > context.max_response_bytes())
+                {
+                    neural_response_oversized = true;
+                    overflow_cancel.cancel();
+                } else if !neural_response_oversized {
+                    response.extend_from_slice(&chunk.bytes);
+                }
+            }
             emit(&events, &sender, json!({"type":"token_bytes","sequence":chunk.sequence,"bytes_hex":encode_hex(&chunk.bytes),"incremental_root":encode_hex(&chunk.incremental_root)}).to_string());
         }
-        let (code, root) = match execution.await {
-            Ok(Ok(root)) => ("completed", Some(encode_hex(&root))),
-            Ok(Err(crate::runtime::process::ChildError::Cancelled)) => ("cancelled", None),
-            Ok(Err(crate::runtime::process::ChildError::Timeout)) => ("runtime_timeout", None),
-            _ => ("runtime_crash", None),
+        let execution_result = execution.await;
+        let terminal = if neural_response_oversized {
+            json!({"type":"terminal","code":"neural_response_oversized","output_root":null})
+        } else {
+            match execution_result {
+                Ok(Ok(root)) => match (neural_oracle.as_ref(), neural_response.as_deref()) {
+                    (Some(context), Some(response)) => match context.actions(response) {
+                        Ok(artifacts) if artifacts.output_root == root => json!({
+                            "type":"terminal",
+                            "code":"completed",
+                            "output_root":encode_hex(&root),
+                            "neural_oracle":{
+                                "schema":"noos/neural-oracle-worker-artifacts/v1",
+                                "raw_response_hex":encode_hex(response),
+                                "response_bytes":response.len(),
+                                "transcript_root":encode_hex(&artifacts.transcript_root),
+                                "commit_action_hex":encode_hex(&artifacts.commit_action),
+                                "reveal_action_hex":encode_hex(&artifacts.reveal_action),
+                            }
+                        }),
+                        Ok(_) => {
+                            json!({"type":"terminal","code":"runtime_output_mismatch","output_root":null})
+                        }
+                        Err(_) => {
+                            json!({"type":"terminal","code":"neural_artifact_failed","output_root":null})
+                        }
+                    },
+                    (None, None) => {
+                        json!({"type":"terminal","code":"completed","output_root":encode_hex(&root)})
+                    }
+                    _ => {
+                        json!({"type":"terminal","code":"neural_artifact_failed","output_root":null})
+                    }
+                },
+                Ok(Err(crate::runtime::process::ChildError::Cancelled)) => {
+                    json!({"type":"terminal","code":"cancelled","output_root":null})
+                }
+                Ok(Err(crate::runtime::process::ChildError::Timeout)) => {
+                    json!({"type":"terminal","code":"runtime_timeout","output_root":null})
+                }
+                _ => json!({"type":"terminal","code":"runtime_crash","output_root":null}),
+            }
         };
-        emit(
-            &events,
-            &sender,
-            json!({"type":"terminal","code":code,"output_root":root}).to_string(),
-        );
+        emit(&events, &sender, terminal.to_string());
     });
     Ok((
         StatusCode::ACCEPTED,
@@ -579,5 +667,63 @@ mod tests {
         assert!(!text.contains(&"44".repeat(32)));
         assert!(!text.contains("prompt"));
         assert!(text.contains(BONSAI_MODEL_NAME));
+        assert!(text.contains("noos/neural-oracle-worker-artifacts/v1"));
+        assert!(text.contains(r#""reporters":3"#));
+        assert!(text.contains(r#""threshold":2"#));
+    }
+
+    #[tokio::test]
+    async fn neural_oracle_context_is_job_bound_before_admission() {
+        let job_id = "ab".repeat(32);
+        let request_body = |query_id: String| {
+            json!({
+                "job_id": job_id,
+                "prompt": "hello",
+                "prompt_token_ids": [1],
+                "runtime_token_ids": [1],
+                "max_output_tokens": 1,
+                "neural_oracle": {
+                    "query_id": query_id,
+                    "reporter_profile_id": "bc".repeat(32),
+                    "nonce_hex": "cd".repeat(32),
+                    "max_response_bytes": 64
+                }
+            })
+            .to_string()
+        };
+        let invalid_state = test_state();
+        let invalid = router(invalid_state.clone())
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/internal/wwm/v1/jobs")
+                    .header(header::AUTHORIZATION, format!("Bearer {}", "44".repeat(32)))
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(request_body("ac".repeat(32))))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(invalid_state.scheduler.admitted(), 0);
+
+        let valid_state = test_state();
+        let valid = router(valid_state)
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/internal/wwm/v1/jobs")
+                    .header(header::AUTHORIZATION, format!("Bearer {}", "44".repeat(32)))
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(request_body(job_id.clone())))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(valid.status(), StatusCode::ACCEPTED);
+        let body = to_bytes(valid.into_body(), 32_768).await.unwrap();
+        let body = std::str::from_utf8(&body).unwrap();
+        assert!(body.contains(&job_id), "{body}");
+        assert!(body.contains("/internal/wwm/v1/jobs/"), "{body}");
     }
 }

@@ -66,8 +66,8 @@
       "required": ["wwm_v2_schema_sha256", "crypto_domains_sha256", "promotion_ledger_v2_sha256", "action_variant_count", "action_discriminants", "payload_tags", "resolver", "light_update", "transaction_bounds", "v1_wwm_decode"],
       "properties": {
         "wwm_v2_schema_sha256": {"$ref": "#/$defs/hash"}, "crypto_domains_sha256": {"$ref": "#/$defs/hash"},
-        "promotion_ledger_v2_sha256": {"$ref": "#/$defs/hash"}, "action_variant_count": {"const": 60},
-        "action_discriminants": {"const": [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59]},
+        "promotion_ledger_v2_sha256": {"$ref": "#/$defs/hash"}, "action_variant_count": {"const": 66},
+        "action_discriminants": {"const": [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65]},
         "payload_tags": {
           "type": "object", "additionalProperties": false,
           "required": ["41", "50", "52", "58", "59"],
@@ -78,7 +78,7 @@
             "59": {"const": ["Activate", "EmergencyDisable", "AuthorizeOperationalConfig", "ApplyOperationalConfig", "Recover"]}
           }
         },
-        "resolver": {"const": {"normal_max_bytes": 262144, "normal_max_proofs": 17, "authorized_max_bytes": 393216}},
+        "resolver": {"const": {"normal_max_bytes": 262144, "normal_max_proofs": 17, "authorized_max_bytes": 393216, "neural_target": "/neural-oracle/<query_id>", "neural_response_max_bytes": 16384}},
         "light_update": {"const": {"protocol": "/noos/sync/light-update/2", "min_items": 1, "max_items": 128, "max_item_bytes": 262144}},
         "transaction_bounds": {"const": {"action_call_max_bytes": 65536, "tx_plus_witness_max_bytes": 65532, "tx_push_prefix_bytes": 4, "tx_push_max_bytes": 65536}},
         "v1_wwm_decode": {"const": "REJECT"}
@@ -89,7 +89,7 @@
       "required": ["controls_enabled", "promotion_effect", "dns_cutover", "model_execution"],
       "properties": {
         "controls_enabled": {"const": false}, "promotion_effect": {"const": "NONE"},
-        "dns_cutover": {"const": "PROHIBITED"}, "model_execution": {"const": "OFF_CHAIN_ONLY"}
+        "dns_cutover": {"const": "PROHIBITED"}, "model_execution": {"const": "LARGE_MODELS_OFF_CHAIN_BOUNDED_L1_NEURAL_ONLY"}
       }
     },
     "toolchain_locks": {"type": "object", "minProperties": 1},

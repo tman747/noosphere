@@ -1,4 +1,23 @@
-# Desktop wallet live submission
+# Wallet live submission
+
+## Public iPhone wallet
+
+The installable Harbor PWA is served at
+`https://wwm.mindchain.network/wallet/`. On iPhone it requires Safari 17 or
+newer; install it with **Share → Add to Home Screen**. It generates an Ed25519
+key in the browser, stores only an AES-256-GCM encrypted vault in IndexedDB,
+and sends canonical transaction bytes plus signatures through the scoped
+public-testnet wallet gateway. Users must download the encrypted backup before
+clearing Safari data.
+
+The same-origin gateway exposes only fixed wallet operations: chain-bound
+transfer construction, exact validator simulation, signed-envelope relay, and
+a valueless `NOOS_TEST` faucet. Faucet claims are serialized, persisted, and
+limited per account, client address, and day. Generic WWM gateway routes remain
+read-only. The wallet is public-testnet-only (`production = false`) and must
+never be presented as a mainnet or value-bearing wallet.
+
+## Desktop wallet
 
 The desktop shell reads immutable chain identities from
 [`chain-profiles.json`](chain-profiles.json). The checked-in

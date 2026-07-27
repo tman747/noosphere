@@ -89,8 +89,7 @@ impl HostVerifier {
                 "inventory byte length or SHA-256 differs from the signed manifest".to_owned(),
             ));
         }
-        let inventory_value =
-            parse_canonical_json(&inventory_response.body, "static inventory")?;
+        let inventory_value = parse_canonical_json(&inventory_response.body, "static inventory")?;
         let inventory: StaticInventory =
             serde_json::from_value(inventory_value.clone()).map_err(|error| {
                 WebCapacityError::InvalidRecord(format!("invalid static inventory: {error}"))
@@ -297,10 +296,7 @@ impl HostVerifier {
                 ));
             }
 
-            let head = self
-                .fetcher
-                .head(&row.url, ARTIFACT_SHARE_BYTES)
-                .await?;
+            let head = self.fetcher.head(&row.url, ARTIFACT_SHARE_BYTES).await?;
             require_head_response(&head, &row.url)?;
 
             let range_start = (ARTIFACT_SHARE_BYTES / 2) as u64;
@@ -356,9 +352,8 @@ fn require_json_content_type(response: &super::security::FetchedResponse) -> Res
 }
 
 fn parse_canonical_json(bytes: &[u8], label: &str) -> Result<Value> {
-    let value: Value = serde_json::from_slice(bytes).map_err(|error| {
-        WebCapacityError::InvalidRecord(format!("decode {label}: {error}"))
-    })?;
+    let value: Value = serde_json::from_slice(bytes)
+        .map_err(|error| WebCapacityError::InvalidRecord(format!("decode {label}: {error}")))?;
     if canonical_json(&value)? != bytes {
         return Err(WebCapacityError::InvalidRecord(format!(
             "{label} wire bytes are not RFC-8785 canonical JSON"
@@ -464,9 +459,7 @@ fn require_content_length(
     Ok(())
 }
 
-fn require_immutable_transport_headers(
-    response: &super::security::FetchedResponse,
-) -> Result<()> {
+fn require_immutable_transport_headers(response: &super::security::FetchedResponse) -> Result<()> {
     require_cors_and_content_encoding(response)?;
     if response
         .headers
@@ -489,7 +482,9 @@ fn require_immutable_transport_headers(
         let directive = directive.trim();
         let (name, value) = directive
             .split_once('=')
-            .map_or((directive, None), |(name, value)| (name.trim(), Some(value.trim())));
+            .map_or((directive, None), |(name, value)| {
+                (name.trim(), Some(value.trim()))
+            });
         if name.eq_ignore_ascii_case("public") {
             public = true;
         } else if name.eq_ignore_ascii_case("immutable") {
@@ -535,9 +530,7 @@ fn parse_cache_seconds(value: Option<&str>, directive: &str) -> Result<u64> {
         })
 }
 
-fn require_cors_and_content_encoding(
-    response: &super::security::FetchedResponse,
-) -> Result<()> {
+fn require_cors_and_content_encoding(response: &super::security::FetchedResponse) -> Result<()> {
     if response
         .headers
         .get("access-control-allow-origin")
@@ -548,9 +541,11 @@ fn require_cors_and_content_encoding(
             "share response lacks wildcard CORS".to_owned(),
         ));
     }
-    if response.headers.get("content-encoding").is_some_and(|value| {
-        !value.trim().eq_ignore_ascii_case("identity")
-    }) {
+    if response
+        .headers
+        .get("content-encoding")
+        .is_some_and(|value| !value.trim().eq_ignore_ascii_case("identity"))
+    {
         return Err(WebCapacityError::InvalidRecord(
             "share response Content-Encoding is not identity".to_owned(),
         ));
@@ -623,10 +618,7 @@ mod tests {
             Ok(())
         }
 
-        fn checkpoint_stripe(
-            &mut self,
-            _stripe: u32,
-        ) -> std::result::Result<(), ArtifactError> {
+        fn checkpoint_stripe(&mut self, _stripe: u32) -> std::result::Result<(), ArtifactError> {
             Ok(())
         }
 
@@ -684,9 +676,11 @@ mod tests {
             url: SHARE_URL.to_owned(),
         }];
         let rows_value = serde_json::to_value(&rows).unwrap();
-        let inventory_root =
-            domain_hash_hex(DomainId::WwmWebInventoryV1, &[&canonical_json(&rows_value).unwrap()])
-                .unwrap();
+        let inventory_root = domain_hash_hex(
+            DomainId::WwmWebInventoryV1,
+            &[&canonical_json(&rows_value).unwrap()],
+        )
+        .unwrap();
         let now = now_seconds().unwrap();
         let inventory = StaticInventory {
             schema: SCHEMA.to_owned(),
@@ -698,8 +692,7 @@ mod tests {
             rows,
             inventory_root: inventory_root.clone(),
         };
-        let inventory_body =
-            canonical_json(&serde_json::to_value(&inventory).unwrap()).unwrap();
+        let inventory_body = canonical_json(&serde_json::to_value(&inventory).unwrap()).unwrap();
         let license = b"Apache License 2.0 test fixture".to_vec();
         let notice = b"NOOS test fixture notice".to_vec();
         let signer = Keypair::from_seed(SIGNING_SEED);
@@ -830,8 +823,8 @@ mod tests {
     }
 
     fn duplicate_schema_key(canonical: &[u8]) -> Vec<u8> {
-        let mut duplicate = format!("{{\"schema\":{},", serde_json::to_string(SCHEMA).unwrap())
-            .into_bytes();
+        let mut duplicate =
+            format!("{{\"schema\":{},", serde_json::to_string(SCHEMA).unwrap()).into_bytes();
         duplicate.extend_from_slice(&canonical[1..]);
         duplicate
     }
@@ -897,10 +890,7 @@ mod tests {
                     ARTIFACT_SHARE_BYTES
                 };
                 let mut headers = BTreeMap::new();
-                headers.insert(
-                    "content-range".to_owned(),
-                    format!("bytes */{total}"),
-                );
+                headers.insert("content-range".to_owned(), format!("bytes */{total}"));
                 headers.insert("access-control-allow-origin".to_owned(), "*".to_owned());
                 headers.insert("content-encoding".to_owned(), "identity".to_owned());
                 return Ok(FetchedResponse {
@@ -915,10 +905,7 @@ mod tests {
                 body.pop();
             }
             let mut headers = share_headers(self.fault);
-            headers.insert(
-                "content-length".to_owned(),
-                (end - start + 1).to_string(),
-            );
+            headers.insert("content-length".to_owned(), (end - start + 1).to_string());
             let content_range = if matches!(self.fault, Fault::BadPartialContent) {
                 format!("bytes {start}-{end}/{}", ARTIFACT_SHARE_BYTES - 1)
             } else {

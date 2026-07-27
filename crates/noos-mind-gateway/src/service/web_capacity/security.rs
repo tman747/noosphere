@@ -205,13 +205,8 @@ impl HostFetcher for ReqwestHostFetcher {
         end: u64,
         maximum_bytes: usize,
     ) -> Result<FetchedResponse> {
-        self.request(
-            Method::GET,
-            url,
-            Some((start, end)),
-            maximum_bytes,
-        )
-        .await
+        self.request(Method::GET, url, Some((start, end)), maximum_bytes)
+            .await
     }
 }
 
@@ -428,9 +423,7 @@ fn exact_loopback_destination(host: &str, port: u16) -> Result<SocketAddr> {
             "loopback test transport rejects DNS names and requires a literal address".to_owned(),
         )
     })?;
-    if address != IpAddr::V4(Ipv4Addr::LOCALHOST)
-        && address != IpAddr::V6(Ipv6Addr::LOCALHOST)
-    {
+    if address != IpAddr::V4(Ipv4Addr::LOCALHOST) && address != IpAddr::V6(Ipv6Addr::LOCALHOST) {
         return Err(WebCapacityError::Ssrf(
             "loopback test transport permits only exact 127.0.0.1 or ::1".to_owned(),
         ));

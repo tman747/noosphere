@@ -401,7 +401,7 @@ input[type="text"][aria-invalid="true"] { border-color: var(--danger); }
   transition: background-color 140ms var(--ease-out), transform 80ms var(--ease-out);
 }
 
-.btn-launch:hover:not(:disabled) { background: #b9e373; }
+.btn-launch:hover:not(:disabled) { background: #8f290c; }
 
 .btn-launch:active:not(:disabled) { transform: translateY(1px); }
 

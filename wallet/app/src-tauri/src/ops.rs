@@ -10,6 +10,7 @@ use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 use thiserror::Error;
+use zeroize::Zeroizing;
 
 const API_VERSION: &str = "v1";
 const PROTOCOL_VERSION: &str = "v1";
@@ -42,6 +43,8 @@ pub enum OpsError {
     MalformedStatus,
     #[error("stale_status")]
     StaleStatus,
+    #[error("indexer_unavailable")]
+    IndexerUnavailable,
     #[error("wrong_protocol_identity")]
     WrongProtocolIdentity,
     #[error("invalid_transaction")]
@@ -171,11 +174,10 @@ fn chain_profile(id: &str) -> Result<ChainProfile, OpsError> {
         .ok_or(OpsError::UnknownChainProfile)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct DeriveRequest {
-    pub seed_hex: String,
+    pub seed_hex: Zeroizing<String>,
     pub purpose: String,
-    #[serde(default)]
     pub suite: Option<u32>,
     pub account: u32,
     pub index: u32,
@@ -192,7 +194,7 @@ pub struct DeriveResponse {
 /// Derive an authority and return only public identifiers.
 pub fn derive(req: &DeriveRequest) -> Result<DeriveResponse, OpsError> {
     let purpose = parse_purpose(&req.purpose, req.suite)?;
-    let seed = parse_seed(&req.seed_hex)?;
+    let seed = Zeroizing::new(parse_seed(&req.seed_hex)?);
     let path = derivation_path(purpose, req.account, req.index)?;
     let mut bytes = String::with_capacity(path.len().saturating_mul(8));
     let mut path_hex = Vec::with_capacity(path.len());
@@ -216,10 +218,10 @@ pub fn derive(req: &DeriveRequest) -> Result<DeriveResponse, OpsError> {
     })
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct SubmitRequest {
     pub profile_id: String,
-    pub seed_hex: String,
+    pub seed_hex: Zeroizing<String>,
     pub account: u32,
     pub index: u32,
     pub signer_scope: u8,
@@ -302,6 +304,12 @@ struct ChainPoint {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct LiveStatus {
+    #[serde(default)]
+    readiness: Option<String>,
+    #[serde(default)]
+    ready: Option<bool>,
+    #[serde(default)]
+    indexed_generation: Option<String>,
     chain_id: String,
     genesis_hash: String,
     protocol_version: String,
@@ -352,6 +360,21 @@ fn fetch_status(
     }
     let status: LiveStatus =
         serde_json::from_str(&reply.body).map_err(|_| OpsError::MalformedStatus)?;
+    if status.ready == Some(false)
+        || status
+            .readiness
+            .as_deref()
+            .is_some_and(|readiness| readiness != "ready")
+    {
+        return Err(OpsError::IndexerUnavailable);
+    }
+    if status
+        .indexed_generation
+        .as_deref()
+        .is_some_and(|generation| parse_decimal_u64(generation).is_err())
+    {
+        return Err(OpsError::MalformedStatus);
+    }
     for hash in [
         &status.chain_id,
         &status.genesis_hash,
@@ -645,7 +668,7 @@ fn submit_with_client(
 pub fn submit(req: &SubmitRequest) -> Result<SubmitResponse, OpsError> {
     // Parse once before any network access; seed material never enters an
     // error string, log message, response, or persistent structure.
-    parse_seed(&req.seed_hex)?;
+    let _seed = Zeroizing::new(parse_seed(&req.seed_hex)?);
     let profile = chain_profile(&req.profile_id)?;
     submit_with_client(req, &profile, &mut LivePublicApiClient)
 }
@@ -730,6 +753,9 @@ mod tests {
             })
         };
         json!({
+            "readiness": "ready",
+            "ready": true,
+            "indexed_generation": "7",
             "chain_id": profile.chain_id,
             "genesis_hash": profile.genesis_hash,
             "protocol_version": "v1",
@@ -781,7 +807,7 @@ mod tests {
         });
         SubmitRequest {
             profile_id: profile.id.clone(),
-            seed_hex,
+            seed_hex: Zeroizing::new(seed_hex),
             account: 0,
             index: 0,
             signer_scope: 0,
@@ -804,6 +830,26 @@ mod tests {
         client.reply(200, status(profile, 10));
         client.reply(200, note());
         client
+    }
+
+    #[test]
+    fn configured_profiles_expose_all_public_valueless_testnet_indexers() {
+        let profiles = chain_profiles().unwrap();
+        assert_eq!(profiles.len(), 4);
+        assert_eq!(profiles[0].id, "local-live-devnet");
+        let public: Vec<_> = profiles
+            .iter()
+            .filter(|profile| profile.id.starts_with("public-valueless-testnet-"))
+            .collect();
+        assert_eq!(public.len(), 3);
+        assert!(public.iter().all(|profile| {
+            profile.chain_id
+                == "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b"
+                && profile.genesis_hash
+                    == "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e"
+                && profile.api_base_url.starts_with("https://")
+                && profile.max_freshness_ms == "15000"
+        }));
     }
 
     #[test]
@@ -848,6 +894,17 @@ mod tests {
         assert_eq!(
             submit_with_client(&req, &profile, &mut client),
             Err(OpsError::WrongProtocolIdentity)
+        );
+        assert_eq!(client.requests.len(), 1);
+
+        let mut rebuilding = status(&profile, 10);
+        rebuilding["readiness"] = json!("rebuilding");
+        rebuilding["ready"] = json!(false);
+        let mut client = ScriptedClient::default();
+        client.reply(200, rebuilding);
+        assert_eq!(
+            submit_with_client(&req, &profile, &mut client),
+            Err(OpsError::IndexerUnavailable)
         );
         assert_eq!(client.requests.len(), 1);
     }

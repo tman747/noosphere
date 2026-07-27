@@ -14,14 +14,14 @@
 //!               b"m/head"                    -> head block hash
 //!               b"m/final"                   -> finalized CheckpointRef (canonical)
 //!               b"m/just"                    -> justified CheckpointRef (canonical)
-//! Receipts CF:  txid(32)                     -> height u64 LE ++ canonical ReceiptV1
+//! Receipts CF:  reserved; authenticated receipts live in Lumen state
 //! Blobs      :  body_da_root                 -> served canonical body bytes
 //! ```
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use noos_lumen::state::LumenRoots;
+use noos_lumen::state::{LumenRoots, TreeId};
 use noos_store::{Cf, RealVfs, Store, StoreConfig, WriteSet};
 
 use crate::{Hash32, NodeError};
@@ -73,7 +73,7 @@ pub type ScanEntries = Vec<(Vec<u8>, Vec<u8>)>;
 /// Storage surface the consensus core requires. Every mutation is
 /// `&mut self`: the single-writer law extends through storage.
 pub trait StorePort: Send {
-    fn commit(&mut self, ws: &WriteSet) -> Result<u64, NodeError>;
+    fn commit(&mut self, ws: WriteSet) -> Result<u64, NodeError>;
     /// Fsync-backed safety record (persist-before-vote / beacon barrier).
     fn persist_safety(&mut self, kind: u16, payload: &[u8]) -> Result<u64, NodeError>;
     /// Durability barrier: previously acked writes survive a crash.
@@ -127,7 +127,7 @@ fn map_open_err(e: noos_store::StoreError) -> NodeError {
 }
 
 impl StorePort for InProcStore {
-    fn commit(&mut self, ws: &WriteSet) -> Result<u64, NodeError> {
+    fn commit(&mut self, ws: WriteSet) -> Result<u64, NodeError> {
         Ok(self.store.commit(ws)?)
     }
     fn persist_safety(&mut self, kind: u16, payload: &[u8]) -> Result<u64, NodeError> {
@@ -146,7 +146,24 @@ impl StorePort for InProcStore {
         Ok(self.store.get_index(key)?)
     }
     fn get_receipt(&self, key: &[u8]) -> Result<Option<Vec<u8>>, NodeError> {
-        Ok(self.store.get_receipt(key)?)
+        let Some(index) = self.store.get_receipt(key)? else {
+            return Ok(None);
+        };
+        let height = index.get(..8).ok_or(NodeError::BodyMismatch {
+            what: "receipt height index",
+        })?;
+        let txid: Hash32 = key.try_into().map_err(|_| NodeError::BodyMismatch {
+            what: "receipt key",
+        })?;
+        let receipt = self.store.get_state(TreeId::Receipts, &txid, None)?.ok_or(
+            NodeError::BodyMismatch {
+                what: "receipt state index",
+            },
+        )?;
+        let mut value = Vec::with_capacity(height.len().saturating_add(receipt.len()));
+        value.extend_from_slice(height);
+        value.extend_from_slice(&receipt);
+        Ok(Some(value))
     }
     fn get_blob(&self, hash: &Hash32) -> Result<Option<Vec<u8>>, NodeError> {
         Ok(self.store.get_blob(hash)?)

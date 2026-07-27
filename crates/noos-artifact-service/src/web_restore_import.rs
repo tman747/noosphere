@@ -22,8 +22,7 @@ use url::Url;
 
 pub const IMPORT_INDEX_SCHEMA: &str = "noos/wwm-web-capacity/v1";
 pub const IMPORT_INDEX_RECORD_KIND: &str = "WEB_RESTORED_POSITION_IMPORT_INDEX";
-pub const IMPORT_INDEX_SIGNATURE_DOMAIN: &str =
-    "NOOS/SIG/WWM-WEB-RESTORE-IMPORT-INDEX/V1";
+pub const IMPORT_INDEX_SIGNATURE_DOMAIN: &str = "NOOS/SIG/WWM-WEB-RESTORE-IMPORT-INDEX/V1";
 pub const RESTORE_TASK_SIGNATURE_DOMAIN: &str = "NOOS/SIG/WWM-WEB-RESTORE-TASK/V1";
 const MAX_IMPORT_INDEX_BYTES: u64 = 2 * 1024 * 1024;
 
@@ -192,7 +191,9 @@ fn import_web_restored_position_at(
         .map_err(|error| format!("validate canonical source manifest: {error}"))?;
     let manifest_root = hex::encode(manifest.manifest_root().as_bytes());
     if manifest_root != index.chain_binding.manifest_root {
-        return Err("import index manifest_root does not match canonical source manifest".to_owned());
+        return Err(
+            "import index manifest_root does not match canonical source manifest".to_owned(),
+        );
     }
     if index.rows.len() != manifest.stripes.len() {
         return Err(format!(
@@ -275,12 +276,9 @@ fn import_web_restored_position_at(
                     &mut reopened_share,
                 )
                 .map_err(|error| format!("reopen replacement share: {error}"))?;
-            let commitment = share_commitment(
-                stripe.stripe_index,
-                config.target_position,
-                &reopened_share,
-            )
-            .map_err(|error| format!("reverify replacement share: {error}"))?;
+            let commitment =
+                share_commitment(stripe.stripe_index, config.target_position, &reopened_share)
+                    .map_err(|error| format!("reverify replacement share: {error}"))?;
             if commitment != stripe.shares[config.target_position as usize] {
                 return Err(format!(
                     "reopened share commitment mismatch at stripe {} position {}",
@@ -361,7 +359,8 @@ fn verify_index_envelope(
     if index.rows.is_empty() || index.rows.len() > ARTIFACT_MAX_STRIPES {
         return Err("signed import index row count is outside canonical bounds".to_owned());
     }
-    if index.generated_at > now || index.expires_at <= now || index.expires_at <= index.generated_at {
+    if index.generated_at > now || index.expires_at <= now || index.expires_at <= index.generated_at
+    {
         return Err("signed import index is not currently valid".to_owned());
     }
     validate_hex32(&index.coordinator_public_key, "coordinator_public_key")?;
@@ -372,10 +371,14 @@ fn verify_index_envelope(
     )?;
     validate_chain_binding(expected_chain_binding)?;
     if index.coordinator_public_key != expected_coordinator_public_key {
-        return Err("signed import index coordinator key differs from operator-pinned key".to_owned());
+        return Err(
+            "signed import index coordinator key differs from operator-pinned key".to_owned(),
+        );
     }
     if &index.chain_binding != expected_chain_binding {
-        return Err("signed import index chain binding differs from operator-pinned identity".to_owned());
+        return Err(
+            "signed import index chain binding differs from operator-pinned identity".to_owned(),
+        );
     }
     verify_signature_value(
         &index.signature,
@@ -481,7 +484,8 @@ fn validate_pair(
     if receipt.task_id != task.task_id || receipt.bytes != task.expected_bytes {
         return Err("restore receipt does not match its signed task identity".to_owned());
     }
-    let coordinate_digest = coordinate_digest(&index.chain_binding, expected_stripe, target_position)?;
+    let coordinate_digest =
+        coordinate_digest(&index.chain_binding, expected_stripe, target_position)?;
     if receipt.coordinate_digest != coordinate_digest {
         return Err("restore receipt coordinate digest mismatch".to_owned());
     }
@@ -505,7 +509,9 @@ fn validate_pair(
     if canonical.share_digest != Hash32::from_bytes(share_digest)
         || canonical.probe_root != Hash32::from_bytes(probe_root)
     {
-        return Err("restore coordinate noos-da commitment differs from canonical manifest".to_owned());
+        return Err(
+            "restore coordinate noos-da commitment differs from canonical manifest".to_owned(),
+        );
     }
     let _ = artifact;
     Ok(())
@@ -533,7 +539,10 @@ fn read_and_verify_quarantine_share(
         ));
     }
     if metadata.len() != ARTIFACT_SHARE_BYTES as u64 || out.len() != ARTIFACT_SHARE_BYTES {
-        return Err(format!("quarantine share has wrong length: {}", path.display()));
+        return Err(format!(
+            "quarantine share has wrong length: {}",
+            path.display()
+        ));
     }
     let canonical = fs::canonicalize(&path)
         .map_err(|error| format!("canonicalize quarantine share {}: {error}", path.display()))?;
@@ -586,7 +595,11 @@ fn validate_quarantine_root(root: &Path) -> Result<PathBuf, String> {
         .map_err(|error| format!("canonicalize quarantine root {}: {error}", root.display()))
 }
 
-fn quarantine_share_path(root: &Path, artifact_id: &str, quarantine_id: &str) -> Result<PathBuf, String> {
+fn quarantine_share_path(
+    root: &Path,
+    artifact_id: &str,
+    quarantine_id: &str,
+) -> Result<PathBuf, String> {
     validate_hex32(artifact_id, "artifact_id")?;
     validate_hex32(quarantine_id, "quarantine_id")?;
     let artifact_dir = root.join(artifact_id);
@@ -632,8 +645,8 @@ fn verify_signature_value(
 }
 
 fn unsigned_value<T: Serialize>(record: &T) -> Result<Value, String> {
-    let mut value = serde_json::to_value(record)
-        .map_err(|error| format!("encode signed record: {error}"))?;
+    let mut value =
+        serde_json::to_value(record).map_err(|error| format!("encode signed record: {error}"))?;
     value
         .as_object_mut()
         .ok_or_else(|| "signed record is not a JSON object".to_owned())?
@@ -660,7 +673,11 @@ fn coordinate_digest(
     .map_err(|error| format!("compute coordinate digest: {error}"))
 }
 
-fn quarantine_id(task_id: &str, coordinate_digest: &str, transport_sha256: &str) -> Result<String, String> {
+fn quarantine_id(
+    task_id: &str,
+    coordinate_digest: &str,
+    transport_sha256: &str,
+) -> Result<String, String> {
     hash_domain(
         DomainId::WwmWebQuarantineIdV1,
         &[
@@ -700,7 +717,9 @@ fn origin_of_url(value: &str) -> Result<String, String> {
         || parsed.password().is_some()
         || parsed.fragment().is_some()
     {
-        return Err("coordinate URL must be absolute HTTPS without credentials or fragment".to_owned());
+        return Err(
+            "coordinate URL must be absolute HTTPS without credentials or fragment".to_owned(),
+        );
     }
     Ok(parsed.origin().ascii_serialization())
 }
@@ -879,9 +898,7 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 
     use noos_crypto::Keypair;
-    use noos_da::{
-        ArtifactEncoderV1, ArtifactError, ArtifactShareSink, ARTIFACT_STRIPE_BYTES,
-    };
+    use noos_da::{ArtifactEncoderV1, ArtifactError, ArtifactShareSink, ARTIFACT_STRIPE_BYTES};
 
     static NONCE: AtomicU64 = AtomicU64::new(0);
     const NOW: u64 = 1_800_000_000;
@@ -1048,8 +1065,7 @@ mod tests {
                 };
                 sign_task(&mut task, &signer);
                 let digest = coordinate_digest(&binding, stripe, POSITION).unwrap();
-                let quarantine_id =
-                    quarantine_id(&task_id, &digest, &transport_sha256).unwrap();
+                let quarantine_id = quarantine_id(&task_id, &digest, &transport_sha256).unwrap();
                 fs::write(
                     artifact_quarantine.join(format!("{quarantine_id}.share")),
                     &share,
@@ -1080,10 +1096,7 @@ mod tests {
                 generated_at: NOW - 2,
                 expires_at: NOW + 100,
                 rows,
-                signature: empty_signature(
-                    &coordinator_public_key,
-                    IMPORT_INDEX_SIGNATURE_DOMAIN,
-                ),
+                signature: empty_signature(&coordinator_public_key, IMPORT_INDEX_SIGNATURE_DOMAIN),
             };
             sign_index(&mut index, &signer);
             write_index(&index_path, &index);
@@ -1102,7 +1115,11 @@ mod tests {
             }
         }
 
-        fn config_with(&self, replacement: ArtifactStoreConfig, report: PathBuf) -> WebRestoredPositionImportConfig {
+        fn config_with(
+            &self,
+            replacement: ArtifactStoreConfig,
+            report: PathBuf,
+        ) -> WebRestoredPositionImportConfig {
             WebRestoredPositionImportConfig {
                 source_store: self.source_config.clone(),
                 quarantine_root: self.quarantine_root.clone(),
@@ -1122,7 +1139,10 @@ mod tests {
         fn quarantine_path(&self, row: usize) -> PathBuf {
             self.quarantine_root
                 .join(&self.index.chain_binding.artifact_id)
-                .join(format!("{}.share", self.index.rows[row].receipt.quarantine_id))
+                .join(format!(
+                    "{}.share",
+                    self.index.rows[row].receipt.quarantine_id
+                ))
         }
 
         fn fresh_target(&self, name: &str, quota: u64) -> (ArtifactStoreConfig, PathBuf) {
@@ -1229,7 +1249,10 @@ mod tests {
         let fixture = Fixture::new(2);
 
         let mut tampered_signature = fixture.index.clone();
-        tampered_signature.signature.signature.replace_range(0..2, "ff");
+        tampered_signature
+            .signature
+            .signature
+            .replace_range(0..2, "ff");
         assert!(run_failure(&fixture, &tampered_signature, "bad-signature")
             .contains("signature verification"));
 
@@ -1283,12 +1306,8 @@ mod tests {
         noos_tampered.rows[0].task.coordinate.transport_sha256 = transport.clone();
         sign_task(&mut noos_tampered.rows[0].task, &fixture.signer);
         let digest = noos_tampered.rows[0].receipt.coordinate_digest.clone();
-        let quarantine = quarantine_id(
-            &noos_tampered.rows[0].task.task_id,
-            &digest,
-            &transport,
-        )
-        .unwrap();
+        let quarantine =
+            quarantine_id(&noos_tampered.rows[0].task.task_id, &digest, &transport).unwrap();
         noos_tampered.rows[0].receipt.quarantine_id = quarantine.clone();
         sign_index(&mut noos_tampered, &fixture.signer);
         fs::write(

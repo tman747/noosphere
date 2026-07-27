@@ -1,15 +1,15 @@
 :root {
-  color-scheme: dark;
-  --bg: #111310;
-  --field: #0d0f0d;
-  --panel: #191c18;
-  --line: #343a32;
-  --text: #f1f2ed;
-  --muted: #a5ada0;
-  --accent: #91b899;
-  --accent-strong: #b0d1b6;
-  --focus: #d5e4d7;
-  --bad: #d9a099;
+  color-scheme: light;
+  --bg: #f7f2e5;
+  --field: #fdfaf1;
+  --panel: #eee6d4;
+  --line: rgba(28, 24, 17, .16);
+  --text: #1c1811;
+  --muted: #6b6557;
+  --accent: #b8340f;
+  --accent-strong: #8f290c;
+  --focus: #b8340f;
+  --bad: #b8340f;
   --space-1: .5rem;
   --space-2: 1rem;
   --space-3: 1.5rem;
@@ -47,8 +47,8 @@ label { display: block; margin-bottom: .45rem; color: var(--muted); font-size: .
 .input-row { display: flex; gap: .55rem; min-width: 0; }
 input, button { border: .0625rem solid var(--line); border-radius: var(--radius); font: inherit; }
 input { width: 100%; min-width: 0; background: var(--field); color: var(--text); padding: .75rem; }
-button { flex: none; background: var(--accent); color: var(--bg); padding: .75rem 1.1rem; font-weight: 700; cursor: pointer; transition: background-color var(--duration) ease-out, transform var(--duration) ease-out; }
-button:hover { background: var(--accent-strong); }
+button { flex: none; background: var(--text); color: var(--bg); padding: .75rem 1.1rem; font-weight: 700; cursor: pointer; transition: background-color var(--duration) ease-out, transform var(--duration) ease-out; }
+button:hover { background: #3a352b; }
 button:active { transform: translateY(.0625rem); }
 button:disabled { cursor: wait; opacity: .65; }
 :focus-visible { outline: .1875rem solid var(--focus); outline-offset: .1875rem; }

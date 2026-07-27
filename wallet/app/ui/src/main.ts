@@ -193,6 +193,90 @@ deleteWalletBtn.addEventListener("click", () => {
   })();
 });
 
+// --- Encrypted recovery -------------------------------------------------
+const recoveryPasswordInput = el("recovery-password", HTMLInputElement);
+const recoveryPackageInput = el("recovery-package", HTMLTextAreaElement);
+const exportRecoveryBtn = el("export-recovery-btn", HTMLButtonElement);
+const importRecoveryBtn = el("import-recovery-btn", HTMLButtonElement);
+const recoveryOut = el("recovery-out", HTMLOutputElement);
+exportRecoveryBtn.disabled = true;
+importRecoveryBtn.disabled = true;
+
+function recoveryPassword(): string {
+  const password = recoveryPasswordInput.value;
+  const bytes = new TextEncoder().encode(password).byteLength;
+  if (bytes < 12 || bytes > 1024) throw new Error("recovery_authentication_failed");
+  return password;
+}
+
+exportRecoveryBtn.addEventListener("click", () => {
+  void (async () => {
+    if (!invoke || !activeProfile) return;
+    exportRecoveryBtn.disabled = true;
+    exportRecoveryBtn.setAttribute("aria-busy", "true");
+    showPending(recoveryOut, "Encrypting a chain-bound recovery package…");
+    try {
+      const packageJson = await invoke("export_recovery_package_cmd", {
+        req: {
+          wallet_id: walletId(),
+          profile_id: activeProfile.id,
+          password: recoveryPassword(),
+        },
+      });
+      if (typeof packageJson !== "string" || packageJson.length === 0 || packageJson.length > 1_048_576) {
+        throw new Error("invalid_recovery_package");
+      }
+      const parsed: unknown = JSON.parse(packageJson);
+      if (!parsed || typeof parsed !== "object"
+        || !("schema" in parsed) || parsed.schema !== "noos-wallet-recovery-v1") {
+        throw new Error("invalid_recovery_package");
+      }
+      recoveryPackageInput.value = packageJson;
+      show(recoveryOut, true, "Encrypted package ready. Store it separately from its password.");
+    } catch (e) {
+      show(recoveryOut, false, errorCode(e));
+    } finally {
+      recoveryPasswordInput.value = "";
+      exportRecoveryBtn.disabled = false;
+      exportRecoveryBtn.removeAttribute("aria-busy");
+    }
+  })();
+});
+
+importRecoveryBtn.addEventListener("click", () => {
+  void (async () => {
+    if (!invoke || !activeProfile) return;
+    importRecoveryBtn.disabled = true;
+    importRecoveryBtn.setAttribute("aria-busy", "true");
+    showPending(recoveryOut, "Decrypting and checking the package identity…");
+    try {
+      const packageJson = recoveryPackageInput.value.trim();
+      if (packageJson.length === 0 || packageJson.length > 1_048_576) {
+        throw new Error("invalid_recovery_package");
+      }
+      const handle = await invoke("import_recovery_package_cmd", {
+        req: {
+          wallet_id: walletId(),
+          profile_id: activeProfile.id,
+          password: recoveryPassword(),
+          package_json: packageJson,
+        },
+      });
+      if (!handle || typeof handle !== "object"
+        || !("secret_exported_to_ui" in handle) || handle.secret_exported_to_ui !== false) {
+        throw new Error("malformed_secure_store_response");
+      }
+      show(recoveryOut, true, "Recovery package accepted into the OS vault.");
+    } catch (e) {
+      show(recoveryOut, false, errorCode(e));
+    } finally {
+      recoveryPasswordInput.value = "";
+      importRecoveryBtn.disabled = false;
+      importRecoveryBtn.removeAttribute("aria-busy");
+    }
+  })();
+});
+
 // --- Derivation ---------------------------------------------------------
 const purpose = el("purpose", HTMLSelectElement);
 const suiteLabel = el("suite-label", HTMLLabelElement);
@@ -388,12 +472,16 @@ void (async () => {
     renderProfile();
     refreshStatusBtn.disabled = false;
     submitBtn.disabled = false;
+    exportRecoveryBtn.disabled = false;
+    importRecoveryBtn.disabled = false;
     wwmAuthorizeBtn.disabled = false;
     manifestBtn.disabled = false;
   } catch (e) {
     show(profileOut, false, errorCode(e));
     refreshStatusBtn.disabled = true;
     submitBtn.disabled = true;
+    exportRecoveryBtn.disabled = true;
+    importRecoveryBtn.disabled = true;
     wwmAuthorizeBtn.disabled = true;
     manifestBtn.disabled = true;
   }

@@ -743,6 +743,23 @@ fn reorgs_never_cross_the_finalized_checkpoint() {
         checkpoint_hash: tip_a,
     })
     .unwrap();
+    dag.prune_finalized_history();
+    assert!(
+        dag.contains(&ghash),
+        "the older Ground anchor still named by live headers was pruned"
+    );
+    assert_eq!(
+        dag.ancestors(&tip_a).count(),
+        noos_ground::MEDIAN_TIME_PAST_BLOCKS,
+        "the exact Ground median-time-past context remains available"
+    );
+    assert!(
+        dag.len()
+            <= noos_ground::MEDIAN_TIME_PAST_BLOCKS
+                .saturating_mul(2)
+                .saturating_add(1),
+        "two epoch-length branches were not reduced to bounded finality and anchor context"
+    );
     assert_eq!(
         dag.plan_reorg(&tip_a, &tip_b).unwrap_err(),
         DagError::ReorgAcrossFinality
@@ -829,6 +846,11 @@ fn checkpoint_advancement_rules() {
 fn body_roundtrip_and_loom_hard_zero() {
     let body = minimal_body();
     let bytes = body.encode_canonical();
+    assert_eq!(
+        body.encode_canonical_with_ground_ticket(body.ground_ticket.0),
+        bytes,
+        "ticket substitution encoder must preserve the canonical body wire law"
+    );
     let back = BlockBodyV1::decode_canonical(&bytes).unwrap();
     assert_eq!(back, body);
     assert_eq!(back.ground_ticket.0.nonce, fixture_ticket().nonce);

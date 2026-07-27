@@ -189,8 +189,6 @@ fn probe_position(probe: &PositionProbe, manifest_root: &str) -> bool {
             .get("accept-ranges")
             .and_then(|value| value.to_str().ok())
             == Some("bytes")
-        && headers
-            .get("etag")
-            .and_then(|value| value.to_str().ok())
+        && headers.get("etag").and_then(|value| value.to_str().ok())
             == Some(probe.expected_etag.as_str())
 }

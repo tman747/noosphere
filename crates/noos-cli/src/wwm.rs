@@ -6,6 +6,10 @@
 use crate::{CliError, Result};
 use noos_codec::NoosEncode;
 use noos_lumen::{
+    neural_oracle::{
+        EvaluateNeuralProgramV1, FinalizeNeuralOracleQueryV1, NeuralOracleCommitV1,
+        NeuralOracleQueryV1, NeuralOracleRevealV1, NeuralProgramV1,
+    },
     objects::{ActionV1, BoundedBytes, BoundedList, TransactionV1, TransactionWitnessesV1},
     wwm::{
         carrier_len_valid, ArtifactDescriptorV1, ArtifactRepairPayloadV1,
@@ -53,6 +57,12 @@ pub fn is_wwm_action(action: &ActionV1) -> bool {
             | ActionV1::SettleWwmJob(_)
             | ActionV1::TransitionServingAlias(_)
             | ActionV1::TransitionWwmControl(_)
+            | ActionV1::RegisterNeuralProgram(_)
+            | ActionV1::EvaluateNeuralProgram(_)
+            | ActionV1::OpenNeuralOracleQuery(_)
+            | ActionV1::CommitNeuralOracleReply(_)
+            | ActionV1::RevealNeuralOracleReply(_)
+            | ActionV1::FinalizeNeuralOracleQuery(_)
     )
 }
 
@@ -139,6 +149,36 @@ typed_builder!(
     transition_wwm_control,
     TransitionWwmControlPayloadV1,
     TransitionWwmControl
+);
+typed_builder!(
+    register_neural_program,
+    NeuralProgramV1,
+    RegisterNeuralProgram
+);
+typed_builder!(
+    evaluate_neural_program,
+    EvaluateNeuralProgramV1,
+    EvaluateNeuralProgram
+);
+typed_builder!(
+    open_neural_oracle_query,
+    NeuralOracleQueryV1,
+    OpenNeuralOracleQuery
+);
+typed_builder!(
+    commit_neural_oracle_reply,
+    NeuralOracleCommitV1,
+    CommitNeuralOracleReply
+);
+typed_builder!(
+    reveal_neural_oracle_reply,
+    NeuralOracleRevealV1,
+    RevealNeuralOracleReply
+);
+typed_builder!(
+    finalize_neural_oracle_query,
+    FinalizeNeuralOracleQueryV1,
+    FinalizeNeuralOracleQuery
 );
 /// Exact three-step WWM job lifecycle accepted by the devnet/test operator.
 ///
@@ -275,9 +315,7 @@ mod tests {
     use super::*;
     use noos_codec::NoosDecode;
     use noos_lumen::objects::{OptionalObject, ResourceVector};
-    use noos_lumen::wwm::{
-        FundBucketTag, SignatureEntryV1, WwmEvidenceTier, WwmTerminalCode,
-    };
+    use noos_lumen::wwm::{FundBucketTag, SignatureEntryV1, WwmEvidenceTier, WwmTerminalCode};
 
     fn empty_tx() -> TransactionV1 {
         TransactionV1 {

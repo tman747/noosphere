@@ -400,6 +400,93 @@ class HostedModelDemoTests(unittest.TestCase):
             stop.assert_called_once_with(process)
             getattr(process, "_noos_log").close()
 
+    def test_chain_bound_job_verifies_only_the_finalized_projection(self) -> None:
+        network = Mock()
+        plan = {
+            "job_id": "11" * 32,
+            "job": {"client_commitment": "12" * 32},
+            "bindings": {
+                "capsule_id": "13" * 32,
+                "execution_profile_id": "14" * 32,
+                "availability_certificate_id": "15" * 32,
+                "fund_profile_id": "16" * 32,
+            },
+        }
+        projected = {"record": {"job_id": "11" * 32}}
+        with patch.object(demo, "finalized_wwm_record", return_value=projected) as finalized:
+            self.assertEqual(demo.verify_chain_bound_job(network, plan), projected)
+        expected = finalized.call_args.args[3]
+        self.assertEqual(
+            set(expected),
+            {
+                "job_id",
+                "capsule_id",
+                "execution_profile_id",
+                "availability_certificate_id",
+                "fund_profile_id",
+            },
+        )
+        self.assertNotIn("client_commitment", expected)
+
+    def test_submit_wwm_actions_builds_one_atomic_finality_batch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = {
+                "governance": {
+                    "seed_hex": GOVERNANCE_SEED,
+                    "account_id": GOVERNANCE_ACCOUNT,
+                }
+            }
+            paths = Mock(cli=root / "noos-cli", disposable_root=root / "disposable")
+            network = Mock(node_rpc="http://127.0.0.1:9642", node_token="token")
+            status = {
+                "chain_id": "11" * 32,
+                "genesis_hash": "22" * 32,
+                "unsafe_head": {"height": 100},
+            }
+            actions = (
+                {"type": "record_wwm_receipt", "receipt_id": "44" * 32},
+                {"type": "settle_wwm_job", "settlement_id": "55" * 32},
+            )
+            encoded = (
+                {
+                    "schema": "noos/wwm-devnet-operator-action/v1",
+                    "production_capable": False,
+                    "id": "44" * 32,
+                    "action": "aa",
+                },
+                {
+                    "schema": "noos/wwm-devnet-operator-action/v1",
+                    "production_capable": False,
+                    "id": "55" * 32,
+                    "action": "bb",
+                },
+            )
+            receipt = {"state": {"settled_height": 101}}
+            submitted = Mock()
+            with (
+                patch.object(demo, "http_json", return_value=status),
+                patch.object(demo, "run_json", side_effect=encoded),
+                patch.object(
+                    demo,
+                    "build_and_submit",
+                    return_value=("66" * 32, receipt),
+                ) as build,
+                patch.object(demo, "wait_finalized", return_value=status) as finalized,
+            ):
+                result = demo.submit_wwm_actions(config, paths, network, actions, submitted)
+
+            spec = build.call_args.args[3]
+            self.assertEqual(spec["actions"], ["aa", "bb"])
+            self.assertEqual(spec["resource_limits"]["bytes"], 131_072)
+            self.assertEqual(spec["resource_limits"]["proof_units"], 128)
+            self.assertEqual(result["action_ids"], ["44" * 32, "55" * 32])
+            self.assertEqual(result["finalized_height"], 101)
+            finalized.assert_called_once_with(network, 101)
+            self.assertIs(build.call_args.args[5], submitted)
+            with self.assertRaisesRegex(demo.DemoError, "1..8"):
+                demo.submit_wwm_actions(config, paths, network, ())
+
 
 if __name__ == "__main__":
     unittest.main()

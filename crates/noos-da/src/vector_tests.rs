@@ -27,7 +27,7 @@ use crate::vector_gen::{
 use crate::{
     encode_body, reconstruct_and_verify, validate_blob_descriptor,
     validate_consensus_blob_descriptor, verify_shard_sample, BodyDaClaimV1, DaError, EncodedBodyV1,
-    ShardBranch, BODY_SHARD_DEPTH, MAX_BLOCK_BODY_BYTES,
+    ShardBranch, BODY_SHARD_DEPTH, MAX_BLOCK_DA_FORM_BYTES,
 };
 
 fn vectors_dir() -> PathBuf {
@@ -140,7 +140,7 @@ fn shard_sample_vectors_execute() {
         let enc = encode_body(&body).unwrap();
         let (index, branch) = parse_sample(&case.bytes);
         let shard_root = hash32(extra(case, "shard_root"));
-        let mut content_root = hash32(extra(case, "content_root"));
+        let mut claim = *enc.claim();
 
         // The sampled shard: honest bytes unless the index is out of range
         // (then any fixed-size stand-in shows the range check fires first).
@@ -148,16 +148,18 @@ fn shard_sample_vectors_execute() {
             .shards()
             .get(index as usize)
             .cloned()
-            .unwrap_or_else(|| vec![0_u8; crate::BODY_SHARD_BYTES]);
+            .unwrap_or_else(|| vec![0_u8; enc.shards()[0].len()]);
 
         match extra_str(case, "tamper") {
             Some("flip_shard_byte") => shard[0] ^= 0xFF,
-            Some("foreign_content_root") => content_root = Hash32::from_bytes([0x66; 32]),
+            Some("foreign_content_root") => {
+                claim.content_root = Hash32::from_bytes([0x66; 32]);
+            }
             Some(other) => panic!("{}: unknown tamper {other}", case.name),
             None => {}
         }
 
-        let got = verify_shard_sample(&shard_root, &content_root, index, &shard, &branch);
+        let got = verify_shard_sample(&shard_root, &claim, index, &shard, &branch);
         match case.kind {
             "positive" => got.unwrap_or_else(|e| panic!("{}: {e}", case.name)),
             "negative" => {
@@ -220,7 +222,7 @@ fn reconstruction_vectors_execute() {
 
         match tamper {
             Some("corrupt_first_candidate") => candidates[0].bytes[0] ^= 0x01,
-            Some("oversize_claim") => claim.original_bytes = MAX_BLOCK_BODY_BYTES as u64 + 1,
+            Some("oversize_claim") => claim.original_bytes = MAX_BLOCK_DA_FORM_BYTES as u64 + 1,
             _ => {}
         }
 

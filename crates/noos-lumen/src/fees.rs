@@ -84,10 +84,10 @@ impl FeeParamsV1 {
             min_price: 1,
             max_price: 1_000_000,
             max_change_ppm: 125_000, // ±12.5% per block
-            capacity_b: 1_048_576,   // 1 MiB canonical bytes
+            capacity_b: 536_870_912, // 512 MiB canonical bytes
             capacity_g: 100_000_000, // grain steps
             capacity_v: 100_000,     // proof units
-            capacity_r: 1_000_000,   // state-word epochs
+            capacity_r: 64_000_000,  // state-word epochs
             capacity_d: 4_194_304,   // 4 MiB blob bytes
             failure_fee: 1_000,      // micro-NOOS_TEST
             min_activation_delay: 16,

@@ -23,16 +23,17 @@ constants-table review (plan §1.7); the protocol ID list itself is FROZEN by
 
 ## 2. Protocol identifiers
 
-Application protocols (closed list, identity-v1.md §3 — FROZEN):
+Application protocols (closed list, identity-v1.md §3):
 
 | id | shape | lane |
 |---|---|---|
 | `/noos/braid/header/1` | header announce (push) / header request | priority |
-| `/noos/braid/body/1` | body request → transfer | priority |
+| `/noos/braid/body/2` | bounded body-chunk request → reassembled transfer | priority |
 | `/noos/braid/vote/1` | checkpoint vote push | priority |
 | `/noos/lumen/tx/1` | transaction push | normal |
 | `/noos/sync/range/1` | ascending header range request | priority |
 | `/noos/sync/snapshot/1` | snapshot chunk request | priority |
+| `/noos/sync/light-update/2` | finalized light-update range request | priority |
 | `/noos/blob/shard/1` | DA shard request → transfer | normal |
 | `/noos/loom/receipt/1` | loom receipt push (lane OFF at genesis) | normal |
 
@@ -45,11 +46,11 @@ Session-gate protocol (transport addition, PROPOSED-G0):
 libp2p binds TLS identity to the *peer key* but has **no chain-identity
 concept**; per plan §7.4 the required behavior is added AROUND libp2p as a
 dedicated first substream rather than by switching wire stacks. The
-`identity-v1.md` §3 closed list enumerates the eight *application* protocols;
-`/noos/handshake/1` is a session gate that carries no application objects and
-is recorded here for G0 review. Any other protocol string — including any
-unknown `/noos/…` — is refused at libp2p negotiation because only these nine
-are registered on a NOOSPHERE listener.
+`identity-v1.md` §3 enumerates the nine *application* protocols;
+`/noos/handshake/1` is a session gate that carries no application objects.
+Any other protocol string — including any unknown `/noos/…` — is refused at
+libp2p negotiation because only these ten protocol IDs are registered on a
+NOOSPHERE listener.
 
 ## 3. Identity-binding law (D-SIG-PEER)
 
@@ -118,6 +119,7 @@ violation `stream_before_handshake` (a 3 s grace covers the final-Ack race).
 |---|---|
 | `MAX_HEADER_BYTES` | 65_536 |
 | `MAX_BODY_BYTES` | 1_047_552 (1 MiB − 1 KiB) |
+| `MAX_REASSEMBLED_BODY_BYTES` | 134_217_728 (128 MiB) |
 | `MAX_VOTE_BYTES` | 8_192 |
 | `MAX_TX_BYTES` | 65_536 |
 | `MAX_SNAPSHOT_CHUNK_BYTES` | 1_047_552 |
@@ -148,15 +150,27 @@ HeaderReplyV1 = 0 Ack | 1 Header(bytes<=MAX_HEADER_BYTES) | 2 NotFound
 Announce is a push: fresh announces are dispatched to the embedder and
 answered `Ack`; duplicates (§7.2) are answered `Ack` without dispatch.
 
-### 5.2 `/noos/braid/body/1`
+### 5.2 `/noos/braid/body/2`
 
 ```
-BodyRequestV1 { 1 => chain_id, 2 => block_hash: [u8;32] }
-BodyReplyV1   = 0 Body(bytes<=MAX_BODY_BYTES) | 1 NotFound
+BodyRequestV1 (wire version 2) {
+  1 => chain_id, 2 => block_hash: [u8;32],
+  3 => offset: u64, 4 => max_bytes: u32
+}
+BodyReplyV1 (wire version 2)
+  = 0 Chunk { total_bytes: u64, offset: u64, bytes<=MAX_BODY_BYTES }
+  | 1 NotFound
 ```
 
-This request is also the **targeted repair** primitive: ask a SPECIFIC peer
-for a SPECIFIC hash (`P2pHandle::request_body(peer, hash)`).
+This is also the **targeted repair** primitive: ask a SPECIFIC peer for a
+SPECIFIC hash (`P2pHandle::request_body(peer, hash)`). The requester fetches
+offset zero first, checks the declared total, allocates no more than
+`MAX_REASSEMBLED_BODY_BYTES`, then fetches the remaining fixed offsets through
+at most eight concurrent QUIC streams. Every non-final chunk is exactly
+`MAX_BODY_BYTES`; the final chunk is exactly the remaining length. Replies must
+keep `total_bytes` stable and echo their requested offsets. Missing, short,
+overlapping, overlong, or inconsistent replies are `bad_reply`. The 1 MiB frame
+ceiling remains unchanged.
 
 ### 5.3 Push envelopes
 
@@ -207,9 +221,9 @@ layer; this file only fixes the request/response substreams they use.
 
 ### 6.1 Lanes (consensus-over-AI)
 
-- **Priority**: `/noos/braid/header/1`, `/noos/braid/body/1`,
-  `/noos/braid/vote/1`, `/noos/sync/range/1`, `/noos/sync/snapshot/1`
-  (and the handshake).
+- **Priority**: `/noos/braid/header/1`, `/noos/braid/body/2`,
+  `/noos/braid/vote/1`, `/noos/sync/range/1`, `/noos/sync/snapshot/1`,
+  `/noos/sync/light-update/2` (and the handshake).
 - **Normal**: `/noos/lumen/tx/1`, `/noos/blob/shard/1`, `/noos/loom/receipt/1`.
 
 Per peer, one request is in flight at a time and the priority lane drains
@@ -229,7 +243,7 @@ Integer milli-token buckets, `burst` capacity refilled at `per_second`:
 | protocol | burst | per_second |
 |---|---|---|
 | braid/header | 64 | 32 |
-| braid/body | 16 | 8 |
+| braid/body chunks | 32 | 32 |
 | braid/vote | 128 | 64 |
 | lumen/tx | 256 | 128 |
 | sync/range | 8 | 4 |

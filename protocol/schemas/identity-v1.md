@@ -77,17 +77,19 @@ Negative vectors — each MUST reject with the named error class:
 
 ## 3. libp2p protocol identifiers (closed list)
 
-Transport is libp2p QUIC with peer identity binding. Exactly these protocols exist in v1;
-an unknown `/noos/` protocol or any non-`/noos/` protocol string on a NOOSPHERE listener
-is refused at negotiation:
+Transport is libp2p QUIC with peer identity binding. The current
+`protocol_version = 2` closed list is below; an unknown `/noos/` protocol or
+any non-`/noos/` protocol string on a NOOSPHERE listener is refused at
+negotiation:
 
 ```
 /noos/braid/header/1
-/noos/braid/body/1
+/noos/braid/body/2
 /noos/braid/vote/1
 /noos/lumen/tx/1
 /noos/sync/range/1
 /noos/sync/snapshot/1
+/noos/sync/light-update/2
 /noos/blob/shard/1
 /noos/loom/receipt/1
 ```

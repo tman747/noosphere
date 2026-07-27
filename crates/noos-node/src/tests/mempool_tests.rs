@@ -337,6 +337,52 @@ fn duplicate_pending_and_settled_are_distinct_rejections() {
 }
 
 #[test]
+fn parallel_batch_admission_matches_sequential_errors_and_order() {
+    let (ledger, chain_id, prices) = ledger_fixture();
+    let payer = faucet_key().public_key().into_bytes();
+    let first_tx = make_tx(chain_id, 1, 100, payer, vec![payer], default_resources());
+    let first = sign_tx(&first_tx, &faucet_key(), None);
+    let invalid_duplicate = sign_tx(&first_tx, &Keypair::from_seed([99; 32]), None);
+    let mut workload = vec![first];
+    for expiry in 101..133 {
+        workload.push(faucet_tx(chain_id, expiry, 10_000));
+    }
+    workload.push(invalid_duplicate);
+
+    let mut sequential = Mempool::new(MempoolConfig::default());
+    let sequential_results = workload
+        .iter()
+        .map(|transaction| admit(&mut sequential, &ledger, &chain_id, &prices, transaction, 1))
+        .collect::<Vec<_>>();
+
+    let submissions = workload
+        .iter()
+        .map(|transaction| (transaction.0.as_slice(), transaction.1.as_slice(), 1))
+        .collect::<Vec<_>>();
+    let mut parallel = Mempool::new(MempoolConfig::default());
+    let parallel_results = parallel.admit_batch(&submissions, 1, &chain_id, &prices, &ledger);
+    assert_eq!(parallel_results, sequential_results);
+    assert_eq!(
+        parallel_results.last(),
+        Some(&Err(AdmitError::DuplicatePending)),
+        "duplicate stage must precede the precomputed invalid-signature result"
+    );
+
+    let capacity = ledger.fee_params().expect("fee params").capacity();
+    let sequential_order = sequential
+        .template(&capacity)
+        .into_iter()
+        .map(|entry| entry.txid)
+        .collect::<Vec<_>>();
+    let parallel_order = parallel
+        .template(&capacity)
+        .into_iter()
+        .map(|entry| entry.txid)
+        .collect::<Vec<_>>();
+    assert_eq!(parallel_order, sequential_order);
+}
+
+#[test]
 fn expiry_drops_on_block_connect() {
     let (ledger, chain_id, prices) = ledger_fixture();
     let mut mp = Mempool::new(MempoolConfig::default());
@@ -472,4 +518,12 @@ fn template_respects_per_payer_fifo_nonce_order_and_capacity() {
 
     // Zero capacity: an empty template, never a panic.
     assert!(mp.template(&[0; fees::DIMENSIONS]).is_empty());
+
+    let taken = mp.take_template(&capacity);
+    assert_eq!(
+        taken.iter().map(|entry| entry.txid).collect::<Vec<_>>(),
+        order,
+        "moving template selection must preserve canonical order"
+    );
+    assert_eq!(mp.len(), 0, "taken entries leave every pool index");
 }

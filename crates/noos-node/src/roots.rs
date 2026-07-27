@@ -17,13 +17,17 @@
 //! projection of `LumenState.receipts_root` and comes from the transition.
 
 use noos_braid::{BlobDescriptorV1, FinalityCertificateV1, MAX_FINALITY_CERTIFICATES};
-use noos_codec::NoosEncode;
-use noos_crypto::{hash_domain, DomainId};
+use noos_codec::{NoosDecode, NoosEncode};
+use noos_crypto::{hash_domain, DomainId, DomainKind};
 use noos_ground::GroundTicketV1;
 use noos_lumen::fees::{self, Usage};
 use noos_lumen::objects::{BoundedList, ReceiptV1, TransactionV1, TransactionWitnessesV1};
 
 use crate::{Hash32, NodeError};
+
+const DA_FORM_LZ4_MAGIC: &[u8; 8] = b"NOOSLZ41";
+/// Fail-closed decompression ceiling for the canonical macroblock body.
+pub const MAX_DA_FORM_RAW_BYTES: usize = 536_870_912;
 
 fn ctx_root(domain: DomainId, bytes: &[u8]) -> Result<Hash32, NodeError> {
     Ok(hash_domain(domain, &[bytes])
@@ -31,11 +35,30 @@ fn ctx_root(domain: DomainId, bytes: &[u8]) -> Result<Hash32, NodeError> {
         .into_bytes())
 }
 
+fn canonical_list_root<T: NoosEncode>(domain: DomainId, items: &[T]) -> Result<Hash32, NodeError> {
+    if domain.kind() != DomainKind::Blake3Context {
+        return Err(NodeError::Crypto);
+    }
+    let count = u32::try_from(items.len()).map_err(|_| NodeError::BodyMismatch {
+        what: "canonical list count exceeds u32",
+    })?;
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(domain.context().as_bytes());
+    hasher.update(&count.to_le_bytes());
+    let mut writer = noos_codec::Writer::with_capacity(1024);
+    for item in items {
+        writer.clear();
+        item.encode(&mut writer);
+        hasher.update(writer.as_bytes());
+    }
+    Ok(*hasher.finalize().as_bytes())
+}
+
 /// `tx_root` over the canonical ordered transaction list.
 pub fn body_tx_root(
     txs: &BoundedList<TransactionV1, { noos_braid::MAX_TRANSACTIONS }>,
 ) -> Result<Hash32, NodeError> {
-    ctx_root(DomainId::BodyTxRoot, &txs.encode_canonical())
+    canonical_list_root(DomainId::BodyTxRoot, txs.as_slice())
 }
 
 /// `witness_root` over the canonical ordered segregated-witness list
@@ -43,31 +66,20 @@ pub fn body_tx_root(
 pub fn body_witness_root(
     wits: &BoundedList<TransactionWitnessesV1, { noos_braid::MAX_SEGREGATED_WITNESSES }>,
 ) -> Result<Hash32, NodeError> {
-    ctx_root(DomainId::BodyWitnessRoot, &wits.encode_canonical())
+    canonical_list_root(DomainId::BodyWitnessRoot, wits.as_slice())
 }
 
 /// `execution_receipt_root` over THIS block's ordered execution receipts
 /// (plan §6.3: distinct from the post-state settled-receipt index).
 pub fn body_receipt_root(receipts: &[ReceiptV1]) -> Result<Hash32, NodeError> {
-    let mut w = noos_codec::Writer::with_capacity(
-        64_usize.saturating_add(receipts.len().saturating_mul(96)),
-    );
-    w.put_u32(
-        u32::try_from(receipts.len()).map_err(|_| NodeError::BodyMismatch {
-            what: "receipt count exceeds u32",
-        })?,
-    );
-    for r in receipts {
-        w.put_raw(&r.encode_canonical());
-    }
-    ctx_root(DomainId::BodyReceiptRoot, w.as_bytes())
+    canonical_list_root(DomainId::BodyReceiptRoot, receipts)
 }
 
 /// `finality_certificate_root` over the canonical certificate list.
 pub fn body_cert_root(
     certs: &BoundedList<FinalityCertificateV1, MAX_FINALITY_CERTIFICATES>,
 ) -> Result<Hash32, NodeError> {
-    ctx_root(DomainId::BodyCertRoot, &certs.encode_canonical())
+    canonical_list_root(DomainId::BodyCertRoot, certs.as_slice())
 }
 
 /// `ground_ticket_root` over the canonical 76-byte ticket.
@@ -86,18 +98,55 @@ pub fn zero_ticket() -> GroundTicketV1 {
     }
 }
 
-/// The DA body form (node-v1.md §3.2): canonical `BlockBodyV1` bytes with
-/// `ground_ticket` canonicalized to [`zero_ticket`]. ch01 §4.3 fixes
-/// `proposal_commitment` (which includes `body_da_root`) BEFORE the Ground
-/// nonce search, so the DA-committed bytes MUST be ticket-independent; the
-/// real ticket travels with the header and is bound by `ground_ticket_root`
-/// (header field 24, the one root excluded from the commitment) plus the
-/// ticket law itself.
+/// The compressed DA body form (node-v1.md §3.2): canonical
+/// `BlockBodyV1` bytes with `ground_ticket` canonicalized to
+/// [`zero_ticket`], framed by `NOOSLZ41` and deterministic LZ4 block
+/// compression. ch01 §4.3 fixes `proposal_commitment` (which includes
+/// `body_da_root`) before the Ground nonce search, so the DA bytes remain
+/// ticket-independent. The real ticket travels with the header and is bound
+/// separately by `ground_ticket_root`.
 #[must_use]
 pub fn da_form_bytes(body: &noos_braid::BlockBodyV1) -> Vec<u8> {
-    let mut form = body.clone();
-    form.ground_ticket = noos_braid::GroundTicketWire(zero_ticket());
-    form.encode_canonical()
+    let canonical = body.encode_canonical_with_ground_ticket(zero_ticket());
+    let compressed = lz4_flex::block::compress_prepend_size(&canonical);
+    let mut framed = Vec::with_capacity(DA_FORM_LZ4_MAGIC.len().saturating_add(compressed.len()));
+    framed.extend_from_slice(DA_FORM_LZ4_MAGIC);
+    framed.extend_from_slice(&compressed);
+    framed
+}
+
+/// Decode the only accepted DA form. Length is checked before allocation so a
+/// forged compressed frame cannot exceed the 512 MiB canonical-body ceiling.
+pub fn decode_da_form(bytes: &[u8]) -> Result<noos_braid::BlockBodyV1, NodeError> {
+    let payload = bytes
+        .strip_prefix(DA_FORM_LZ4_MAGIC)
+        .ok_or(NodeError::BodyMismatch {
+            what: "DA compression frame",
+        })?;
+    let size_bytes = payload.get(..4).ok_or(NodeError::BodyMismatch {
+        what: "DA compression length",
+    })?;
+    let raw_len = u32::from_le_bytes(<[u8; 4]>::try_from(size_bytes).map_err(|_| {
+        NodeError::BodyMismatch {
+            what: "DA compression length",
+        }
+    })?) as usize;
+    if raw_len > MAX_DA_FORM_RAW_BYTES {
+        return Err(NodeError::BodyMismatch {
+            what: "DA decompressed body limit",
+        });
+    }
+    let canonical = lz4_flex::block::decompress_size_prepended(payload).map_err(|_| {
+        NodeError::BodyMismatch {
+            what: "DA decompression",
+        }
+    })?;
+    if canonical.len() != raw_len {
+        return Err(NodeError::BodyMismatch {
+            what: "DA decompressed length",
+        });
+    }
+    Ok(noos_braid::BlockBodyV1::decode_canonical(&canonical)?)
 }
 
 /// Blob-descriptor validation for consensus bodies (delegated to noos-da's
@@ -123,4 +172,62 @@ pub fn sum_usage(receipts: &[ReceiptV1]) -> Result<Usage, NodeError> {
         }
     }
     Ok(total)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compressed_da_form_is_deterministic_and_ticket_independent() {
+        let body = noos_braid::vector_gen::minimal_body();
+        let first = da_form_bytes(&body);
+        let second = da_form_bytes(&body);
+        assert_eq!(first, second);
+        assert!(first.starts_with(DA_FORM_LZ4_MAGIC));
+
+        let decoded = decode_da_form(&first).expect("valid compressed DA form");
+        let mut expected = body;
+        expected.ground_ticket = noos_braid::GroundTicketWire(zero_ticket());
+        assert_eq!(decoded, expected);
+    }
+
+    #[test]
+    fn compressed_da_form_rejects_corruption_and_oversized_claim() {
+        let mut truncated = da_form_bytes(&noos_braid::vector_gen::minimal_body());
+        truncated.pop();
+        assert!(matches!(
+            decode_da_form(&truncated),
+            Err(NodeError::BodyMismatch {
+                what: "DA decompression"
+            })
+        ));
+
+        let mut oversized = DA_FORM_LZ4_MAGIC.to_vec();
+        oversized.extend_from_slice(
+            &u32::try_from(MAX_DA_FORM_RAW_BYTES + 1)
+                .expect("ceiling fits u32")
+                .to_le_bytes(),
+        );
+        assert!(matches!(
+            decode_da_form(&oversized),
+            Err(NodeError::BodyMismatch {
+                what: "DA decompressed body limit"
+            })
+        ));
+    }
+
+    #[test]
+    fn streaming_list_root_matches_canonical_list_bytes() {
+        let items = [7_u64, 11, 13];
+        let mut writer = noos_codec::Writer::new();
+        writer.put_list(&items, items.len() as u32);
+        let expected = hash_domain(DomainId::BodyTxRoot, &[writer.as_bytes()])
+            .expect("registered body root domain")
+            .into_bytes();
+        assert_eq!(
+            canonical_list_root(DomainId::BodyTxRoot, &items).expect("streaming root"),
+            expected
+        );
+    }
 }

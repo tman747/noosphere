@@ -25,12 +25,14 @@ class TransactionRecordTests(unittest.TestCase):
             ).encode()
         )
 
-        with patch("urllib.request.urlopen", side_effect=[missing, receipt]):
+        with patch("urllib.request.urlopen", side_effect=[missing, receipt]) as urlopen:
             record = bench_tps.tx_record("http://127.0.0.1", "abc")
 
         self.assertEqual(record["state"], "INCLUDED")
         self.assertEqual(record["inclusion"], {"height": 42})
         self.assertEqual(record["receipt"]["fee_charged"], "544")
+        for call in urlopen.call_args_list:
+            self.assertEqual(call.args[0].get_header("User-agent"), bench_tps.USER_AGENT)
 
 
 if __name__ == "__main__":

@@ -17,7 +17,8 @@
 //!
 //! `retention_blocks = 0` keeps full presentation history (archive mode).
 
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::sync::Arc;
 
 use noos_braid::{BlockHeaderV1, CheckpointRef};
 use noos_lumen::objects::ReceiptV1;
@@ -78,7 +79,7 @@ pub struct BlockSummary {
     pub slot: u64,
     pub timestamp_ms: u64,
     pub parent_hash: Hash32,
-    pub txids: Vec<Hash32>,
+    pub txids: Arc<Vec<Hash32>>,
 }
 
 /// Transaction presentation status.
@@ -117,9 +118,8 @@ pub struct ChainView {
     retention_blocks: u64,
     pruned_before_height: u64,
     blocks: BTreeMap<u64, BlockSummary>,
-    by_hash: BTreeMap<Hash32, u64>,
-    tx_records: BTreeMap<Hash32, TxStatus>,
-    receipts: BTreeMap<Hash32, ReceiptV1>,
+    by_hash: HashMap<Hash32, u64>,
+    tx_records: HashMap<Hash32, TxStatus>,
     pruned_blocks: MarkerSet,
     pruned_txs: MarkerSet,
     pub heads: Heads,
@@ -132,9 +132,8 @@ impl ChainView {
             retention_blocks,
             pruned_before_height: 0,
             blocks: BTreeMap::new(),
-            by_hash: BTreeMap::new(),
-            tx_records: BTreeMap::new(),
-            receipts: BTreeMap::new(),
+            by_hash: HashMap::new(),
+            tx_records: HashMap::new(),
             pruned_blocks: MarkerSet::new(65_536),
             pruned_txs: MarkerSet::new(262_144),
             heads: Heads::default(),
@@ -158,7 +157,9 @@ impl ChainView {
 
     /// Records a pending (mempool) transaction.
     pub fn note_pending(&mut self, txid: Hash32) {
-        self.tx_records.entry(txid).or_insert(TxStatus::Pending);
+        if !self.tx_records.contains_key(&txid) {
+            self.tx_records.insert(txid, TxStatus::Pending);
+        }
     }
 
     /// Drops a pending record (mempool rejection/eviction) if still pending.
@@ -168,20 +169,25 @@ impl ChainView {
         }
     }
 
-    /// Records a connected block and its settled receipts, then applies the
-    /// retention law.
-    pub fn connect_block(&mut self, header: &BlockHeaderV1, hash: Hash32, receipts: &[ReceiptV1]) {
-        let txids: Vec<Hash32> = receipts.iter().map(|r| r.txid).collect();
-        for r in receipts {
-            self.tx_records.insert(
-                r.txid,
-                TxStatus::Settled {
-                    height: header.height,
-                    status: r.status,
-                },
-            );
-            self.receipts.insert(r.txid, r.clone());
-        }
+    /// Records a connected block and its settled transaction identities, then
+    /// applies the retention law. Settled status and height live once in
+    /// Lumen's receipt index; this view retains only pending identities.
+    pub fn connect_block(
+        &mut self,
+        header: &BlockHeaderV1,
+        hash: Hash32,
+        receipts: Vec<ReceiptV1>,
+    ) {
+        let clear_pending = !self.tx_records.is_empty();
+        let txids = receipts
+            .into_iter()
+            .map(|receipt| {
+                if clear_pending {
+                    self.tx_records.remove(&receipt.txid);
+                }
+                receipt.txid
+            })
+            .collect::<Vec<_>>();
         self.by_hash.insert(hash, header.height);
         self.blocks.insert(
             header.height,
@@ -191,7 +197,7 @@ impl ChainView {
                 slot: header.slot,
                 timestamp_ms: header.timestamp_ms,
                 parent_hash: header.parent_hash,
-                txids,
+                txids: Arc::new(txids),
             },
         );
         self.heads.unsafe_head_height = header.height;
@@ -204,9 +210,8 @@ impl ChainView {
     pub fn disconnect_block(&mut self, height: u64) {
         if let Some(summary) = self.blocks.remove(&height) {
             self.by_hash.remove(&summary.hash);
-            for txid in summary.txids {
+            for txid in summary.txids.iter().copied() {
                 self.tx_records.insert(txid, TxStatus::Pending);
-                self.receipts.remove(&txid);
             }
         }
     }
@@ -226,14 +231,8 @@ impl ChainView {
             if let Some(summary) = self.blocks.remove(&h) {
                 self.by_hash.remove(&summary.hash);
                 self.pruned_blocks.insert(summary.hash);
-                for txid in summary.txids {
-                    // TERMINAL eviction arm (the Ascent defect): a record
-                    // settled below the horizon MUST leave the maps.
-                    if matches!(self.tx_records.get(&txid), Some(TxStatus::Settled { .. })) {
-                        self.tx_records.remove(&txid);
-                        self.receipts.remove(&txid);
-                        self.pruned_txs.insert(txid);
-                    }
+                for txid in summary.txids.iter().copied() {
+                    self.pruned_txs.insert(txid);
                 }
             }
         }
@@ -263,18 +262,9 @@ impl ChainView {
     }
 
     #[must_use]
-    pub fn tx_status(&self, txid: &Hash32) -> ViewLookup<TxStatus> {
+    pub(crate) fn local_tx_status(&self, txid: &Hash32) -> ViewLookup<TxStatus> {
         match self.tx_records.get(txid) {
-            Some(s) => ViewLookup::Found(*s),
-            None if self.pruned_txs.contains(txid) => ViewLookup::Pruned,
-            None => ViewLookup::NotFound,
-        }
-    }
-
-    #[must_use]
-    pub fn receipt(&self, txid: &Hash32) -> ViewLookup<&ReceiptV1> {
-        match self.receipts.get(txid) {
-            Some(r) => ViewLookup::Found(r),
+            Some(status) => ViewLookup::Found(*status),
             None if self.pruned_txs.contains(txid) => ViewLookup::Pruned,
             None => ViewLookup::NotFound,
         }

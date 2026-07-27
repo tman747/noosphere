@@ -107,7 +107,9 @@ fn publish_quota_accounting_matches_reopened_store() {
     let c = config(&td);
     let mut store = ArtifactStore::open(c.clone()).unwrap();
     stage_all(&mut store);
-    store.publish(&spec().artifact, b"canonical manifest").unwrap();
+    store
+        .publish(&spec().artifact, b"canonical manifest")
+        .unwrap();
     let published_used = store.used_bytes();
     let stage = c.staging.join("07".repeat(32));
     assert!(!stage.exists());
