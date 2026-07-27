@@ -108,6 +108,7 @@ jobs:
           cargo test --locked -p noos-mind
           cargo test --locked -p noos-commerce
           cargo test --locked -p noos-stable-operator
+          cargo test --locked -p noos-stable-safety
           cargo test --locked -p noos-umbra
           cargo test --locked -p noos-private-besi
           cargo test --locked -p noos-route

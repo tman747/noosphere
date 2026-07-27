@@ -2,6 +2,7 @@
 //! Callers apply the returned supply/debt deltas atomically with ledger balance
 //! changes; every mint or burn is paired with the same debt transition.
 #![forbid(unsafe_code)]
+pub mod v2;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -133,27 +134,31 @@ impl SafetyState {
             price_q9.checked_mul(10_000).ok_or(SafetyError::Overflow)?,
         )?;
         let collateral_seized = requested_collateral.min(position.collateral);
-        self.stable_reserve = self
+        let remaining_collateral = position
+            .collateral
+            .checked_sub(collateral_seized)
+            .ok_or(SafetyError::Overflow)?;
+        let newly_uncovered = remaining_debt;
+
+        let mut candidate = *self;
+        candidate.stable_reserve = candidate
             .stable_reserve
             .checked_sub(stable_burned)
             .ok_or(SafetyError::Overflow)?;
-        self.collateral_reserve = self
+        candidate.collateral_reserve = candidate
             .collateral_reserve
             .checked_add(collateral_seized)
             .ok_or(SafetyError::Overflow)?;
-        let newly_uncovered = remaining_debt;
-        self.uncovered_bad_debt = self
+        candidate.uncovered_bad_debt = candidate
             .uncovered_bad_debt
             .checked_add(newly_uncovered)
             .ok_or(SafetyError::Overflow)?;
+        *self = candidate;
         Ok(BackstopResult {
             stable_burned,
             collateral_seized,
             remaining_position: DebtPosition {
-                collateral: position
-                    .collateral
-                    .checked_sub(collateral_seized)
-                    .ok_or(SafetyError::Overflow)?,
+                collateral: remaining_collateral,
                 debt: remaining_debt,
             },
             newly_uncovered_bad_debt: newly_uncovered,
@@ -179,18 +184,20 @@ impl SafetyState {
         if user == 0 {
             return Err(SafetyError::InvalidParameter);
         }
-        self.collateral_reserve = self
+        let mut candidate = *self;
+        candidate.collateral_reserve = candidate
             .collateral_reserve
             .checked_add(collateral_in)
             .ok_or(SafetyError::Overflow)?;
-        self.psm_debt = self
+        candidate.psm_debt = candidate
             .psm_debt
             .checked_add(gross)
             .ok_or(SafetyError::Overflow)?;
-        self.stable_reserve = self
+        candidate.stable_reserve = candidate
             .stable_reserve
             .checked_add(fee)
             .ok_or(SafetyError::Overflow)?;
+        *self = candidate;
         Ok(PsmMintResult {
             stable_to_user: user,
             stable_fee_to_reserve: fee,
@@ -219,18 +226,20 @@ impl SafetyState {
         if collateral_out == 0 || collateral_out > self.collateral_reserve {
             return Err(SafetyError::InsufficientPsmLiquidity);
         }
-        self.psm_debt = self
+        let mut candidate = *self;
+        candidate.psm_debt = candidate
             .psm_debt
             .checked_sub(burn)
             .ok_or(SafetyError::Overflow)?;
-        self.collateral_reserve = self
+        candidate.collateral_reserve = candidate
             .collateral_reserve
             .checked_sub(collateral_out)
             .ok_or(SafetyError::Overflow)?;
-        self.stable_reserve = self
+        candidate.stable_reserve = candidate
             .stable_reserve
             .checked_add(fee)
             .ok_or(SafetyError::Overflow)?;
+        *self = candidate;
         Ok(PsmRedeemResult {
             collateral_to_user: collateral_out,
             stable_fee_to_reserve: fee,
