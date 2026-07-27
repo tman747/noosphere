@@ -205,6 +205,15 @@ exact revision and the resulting immutable evidence validates.
 | `IND-05` | `EXTERNAL_BLOCKED` | Inject corrupt, replayed, withheld, and stale model shares; prove rejection, repair, and unschedulability below threshold. |
 | `IND-06` | `EXTERNAL_BLOCKED` | Enroll and fund two independently controlled challengers; demonstrate honest fault isolation and frivolous-challenge loss. |
 
+`wwm_independence_drills.py` supplies the fail-closed collection workflow for
+`IND-04` and `IND-05`: signed exact-revision plans, digest-pinned adapters,
+largest-provider and largest-region loss, corrupt-share quarantine,
+replay/stale/withholding rejection, threshold unschedulability, repair,
+content-root equality, unrelated-work isolation, and signed immutable
+results. The adapters and verifier are locally executable; the table remains
+`EXTERNAL_BLOCKED` until the observations come from the independently
+controlled cohort named by the signed plan.
+
 ### Track D — formal E-WWM-23 public pilot
 
 | ID | State | Work and exit |
