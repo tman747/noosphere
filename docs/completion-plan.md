@@ -552,7 +552,7 @@ scenarios and wrote
 | `PROMOTE-01` | `OWNER_BLOCKED` | Protocol/API/peer v2 schemas, predecessor, domains, bounds, authorization, rollback, and mixed-version rejection are frozen and validated; owner identity signatures and independent G0 review remain. |
 | `PROMOTE-02` | `OWNER_BLOCKED` | Resolve production chain, genesis, authorities, economics, operators, origins, retention, and release constants in exact signed records. |
 | `PROMOTE-03` | `DONE` | Deterministic exact-revision protocol, cryptography, economics, operations, wallet, and browser audit handoff packaging includes reproducible verification, source/blob manifests, raw vectors, threat inventory, report templates, and signed-independence ingestion. |
-| `PROMOTE-04` | `EXTERNAL_BLOCKED` | Complete deterministic cross-language vectors, mutation/fuzz, small-state, model/runtime, authorization, and independent reproduction. |
+| `PROMOTE-04` | `EXTERNAL_BLOCKED` | The exact-revision local Rust/Go/Python vector, mutation/fuzz, small-state, model/runtime, authorization, genesis, and reproduction-assurance lab is complete; run qualification scale and obtain independently authored, independently controlled reproduction plus real vendor/hardware evidence. |
 | `PROMOTE-05` | `EXTERNAL_BLOCKED` | Run all client pairings across two independently managed client/verifier families with restart, snapshot, proof, unknown-tag, oversize, WAN, and AI-off tests. |
 | `PROMOTE-06` | `DURATION_BLOCKED` | Append-only threshold-signed public-duration automation is complete; collect 90 public cryptographic/economic days, 30 application days, and seven uninterrupted AI-off days at the exact frozen revision. |
 | `PROMOTE-07` | `OWNER_BLOCKED` | Canonical ceremony, Quiet-Week, anchor, DKG, genesis-reproduction, and authorization tooling is complete; owner scheduling, real post-freeze inputs, multiparty DKG, and all-AI-off production bootstrap remain. |
@@ -624,6 +624,24 @@ It remains explicitly `TEST_FIXTURE_NOT_EVIDENCE`,
 `EXTERNAL_PUBLIC_TIME_VERIFICATION_REQUIRED`,
 `independent_control_established=false`, `production_authorized=false`, and
 `promotion_effect=NONE`. No part of the 180-day external gate is claimed.
+
+Revision `7e22242f6d7d43a15e83d0d8ad88f9b933807687` adds the
+immutable cross-language lab and a pinned CI job. Initial strict execution
+found that both the Python vector walker and Go conformance discovery treated
+the schema-backed WWM manifest as a canonical case envelope; format-aware
+validation plus mutation coverage repaired that silent integration seam. The
+exact smoke passed all 11 lanes: the frozen vector corpus, dedicated WWM
+schema/runtime vectors, Go and Rust vector runners, 512 transition small-state
+cases, 512 admission mutations, 1,024 Grain programs, 512 Weft programs, NEL
+model/runtime tests, authorization/reproduction contracts, and Rust/Python
+genesis reproduction. The result is
+`E:/noosphere-evidence/cross-language-lab-7e22242.json`, SHA-256
+`db7d25a6db62553bdd46175eecf30ef48a4e9ba01a764d1ef0e779e942fd8906`;
+its 12-file artifact tree is
+`6866bde4a94465dd00ea73393a1dfa7720c4da81280f65046f0a6fe26f64f9db`.
+The result remains smoke-scale, non-authorizing, and blocked on qualification
+scale, independent authorship/control and reproduction, and a real
+model-vendor/hardware matrix.
 
 ### Track M — external prerequisites
 
