@@ -555,7 +555,7 @@ scenarios and wrote
 | `PROMOTE-04` | `EXTERNAL_BLOCKED` | Complete deterministic cross-language vectors, mutation/fuzz, small-state, model/runtime, authorization, and independent reproduction. |
 | `PROMOTE-05` | `EXTERNAL_BLOCKED` | Run all client pairings across two independently managed client/verifier families with restart, snapshot, proof, unknown-tag, oversize, WAN, and AI-off tests. |
 | `PROMOTE-06` | `DURATION_BLOCKED` | Append-only threshold-signed public-duration automation is complete; collect 90 public cryptographic/economic days, 30 application days, and seven uninterrupted AI-off days at the exact frozen revision. |
-| `PROMOTE-07` | `OWNER_BLOCKED` | Complete parameter Quiet Week, post-freeze Bitcoin anchor, multiparty DKG, final genesis reproduction, and all-AI-off bootstrap demonstration. |
+| `PROMOTE-07` | `OWNER_BLOCKED` | Canonical ceremony, Quiet-Week, anchor, DKG, genesis-reproduction, and authorization tooling is complete; owner scheduling, real post-freeze inputs, multiparty DKG, and all-AI-off production bootstrap remain. |
 | `PROMOTE-08` | `EXTERNAL_BLOCKED` | Run a 180-day capped-value canary with one-checkpoint disable, target recovery, independent exits, WAN, blackout, and saturation drills. |
 | `PROMOTE-09` | `OWNER_BLOCKED` | Collect final multiparty signatures over identical release, genesis, evidence, role, governance, and cutover bytes only after every lower gate passes. |
 | `PROMOTE-10` | `READY` | Rebaseline all base and WWM claims at one exact revision; run every actionable falsifier and preserve every negative or killed result append-only. |
@@ -580,6 +580,20 @@ trust, gap limits, drills, and lane durations. A CLI smoke against the
 not-started template and an empty ledger returned `NOT_STARTED`, zero
 qualifying days, and `promotion_effect=NONE`. The collector and verifier are
 complete; no real G3 day has been claimed.
+
+Revision `5b1c85745ea02cee320a8476767f9b91c21176b1` restores a true
+cross-language genesis reproduction check after the new risk-review controls.
+The first smoke failed and exposed three stale Python assumptions: the DKG
+transcript domain was still V1, two fee-capacity fixtures had drifted, and the
+WWM genesis anchor plus two new controls were absent. The repaired ceremony
+independently reproduces all six Rust state roots and the node identity:
+chain ID `0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b`
+and genesis hash
+`3bdf2c7be6c03dde5e707a8864ef3999c8e110896797b383d91b1a5d2f00319c`.
+All 24 production-authorization tests, the Rust golden-vector test, and the
+full ceremony self-test passed. The exact non-authorizing vector is
+`E:/noosphere-evidence/genesis-vector-5b1c857.json` with SHA-256
+`6031d1f46d51c2a6760f662a9c64267f7bcf789e296d3689ae1c2243b8ea4383`.
 
 ### Track M — external prerequisites
 
