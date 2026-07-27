@@ -21,19 +21,20 @@
     "schedulable_minimum": 9
   },
   "release_evidence": {
-    "source_revision": "2b86fc04701cad4a729d9780dfca460db56ac0d2",
-    "release_version": "0.1.0+git.2b86fc04701cad4a729d9780dfca460db56ac0d2",
-    "local_bundle_id": "f7841c887c29756ccf8e851e5c8cf92797ef16e6473dfdcf9143033b6cd23da0",
-    "ci_bundle_id": "b116034dc467da13e6d17b9f88726bf434ff454e117680974b8567aacf255e52",
-    "ci_workflow_run": "https://github.com/tman747/noosphere/actions/runs/30192240410",
-    "ci_artifact_digest": "b3472504299ad00a43e23235ce2a248e3344d891e931b57cc5310eec64ea2833",
-    "linux_archive_sha256": "f2ccdfad9b61bd8a062c42385f6bf847b85e7d1442c31e8b09f8fa566c286c61",
+    "source_revision": "49e097e3065dfc2c7522ba5cc5c7c56b88e6fd51",
+    "release_version": "0.1.0+git.49e097e3065dfc2c7522ba5cc5c7c56b88e6fd51",
+    "local_bundle_id": "d658ca2264669f90674c7089dea0a918efba740acd627d99d3a79fb2a03be2f2",
+    "ci_bundle_id": "ba9980f937611648a012fd7c73022839cafa6bf5039ceae18d6d83436364bf70",
+    "ci_workflow_run": "https://github.com/tman747/noosphere/actions/runs/30222217633",
+    "ci_artifact_digest": "086d2e6b730f0186bb3f2fced4372ab39ae4d866d2b023dafab73d6386ff8c1b",
+    "linux_archive_sha256": "d50ddaf0d071a6cf81ae412240c6818bbd9bfdd8bb2992b600014929157e2dd3",
     "independent_reproduction": false,
-    "safe_rollback_source_revision": "dd7f326ec1b08b2d64d9e51d77af60843a1d5cd5",
-    "fleet_convergence_observed_at_utc": "2026-07-26T16:42:56.870213Z",
-    "fleet_convergence_evidence_sha256": "10f2cffe3261df47d726269572c270caa681ad4374fe7bccbe25a4830c55e9bf",
+    "safe_rollback_source_revision": "2b86fc04701cad4a729d9780dfca460db56ac0d2",
+    "fleet_convergence_observed_at_utc": "2026-07-27T06:57:59.935447Z",
+    "fleet_convergence_evidence_sha256": "75031a7ace9530ef12b48df0d892ae8e180457aba1f31318e24d8cf468bba64e",
     "configuration_sha256": {
-      "local_supervisor": "09e64ef3f00f0c3d2b6b5ad4ba6aa3246ee6cab70247016ab02fd2de8dc09fcd",
+      "local_supervisor": "50467c5667998b31739ec4c812b37887317962d51ec67ad4d42c1e49b0fe6805",
+      "hosted_model_publisher": "41dac5b7956e1435eb0fae4e8a1e3a269b085f69acae6b69a57b2c397ec169ee",
       "validator_launcher": "d829c2d589d8f000cef6a9df71d01f3ceb9ed0fa679e17feaa6f7f849ab6a667",
       "validator_service": "9cd28b4decb569b6d1a6db5f1497ca3a02549972eca0335330118e475752b0f4",
       "witness_service_template": "55d442d1277376538ae74177e2e6d96bc4069fae91835e0ee7493e1be1d980b9",
@@ -44,8 +45,8 @@
     "node_rpc": "127.0.0.1:29652",
     "node_p2p": "/ip4/0.0.0.0/udp/29650/quic-v1",
     "node_role": "observer-read-gateway-source",
-    "node_binary_sha256": "4d80e13e05b9cf89c43fb9d32c9448bbe64f8635b2dd84946eddaf8f5e10a838",
-    "node_source_revision": "2b86fc04701cad4a729d9780dfca460db56ac0d2",
+    "node_binary_sha256": "35b046209554b139da526af92d78c55379b6125c6ff47ab5027241e47eb9faa1",
+    "node_source_revision": "49e097e3065dfc2c7522ba5cc5c7c56b88e6fd51",
     "node_replay_repair": "adaptive-range-sync-rendezvous-finality-bounded-replay-queue-rotation-v1",
     "bootstrap_peers": [
       "/ip4/20.15.164.29/udp/31004/quic-v1",
@@ -83,7 +84,7 @@
   },
   "public_inference": {
     "schema": "noos/wwm-public-inference/v1",
-    "mode": "off-chain-interactive-testnet",
+    "mode": "chain-settled-interactive-testnet",
     "model": "bonsai-q1",
     "signing_algorithm": "Ed25519",
     "signing_key_id": "1ad4d182db7efffd0e4435fdb748c793f38c2b0062150d00d05c3dda336ed1c6",
@@ -99,9 +100,9 @@
     "payment_modes": [
       "SPONSORED"
     ],
-    "interactive_chain_settlement": false,
+    "interactive_chain_settlement": true,
     "evidence_state": "PROVISIONAL_SIGNED",
-    "settlement_state": "PENDING_CHAIN",
+    "settlement_state": "FINALIZED_PAID",
     "production": false,
     "promotion_effect": "NONE"
   },
@@ -171,8 +172,8 @@
     "fixture_keys": true,
     "single_operator_control": true,
     "production_eligible": false,
-    "node_source_revision": "2b86fc04701cad4a729d9780dfca460db56ac0d2",
-    "node_binary_sha256": "2e274698fbb6dfeb8513fdec3378497ec6077720ebd96f42685d99d1706565a5",
+    "node_source_revision": "49e097e3065dfc2c7522ba5cc5c7c56b88e6fd51",
+    "node_binary_sha256": "de7bebd79b5ea6559201bba74430a34e1829808bee16a9c70b0c147b168a8a1d",
     "node_replay_repair": "adaptive-range-sync-rendezvous-finality-bounded-replay-queue-rotation-v1"
   },
   "host_memory_safety": {
@@ -185,13 +186,13 @@
   },
   "public_indexers": {
     "api_version": "v1",
-    "source_revision": "2b86fc04701cad4a729d9780dfca460db56ac0d2",
-    "release_version": "0.1.0+git.2b86fc04701cad4a729d9780dfca460db56ac0d2",
+    "source_revision": "49e097e3065dfc2c7522ba5cc5c7c56b88e6fd51",
+    "release_version": "0.1.0+git.49e097e3065dfc2c7522ba5cc5c7c56b88e6fd51",
     "maximum_freshness_ms": 15000,
     "minimum_control_cluster_quorum": 2,
     "quorum_basis": "distinct-virtual-machine-failure-domains",
     "operator_independent": false,
-    "indexer_binary_sha256": "a710dc9ca062772b2369a2ebc7452c9b351bab798d2280d60867697939b1c471",
+    "indexer_binary_sha256": "81071850c3cc6c1456496f51dcd286220b7f6ffe65ae93904613268a8fd08cb4",
     "endpoints": [
       {
         "base_url": "https://wwm-seed.mindchain.network",
