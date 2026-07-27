@@ -15,6 +15,7 @@ pub mod fiber_dag;
 pub mod hidden;
 pub mod privacy_ir;
 pub mod private_job;
+pub mod private_retrieval;
 pub mod stealth;
 pub mod tee_fiber;
 

@@ -1006,6 +1006,46 @@ mod tests {
     }
 
     #[test]
+    fn private_history_is_local_key_and_origin_controlled() {
+        let first = origin(1, 2, 1);
+        let second = origin(1, 2, 2);
+        let mut vault = OriginVault::default();
+        vault
+            .put(
+                &h(42),
+                first,
+                VaultPartition::QueryHistory,
+                b"private-session",
+                b"encrypted-output-reference",
+                [42; 24],
+                1,
+                None,
+            )
+            .unwrap();
+        assert!(vault
+            .get(
+                &h(43),
+                first,
+                VaultPartition::QueryHistory,
+                b"private-session",
+                2,
+            )
+            .is_err());
+        assert!(vault
+            .get(
+                &h(42),
+                second,
+                VaultPartition::QueryHistory,
+                b"private-session",
+                2,
+            )
+            .unwrap()
+            .is_none());
+        assert_eq!(vault.delete_origin(first), 1);
+        assert_eq!(vault.entry_count(first), 0);
+    }
+
+    #[test]
     fn permission_receipt_is_exact_origin_resource_and_presence_bound() {
         let device = Keypair::from_seed([20; 32]);
         let first = origin(1, 2, 1);
