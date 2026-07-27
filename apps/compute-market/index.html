@@ -35,8 +35,8 @@
           <label>Admin token<input id="admin-token" type="password" autocomplete="off" required><small>Read from the coordinator’s private token file.</small></label>
           <div class="form-grid">
             <label>Shards<input id="shards" type="number" min="1" max="64" value="3" required></label>
-            <label>Units / shard<input id="units" type="number" min="1" max="1000000" value="2048" required></label>
-            <label>Rounds / unit<input id="rounds" type="number" min="1" max="1048576" value="4096" required></label>
+            <label>Units / shard<input id="units" type="number" min="1" max="1000000" value="256" required></label>
+            <label>Rounds / unit<input id="rounds" type="number" min="1" max="1000000" value="2048" required><small>Units × rounds must stay at or below 1,000,000.</small></label>
             <label>Max micro-NOOS / unit<input id="price" type="number" min="1" value="2" required></label>
           </div>
           <button class="primary" type="submit"><span>Open escrowed shards</span><b>OPEN</b></button>

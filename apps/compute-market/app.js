@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const stateNames = ["OPEN", "CLAIMED", "SUBMITTED", "SETTLED", "CANCELLED"];
+const stateNames = ["OPEN", "CLAIMED", "SUBMITTED", "SETTLED", "CANCELLED", "INVALID", "TIMED_OUT"];
 let helping = false;
 let helperAbort = false;
 
@@ -79,12 +79,17 @@ $("job-form").addEventListener("submit", async (event) => {
   status.className = "form-status";
   status.textContent = "Signing and settling each open-job transaction…";
   try {
+    const units = Number($("units").value);
+    const rounds = Number($("rounds").value);
+    if (!Number.isSafeInteger(units) || !Number.isSafeInteger(rounds) || units * rounds > 1_000_000) {
+      throw new Error("Units × rounds must not exceed 1,000,000 dispute operations.");
+    }
     const value = await request("/api/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${$("admin-token").value}` },
       body: JSON.stringify({
-        shard_count: Number($("shards").value), units_per_shard: Number($("units").value),
-        rounds: Number($("rounds").value), max_price_per_unit: Number($("price").value)
+        shard_count: Number($("shards").value), units_per_shard: units,
+        rounds, max_price_per_unit: Number($("price").value)
       })
     });
     status.textContent = `${value.jobs.length} shards opened; ${value.maximum_escrow} micro-NOOS maximum escrow.`;

@@ -1733,7 +1733,7 @@ fn compute_workers_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
         .iter()
         .map(|worker| {
             format!(
-                r#"{{"worker":"{}","capabilities":{},"cpu_threads":{},"memory_mb":{},"gpu_memory_mb":{},"price_per_unit":"{}","endpoint_commitment":"{}","active":{},"jobs_completed":"{}","units_completed":"{}"}}"#,
+                r#"{{"worker":"{}","capabilities":{},"cpu_threads":{},"memory_mb":{},"gpu_memory_mb":{},"price_per_unit":"{}","endpoint_commitment":"{}","active":{},"jobs_completed":"{}","units_completed":"{}","bond_available":"{}","bond_locked":"{}","jobs_failed":"{}","penalties_paid":"{}"}}"#,
                 hex(&worker.worker),
                 worker.capabilities,
                 worker.cpu_threads,
@@ -1744,6 +1744,10 @@ fn compute_workers_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
                 worker.active,
                 worker.jobs_completed,
                 worker.units_completed,
+                worker.bond_available,
+                worker.bond_locked,
+                worker.jobs_failed,
+                worker.penalties_paid,
             )
         })
         .collect::<Vec<_>>()
@@ -1774,7 +1778,7 @@ fn compute_jobs_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
                 .map(|value| format!(r#""{}""#, hex(value)))
                 .unwrap_or_else(|| "null".into());
             format!(
-                r#"{{"job_id":"{}","requester":"{}","worker":{},"workload_kind":{},"input_root":"{}","units":"{}","unit_size":{},"max_price_per_unit":"{}","agreed_price_per_unit":"{}","escrow":"{}","deadline_height":"{}","state":{},"result_root":"{}","completed_units":"{}"}}"#,
+                r#"{{"job_id":"{}","requester":"{}","worker":{},"workload_kind":{},"input_root":"{}","units":"{}","unit_size":{},"max_price_per_unit":"{}","agreed_price_per_unit":"{}","escrow":"{}","deadline_height":"{}","state":{},"result_root":"{}","completed_units":"{}","worker_bond":"{}","claimed_height":"{}","submitted_height":"{}","review_deadline_height":"{}","resolution":{}}}"#,
                 hex(&job.job_id),
                 hex(&job.requester),
                 worker,
@@ -1789,6 +1793,11 @@ fn compute_jobs_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
                 job.state,
                 hex(&job.result_root),
                 job.completed_units,
+                job.worker_bond,
+                job.claimed_height,
+                job.submitted_height,
+                job.review_deadline_height,
+                job.resolution,
             )
         })
         .collect::<Vec<_>>()

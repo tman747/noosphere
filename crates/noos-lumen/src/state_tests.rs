@@ -23,11 +23,12 @@ use crate::neural_oracle::{
 };
 use crate::objects::{
     agent_private_payment_schema_root, agent_private_payment_scope, asset_id, compute_job_id,
-    debt_position_id, lending_market_id, liquidity_position_id, note_id, oracle_feed_id, pool_id,
-    private_recipient_commitment, stable_asset_id, txid, witness_root, AccessEntry, AccountV1,
-    ActionV1, BoundedBytes, BoundedList, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1,
-    FeatureControlV1, IntentV1, NoteV1, ObjectV1, OptionalHash32, OptionalObject, PrivatePaymentV1,
-    ResourceVector, SignedIntentV1, TransactionV1, TransactionWitnessesV1,
+    compute_mix32_input_root, compute_mix32_result_root, debt_position_id, lending_market_id,
+    liquidity_position_id, note_id, oracle_feed_id, pool_id, private_recipient_commitment,
+    stable_asset_id, txid, witness_root, AccessEntry, AccountV1, ActionV1, BoundedBytes,
+    BoundedList, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1, FeatureControlV1, IntentV1,
+    NoteV1, ObjectV1, OptionalHash32, OptionalObject, PrivatePaymentV1, ResourceVector,
+    SignedIntentV1, TransactionV1, TransactionWitnessesV1,
 };
 use crate::state::{
     param_key, ApplyOutcome, BlockContext, FailCode, GenesisConfig, GenesisError, LumenLedger,
@@ -1807,6 +1808,7 @@ fn compute_market_escrow_requires_requester_acceptance_before_payment() {
             gpu_memory_mb: 8_192,
             price_per_unit: 7,
             endpoint_commitment: [0x44; 32],
+            bond: 10_000,
         }],
         vec![],
     );
@@ -1860,6 +1862,9 @@ fn compute_market_escrow_requires_requester_acceptance_before_payment() {
             .unwrap(),
         ApplyOutcome::Applied { .. }
     ));
+    let claimed_worker = ledger.get_compute_worker(&worker).unwrap();
+    assert_eq!(claimed_worker.bond_available, 9_000);
+    assert_eq!(claimed_worker.bond_locked, 1_000);
     let worker_before_submit = ledger.balance(&worker, &NOOS_ASSET);
 
     let (submit, submit_witnesses, _) = build_tx(
@@ -1916,6 +1921,390 @@ fn compute_market_escrow_requires_requester_acceptance_before_payment() {
     assert_eq!(
         ledger.get_compute_worker(&worker).unwrap().jobs_completed,
         1
+    );
+    let settled_worker = ledger.get_compute_worker(&worker).unwrap();
+    assert_eq!(settled_worker.bond_available, 10_000);
+    assert_eq!(settled_worker.bond_locked, 0);
+}
+
+fn apply_compute_actions(
+    ledger: &mut LumenLedger,
+    height: u64,
+    signers: Vec<Hash32>,
+    actions: Vec<ActionV1>,
+) -> (ApplyOutcome, TransactionV1) {
+    let (bytes, witnesses, tx) = build_tx(height, vec![], signers, actions, vec![]);
+    let outcome = ledger
+        .apply_transaction(&ctx(height), &bytes, &witnesses, &StubEngine, &AcceptAll)
+        .unwrap();
+    (outcome, tx)
+}
+
+fn register_bonded_compute_worker(
+    ledger: &mut LumenLedger,
+    worker: Hash32,
+    bond: u128,
+    price_per_unit: u128,
+) {
+    let (funded, _) = apply_compute_actions(
+        ledger,
+        1,
+        vec![PAYER],
+        vec![
+            ActionV1::WithdrawFromAccount {
+                account_id: PAYER,
+                asset_id: NOOS_ASSET,
+                amount: 100_000,
+            },
+            ActionV1::DepositToAccount {
+                account_id: worker,
+                asset_id: NOOS_ASSET,
+                amount: 100_000,
+            },
+        ],
+    );
+    assert!(matches!(funded, ApplyOutcome::Applied { .. }));
+    let (registered, _) = apply_compute_actions(
+        ledger,
+        2,
+        vec![PAYER, worker],
+        vec![ActionV1::RegisterComputeWorker {
+            worker,
+            capabilities: ComputeWorkerV1::CAPABILITY_CPU,
+            cpu_threads: 1,
+            memory_mb: 1024,
+            gpu_memory_mb: 0,
+            price_per_unit,
+            endpoint_commitment: [0x44; 32],
+            bond,
+        }],
+    );
+    assert!(matches!(registered, ApplyOutcome::Applied { .. }));
+}
+
+fn submit_mix32_job(ledger: &mut LumenLedger, worker: Hash32, result_root: Hash32) -> Hash32 {
+    const SEED: u32 = 7;
+    const START: u64 = 11;
+    const UNITS: u64 = 2;
+    const ROUNDS: u32 = 3;
+    register_bonded_compute_worker(ledger, worker, 100, 7);
+    let input_root = compute_mix32_input_root(SEED, START, UNITS, ROUNDS).unwrap();
+    let (opened, open_tx) = apply_compute_actions(
+        ledger,
+        3,
+        vec![PAYER],
+        vec![ActionV1::OpenComputeJob {
+            requester: PAYER,
+            workload_kind: 0,
+            input_root,
+            units: UNITS,
+            unit_size: ROUNDS,
+            max_price_per_unit: 10,
+            deadline_height: 20,
+        }],
+    );
+    assert!(matches!(opened, ApplyOutcome::Applied { .. }));
+    let job_id = compute_job_id(&txid(&open_tx), 0);
+    let (claimed, _) = apply_compute_actions(
+        ledger,
+        4,
+        vec![PAYER, worker],
+        vec![ActionV1::ClaimComputeJob { worker, job_id }],
+    );
+    assert!(matches!(claimed, ApplyOutcome::Applied { .. }));
+    let (submitted, _) = apply_compute_actions(
+        ledger,
+        5,
+        vec![PAYER, worker],
+        vec![ActionV1::SubmitComputeResult {
+            worker,
+            job_id,
+            result_root,
+            completed_units: UNITS,
+        }],
+    );
+    assert!(matches!(submitted, ApplyOutcome::Applied { .. }));
+    job_id
+}
+
+#[test]
+fn mix32_consensus_verifier_matches_canonical_python_vectors() {
+    assert_eq!(
+        compute_mix32_input_root(7, 11, 2, 3).unwrap(),
+        [
+            0x1c, 0xf4, 0xc1, 0xa6, 0xac, 0xac, 0x71, 0x3b, 0x15, 0x9a, 0x76, 0xf9, 0x26, 0xe3,
+            0xcf, 0xa1, 0x6c, 0xfe, 0x97, 0xe7, 0xc2, 0xb7, 0x8e, 0xf7, 0xea, 0xfa, 0x69, 0x93,
+            0x8b, 0xb7, 0xa7, 0x8d,
+        ]
+    );
+    assert_eq!(
+        compute_mix32_result_root(7, 11, 2, 3).unwrap(),
+        [
+            0x1d, 0x5d, 0xd1, 0x23, 0x0a, 0x46, 0x18, 0xe0, 0x03, 0x48, 0x60, 0x79, 0xc6, 0xf5,
+            0xe0, 0xd4, 0xcc, 0x57, 0xc7, 0x4f, 0xb9, 0x29, 0x56, 0xfa, 0x26, 0xcf, 0x2e, 0xf3,
+            0xa4, 0xf5, 0xe9, 0xc2,
+        ]
+    );
+    assert!(compute_mix32_result_root(1, 0, 1_000_001, 1).is_none());
+    assert!(compute_mix32_result_root(1, u64::MAX, 2, 1).is_none());
+}
+
+#[test]
+fn invalid_compute_result_challenge_refunds_and_slashes_worker() {
+    let mut ledger = genesis();
+    let worker = [0xA8; 32];
+    let mut invalid_root = compute_mix32_result_root(7, 11, 2, 3).unwrap();
+    invalid_root[0] ^= 0xff;
+    let job_id = submit_mix32_job(&mut ledger, worker, invalid_root);
+
+    let (cancelled, _) = apply_compute_actions(
+        &mut ledger,
+        6,
+        vec![PAYER],
+        vec![ActionV1::CancelComputeJob {
+            requester: PAYER,
+            job_id,
+        }],
+    );
+    assert!(matches!(
+        cancelled,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    let still_submitted = ledger.get_compute_job(&job_id).unwrap();
+    assert_eq!(still_submitted.state, ComputeJobV1::STATE_SUBMITTED);
+    assert_eq!(still_submitted.escrow, 20);
+    assert_eq!(still_submitted.worker_bond, 20);
+
+    let (wrong_payload, _) = apply_compute_actions(
+        &mut ledger,
+        7,
+        vec![PAYER],
+        vec![ActionV1::ChallengeComputeResult {
+            requester: PAYER,
+            job_id,
+            seed: 8,
+            start: 11,
+        }],
+    );
+    assert!(matches!(
+        wrong_payload,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert_eq!(
+        ledger.get_compute_job(&job_id).unwrap().state,
+        ComputeJobV1::STATE_SUBMITTED
+    );
+    assert_eq!(ledger.get_compute_worker(&worker).unwrap().bond_locked, 20);
+
+    let (challenged, _) = apply_compute_actions(
+        &mut ledger,
+        8,
+        vec![PAYER],
+        vec![ActionV1::ChallengeComputeResult {
+            requester: PAYER,
+            job_id,
+            seed: 7,
+            start: 11,
+        }],
+    );
+    let ApplyOutcome::Applied { receipt, .. } = challenged else {
+        panic!("valid challenge must settle");
+    };
+    assert_eq!(receipt.resources_used.grain_steps, 6);
+    let job = ledger.get_compute_job(&job_id).unwrap();
+    assert_eq!(job.state, ComputeJobV1::STATE_INVALID);
+    assert_eq!(
+        job.resolution,
+        ComputeJobV1::RESOLUTION_CHALLENGE_REJECTED_RESULT
+    );
+    assert_eq!(job.escrow, 0);
+    assert_eq!(job.worker_bond, 0);
+    let record = ledger.get_compute_worker(&worker).unwrap();
+    assert_eq!(record.active, 0);
+    assert_eq!(record.bond_available, 80);
+    assert_eq!(record.bond_locked, 0);
+    assert_eq!(record.jobs_failed, 1);
+    assert_eq!(record.penalties_paid, 20);
+    assert_eq!(ledger.balance(&worker, &NOOS_ASSET), 99_900);
+}
+
+#[test]
+fn false_compute_challenge_pays_worker_and_forfeits_challenge_bond() {
+    let mut ledger = genesis();
+    let worker = [0xA9; 32];
+    let result_root = compute_mix32_result_root(7, 11, 2, 3).unwrap();
+    let job_id = submit_mix32_job(&mut ledger, worker, result_root);
+
+    let (challenged, _) = apply_compute_actions(
+        &mut ledger,
+        6,
+        vec![PAYER],
+        vec![ActionV1::ChallengeComputeResult {
+            requester: PAYER,
+            job_id,
+            seed: 7,
+            start: 11,
+        }],
+    );
+    assert!(matches!(challenged, ApplyOutcome::Applied { .. }));
+    let job = ledger.get_compute_job(&job_id).unwrap();
+    assert_eq!(job.state, ComputeJobV1::STATE_SETTLED);
+    assert_eq!(
+        job.resolution,
+        ComputeJobV1::RESOLUTION_CHALLENGE_CONFIRMED_RESULT
+    );
+    let record = ledger.get_compute_worker(&worker).unwrap();
+    assert_eq!(record.bond_available, 100);
+    assert_eq!(record.bond_locked, 0);
+    assert_eq!(record.jobs_completed, 1);
+    assert_eq!(ledger.balance(&worker, &NOOS_ASSET), 99_915);
+}
+
+#[test]
+fn permissionless_compute_expiry_refunds_and_slashes_timeout() {
+    let mut ledger = genesis();
+    let worker = [0xAA; 32];
+    register_bonded_compute_worker(&mut ledger, worker, 100, 7);
+    let input_root = compute_mix32_input_root(7, 11, 2, 3).unwrap();
+    let (opened, open_tx) = apply_compute_actions(
+        &mut ledger,
+        3,
+        vec![PAYER],
+        vec![ActionV1::OpenComputeJob {
+            requester: PAYER,
+            workload_kind: 0,
+            input_root,
+            units: 2,
+            unit_size: 3,
+            max_price_per_unit: 10,
+            deadline_height: 4,
+        }],
+    );
+    assert!(matches!(opened, ApplyOutcome::Applied { .. }));
+    let job_id = compute_job_id(&txid(&open_tx), 0);
+    let (claimed, _) = apply_compute_actions(
+        &mut ledger,
+        4,
+        vec![PAYER, worker],
+        vec![ActionV1::ClaimComputeJob { worker, job_id }],
+    );
+    assert!(matches!(claimed, ApplyOutcome::Applied { .. }));
+
+    let (expired, _) = apply_compute_actions(
+        &mut ledger,
+        5,
+        vec![PAYER],
+        vec![ActionV1::ExpireComputeJob { job_id }],
+    );
+    assert!(matches!(expired, ApplyOutcome::Applied { .. }));
+    let job = ledger.get_compute_job(&job_id).unwrap();
+    assert_eq!(job.state, ComputeJobV1::STATE_TIMED_OUT);
+    assert_eq!(job.resolution, ComputeJobV1::RESOLUTION_TIMEOUT);
+    assert_eq!(job.escrow, 0);
+    assert_eq!(job.worker_bond, 0);
+    let record = ledger.get_compute_worker(&worker).unwrap();
+    assert_eq!(record.active, 0);
+    assert_eq!(record.bond_available, 80);
+    assert_eq!(record.bond_locked, 0);
+    assert_eq!(record.jobs_failed, 1);
+    assert_eq!(record.penalties_paid, 20);
+}
+
+#[test]
+fn permissionless_finalize_verifies_result_only_after_review_window() {
+    let mut ledger = genesis();
+    let worker = [0xAB; 32];
+    let result_root = compute_mix32_result_root(7, 11, 2, 3).unwrap();
+    let job_id = submit_mix32_job(&mut ledger, worker, result_root);
+    assert_eq!(
+        ledger
+            .get_compute_job(&job_id)
+            .unwrap()
+            .review_deadline_height,
+        105
+    );
+
+    let (early, _) = apply_compute_actions(
+        &mut ledger,
+        105,
+        vec![PAYER],
+        vec![ActionV1::FinalizeComputeResult {
+            worker,
+            job_id,
+            seed: 7,
+            start: 11,
+        }],
+    );
+    assert!(matches!(
+        early,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert_eq!(
+        ledger.get_compute_job(&job_id).unwrap().state,
+        ComputeJobV1::STATE_SUBMITTED
+    );
+
+    let (finalized, _) = apply_compute_actions(
+        &mut ledger,
+        106,
+        vec![PAYER],
+        vec![ActionV1::FinalizeComputeResult {
+            worker,
+            job_id,
+            seed: 7,
+            start: 11,
+        }],
+    );
+    assert!(matches!(finalized, ApplyOutcome::Applied { .. }));
+    let job = ledger.get_compute_job(&job_id).unwrap();
+    assert_eq!(job.state, ComputeJobV1::STATE_SETTLED);
+    assert_eq!(
+        job.resolution,
+        ComputeJobV1::RESOLUTION_OBJECTIVE_FINALIZED_VALID
+    );
+    assert_eq!(ledger.balance(&worker, &NOOS_ASSET), 99_914);
+}
+
+#[test]
+fn compute_open_rejects_unbounded_dispute_work() {
+    let mut ledger = genesis();
+    let payer_before = ledger.balance(&PAYER, &NOOS_ASSET);
+    let (outcome, open_tx) = apply_compute_actions(
+        &mut ledger,
+        1,
+        vec![PAYER],
+        vec![ActionV1::OpenComputeJob {
+            requester: PAYER,
+            workload_kind: 0,
+            input_root: [0x55; 32],
+            units: 1_001,
+            unit_size: 1_000,
+            max_price_per_unit: 1,
+            deadline_height: 20,
+        }],
+    );
+    assert!(matches!(
+        outcome,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert!(ledger
+        .get_compute_job(&compute_job_id(&txid(&open_tx), 0))
+        .is_none());
+    assert_eq!(
+        payer_before - ledger.balance(&PAYER, &NOOS_ASSET),
+        FeeParamsV1::testnet_fixture().failure_fee
     );
 }
 

@@ -610,6 +610,7 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
             gpu_memory_mb: spec_u32(spec, "gpu_memory_mb")?,
             price_per_unit: spec_u128(spec, "price_per_unit")?,
             endpoint_commitment: spec_hash(spec, "endpoint_commitment")?,
+            bond: spec_u128(spec, "bond")?,
         },
         "open_compute_job" => ActionV1::OpenComputeJob {
             requester: spec_hash(spec, "requester")?,
@@ -636,6 +637,21 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
         },
         "cancel_compute_job" => ActionV1::CancelComputeJob {
             requester: spec_hash(spec, "requester")?,
+            job_id: spec_hash(spec, "job_id")?,
+        },
+        "challenge_compute_result" => ActionV1::ChallengeComputeResult {
+            requester: spec_hash(spec, "requester")?,
+            job_id: spec_hash(spec, "job_id")?,
+            seed: spec_u32(spec, "seed")?,
+            start: spec_u64(spec, "start")?,
+        },
+        "finalize_compute_result" => ActionV1::FinalizeComputeResult {
+            worker: spec_hash(spec, "worker")?,
+            job_id: spec_hash(spec, "job_id")?,
+            seed: spec_u32(spec, "seed")?,
+            start: spec_u64(spec, "start")?,
+        },
+        "expire_compute_job" => ActionV1::ExpireComputeJob {
             job_id: spec_hash(spec, "job_id")?,
         },
         "commit_custody_positions" => {

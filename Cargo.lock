@@ -3816,6 +3816,7 @@ dependencies = [
  "noos-codec",
  "noos-crypto",
  "noos-stable-safety",
+ "sha2",
  "smallvec",
 ]
 

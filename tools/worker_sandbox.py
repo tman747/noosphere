@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
@@ -48,6 +49,24 @@ POLICY_FIELDS = {
     "max_result_bytes",
     "max_network_bytes_per_job",
 }
+
+class _MacosRusageInfoV0(ctypes.Structure):
+    """Exact Darwin `struct rusage_info_v0`; flavor and buffer size must match."""
+
+    _fields_ = [
+        ("ri_uuid", ctypes.c_ubyte * 16),
+        ("ri_user_time", ctypes.c_uint64),
+        ("ri_system_time", ctypes.c_uint64),
+        ("ri_pkg_idle_wkups", ctypes.c_uint64),
+        ("ri_interrupt_wkups", ctypes.c_uint64),
+        ("ri_pageins", ctypes.c_uint64),
+        ("ri_wired_size", ctypes.c_uint64),
+        ("ri_resident_size", ctypes.c_uint64),
+        ("ri_phys_footprint", ctypes.c_uint64),
+        ("ri_proc_start_abstime", ctypes.c_uint64),
+        ("ri_proc_exit_abstime", ctypes.c_uint64),
+    ]
+
 WINDOW_FIELDS = {"start_minute", "end_minute"}
 CHILD_REQUEST_FIELDS = {
     "schema",
@@ -374,7 +393,6 @@ def _linux_battery() -> tuple[bool | None, int | None, bool | None]:
 
 def _windows_battery() -> tuple[bool | None, int | None, bool | None]:
     try:
-        import ctypes
 
         class SystemPowerStatus(ctypes.Structure):
             _fields_ = [
@@ -593,39 +611,16 @@ def _resident_memory_bytes(process: subprocess.Popen[bytes]) -> int | None:
             raise SandboxError(f"cannot inspect Linux sandbox memory: {error}") from error
         raise SandboxError("Linux sandbox resident-memory record is missing")
     if sys.platform == "darwin":
-        import ctypes
-
-        class RusageInfoV2(ctypes.Structure):
-            _fields_ = [
-                ("ri_uuid", ctypes.c_ubyte * 16),
-                ("ri_user_time", ctypes.c_uint64),
-                ("ri_system_time", ctypes.c_uint64),
-                ("ri_pkg_idle_wkups", ctypes.c_uint64),
-                ("ri_interrupt_wkups", ctypes.c_uint64),
-                ("ri_pageins", ctypes.c_uint64),
-                ("ri_wired_size", ctypes.c_uint64),
-                ("ri_resident_size", ctypes.c_uint64),
-                ("ri_phys_footprint", ctypes.c_uint64),
-                ("ri_proc_start_abstime", ctypes.c_uint64),
-                ("ri_proc_exit_abstime", ctypes.c_uint64),
-                ("ri_child_user_time", ctypes.c_uint64),
-                ("ri_child_system_time", ctypes.c_uint64),
-                ("ri_child_pkg_idle_wkups", ctypes.c_uint64),
-                ("ri_child_interrupt_wkups", ctypes.c_uint64),
-                ("ri_child_pageins", ctypes.c_uint64),
-                ("ri_child_elapsed_abstime", ctypes.c_uint64),
-            ]
-
         try:
             libproc = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
             libproc.proc_pid_rusage.argtypes = [
                 ctypes.c_int,
                 ctypes.c_int,
-                ctypes.POINTER(RusageInfoV2),
+                ctypes.POINTER(_MacosRusageInfoV0),
             ]
             libproc.proc_pid_rusage.restype = ctypes.c_int
-            usage = RusageInfoV2()
-            if libproc.proc_pid_rusage(process.pid, 2, ctypes.byref(usage)) == 0:
+            usage = _MacosRusageInfoV0()
+            if libproc.proc_pid_rusage(process.pid, 0, ctypes.byref(usage)) == 0:
                 return int(usage.ri_resident_size)
         except (AttributeError, OSError, ValueError) as error:
             raise SandboxError(f"cannot inspect macOS sandbox memory: {error}") from error
@@ -637,7 +632,6 @@ def _resident_memory_bytes(process: subprocess.Popen[bytes]) -> int | None:
 def _assign_windows_job(process: subprocess.Popen[bytes], policy: SandboxPolicy) -> object | None:
     if os.name != "nt":
         return None
-    import ctypes
     from ctypes import wintypes
 
     class LargeInteger(ctypes.Structure):

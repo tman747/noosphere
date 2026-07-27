@@ -3,8 +3,9 @@
 
 The requester key stays in this process. Workers retain their own keys and use
 compute_worker.py. The service stores only deterministic workload payloads,
-verifies submitted roots independently, and signs acceptance only after exact
-recomputation. It never releases escrow on worker submission alone.
+verifies submitted roots independently, and signs acceptance or objective
+challenge settlement after exact recomputation. Worker submission alone never
+releases escrow.
 """
 from __future__ import annotations
 
@@ -31,10 +32,12 @@ from compute_workload_registry import (  # noqa: E402
 )
 from compute_worker import compute_root, live_status, submit_action  # noqa: E402
 from wallet_transfer import api_json, cargo_binary, derive, load_profile, read_seed  # noqa: E402
+from worker_payout_identity import WorkerIdentity  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "apps" / "compute-market"
 MAX_BODY = 64 * 1024
+MAX_DISPUTE_OPERATIONS = 1_000_000
 
 
 class Market:
@@ -49,11 +52,17 @@ class Market:
         registry: VerifiedRegistry,
     ):
         self.profile = profile
-        self.seed = seed
         self.account = account
         self.index = index
         self.requester = str(derive(cargo_binary("noos-cli"), seed, account, index)["verifying_key"])
-        self.admin_token = admin_token
+        self.identity = WorkerIdentity(
+            chain_id=str(profile["chain_id"]),
+            genesis_hash=str(profile["genesis_hash"]),
+            account=account,
+            index=index,
+            payout_account=self.requester,
+            seed=bytearray.fromhex(seed),
+        )
         self.registry = registry
         self.db = sqlite3.connect(db_path, check_same_thread=False)
         self.db.execute("PRAGMA journal_mode=WAL")
@@ -80,8 +89,8 @@ class Market:
 
     def create_jobs(self, value: dict) -> dict:
         shard_count = int(value.get("shard_count", 1))
-        units = int(value.get("units_per_shard", 1024))
-        rounds = int(value.get("rounds", 4096))
+        units = int(value.get("units_per_shard", 256))
+        rounds = int(value.get("rounds", 2048))
         max_price = int(value.get("max_price_per_unit", 1))
         deadline_blocks = int(value.get("deadline_blocks", 1000))
         seed = int(value.get("seed", secrets.randbits(31)))
@@ -95,10 +104,13 @@ class Market:
             not 1 <= units <= limits["max_units"]
             or not 1 <= rounds <= limits["max_unit_size"]
             or units * rounds > limits["max_operations"]
+            or units * rounds > MAX_DISPUTE_OPERATIONS
         ):
             raise ValueError("workload exceeds signed registry bounds")
         if not 1 <= max_price <= 10**18:
             raise ValueError("price outside bounds")
+        if not 1 <= deadline_blocks <= 1_000_000:
+            raise ValueError("deadline_blocks outside bounds")
         deadline = height + deadline_blocks
         created: list[dict] = []
         for shard in range(shard_count):
@@ -110,7 +122,7 @@ class Market:
                     (input_root, seed, shard * units, units, rounds, int(time.time() * 1000)),
                 )
                 self.db.commit()
-            result = submit_action(self.profile, self.seed, self.account, self.index, {
+            result = submit_action(self.profile, self.identity, {
                 "type": "open_compute_job", "requester": self.requester,
                 "workload_kind": workload.workload_kind, "input_root": input_root, "units": units,
                 "unit_size": rounds, "max_price_per_unit": str(max_price),
@@ -197,33 +209,57 @@ class Market:
             rounds,
             max(1, min(32, units)),
         )
-        if claimed_root != expected:
-            raise ValueError("result root failed independent recomputation")
-        if job.get("result_root") != expected:
-            raise ValueError("chain job is not a matching submitted result")
-        result = submit_action(self.profile, self.seed, self.account, self.index, {
-            "type": "accept_compute_result", "requester": self.requester, "job_id": job_id,
-        })
+        chain_root = str(job.get("result_root", ""))
+        if chain_root != expected:
+            result = submit_action(self.profile, self.identity, {
+                "type": "challenge_compute_result",
+                "requester": self.requester,
+                "job_id": job_id,
+                "seed": seed,
+                "start": start,
+            })
+            resolution = "INVALID_RESULT_REFUNDED_AND_SLASHED"
+        else:
+            if claimed_root != expected:
+                raise ValueError("result notification differs from the verified on-chain result")
+            result = submit_action(self.profile, self.identity, {
+                "type": "accept_compute_result", "requester": self.requester, "job_id": job_id,
+            })
+            resolution = "REQUESTER_ACCEPTED"
         with self.lock:
             self.db.execute("UPDATE payloads SET accepted_txid=?, result_root=? WHERE job_id=?",
-                            (result["txid"], expected, job_id))
+                            (result["txid"], chain_root, job_id))
             self.db.commit()
-        return {"job_id": job_id, "result_root": expected, "settlement_txid": result["txid"],
-                "state": result["state"], "workload_id": workload.workload_id}
+        return {
+            "job_id": job_id,
+            "result_root": expected,
+            "submitted_result_root": chain_root,
+            "settlement_txid": result["txid"],
+            "state": result["state"],
+            "resolution": resolution,
+            "workload_id": workload.workload_id,
+        }
 
-    def ensure_helper_worker(self) -> None:
+    def ensure_helper_worker(self, minimum_available_bond: int) -> None:
+        if minimum_available_bond <= 0:
+            raise ValueError("helper bond requirement must be positive")
+        minimum_available_bond = max(100_000, minimum_available_bond)
         workers = self.chain("/api/v1/workers").get("items", [])
-        if any(item.get("worker") == self.requester and item.get("active") == 1 for item in workers):
+        record = next((item for item in workers if item.get("worker") == self.requester), None)
+        available = int(record.get("bond_available", "0")) if record else 0
+        locked = int(record.get("bond_locked", "0")) if record else 0
+        if record is not None and record.get("active") == 1 and available >= minimum_available_bond:
             return
-        submit_action(self.profile, self.seed, self.account, self.index, {
+        desired_bond = max(available + locked, locked + minimum_available_bond)
+        submit_action(self.profile, self.identity, {
             "type": "register_compute_worker", "worker": self.requester,
             "capabilities": 3, "cpu_threads": 1, "memory_mb": 1024,
             "gpu_memory_mb": 1, "price_per_unit": "1",
             "endpoint_commitment": hashlib.sha256(b"NOOS/BROWSER/HELPER/V1").hexdigest(),
+            "bond": str(desired_bond),
         })
 
     def helper_claim(self) -> dict:
-        self.ensure_helper_worker()
         height = int(self.chain("/api/status")["unsafe_head"]["height"])
         workload = self.registry.require_active(0, height)
         jobs = self.chain("/api/v1/jobs").get("items", [])
@@ -242,6 +278,7 @@ class Market:
                 height=height,
                 max_operations=None,
             )
+            self.ensure_helper_worker(int(job.get("escrow", "0")))
             with self.lock:
                 if self.db.execute("SELECT 1 FROM helper_claims WHERE job_id=?", (job_id,)).fetchone():
                     continue
@@ -249,7 +286,7 @@ class Market:
                                 (job_id, int(time.time() * 1000)))
                 self.db.commit()
             try:
-                submit_action(self.profile, self.seed, self.account, self.index, {
+                submit_action(self.profile, self.identity, {
                     "type": "claim_compute_job", "worker": self.requester, "job_id": job_id,
                 })
                 return {
@@ -291,7 +328,7 @@ class Market:
         )
         if expected != claimed_root:
             raise ValueError("helper result failed independent recomputation")
-        submit_action(self.profile, self.seed, self.account, self.index, {
+        submit_action(self.profile, self.identity, {
             "type": "submit_compute_result", "worker": self.requester, "job_id": job_id,
             "result_root": expected, "completed_units": units,
         })
@@ -299,7 +336,7 @@ class Market:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "MindCompute/0.1"
+    server_version = "MindCompute/0.4"
 
     @property
     def market(self) -> Market:
@@ -328,7 +365,7 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlsplit(self.path).path
         try:
             if path == "/api/health":
-                self.reply(200, {"ok": True, "version": "0.3", "operator_head": bool(self.market.profile.get("_operator_node")),
+                self.reply(200, {"ok": True, "version": "0.4", "operator_head": bool(self.market.profile.get("_operator_node")),
                                  "workload_registry_id": self.market.registry.registry_id})
             elif path == "/api/config":
                 self.reply(200, {
@@ -443,7 +480,11 @@ def main() -> int:
         "workload_registry": registry.registry_id,
         "registry_signer_key_id": registry.signer_key_id,
     }, indent=2), flush=True)
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    finally:
+        market.identity.close()
+        market.db.close()
     return 0
 
 

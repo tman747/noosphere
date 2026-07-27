@@ -1,4 +1,5 @@
 import copy
+import ctypes
 from datetime import datetime, timezone
 import io
 import json
@@ -150,6 +151,10 @@ class WorkerSandboxTests(unittest.TestCase):
         with self.assertRaisesRegex(sandbox.SandboxError, "network traffic"):
             budget.consume(1, "overflow")
 
+    def test_macos_rusage_buffer_matches_v0_kernel_layout(self):
+        self.assertEqual(ctypes.sizeof(sandbox._MacosRusageInfoV0), 96)
+        self.assertEqual(sandbox._MacosRusageInfoV0.ri_resident_size.offset, 64)
+
     def test_registration_binds_advertised_resources_to_local_policy(self):
         identity = compute_worker.WorkerIdentity(
             chain_id="01" * 32,
@@ -159,7 +164,7 @@ class WorkerSandboxTests(unittest.TestCase):
             payout_account="03" * 32,
             seed=bytearray(range(32)),
         )
-        args = SimpleNamespace(market="https://market.invalid/", price_per_unit=7)
+        args = SimpleNamespace(market="https://market.invalid/", price_per_unit=7, bond=100_000)
         first = make_policy(memory_mb=256)
         second = make_policy(memory_mb=512)
         with patch.object(compute_worker, "submit_action", return_value={"state": "INCLUDED"}) as submit:
@@ -170,6 +175,7 @@ class WorkerSandboxTests(unittest.TestCase):
         self.assertEqual(first_action["cpu_threads"], 1)
         self.assertEqual(first_action["memory_mb"], 256)
         self.assertEqual(first_action["gpu_memory_mb"], 0)
+        self.assertEqual(first_action["bond"], "100000")
         self.assertNotEqual(
             first_action["endpoint_commitment"],
             second_action["endpoint_commitment"],

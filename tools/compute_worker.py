@@ -41,13 +41,45 @@ from worker_sandbox import (  # noqa: E402
     probe_host,
 )
 
+WORKER_ACTIONS = frozenset(
+    {
+        "register_compute_worker",
+        "claim_compute_job",
+        "submit_compute_result",
+    }
+)
+REQUESTER_ACTIONS = frozenset(
+    {
+        "open_compute_job",
+        "accept_compute_result",
+        "cancel_compute_job",
+        "challenge_compute_result",
+    }
+)
+PERMISSIONLESS_ACTIONS = frozenset({"finalize_compute_result", "expire_compute_job"})
+DISPUTE_ACTIONS = frozenset({"challenge_compute_result", "finalize_compute_result"})
+
+def require_local_action_actor(action: dict, signer: str) -> None:
+    action_type = action.get("type")
+    if action_type in WORKER_ACTIONS:
+        actor = action.get("worker")
+    elif action_type in REQUESTER_ACTIONS:
+        actor = action.get("requester")
+    elif action_type in PERMISSIONLESS_ACTIONS:
+        actor = signer
+    else:
+        raise RuntimeError("unsupported compute action for local signing")
+    if actor != signer:
+        raise RuntimeError("compute action differs from the local payout identity")
+
 
 def transaction_spec(profile: dict, signer: str, height: int, action: dict) -> dict:
+    grain_steps = 1_000_000 if action.get("type") in DISPUTE_ACTIONS else 0
     return {
         "chain_id": profile["chain_id"], "format_version": 1,
         "expiry_height": height + 1000, "fee_payer": signer,
         "fee_authorization": None,
-        "resource_limits": {"bytes": 8192, "grain_steps": 0, "proof_units": 0,
+        "resource_limits": {"bytes": 8192, "grain_steps": grain_steps, "proof_units": 0,
                              "blob_bytes": 0, "state_reads": 128, "state_writes": 128},
         "note_inputs": [], "account_inputs": [signer], "object_access_list": [],
         "actions": [action], "outputs": [], "evidence_refs": [], "lock_reveals": [],
@@ -101,8 +133,7 @@ def submit_action(
     wait: float = 90,
 ) -> dict:
     signer = identity.payout_account
-    if action.get("worker") != signer:
-        raise RuntimeError("worker action differs from the local payout identity")
+    require_local_action_actor(action, signer)
     exe = cargo_binary("noos-cli")
     status = live_status(profile)
     spec = transaction_spec(profile, signer, int(status["unsafe_head"]["height"]), action)
@@ -199,7 +230,7 @@ def validate_payload(
     registry: VerifiedRegistry,
     job: dict,
     payload: dict,
-    height: int,
+    height: int | None,
     max_operations: int,
 ) -> tuple[WorkloadSpec, int, int, int, int]:
     """Bind coordinator bytes to the signed workload, on-chain job, and local meter."""
@@ -266,6 +297,7 @@ def register(
         "gpu_memory_mb": 0,
         "price_per_unit": str(args.price_per_unit),
         "endpoint_commitment": endpoint,
+        "bond": str(args.bond),
     }
     return submit_action(profile, identity, action)
 
@@ -290,6 +322,7 @@ def run_worker(
                 "threads": policy.cpu_threads,
                 "memory_mb": policy.memory_mb,
                 "market": args.market,
+                "bond": args.bond,
                 "workload_registry": registry.registry_id,
                 "registry_signer_key_id": registry.signer_key_id,
                 "sandbox_policy": policy.summary(),
@@ -302,13 +335,53 @@ def run_worker(
         try:
             policy.enforce_host(probe_host())
             height = int(live_status(profile)["unsafe_head"]["height"])
-            workload = registry.require_active(0, height)
             jobs = api_json(str(profile["api_base_url"]), "/api/v1/jobs").get("items", [])
+            due = [
+                job for job in jobs
+                if job.get("state") == 2
+                and job.get("worker") == worker
+                and height > int(job.get("review_deadline_height", "0"))
+            ]
+            if due:
+                job = min(due, key=lambda item: item["job_id"])
+                job_id = str(job["job_id"])
+                budget = JobNetworkBudget(policy)
+                payload, _ = get_payload(args.market, job_id, policy, budget)
+                _, workload_seed, start, _, _ = validate_payload(
+                    registry, job, payload, None, policy.max_operations
+                )
+                finalized = submit_action(
+                    profile,
+                    identity,
+                    {
+                        "type": "finalize_compute_result",
+                        "worker": worker,
+                        "job_id": job_id,
+                        "seed": workload_seed,
+                        "start": start,
+                    },
+                )
+                print(
+                    json.dumps(
+                        {"job_id": job_id, "settlement": finalized, "resolution": "OBJECTIVE_FINALIZE"},
+                        indent=2,
+                    ),
+                    flush=True,
+                )
+                continue
+            workload = registry.require_active(0, height)
+            workers = api_json(str(profile["api_base_url"]), "/api/v1/workers").get("items", [])
+            worker_record = next((item for item in workers if item.get("worker") == worker), None)
+            if worker_record is None or worker_record.get("active") != 1:
+                time.sleep(args.poll)
+                continue
+            available_bond = int(worker_record.get("bond_available", "0"))
             candidates = [
                 job for job in jobs
                 if job.get("state") == 0
                 and job.get("workload_kind") == workload.workload_kind
                 and int(job.get("max_price_per_unit", "0")) >= args.price_per_unit
+                and int(job.get("escrow", "0")) <= available_bond
             ]
             if not candidates:
                 time.sleep(args.poll)
@@ -390,9 +463,16 @@ def main() -> int:
     parser.add_argument("--identity-password-file", type=Path)
     parser.add_argument("--sandbox-policy", type=Path, required=True)
     parser.add_argument("--price-per-unit", type=int, default=1)
+    parser.add_argument("--bond", type=int, default=100_000)
     parser.add_argument("--poll", type=float, default=2)
     parser.add_argument("command", choices=("register", "run", "register-and-run"))
     args = parser.parse_args()
+    if args.price_per_unit <= 0:
+        parser.error("--price-per-unit must be positive")
+    if args.bond <= 0:
+        parser.error("--bond must be positive")
+    if args.poll <= 0:
+        parser.error("--poll must be positive")
     policy = load_policy(args.sandbox_policy)
     profile = load_profile(args.profile)
     exe = cargo_binary("noos-cli")

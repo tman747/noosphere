@@ -172,6 +172,47 @@ class ComputeNetworkTests(unittest.TestCase):
             compute_worker.submit_action(profile, local_identity, forged)
 
 
+    def test_dispute_recomputation_reserves_consensus_grain(self) -> None:
+        profile = {"chain_id": "01" * 32}
+        signer = "ab" * 32
+        challenge = compute_worker.transaction_spec(
+            profile,
+            signer,
+            7,
+            {
+                "type": "challenge_compute_result",
+                "requester": signer,
+                "job_id": "cd" * 32,
+                "seed": 1,
+                "start": 0,
+            },
+        )
+        accept = compute_worker.transaction_spec(
+            profile,
+            signer,
+            7,
+            {
+                "type": "accept_compute_result",
+                "requester": signer,
+                "job_id": "cd" * 32,
+            },
+        )
+        self.assertEqual(challenge["resource_limits"]["grain_steps"], 1_000_000)
+        self.assertEqual(accept["resource_limits"]["grain_steps"], 0)
+        compute_worker.require_local_action_actor(
+            {"type": "accept_compute_result", "requester": signer, "job_id": "cd" * 32},
+            signer,
+        )
+        compute_worker.require_local_action_actor(
+            {"type": "finalize_compute_result", "worker": "ef" * 32, "job_id": "cd" * 32},
+            signer,
+        )
+        with self.assertRaisesRegex(RuntimeError, "differs from the local payout"):
+            compute_worker.require_local_action_actor(
+                {"type": "challenge_compute_result", "requester": "ef" * 32},
+                signer,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

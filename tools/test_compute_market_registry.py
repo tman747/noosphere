@@ -50,7 +50,7 @@ class ComputeMarketRegistryTests(unittest.TestCase):
         ):
             self.market = compute_market.Market(
                 profile,
-                "wallet-seed",
+                "01" * 32,
                 0,
                 0,
                 Path(self.temporary.name) / "market.sqlite3",
@@ -59,6 +59,7 @@ class ComputeMarketRegistryTests(unittest.TestCase):
             )
 
     def tearDown(self) -> None:
+        self.market.identity.close()
         self.market.db.close()
         self.temporary.cleanup()
 
@@ -66,7 +67,7 @@ class ComputeMarketRegistryTests(unittest.TestCase):
         self.market.chain = lambda path: {"unsafe_head": {"height": 5}}
         captured: list[dict] = []
 
-        def submit(profile, seed, account, index, action):
+        def submit(profile, identity, action):
             captured.append(action)
             return {
                 "txid": "44" * 32,
@@ -131,13 +132,52 @@ class ComputeMarketRegistryTests(unittest.TestCase):
         ) as submit:
             accepted = self.market.accept({"job_id": job_id, "result_root": expected})
         self.assertEqual(accepted["workload_id"], workload.workload_id)
-        self.assertEqual(submit.call_args.args[4]["type"], "accept_compute_result")
+        self.assertEqual(submit.call_args.args[2]["type"], "accept_compute_result")
 
         self.market.chain = lambda path: {"items": [{**job, "input_root": "00" * 32}]}
         with patch.object(compute_market, "submit_action") as rejected_submit:
             with self.assertRaisesRegex(ValueError, "commitment mismatch"):
                 self.market.accept({"job_id": job_id, "result_root": expected})
         rejected_submit.assert_not_called()
+
+        invalid = "ff" * 32
+        self.market.chain = lambda path: {"items": [{**job, "result_root": invalid}]}
+        with patch.object(
+            compute_market,
+            "submit_action",
+            return_value={"txid": "88" * 32, "state": "INCLUDED"},
+        ) as submit:
+            challenged = self.market.accept({"job_id": job_id, "result_root": invalid})
+        action = submit.call_args.args[2]
+        self.assertEqual(action["type"], "challenge_compute_result")
+        self.assertEqual(action["seed"], 7)
+        self.assertEqual(action["start"], 0)
+        self.assertEqual(challenged["resolution"], "INVALID_RESULT_REFUNDED_AND_SLASHED")
+
+        self.market.chain = lambda path: {"items": [job]}
+        with patch.object(compute_market, "submit_action") as rejected_submit:
+            with self.assertRaisesRegex(ValueError, "notification differs"):
+                self.market.accept({"job_id": job_id, "result_root": invalid})
+        rejected_submit.assert_not_called()
+
+    def test_helper_registration_reserves_available_bond(self) -> None:
+        self.market.chain = lambda path: {
+            "items": [{
+                "worker": self.market.requester,
+                "active": 1,
+                "bond_available": "50",
+                "bond_locked": "20",
+            }]
+        }
+        with patch.object(
+            compute_market,
+            "submit_action",
+            return_value={"txid": "99" * 32, "state": "INCLUDED"},
+        ) as submit:
+            self.market.ensure_helper_worker(500)
+        action = submit.call_args.args[2]
+        self.assertEqual(action["type"], "register_compute_worker")
+        self.assertEqual(action["bond"], "100020")
 
 
 if __name__ == "__main__":
