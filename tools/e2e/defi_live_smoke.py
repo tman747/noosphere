@@ -84,7 +84,23 @@ def asset_transfer_actions(sender: str, recipient: str, asset: str, amount: int)
 
 def submit_seed(exe: Path, chain_id: str, genesis_hash: str, signer: str, seed: str, actions: list[dict | str]) -> dict:
     built = cli(exe, "tx", "build", "--spec", json.dumps(spec(chain_id, signer, actions), separators=(",", ":")))
-    signed = cli(exe, "tx", "sign", "--tx", built["tx"], "--seed", seed, "--account", "0", "--index", "0", "--chain-id", chain_id, "--genesis-hash", genesis_hash)
+    signed = cli(
+        exe,
+        "tx",
+        "sign",
+        "--tx",
+        built["tx"],
+        "--seed-stdin",
+        "--account",
+        "0",
+        "--index",
+        "0",
+        "--chain-id",
+        chain_id,
+        "--genesis-hash",
+        genesis_hash,
+        stdin_text=seed + "\n",
+    )
     submitted = cli(exe, "tx", "submit", "--node", RPC, "--token", TOKEN, "--chain-id", chain_id, "--genesis-hash", genesis_hash, "--tx", built["tx"], "--witnesses", signed["witnesses"])
     if submitted["txid"] != built["txid"]:
         raise RuntimeError("node returned a different transaction id")
@@ -107,7 +123,21 @@ def main() -> int:
     env = os.environ.copy()
     exes = binaries(env)
     seeds = [hashlib.blake2b(f"defi-live-smoke/{index}".encode(), digest_size=32).hexdigest() for index in range(3)]
-    accounts = [cli(exes["noos-cli"], "keygen", "--seed", seed, "--purpose", "sign", "--account", "0", "--index", "0")["verifying_key"] for seed in seeds]
+    accounts = [
+        cli(
+            exes["noos-cli"],
+            "keygen",
+            "--seed-stdin",
+            "--purpose",
+            "sign",
+            "--account",
+            "0",
+            "--index",
+            "0",
+            stdin_text=seed + "\n",
+        )["verifying_key"]
+        for seed in seeds
+    ]
     work = Path(tempfile.mkdtemp(prefix="noos-defi-live-"))
     logs = work / "logs"; logs.mkdir()
     procs: list[Proc] = []

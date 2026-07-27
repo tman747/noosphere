@@ -116,6 +116,61 @@ class ComputeNetworkTests(unittest.TestCase):
                 self.registry, job, payload, 1, 99
             )
 
+    def test_worker_actions_are_signed_only_for_local_payout_identity(self) -> None:
+        payout = "ab" * 32
+        local_identity = compute_worker.WorkerIdentity(
+            chain_id="01" * 32,
+            genesis_hash="02" * 32,
+            account=3,
+            index=4,
+            payout_account=payout,
+            seed=bytearray(range(32)),
+        )
+        profile = {
+            "chain_id": local_identity.chain_id,
+            "genesis_hash": local_identity.genesis_hash,
+            "api_base_url": "http://127.0.0.1:18080",
+        }
+        action = {
+            "type": "register_compute_worker",
+            "worker": payout,
+            "capabilities": 1,
+        }
+        built = {"tx": "11" * 32, "txid": "22" * 32}
+        signed = {"txid": built["txid"], "verifying_key": payout, "witnesses": "33"}
+        with (
+            patch.object(compute_worker, "cargo_binary", return_value=Path("noos-cli")),
+            patch.object(
+                compute_worker,
+                "live_status",
+                return_value={"unsafe_head": {"height": 7}},
+            ),
+            patch.object(
+                compute_worker, "cli_json", side_effect=[built, signed]
+            ) as cli,
+            patch.object(compute_worker, "checked_status"),
+            patch.object(
+                compute_worker,
+                "api_json",
+                return_value={"txid": built["txid"]},
+            ),
+            patch.object(
+                compute_worker,
+                "settlement_record",
+                return_value={"state": "INCLUDED"},
+            ),
+        ):
+            result = compute_worker.submit_action(profile, local_identity, action)
+        self.assertEqual(result["txid"], built["txid"])
+        sign_call = cli.call_args_list[1]
+        self.assertIn("--seed-stdin", sign_call.args)
+        self.assertNotIn(local_identity.seed.hex(), sign_call.args)
+        self.assertEqual(sign_call.kwargs["stdin_text"], local_identity.seed.hex() + "\n")
+
+        forged = dict(action, worker="cd" * 32)
+        with self.assertRaisesRegex(RuntimeError, "differs from the local payout"):
+            compute_worker.submit_action(profile, local_identity, forged)
+
 
 
 if __name__ == "__main__":

@@ -27,8 +27,11 @@ from compute_workload_registry import (  # noqa: E402
     read_public_key,
     validate_payload as validate_registered_payload,
 )
-from wallet_transfer import (  # noqa: E402
-    api_json, cargo_binary, checked_status, cli_json, derive, load_profile, read_seed,
+from wallet_transfer import api_json, cargo_binary, checked_status, cli_json, load_profile  # noqa: E402
+from worker_payout_identity import (  # noqa: E402
+    WorkerIdentity,
+    open_identity,
+    read_password,
 )
 
 
@@ -84,16 +87,40 @@ def settlement_record(profile: dict, txid: str) -> dict | None:
     }
 
 
-def submit_action(profile: dict, seed: str, account: int, index: int, action: dict, wait: float = 90) -> dict:
+def submit_action(
+    profile: dict,
+    identity: WorkerIdentity,
+    action: dict,
+    wait: float = 90,
+) -> dict:
     exe = cargo_binary("noos-cli")
-    signer = str(derive(exe, seed, account, index)["verifying_key"])
+    signer = identity.payout_account
+    if action.get("worker") != signer:
+        raise RuntimeError("worker action differs from the local payout identity")
     status = live_status(profile)
     spec = transaction_spec(profile, signer, int(status["unsafe_head"]["height"]), action)
     built = cli_json(exe, "tx", "build", "--spec", json.dumps(spec, separators=(",", ":")))
-    signed = cli_json(exe, "tx", "sign", "--tx", str(built["tx"]), "--seed", seed,
-                      "--account", str(account), "--index", str(index),
-                      "--chain-id", str(profile["chain_id"]),
-                      "--genesis-hash", str(profile["genesis_hash"]), "--scope", "0")
+    signed = cli_json(
+        exe,
+        "tx",
+        "sign",
+        "--tx",
+        str(built["tx"]),
+        "--seed-stdin",
+        "--account",
+        str(identity.account),
+        "--index",
+        str(identity.index),
+        "--chain-id",
+        str(profile["chain_id"]),
+        "--genesis-hash",
+        str(profile["genesis_hash"]),
+        "--scope",
+        "0",
+        stdin_text=identity.seed.hex() + "\n",
+    )
+    if signed.get("verifying_key") != signer:
+        raise RuntimeError("signed transaction differs from the local payout identity")
     checked_status(profile)
     accepted = api_json(str(profile["api_base_url"]), "/api/v1/transactions",
                         body={"tx": built["tx"], "witnesses": signed["witnesses"]})
@@ -186,27 +213,46 @@ def notify_result(market: str, job_id: str, result_root: str) -> dict:
         return json.load(response)
 
 
-def register(args: argparse.Namespace, profile: dict, seed: str, worker: str) -> dict:
+def register(args: argparse.Namespace, profile: dict, identity: WorkerIdentity) -> dict:
     endpoint = hashlib.sha256(args.market.rstrip("/").encode()).hexdigest()
     action = {
-        "type": "register_compute_worker", "worker": worker,
-        "capabilities": 1, "cpu_threads": args.threads,
-        "memory_mb": args.memory_mb, "gpu_memory_mb": 0,
-        "price_per_unit": str(args.price_per_unit), "endpoint_commitment": endpoint,
+        "type": "register_compute_worker",
+        "worker": identity.payout_account,
+        "capabilities": 1,
+        "cpu_threads": args.threads,
+        "memory_mb": args.memory_mb,
+        "gpu_memory_mb": 0,
+        "price_per_unit": str(args.price_per_unit),
+        "endpoint_commitment": endpoint,
     }
-    return submit_action(profile, seed, args.account, args.index, action)
+    return submit_action(profile, identity, action)
 
 
 def run_worker(
     args: argparse.Namespace,
     profile: dict,
-    seed: str,
-    worker: str,
+    identity: WorkerIdentity,
     registry: VerifiedRegistry,
 ) -> None:
-    print(json.dumps({"worker": worker, "platform": platform.platform(), "threads": args.threads,
-                      "market": args.market, "workload_registry": registry.registry_id,
-                      "registry_signer_key_id": registry.signer_key_id}, indent=2), flush=True)
+    worker = identity.payout_account
+    print(
+        json.dumps(
+            {
+                "worker": worker,
+                "payout_account": worker,
+                "custody": "LOCAL_PASSWORD_ENCRYPTED",
+                "browser_storage_used": False,
+                "coordinator_storage_used": False,
+                "platform": platform.platform(),
+                "threads": args.threads,
+                "market": args.market,
+                "workload_registry": registry.registry_id,
+                "registry_signer_key_id": registry.signer_key_id,
+            },
+            indent=2,
+        ),
+        flush=True,
+    )
     while True:
         try:
             height = int(live_status(profile)["unsafe_head"]["height"])
@@ -224,8 +270,11 @@ def run_worker(
             job = min(candidates, key=lambda item: item["job_id"])
             job_id = str(job["job_id"])
             try:
-                submit_action(profile, seed, args.account, args.index,
-                              {"type": "claim_compute_job", "worker": worker, "job_id": job_id})
+                submit_action(
+                    profile,
+                    identity,
+                    {"type": "claim_compute_job", "worker": worker, "job_id": job_id},
+                )
             except RuntimeError:
                 time.sleep(0.5)
                 continue
@@ -238,10 +287,17 @@ def run_worker(
                 workload, workload_seed, start, units, rounds, args.threads
             )
             elapsed = time.perf_counter() - started
-            submit_action(profile, seed, args.account, args.index, {
-                "type": "submit_compute_result", "worker": worker, "job_id": job_id,
-                "result_root": result_root, "completed_units": int(payload["units"]),
-            })
+            submit_action(
+                profile,
+                identity,
+                {
+                    "type": "submit_compute_result",
+                    "worker": worker,
+                    "job_id": job_id,
+                    "result_root": result_root,
+                    "completed_units": int(payload["units"]),
+                },
+            )
             accepted = notify_result(args.market, job_id, result_root)
             print(json.dumps({"job_id": job_id, "units": payload["units"], "seconds": elapsed,
                               "units_per_second": int(payload["units"]) / elapsed,
@@ -257,9 +313,8 @@ def main() -> int:
     parser.add_argument("--market", required=True)
     parser.add_argument("--workload-registry", type=Path, required=True)
     parser.add_argument("--registry-public-key", type=Path, required=True)
-    parser.add_argument("--seed-file")
-    parser.add_argument("--account", type=int, default=0)
-    parser.add_argument("--index", type=int, default=0)
+    parser.add_argument("--identity-file", type=Path, required=True)
+    parser.add_argument("--identity-password-file", type=Path)
     parser.add_argument("--threads", type=int, default=max(1, os.cpu_count() or 1))
     parser.add_argument("--memory-mb", type=int, default=4096)
     parser.add_argument("--price-per-unit", type=int, default=1)
@@ -268,20 +323,30 @@ def main() -> int:
     parser.add_argument("command", choices=("register", "run", "register-and-run"))
     args = parser.parse_args()
     profile = load_profile(args.profile)
-    seed = read_seed(args.seed_file)
     exe = cargo_binary("noos-cli")
-    worker = str(derive(exe, seed, args.account, args.index)["verifying_key"])
-    registry = load_registry(
-        args.workload_registry,
-        trusted_public_key=read_public_key(args.registry_public_key),
-        expected_chain_id=str(profile["chain_id"]),
-        expected_genesis_hash=str(profile["genesis_hash"]),
-        height=int(live_status(profile)["unsafe_head"]["height"]),
-    )
-    if args.command in {"register", "register-and-run"}:
-        print(json.dumps(register(args, profile, seed, worker), indent=2), flush=True)
-    if args.command in {"run", "register-and-run"}:
-        run_worker(args, profile, seed, worker, registry)
+    password = read_password(args.identity_password_file)
+    try:
+        identity = open_identity(
+            args.identity_file,
+            password,
+            str(profile["chain_id"]),
+            str(profile["genesis_hash"]),
+            exe,
+        )
+    finally:
+        password[:] = b"\x00" * len(password)
+    with identity:
+        registry = load_registry(
+            args.workload_registry,
+            trusted_public_key=read_public_key(args.registry_public_key),
+            expected_chain_id=str(profile["chain_id"]),
+            expected_genesis_hash=str(profile["genesis_hash"]),
+            height=int(live_status(profile)["unsafe_head"]["height"]),
+        )
+        if args.command in {"register", "register-and-run"}:
+            print(json.dumps(register(args, profile, identity), indent=2), flush=True)
+        if args.command in {"run", "register-and-run"}:
+            run_worker(args, profile, identity, registry)
     return 0
 
 

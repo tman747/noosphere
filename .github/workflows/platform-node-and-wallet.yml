@@ -8,9 +8,10 @@ on:
       - "crates/**"
       - "wallet/**"
       - "apps/mind-market/wallet/**"
-      - "tools/e2e/market_gateway.py"
+      - "tools/e2e/**"
       - "tools/gates/check_throughput.py"
       - "tools/operations/**"
+      - "tools/*.py"
       - "site/**"
       - "experiments/wwm-web-capacity/**"
       - "protocol/api/openapi-wwm-web-capacity-v1.yaml"
@@ -44,6 +45,23 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check --only-binary=:all: "cryptography==49.0.0"
           python -m unittest -v test_host_lifecycle.py
+
+  worker-payout-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13.5"
+      - name: Verify encrypted worker payout custody
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: "cryptography==49.0.0"
+          python -m unittest -v \
+            tools.test_worker_payout_identity \
+            tools.test_compute_worker_network
 
   native:
     strategy:

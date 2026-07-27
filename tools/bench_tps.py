@@ -126,9 +126,25 @@ def main() -> int:
             "outputs": [], "evidence_refs": [], "lock_reveals": [],
         }
         built = cli_json(exe, "tx", "build", "--spec", json.dumps(spec, separators=(",", ":")))
-        signed = cli_json(exe, "tx", "sign", "--tx", str(built["tx"]), "--seed", seed,
-            "--account", str(args.account), "--index", str(args.index),
-            "--chain-id", str(profile["chain_id"]), "--genesis-hash", str(profile["genesis_hash"]), "--scope", "0")
+        signed = cli_json(
+            exe,
+            "tx",
+            "sign",
+            "--tx",
+            str(built["tx"]),
+            "--seed-stdin",
+            "--account",
+            str(args.account),
+            "--index",
+            str(args.index),
+            "--chain-id",
+            str(profile["chain_id"]),
+            "--genesis-hash",
+            str(profile["genesis_hash"]),
+            "--scope",
+            "0",
+            stdin_text=seed + "\n",
+        )
         accepted = post(str(profile["api_base_url"]), {"tx": built["tx"], "witnesses": signed["witnesses"]})
         if accepted.get("txid") != built["txid"]:
             raise SystemExit("submission txid mismatch")

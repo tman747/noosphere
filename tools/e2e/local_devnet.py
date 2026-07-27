@@ -164,14 +164,14 @@ def derive_recipient(exe: Path) -> str:
     derived = cli(
         exe,
         "keygen",
-        "--seed",
-        RECIPIENT_SEED,
+        "--seed-stdin",
         "--purpose",
         "sign",
         "--account",
         "0",
         "--index",
         "0",
+        stdin_text=RECIPIENT_SEED + "\n",
     )
     verifying_key = str(derived["verifying_key"])
     if re.fullmatch(r"[0-9a-f]{64}", verifying_key) is None:

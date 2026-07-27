@@ -1424,9 +1424,9 @@ fn read_spec_arg(args: &[String]) -> Result<String> {
 }
 
 pub const USAGE: &str = "noos-cli <command>\n\
-  keygen    --seed <hex> --purpose sign|view|agent|recovery|umbra:<suite> --account <n> --index <n>\n\
+  keygen    --seed-stdin --purpose sign|view|agent|recovery|umbra:<suite> --account <n> --index <n>\n\
   tx build  --spec <json> | --spec-file <path>\n\
-  tx sign   --tx <hex> --seed <hex> --account <n> --index <n> --chain-id <hex32> --genesis-hash <hex32> [--scope <n>] [--lock-reveal <hex>]...\n\
+  tx sign   --tx <hex> --seed-stdin --account <n> --index <n> --chain-id <hex32> --genesis-hash <hex32> [--scope <n>] [--lock-reveal <hex>]...\n\
   tx submit --node <addr> --token <t> --chain-id <hex32> --genesis-hash <hex32> --tx <hex> --witnesses <hex>\n\
   query     block <height|hash> --indexer <addr> | tx <txid> --indexer <addr> | neural-oracle <query-id> --node <addr> --token <t>\n\
   manifest  verify --file <path> --public-key <hex32> [--now-unix-ms <u64>]\n\

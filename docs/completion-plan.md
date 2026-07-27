@@ -254,7 +254,7 @@ those gates.
 | `NET-05` | `READY` | Generate signed expiring invitations, lease each voting role once, reject duplicate leases, and support revocation and reassignment. |
 | `NET-06` | `DONE` | Signed Linux x86_64/aarch64 packages render fixed-order, per-service hardened systemd units for producer, node, indexer, gateway, and dashboard; private configuration and durable state remain outside immutable releases across repair and uninstall. |
 | `NET-07` | `ACTIVE` | Signed monotonic lifecycle tooling now emits Linux systemd, macOS user launchd, and Windows limited-user Task Scheduler packages with downgrade protection, single-use rollback, repair, and data-preserving uninstall; native three-platform CI is the remaining exit check. |
-| `NET-08` | `READY` | Generate or recover a local worker payout identity outside browser and coordinator storage; settle a WAN job directly to it. |
+| `NET-08` | `ACTIVE` | Password-encrypted local identity custody, portable recovery, stdin-only signing, and worker/payout binding are implemented; a funded WAN job must still settle directly to the generated account. |
 | `NET-09` | `DONE` | Frozen signed MIX32 registry binds canonical identity, verifier, metering, limits, lifecycle, and executable fail-closed rejection vectors. |
 | `NET-10` | `READY` | Enforce filesystem, network, memory, runtime, storage, GPU, temperature, battery, schedule, and bandwidth policies against malicious workloads. |
 | `NET-11` | `READY` | Implement objective result verification, timeout, dispute, penalty, cancellation, and refund paths that cannot release escrow for invalid work. |
@@ -272,6 +272,19 @@ dependency rejection, update/downgrade policy, target mismatch, rollback
 expiry/replay, repair, root isolation, and exact reinstall. A native Windows CLI
 install/verify/uninstall smoke passed; the pinned Linux/macOS/Windows workflow
 must pass before `NET-07` becomes done.
+
+`worker_payout_identity.py` implements the code-controlled portion of `NET-08`.
+It creates an OS-random seed, derives the payout account through `noos-cli`,
+stores only an Scrypt/AES-256-GCM envelope under restrictive local permissions,
+and validates chain, genesis, derivation path, account, canonical encoding, and
+KDF policy during recovery. `noos-cli` rejects seed material on the process
+argument vector and accepts it only through a bounded stdin ingress.
+`compute_worker.py` requires this encrypted identity and refuses registration,
+claim, or result submission unless the signed worker account equals the local
+payout account. Contract tests cover wrong passwords, metadata/ciphertext
+tampering, KDF downgrade, chain mismatch, recovery, zeroization, secret ingress,
+and payout-account substitution. `NET-08` remains active until a funded job
+settles over the WAN and the balance transition is captured.
 
 ### Track F — native clients and release supply chain
 

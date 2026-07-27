@@ -219,7 +219,7 @@ class HostLifecycleContractTests(unittest.TestCase):
             runner = (package / f"run-{name}.ps1").read_text(encoding="utf-8")
             descriptor = host.load_object(package / f"mindchain-{name}.task.json")
             self.assertIn("[Environment]::SetEnvironmentVariable", runner)
-            self.assertIn(f"bin\\{name}.exe", runner)
+            self.assertIn(str(Path("bin") / f"{name}.exe"), runner)
             self.assertNotIn("=production", runner)
             self.assertEqual(descriptor["service"], name)
             self.assertEqual(descriptor["run_level"], "LIMITED")

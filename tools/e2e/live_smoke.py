@@ -92,8 +92,14 @@ def build_binaries(env: dict) -> dict[str, Path]:
     return out
 
 
-def cli(exe: Path, *args: str) -> dict:
-    proc = subprocess.run([str(exe), *args], capture_output=True, text=True, cwd=ROOT)
+def cli(exe: Path, *args: str, stdin_text: str | None = None) -> dict:
+    proc = subprocess.run(
+        [str(exe), *args],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        input=stdin_text,
+    )
     if proc.returncode != 0:
         raise SystemExit(f"noos-cli {' '.join(args[:2])} failed: {proc.stderr.strip()}")
     return json.loads(proc.stdout)
@@ -165,8 +171,18 @@ def main() -> int:
         # Product journey starts with a wallet identity. Provision that
         # account in the test-network genesis so DepositToAccount can settle.
         recipient_seed = hashlib.blake2b(b"noos-live-smoke/recipient", digest_size=32).hexdigest()
-        keygen = cli(exes["noos-cli"], "keygen", "--seed", recipient_seed,
-                     "--purpose", "sign", "--account", "0", "--index", "0")
+        keygen = cli(
+            exes["noos-cli"],
+            "keygen",
+            "--seed-stdin",
+            "--purpose",
+            "sign",
+            "--account",
+            "0",
+            "--index",
+            "0",
+            stdin_text=recipient_seed + "\n",
+        )
         recipient = bytes.fromhex(keygen["public_id"])
         check("cli keygen", len(recipient) == 32,
               {"path": keygen.get("path"), "public_id": keygen["public_id"]})
