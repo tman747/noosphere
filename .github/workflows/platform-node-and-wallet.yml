@@ -367,8 +367,69 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  mobile-evidence-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13.5"
+      - name: Verify mobile evidence contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mobile-evidence-contracts
+          python -m pip install --disable-pip-version-check --only-binary=:all: "cryptography==49.0.0"
+          python --version 2>&1 | tee mobile-evidence-contracts/python-version.txt
+          python -m pip show cryptography > mobile-evidence-contracts/python-cryptography.txt
+          python -m unittest -v \
+            tools.operations.test_mobile_release_supply \
+            tools.operations.test_mobile_device_evidence \
+            tools.operations.test_mobile_release_reproduction \
+            2>&1 | tee mobile-evidence-contracts/tests.txt
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+
+          root = pathlib.Path("mobile-evidence-contracts")
+          subjects = [
+              {
+                  "file": path.name,
+                  "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+              }
+              for path in sorted(root.iterdir())
+              if path.is_file()
+          ]
+          (root / "evidence.json").write_text(
+              json.dumps(
+                  {
+                      "schema": "noos/mobile-evidence-contract-ci/v1",
+                      "source_revision": os.environ["GITHUB_SHA"],
+                      "runner_os": os.environ["RUNNER_OS"],
+                      "runner_arch": os.environ["RUNNER_ARCH"],
+                      "subjects": subjects,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mindchain-mobile-evidence-contracts-${{ github.sha }}
+          path: mobile-evidence-contracts/
+          if-no-files-found: error
+          retention-days: 30
+
   mobile-release-supply:
-    needs: [native, android, ios]
+    needs: [native, android, ios, mobile-evidence-contracts]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
