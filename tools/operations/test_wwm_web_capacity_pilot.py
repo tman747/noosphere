@@ -40,21 +40,30 @@ class WwmWebCapacityPilotTests(unittest.TestCase):
                 }
             )
         manifest = json.loads(pilot.EXPERIMENT_MANIFEST.read_text(encoding="utf-8"))
+        _, cohort_cells = pilot._manifest_contract()
         config = {
             "schema": pilot.LEDGER_SCHEMA,
             "experiment_id": "E-WWM-23",
+            "experiment_manifest_sha256": pilot.sha256_bytes(pilot.EXPERIMENT_MANIFEST.read_bytes()),
             "model_id": manifest["model_binding"]["artifact_id"],
             "model_source_sha256": manifest["model_binding"]["source_sha256"],
             "source_revision": "a" * 40,
+            "deployment_sha256": "d" * 64,
+            "release_version": f"0.1.0+git.{'a' * 40}",
             "evidence_scope": "TEST_FIXTURE",
             "pilot_start_utc": pilot.format_utc(self.start),
             "initialized_at_utc": pilot.format_utc(self.start),
+            "consent_version": "consent-v1",
+            "authorized_origins": ["https://pilot.example"],
+            "cohort_cells": sorted(cohort_cells),
             "controls_enabled": False,
             "production_claim": False,
             "promotion_authorized": False,
             "trusted_observers": self.observers,
+            "pilot_signer_key_id": self.observers[0]["key_id"],
             "summary_signer_key_id": self.observers[0]["key_id"],
         }
+        self.config = self.sign_config(config)
         self.config_path = self.root / "pilot-config.json"
         self.config_path.write_bytes(pilot.canonical_json(config))
         self.ledger = self.root / "ledger"
@@ -66,6 +75,13 @@ class WwmWebCapacityPilotTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+    def sign_config(self, config: dict[str, object]) -> dict[str, object]:
+        config.pop("freeze_signature_base64", None)
+        config["freeze_signature_base64"] = base64.b64encode(
+            self.keys[0].sign(pilot.freeze_message(config))
+        ).decode("ascii")
+        return config
+
 
     def append(
         self,
@@ -289,6 +305,66 @@ class WwmWebCapacityPilotTests(unittest.TestCase):
             paths.append(path)
         return paths
 
+    def test_signed_freeze_binds_deployment_consent_origins_and_cohort_before_start(self) -> None:
+        tampered = json.loads(json.dumps(self.config))
+        tampered["deployment_sha256"] = "e" * 64
+        with self.assertRaisesRegex(pilot.PilotError, "forged|invalid"):
+            pilot.validate_config(tampered, now=self.start)
+
+        late = json.loads(json.dumps(self.config))
+        late["initialized_at_utc"] = pilot.format_utc(self.start + timedelta(seconds=1))
+        self.sign_config(late)
+        with self.assertRaisesRegex(pilot.PilotError, "no later than its start"):
+            pilot.validate_config(late, now=self.start + timedelta(seconds=1))
+
+        incomplete_public = json.loads(json.dumps(self.config))
+        incomplete_public["evidence_scope"] = "REAL_PUBLIC_PILOT"
+        self.sign_config(incomplete_public)
+        with self.assertRaisesRegex(pilot.PilotError, "fewer than 30"):
+            pilot.validate_config(incomplete_public, now=self.start)
+
+        wrong_cohort = json.loads(json.dumps(self.config))
+        wrong_cohort["cohort_cells"].pop()
+        self.sign_config(wrong_cohort)
+        with self.assertRaisesRegex(pilot.PilotError, "cohort is not exact"):
+            pilot.validate_config(wrong_cohort, now=self.start)
+
+    def test_freeze_command_is_insert_once_and_key_bound(self) -> None:
+        draft = dict(self.config)
+        draft.pop("freeze_signature_base64")
+        draft_path = self.root / "draft.json"
+        draft_path.write_bytes(pilot.canonical_json(draft))
+        private_path = self.root / "pilot-private.key"
+        private_path.write_bytes(
+            self.keys[0].private_bytes(
+                serialization.Encoding.Raw,
+                serialization.PrivateFormat.Raw,
+                serialization.NoEncryption(),
+            )
+        )
+        output = self.root / "frozen.json"
+        result = pilot.freeze_config(draft_path, output, private_path, now=self.start)
+        self.assertEqual(result["freeze_id"], pilot.freeze_id(self.config))
+        self.assertEqual(pilot.load_object(output), self.config)
+        with self.assertRaisesRegex(pilot.PilotError, "already exists"):
+            pilot.freeze_config(draft_path, output, private_path, now=self.start)
+
+        wrong_private = self.root / "wrong-private.key"
+        wrong_private.write_bytes(
+            self.keys[1].private_bytes(
+                serialization.Encoding.Raw,
+                serialization.PrivateFormat.Raw,
+                serialization.NoEncryption(),
+            )
+        )
+        with self.assertRaisesRegex(pilot.PilotError, "does not match"):
+            pilot.freeze_config(
+                draft_path,
+                self.root / "wrong-frozen.json",
+                wrong_private,
+                now=self.start,
+            )
+
     def test_29_days_23_hours_59_minutes_59_seconds_rejects(self) -> None:
         self.add_daily_observations(last_second_short=True)
         with self.assertRaisesRegex(pilot.PilotError, "under 30 elapsed days"):
@@ -469,6 +545,9 @@ class WwmWebCapacityPilotTests(unittest.TestCase):
         self.assertFalse(summary["promotion_authorized"])
         self.assertFalse(summary["production_claim"])
         self.assertFalse(summary["controls_enabled"])
+        self.assertEqual(summary["pilot_freeze_id"], pilot.freeze_id(self.config))
+        self.assertEqual(summary["deployment_sha256"], self.config["deployment_sha256"])
+        self.assertEqual(summary["consent_version"], self.config["consent_version"])
         self.assertEqual(summary["elapsed_seconds"], 30 * 24 * 60 * 60)
         observed = gate.verify_bundle_directory(
             sealed,

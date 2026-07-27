@@ -312,6 +312,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p browser-capacity-evidence
+          python -m pip install --disable-pip-version-check --only-binary=:all: "cryptography==49.0.0"
+          python -m pip show cryptography > browser-capacity-evidence/python-cryptography.txt
           node --version | tee browser-capacity-evidence/node-version.txt
           node --test \
             site/wwm/client.test.mjs \
@@ -324,6 +326,9 @@ jobs:
             tools.operations.test_wwm_web_capacity_experiment \
             tools.operations.test_wwm_web_capacity_topology \
             tools.operations.test_wwm_web_capacity_vectors \
+            tools.operations.test_wwm_web_capacity_devnet \
+            tools.operations.test_wwm_web_capacity_pilot \
+            tools.operations.test_wwm_web_capacity_resilience \
             2>&1 | tee browser-capacity-evidence/python-tests.txt
       - name: Record exact browser capacity evidence
         shell: bash
