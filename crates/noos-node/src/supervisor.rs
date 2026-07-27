@@ -78,6 +78,14 @@ const fn smaller_sync_range_page(current: u32) -> Option<u32> {
     }
 }
 
+const fn range_sync_failure_backoff(current: u32, ready_peer_count: usize) -> Option<u32> {
+    if ready_peer_count > 1 {
+        None
+    } else {
+        smaller_sync_range_page(current)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Store task
 // ---------------------------------------------------------------------------
@@ -933,19 +941,22 @@ async fn sync_ready_peer(
                     );
                     return;
                 }
-                match smaller_sync_range_page(page_headers) {
+                let ready_peer_count = edge.peers().len();
+                match range_sync_failure_backoff(page_headers, ready_peer_count) {
                     Some(smaller_page) => {
                         eprintln!(
-                            "range-sync page backoff for peer {peer} at height {start_height}: \
-                             {error} (page_headers={page_headers}->{smaller_page})"
+                            "range-sync page backoff for sole peer {peer} at height \
+                             {start_height}: {error} \
+                             (page_headers={page_headers}->{smaller_page})"
                         );
                         page_headers = smaller_page;
                         continue;
                     }
                     None => {
                         eprintln!(
-                            "range-sync request failed from peer {peer} at height {start_height}: \
-                             {error} (page_headers={page_headers})"
+                            "range-sync request failed from peer {peer} at height \
+                             {start_height}: {error} (page_headers={page_headers}, \
+                             ready_peers={ready_peer_count}); yielding to peer rotation"
                         );
                         return;
                     }
@@ -1465,6 +1476,8 @@ mod tests {
 
         assert_eq!(pages, vec![16, 8, 4, 2, 1]);
         assert_eq!(smaller_sync_range_page(1), None);
+        assert_eq!(range_sync_failure_backoff(16, 1), Some(8));
+        assert_eq!(range_sync_failure_backoff(16, 2), None);
     }
 
     #[test]

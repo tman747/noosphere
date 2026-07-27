@@ -79,6 +79,14 @@ Acceptance: reboot returns the complete host stack to healthy state without a te
 - Add multiple peers, reconnect, failover, and WAN/NAT/packet-loss tests.
 - Keep public HTTP and operator RPC unreachable on the overlay unless explicitly permitted.
 
+`tools/operations/multi_node_fault_harness.py` emits
+`noos/multi-node-network-soak-report/v2`. A passing report requires distinct
+per-client NAT mappings, measured deterministic loss and latency, a complete
+bootstrap outage followed by redial, an accepted direct signed bootstrap
+successor with a stable PeerId and rotated address, block-equal state sync,
+observer and indexer restart recovery, loopback-only operator binds, and an
+observed HTTP 401 without the private bearer token.
+
 ### Public edge
 
 - Deploy at least three bootstrap nodes across distinct regions and failure domains.
@@ -215,7 +223,7 @@ exact revision and the resulting immutable evidence validates.
 | `NET-01` | `READY` | Persist query state and ingest cursor as one versioned generation bound to height, hash, schema, and state digest. |
 | `NET-02` | `READY` | Crash at every indexer commit boundary and prove repeated restart returns byte-equivalent balances, transactions, receipts, workers, and jobs. |
 | `NET-03` | `DONE` | Signed multi-bootstrap snapshots bind stable PeerIds, chain/genesis, expiry, direct address rotation, irreversible revocation, and persisted rollback refusal. |
-| `NET-04` | `READY` | Run NAT, WAN loss, bootstrap outage, reconnect, peer rotation, snapshot, and state-sync soak without operator RPC exposure. |
+| `NET-04` | `DONE` | The v2 live soak covers multi-client NAT, measured WAN loss/latency, total bootstrap outage and redial, signed address rotation, block-equal state sync, process recovery, and loopback authenticated operator RPC. |
 | `NET-05` | `READY` | Generate signed expiring invitations, lease each voting role once, reject duplicate leases, and support revocation and reassignment. |
 | `NET-06` | `READY` | Package producer, node, indexer, gateway, dashboard, and private configuration as least-privilege auto-start services with repair and uninstall. |
 | `NET-07` | `READY` | Add signed installer/update manifests, downgrade protection, rollback, repair, and data-preserving uninstall for supported desktop platforms. |
