@@ -256,8 +256,8 @@ those gates.
 | `NET-07` | `DONE` | Signed monotonic lifecycle tooling emits Linux systemd, macOS user launchd, and Windows limited-user Task Scheduler packages with downgrade protection, single-use rollback, repair, and data-preserving uninstall; the pinned three-platform matrix passed at `009c2d269d0c387e4c4daa4d1d2764782d342d81`. |
 | `NET-08` | `ACTIVE` | Password-encrypted local identity custody, portable recovery, stdin-only signing, and worker/payout binding are implemented; a funded WAN job must still settle directly to the generated account. |
 | `NET-09` | `DONE` | Frozen signed MIX32 registry binds canonical identity, verifier, metering, limits, lifecycle, and executable fail-closed rejection vectors. |
-| `NET-10` | `ACTIVE` | Canonical local policies now enforce workload allowlisting, filesystem/network/GPU denial, zero scratch, memory/CPU/wall limits, operation and coordinator-byte budgets, temperature, battery, and UTC schedule; native three-platform CI remains. |
-| `NET-11` | `READY` | Implement objective result verification, timeout, dispute, penalty, cancellation, and refund paths that cannot release escrow for invalid work. |
+| `NET-10` | `DONE` | Canonical local policies enforce workload allowlisting, filesystem/network/GPU denial, zero scratch, memory/CPU/wall limits, operation and coordinator-byte budgets, temperature, battery, and UTC schedule; the Linux, macOS, and Windows security matrix passed at `0572d1ab58c804d08d4c0cbdaae049774f7593b7`. |
+| `NET-11` | `DONE` | Objective canonical MIX32 verification, bonded claims, bounded review, permissionless timeout/finalization, requester challenges, false-challenge penalties, worker slashing, cancellation, and refunds prevent invalid work from releasing escrow at `0572d1ab58c804d08d4c0cbdaae049774f7593b7`. |
 
 `host_lifecycle.py` implements `NET-06` and the code-controlled portion of
 `NET-07`: canonical Ed25519 release manifests, runtime platform/architecture
@@ -298,7 +298,20 @@ limit changes midflight. Adversarial tests cover policy tampering, unavailable
 sensors, thermal and battery rejection, schedule closure, oversized
 operations/payloads, bandwidth exhaustion, forbidden capabilities, zero
 scratch use, deterministic result equivalence, and runtime termination.
-`NET-10` remains active until the Linux, macOS, and Windows workflow passes.
+The Linux, macOS, and Windows worker-security matrix passed at `0572d1ab58c804d08d4c0cbdaae049774f7593b7` in [workflow run 30300220501](https://github.com/tman747/noosphere/actions/runs/30300220501).
+
+The `NET-11` transition locks an escrow-equivalent worker bond at claim time.
+Canonical SHA-256 input and result roots make MIX32 disputes objective and
+bounded by the one-million-operation consensus cap. A valid challenge refunds
+escrow, slashes the full locked bond, records failure, and deactivates the
+worker; a false challenge settles valid work and transfers the challenge bond
+to the worker. Submitted results cannot be cancelled, and any account may
+expire a missed claim or finalize a due result after its review window.
+Consensus tests cover canonical vectors, wrong-payload rejection, cancellation
+ordering, both challenge outcomes, permissionless expiry/finalization, and the
+operation cap. The Lumen, CLI, and node suites passed 219 tests; the worker,
+market, dashboard, and sandbox contract suites passed 23 tests at this
+revision.
 
 ### Track F — native clients and release supply chain
 
