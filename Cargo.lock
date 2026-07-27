@@ -3830,6 +3830,7 @@ dependencies = [
 name = "noos-mind"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "hex",
  "noos-crypto",
  "serde",
