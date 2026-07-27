@@ -12,7 +12,7 @@ SCHEMA_PATH = ROOT / "protocol" / "schemas" / "wwm-web-capacity-v1.schema.json"
 OPENAPI_PATH = ROOT / "protocol" / "api" / "openapi-wwm-web-capacity-v1.yaml"
 FROZEN_WWM_V2_PATH = ROOT / "protocol" / "schemas" / "wwm-v2.md"
 DOMAIN_PATH = ROOT / "protocol" / "spec" / "crypto-domains-v1.csv"
-FROZEN_WWM_V2_SHA256 = "eb6fbd2bb818c60b922d607b7e9a82989d11319e7eb847841b18025af6e01d51"
+FROZEN_WWM_V2_SHA256 = "60254a5efad3ce92fb465ac491a038f4f6dc9ed9c2fad64476323a761ac356ff"
 
 
 def load_json(path: Path) -> dict[str, Any]:

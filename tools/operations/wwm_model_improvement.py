@@ -40,7 +40,7 @@ SUCCESSOR_SCHEMA = "noos.wwm.immutable-successor-evidence.v1"
 ROUNDTRIP_SCHEMA = "noos.wwm.real-parent-roundtrip-gate.v1"
 ACTIVATION_SCHEMA = "noos.wwm.activation-evidence.v1"
 
-FROZEN_V2_SHA256 = "eb6fbd2bb818c60b922d607b7e9a82989d11319e7eb847841b18025af6e01d51"
+FROZEN_V2_SHA256 = "60254a5efad3ce92fb465ac491a038f4f6dc9ed9c2fad64476323a761ac356ff"
 FROZEN_Q1_SHA256 = "17ef842e47450caeb8eaa3ebfbbab5d2f2278b62b79be107985fb69a2f819aa0"
 FROZEN_Q1_BYTES = 3_803_452_480
 REAL_PARENT_NAME = "Bonsai-27B-F16.gguf"

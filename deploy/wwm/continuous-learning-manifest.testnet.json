@@ -6,8 +6,8 @@
   "promotion_effect": "NONE",
   "files": {
     "tools/operations/wwm_continuous_learning.py": "cccc092527f4543381f10c8b05bbadc0a76d74a17046d4a4d800f88a57990b12",
-    "tools/operations/wwm_model_improvement.py": "5357f90b5a0aeebbbb5f1893b95d31792a5792e225abeaf2cd9f75ab8ebca415",
-    "protocol/schemas/wwm-v2.md": "eb6fbd2bb818c60b922d607b7e9a82989d11319e7eb847841b18025af6e01d51",
+    "tools/operations/wwm_model_improvement.py": "e779e3bd616181166f9077d81960acfab88428dc48a3f14f2c46453f81f580b9",
+    "protocol/schemas/wwm-v2.md": "60254a5efad3ce92fb465ac491a038f4f6dc9ed9c2fad64476323a761ac356ff",
     "deploy/wwm/continuous-learning.testnet.json": "d0598bcb2e2f02e6875f9193a543278fbff1caba9a8a62f62c2aa10d1443cd6e",
     "deploy/wwm/model-improvement.json": "281dde8af21545771f9e89a6aeec4f0b50a390d6bba768a13bbe307d8d6181eb",
     "deploy/wwm/licenses/Bonsai-27B/LICENSE.txt": "69849221bfb90053de2134ef5e6d540287b4b98062326492f1f96f5da685524b",
