@@ -34,6 +34,10 @@ fn help_prints_the_operator_surface_and_exits_zero() {
         "documents the command-line-secret-safe RPC token file"
     );
     assert!(
+        text.contains("--public-testnet-genesis-v1"),
+        "documents the deployed public-testnet identity profile"
+    );
+    assert!(
         text.contains("--mempool-max-transactions"),
         "documents bounded mempool capacity"
     );
@@ -58,6 +62,7 @@ fn public_testnet_capacity_flags_parse_as_one_contract() {
         "983040",
         "--template-max-transactions",
         "16384",
+        "--public-testnet-genesis-v1",
         "--help",
     ]);
     assert!(

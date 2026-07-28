@@ -36,6 +36,9 @@ OPTIONS:
     --data-dir <path>      Durable state root (default: ./noosd-data)
     --genesis-time <ms>    Genesis time origin, unix milliseconds
                            (devnet fixture; default: 1760000000000)
+    --public-testnet-genesis-v1
+                           Preserve the deployed public-testnet v1 genesis
+                           identity (TEST NETWORKS ONLY)
     --stable-safety-activation-height <height>
                            Consensus height for deterministic StableSafetyV1
                            backfill (omit until the upgrade is scheduled)
@@ -147,6 +150,7 @@ fn main() -> ExitCode {
     let mut devnet_contract_fixture = false;
     let mut devnet_witness_fixture = false;
     let mut devnet_bonsai_fixture = false;
+    let mut public_testnet_genesis_v1 = false;
     let mut light = false;
     let mut retention: u64 = 0;
     let mut social: Option<noos_braid::CheckpointRef> = None;
@@ -365,6 +369,7 @@ fn main() -> ExitCode {
             "--devnet-contract-fixture" => devnet_contract_fixture = true,
             "--devnet-witness-fixture" => devnet_witness_fixture = true,
             "--devnet-bonsai-fixture" => devnet_bonsai_fixture = true,
+            "--public-testnet-genesis-v1" => public_testnet_genesis_v1 = true,
             "--observer" => observer = true,
             "--light" => light = true,
             "--retention" => match take("--retention").and_then(|v| v.parse().ok()) {
@@ -493,6 +498,10 @@ fn main() -> ExitCode {
         );
         return ExitCode::FAILURE;
     }
+    if public_testnet_genesis_v1 && !params.is_test_network {
+        eprintln!("error: --public-testnet-genesis-v1 requires is_test_network = true");
+        return ExitCode::FAILURE;
+    }
     let min_bond = params.min_bond_micro;
     let witness_bonds =
         if validator || devnet_producer || devnet_witness.is_some() || devnet_witness_fixture {
@@ -530,6 +539,7 @@ fn main() -> ExitCode {
     };
     spec.contract_codes = contract_codes.clone();
     spec.wwm_bonsai_fixture = devnet_bonsai_fixture;
+    spec.public_testnet_genesis_v1 = public_testnet_genesis_v1;
     if let (Some(registry_path), Some(public_key_hex)) = (
         bootstrap_registry_path.as_ref(),
         bootstrap_public_key.as_deref(),

@@ -28,6 +28,7 @@ arguments=(
   --params /opt/mindchain-wwm/protocol/genesis/devnet-parameters.toml
   --devnet-witness-fixture
   --devnet-bonsai-fixture
+  --public-testnet-genesis-v1
   --devnet-governance-account 17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce
   --rpc "${RPC_LISTEN}"
   --rpc-token-file "${RPC_TOKEN_FILE}"

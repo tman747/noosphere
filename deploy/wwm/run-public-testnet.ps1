@@ -168,6 +168,7 @@ $Specs = @(
             '--observer',
             '--devnet-witness-fixture',
             '--devnet-bonsai-fixture',
+            '--public-testnet-genesis-v1',
             '--rpc', '127.0.0.1:29652',
             '--rpc-token-file', $TokenFile,
             '--devnet-governance-account', $GovernanceAccount,

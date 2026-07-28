@@ -76,6 +76,7 @@ pub const CONTROL_NAMES: [&str; 10] = [
     "lending_reviewed",    // exact-revision independent review gate
     "bridge_reviewed",     // exact-revision independent review gate
 ];
+const PUBLIC_TESTNET_GENESIS_V1_CONTROL_COUNT: usize = 8;
 
 // ---------------------------------------------------------------------------
 // Parameters file
@@ -449,6 +450,10 @@ pub struct GenesisSpec {
     /// is installed as an unspendable zero-balance genesis account, binding
     /// the complete registry to `genesis_hash`.
     pub contract_codes: BTreeMap<Hash32, Vec<u8>>,
+    /// Reconstruct the deployed public-testnet v1 genesis, which predates the
+    /// lending and bridge review records. Missing records remain fail-closed.
+    /// This compatibility profile is refused outside test networks.
+    pub public_testnet_genesis_v1: bool,
     /// Install the exact Bonsai-27B registration graph at genesis. This is
     /// refused by the ledger unless `params.is_test_network` is true.
     pub wwm_bonsai_fixture: bool,
@@ -532,6 +537,7 @@ impl GenesisSpec {
             gov_authority: GOV_AUTHORITY_ACCOUNT,
             contract_codes: BTreeMap::new(),
             wwm_bonsai_fixture: false,
+            public_testnet_genesis_v1: false,
         }
     }
 
@@ -765,16 +771,31 @@ impl GenesisSpec {
     /// authority and emission-recipient accounts, and the disabled-control
     /// records.
     pub fn build_ledger(&self) -> Result<LumenLedger, NodeError> {
+        if self.public_testnet_genesis_v1 && !self.params.is_test_network {
+            return Err(NodeError::Config(
+                "public-testnet genesis v1 compatibility requires is_test_network = true".into(),
+            ));
+        }
+        let fee_params = if self.public_testnet_genesis_v1 {
+            FeeParamsV1::public_testnet_genesis_v1_fixture()
+        } else {
+            FeeParamsV1::testnet_fixture()
+        };
         let mut ledger = LumenLedger::new();
         let accounts = self.canonical_accounts()?;
-        let controls: Vec<(&str, bool)> = CONTROL_NAMES.iter().map(|n| (*n, false)).collect();
+        let controls = CONTROL_NAMES.map(|name| (name, false));
+        let controls = if self.public_testnet_genesis_v1 {
+            &controls[..PUBLIC_TESTNET_GENESIS_V1_CONTROL_COUNT]
+        } else {
+            &controls[..]
+        };
         ledger
             .install_genesis(&GenesisConfig {
-                fee_params: FeeParamsV1::testnet_fixture(),
+                fee_params,
                 fee_state: FeeStateV1::testnet_fixture(),
                 issuance: IssuanceParamsV1::testnet_fixture(),
                 shares: EmissionSharesV1::testnet_fixture(),
-                controls: &controls,
+                controls,
                 accounts: &accounts,
                 gov_authority: self.gov_authority,
                 emergency_authority: EMERGENCY_AUTHORITY_ACCOUNT,
@@ -968,7 +989,8 @@ pub fn mine_ticket(
 
 #[cfg(test)]
 mod production_proposal_refusal_tests {
-    use super::{DevnetParams, GenesisSpec};
+    use super::{DevnetParams, GenesisSpec, NodeError};
+    use noos_lumen::state::{CONTROL_BRIDGE_REVIEWED, CONTROL_LENDING_REVIEWED};
 
     const DEVNET: &str = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -1004,6 +1026,61 @@ mod production_proposal_refusal_tests {
             first.genesis_hash().unwrap(),
             second.genesis_hash().unwrap()
         );
+    }
+
+    #[test]
+    fn public_testnet_genesis_v1_preserves_deployed_identity_and_fails_closed() {
+        let params = DevnetParams::parse(DEVNET).unwrap();
+        let governance = super::hex32(
+            "17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce",
+            "test governance account",
+        )
+        .unwrap();
+        let mut modern = GenesisSpec::devnet(params, 1_760_000_000_000);
+        modern.extra_accounts = vec![(governance, 0)];
+        modern.gov_authority = governance;
+        modern.wwm_bonsai_fixture = true;
+        let mut deployed = modern.clone();
+        deployed.public_testnet_genesis_v1 = true;
+
+        let modern = modern.build().unwrap();
+        let deployed = deployed.build().unwrap();
+        assert_eq!(
+            deployed.chain_id,
+            super::hex32(
+                "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+                "deployed chain id",
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            deployed.genesis_hash,
+            super::hex32(
+                "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+                "deployed genesis hash",
+            )
+            .unwrap()
+        );
+        assert_eq!(modern.chain_id, deployed.chain_id);
+        assert_ne!(modern.genesis_hash, deployed.genesis_hash);
+        assert!(!deployed.ledger.feature_enabled(CONTROL_LENDING_REVIEWED));
+        assert!(!deployed.ledger.feature_enabled(CONTROL_BRIDGE_REVIEWED));
+    }
+
+    #[test]
+    fn public_testnet_genesis_v1_is_refused_outside_test_networks() {
+        let mut params = DevnetParams::parse(DEVNET).unwrap();
+        params.is_test_network = false;
+        let mut spec = GenesisSpec::devnet(params, 1_760_000_000_000);
+        spec.public_testnet_genesis_v1 = true;
+
+        match spec.build_ledger() {
+            Err(NodeError::Config(message)) => {
+                assert!(message.contains("requires is_test_network = true"));
+            }
+            Err(_) => panic!("compatibility profile returned the wrong error"),
+            Ok(_) => panic!("compatibility profile accepted a production network"),
+        }
     }
 
     #[test]
