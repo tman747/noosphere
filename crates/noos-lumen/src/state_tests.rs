@@ -168,6 +168,7 @@ fn ctx(height: u64) -> BlockContext {
     BlockContext {
         chain_id: CHAIN,
         height,
+        allow_refunded_wwm_terminal_receipts: true,
     }
 }
 
@@ -3435,6 +3436,106 @@ fn testnet_wwm_failure_receipts_refund_without_output_commitments() {
             ApplyOutcome::Applied { .. }
         ));
     }
+}
+
+#[test]
+fn refunded_wwm_terminal_receipt_activation_preserves_historical_execution() {
+    let (base, job, mut receipt, mut settlement) = wwm_flow_fixture(WwmControlMode::Testnet);
+    receipt.receipt_id = [0xbd; 32];
+    receipt.output_tokens = 0;
+    receipt.output_root = [0; 32];
+    receipt.token_history_root = [0; 32];
+    receipt.signer_ids = BoundedList::default();
+    receipt.control_cluster_ids = BoundedList::default();
+    receipt.metered_amount = 0;
+    receipt.paid_amount = 0;
+    receipt.refunded_amount = job.reserved_amount;
+    receipt.terminal_code = WwmTerminalCode::Deadline;
+    settlement.settlement_id = [0xcd; 32];
+    settlement.receipt_id = receipt.receipt_id;
+    settlement.paid_amount = 0;
+    settlement.refunded_amount = job.reserved_amount;
+    settlement.released_amount = 0;
+    settlement.settled_height = 11;
+
+    let mut legacy = base.clone();
+    let mut activated = base;
+    assert!(matches!(
+        apply_wwm_action(&mut legacy, 10, ActionV1::OpenWwmJob(job.clone())),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply_wwm_action(&mut activated, 10, ActionV1::OpenWwmJob(job)),
+        ApplyOutcome::Applied { .. }
+    ));
+    let (tx, witnesses, _) = build_tx(
+        11,
+        vec![],
+        vec![PAYER, GOV],
+        vec![
+            ActionV1::RecordWwmReceipt(receipt.clone()),
+            ActionV1::SettleWwmJob(settlement.clone()),
+        ],
+        vec![],
+    );
+
+    let legacy_outcome = legacy
+        .apply_transaction(
+            &BlockContext {
+                chain_id: CHAIN,
+                height: 11,
+                allow_refunded_wwm_terminal_receipts: false,
+            },
+            &tx,
+            &witnesses,
+            &StubEngine,
+            &AcceptAll,
+        )
+        .unwrap();
+    assert!(matches!(
+        &legacy_outcome,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert_eq!(
+        legacy_outcome.receipt().status,
+        FailCode::PostconditionFailed.status()
+    );
+    assert_eq!(legacy_outcome.receipt().resources_used.state_writes, 0);
+
+    let activated_outcome = activated
+        .apply_transaction(
+            &BlockContext {
+                chain_id: CHAIN,
+                height: 11,
+                allow_refunded_wwm_terminal_receipts: true,
+            },
+            &tx,
+            &witnesses,
+            &StubEngine,
+            &AcceptAll,
+        )
+        .unwrap();
+    assert!(matches!(&activated_outcome, ApplyOutcome::Applied { .. }));
+    assert_eq!(activated_outcome.receipt().status, 0);
+    assert_eq!(activated_outcome.receipt().resources_used.state_writes, 4);
+
+    let receipt_key = wwm_profile_key(WwmLeafKind::Receipt, &receipt.receipt_id);
+    let settlement_key = wwm_profile_key(WwmLeafKind::Settlement, &settlement.settlement_id);
+    assert!(matches!(
+        legacy.finalized_object_proof(receipt_key).value,
+        crate::wwm::ResolutionValueV1::Absent
+    ));
+    assert!(matches!(
+        activated.finalized_object_proof(receipt_key).value,
+        crate::wwm::ResolutionValueV1::Present(_)
+    ));
+    assert!(matches!(
+        activated.finalized_object_proof(settlement_key).value,
+        crate::wwm::ResolutionValueV1::Present(_)
+    ));
 }
 
 #[test]

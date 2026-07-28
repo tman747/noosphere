@@ -38,6 +38,10 @@ fn help_prints_the_operator_surface_and_exits_zero() {
         "documents the deployed public-testnet identity profile"
     );
     assert!(
+        text.contains("--public-testnet-refund-activation-height"),
+        "documents the refunded WWM terminal receipt activation boundary"
+    );
+    assert!(
         text.contains("--mempool-max-transactions"),
         "documents bounded mempool capacity"
     );
@@ -69,6 +73,39 @@ fn public_testnet_capacity_flags_parse_as_one_contract() {
         out.status.success(),
         "the sealed launcher capacity flags must parse: {}",
         String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+fn public_testnet_refund_activation_requires_positive_height_and_profile() {
+    let zero = noosd(&["--public-testnet-refund-activation-height", "0"]);
+    assert!(!zero.status.success(), "height zero must be refused");
+    assert!(
+        String::from_utf8_lossy(&zero.stderr).contains("positive block height"),
+        "height zero has a typed diagnostic"
+    );
+
+    let unprofiled = noosd(&["--public-testnet-refund-activation-height", "324000"]);
+    assert!(
+        !unprofiled.status.success(),
+        "the activation boundary cannot apply to another chain profile"
+    );
+    assert!(
+        String::from_utf8_lossy(&unprofiled.stderr)
+            .contains("requires --public-testnet-genesis-v1"),
+        "an unprofiled activation has a typed diagnostic"
+    );
+
+    let profiled = noosd(&[
+        "--public-testnet-refund-activation-height",
+        "324000",
+        "--public-testnet-genesis-v1",
+        "--help",
+    ]);
+    assert!(
+        profiled.status.success(),
+        "the scheduled public-testnet activation must parse: {}",
+        String::from_utf8_lossy(&profiled.stderr)
     );
 }
 

@@ -39,6 +39,10 @@ OPTIONS:
     --public-testnet-genesis-v1
                            Preserve the deployed public-testnet v1 genesis
                            identity (TEST NETWORKS ONLY)
+    --public-testnet-refund-activation-height <height>
+                           First height accepting zero-commitment refunded WWM
+                           terminal receipts on that profile (positive; omit
+                           until the upgrade is scheduled)
     --stable-safety-activation-height <height>
                            Consensus height for deterministic StableSafetyV1
                            backfill (omit until the upgrade is scheduled)
@@ -151,6 +155,7 @@ fn main() -> ExitCode {
     let mut devnet_witness_fixture = false;
     let mut devnet_bonsai_fixture = false;
     let mut public_testnet_genesis_v1 = false;
+    let mut public_testnet_refund_activation_height: Option<u64> = None;
     let mut light = false;
     let mut retention: u64 = 0;
     let mut social: Option<noos_braid::CheckpointRef> = None;
@@ -199,6 +204,18 @@ fn main() -> ExitCode {
                     return ExitCode::from(2);
                 }
             },
+            "--public-testnet-refund-activation-height" => {
+                match take("--public-testnet-refund-activation-height").and_then(|v| v.parse().ok())
+                {
+                    Some(v) if v > 0 => public_testnet_refund_activation_height = Some(v),
+                    _ => {
+                        eprintln!(
+                            "error: --public-testnet-refund-activation-height expects a positive block height"
+                        );
+                        return ExitCode::from(2);
+                    }
+                }
+            }
             "--stable-safety-activation-height" => {
                 match take("--stable-safety-activation-height").and_then(|v| v.parse().ok()) {
                     Some(v) => stable_safety_activation_height = Some(v),
@@ -394,6 +411,12 @@ fn main() -> ExitCode {
                 return ExitCode::from(2);
             }
         }
+    }
+    if public_testnet_refund_activation_height.is_some() && !public_testnet_genesis_v1 {
+        eprintln!(
+            "error: --public-testnet-refund-activation-height requires --public-testnet-genesis-v1"
+        );
+        return ExitCode::from(2);
     }
     if mempool.max_bytes < mempool.max_tx_bytes {
         eprintln!(
@@ -630,6 +653,7 @@ fn main() -> ExitCode {
         },
         observer,
         public_testnet_genesis_v1,
+        public_testnet_refund_activation_height,
         view_retention_blocks: retention,
         contract_codes,
         social_checkpoint: social,

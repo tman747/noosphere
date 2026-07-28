@@ -134,6 +134,9 @@ pub const REGISTRY_PREFIX: &str = "noos.registry.";
 pub struct BlockContext {
     pub chain_id: Hash32,
     pub height: u64,
+    /// Enables zero-commitment terminal WWM receipts for refunded outcomes.
+    /// Consensus sets this only after the network's explicit activation height.
+    pub allow_refunded_wwm_terminal_receipts: bool,
 }
 
 /// Genesis installation payload (plan §2.5: engineering networks use the
@@ -5055,16 +5058,24 @@ impl LumenLedger {
                     if overlay_object(&ov, self, &neural_query_key(&job.job_id)).is_some() {
                         validate_neural_wwm_receipt(&ov, self, &job, v, ctx.height)?;
                     } else {
+                        let output_commitment_is_zero = v.output_root == [0; 32];
+                        let history_commitment_is_zero = v.token_history_root == [0; 32];
                         let commitments_are_zero =
-                            v.output_root == [0; 32] && v.token_history_root == [0; 32];
-                        let terminal_is_valid = match v.terminal_code {
-                            WwmTerminalCode::Complete => !commitments_are_zero,
-                            WwmTerminalCode::Cancelled
-                            | WwmTerminalCode::Deadline
-                            | WwmTerminalCode::NoQuorum
-                            | WwmTerminalCode::Rejected => {
-                                commitments_are_zero && v.output_tokens == 0 && v.paid_amount == 0
+                            output_commitment_is_zero && history_commitment_is_zero;
+                        let terminal_is_valid = if ctx.allow_refunded_wwm_terminal_receipts {
+                            match v.terminal_code {
+                                WwmTerminalCode::Complete => !commitments_are_zero,
+                                WwmTerminalCode::Cancelled
+                                | WwmTerminalCode::Deadline
+                                | WwmTerminalCode::NoQuorum
+                                | WwmTerminalCode::Rejected => {
+                                    commitments_are_zero
+                                        && v.output_tokens == 0
+                                        && v.paid_amount == 0
+                                }
                             }
+                        } else {
+                            !output_commitment_is_zero && !history_commitment_is_zero
                         };
                         if !terminal_is_valid {
                             return Err(FailCode::PostconditionFailed);

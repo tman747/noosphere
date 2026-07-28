@@ -10,6 +10,7 @@ RPC_LISTEN="${RPC_LISTEN:-127.0.0.1:29652}"
 RPC_TOKEN_FILE="${RPC_TOKEN_FILE:-/etc/mindchain-wwm/rpc-token}"
 DATA_DIR="${DATA_DIR:-/var/lib/mindchain-wwm}"
 PRODUCE_INTERVAL_MS="${PRODUCE_INTERVAL_MS:-6000}"
+PUBLIC_TESTNET_REFUND_ACTIVATION_HEIGHT="${PUBLIC_TESTNET_REFUND_ACTIVATION_HEIGHT:-0}"
 [[ "${NODE_ROLE}" =~ ^(validator|producer-witness|witness)$ ]] || { echo "invalid node role" >&2; exit 1; }
 [[ "${WITNESS_INDEX}" =~ ^[0-3]$ ]] || { echo "invalid witness index" >&2; exit 1; }
 [[ "${P2P_LISTEN}" =~ ^/ip4/0\.0\.0\.0/udp/[0-9]{4,5}/quic-v1$ ]] || { echo "invalid P2P listen multiaddr" >&2; exit 1; }
@@ -17,6 +18,7 @@ PRODUCE_INTERVAL_MS="${PRODUCE_INTERVAL_MS:-6000}"
 [[ "${RPC_TOKEN_FILE}" =~ ^/etc/mindchain-wwm/[a-zA-Z0-9._-]+$ ]] || { echo "invalid RPC token path" >&2; exit 1; }
 [[ "${DATA_DIR}" =~ ^/var/lib/mindchain-wwm(-witness-[0-3])?$ ]] || { echo "invalid node data path" >&2; exit 1; }
 [[ "${PRODUCE_INTERVAL_MS}" =~ ^[1-9][0-9]{2,5}$ ]] || { echo "invalid production interval" >&2; exit 1; }
+[[ "${PUBLIC_TESTNET_REFUND_ACTIVATION_HEIGHT}" =~ ^(0|[1-9][0-9]*)$ ]] || { echo "invalid public-testnet refund activation height" >&2; exit 1; }
 [[ "${BOOTSTRAP_REGISTRY}" == "/etc/mindchain-wwm/bootstrap-registry.json" ]] || { echo "invalid bootstrap registry path" >&2; exit 1; }
 [[ "${BOOTSTRAP_PUBLIC_KEY_FILE}" == "/etc/mindchain-wwm/bootstrap-registry.public" ]] || { echo "invalid bootstrap public key path" >&2; exit 1; }
 [[ -f "${BOOTSTRAP_REGISTRY}" && ! -L "${BOOTSTRAP_REGISTRY}" ]] || { echo "bootstrap registry is missing or symbolic" >&2; exit 1; }
@@ -37,6 +39,9 @@ arguments=(
   --bootstrap-public-key "${BOOTSTRAP_PUBLIC_KEY}"
   --data-dir "${DATA_DIR}"
 )
+if [[ "${PUBLIC_TESTNET_REFUND_ACTIVATION_HEIGHT}" != "0" ]]; then
+  arguments+=(--public-testnet-refund-activation-height "${PUBLIC_TESTNET_REFUND_ACTIVATION_HEIGHT}")
+fi
 throughput_arguments=(
   --mempool-max-transactions 65536
   --mempool-max-bytes 67108864

@@ -40,6 +40,7 @@ param(
     [string]$SeedIp = '20.15.164.29',
     [string]$MindScanIndexer = 'https://wwm-seed.mindchain.network',
     [string]$MindScanListen = '127.0.0.1:29830',
+    [UInt64]$PublicTestnetRefundActivationHeight = 0,
     [switch]$SkipTunnel
 )
 
@@ -160,23 +161,30 @@ if ($ChainId -notmatch '^[0-9a-f]{64}$' -or $GenesisHash -notmatch '^[0-9a-f]{64
 }
 
 $GovernanceAccount = '17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce'
+$NodeArguments = @(
+    '--observer',
+    '--devnet-witness-fixture',
+    '--devnet-bonsai-fixture',
+    '--public-testnet-genesis-v1',
+    '--rpc', '127.0.0.1:29652',
+    '--rpc-token-file', $TokenFile,
+    '--devnet-governance-account', $GovernanceAccount,
+    '--p2p-listen', '/ip4/0.0.0.0/udp/29650/quic-v1',
+    '--bootstrap-registry', $BootstrapRegistry,
+    '--bootstrap-public-key', $BootstrapPublicKey,
+    '--data-dir', $DataDir
+)
+if ($PublicTestnetRefundActivationHeight -gt 0) {
+    $NodeArguments += @(
+        '--public-testnet-refund-activation-height',
+        $PublicTestnetRefundActivationHeight.ToString([Globalization.CultureInfo]::InvariantCulture)
+    )
+}
 $Specs = @(
     [pscustomobject]@{
         Name = 'node'
         Exe = $NodeBinary
-        Args = @(
-            '--observer',
-            '--devnet-witness-fixture',
-            '--devnet-bonsai-fixture',
-            '--public-testnet-genesis-v1',
-            '--rpc', '127.0.0.1:29652',
-            '--rpc-token-file', $TokenFile,
-            '--devnet-governance-account', $GovernanceAccount,
-            '--p2p-listen', '/ip4/0.0.0.0/udp/29650/quic-v1',
-            '--bootstrap-registry', $BootstrapRegistry,
-            '--bootstrap-public-key', $BootstrapPublicKey,
-            '--data-dir', $DataDir
-        )
+        Args = $NodeArguments
     },
     [pscustomobject]@{
         Name = 'artifact-store'

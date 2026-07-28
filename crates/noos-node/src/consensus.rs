@@ -147,6 +147,10 @@ pub struct NodeConfig {
     /// Preserve the deployed public-testnet v1 genesis and uncompressed DA
     /// commitments. The CLI refuses this profile outside test networks.
     pub public_testnet_genesis_v1: bool,
+    /// First height that accepts zero-commitment refunded WWM terminal
+    /// receipts on the deployed public-testnet v1 chain. `None` preserves
+    /// the historical receipt law indefinitely.
+    pub public_testnet_refund_activation_height: Option<u64>,
     /// Height at which every legacy lending market is deterministically
     /// backfilled with a zero-funded StableSafetyV1 object.
     pub stable_safety_activation_height: Option<u64>,
@@ -166,12 +170,20 @@ impl Default for NodeConfig {
             min_bond: 1,
             devnet_fixture_finality: false,
             public_testnet_genesis_v1: false,
+            public_testnet_refund_activation_height: None,
             stable_safety_activation_height: None,
         }
     }
 }
 
 impl NodeConfig {
+    fn allow_refunded_wwm_terminal_receipts(&self, height: u64) -> bool {
+        !self.public_testnet_genesis_v1
+            || self
+                .public_testnet_refund_activation_height
+                .is_some_and(|activation| height >= activation)
+    }
+
     fn da_form_bytes(&self, body: &BlockBodyV1) -> Vec<u8> {
         if self.public_testnet_genesis_v1 {
             public_testnet_v1_da_form_bytes(body)
@@ -700,6 +712,8 @@ impl<P: StorePort> NodeCore<P> {
                         self.chain_id,
                         &self.engine,
                         self.cfg.stable_safety_activation_height,
+                        self.cfg
+                            .allow_refunded_wwm_terminal_receipts(replay_header.height),
                         &replay_header,
                         &replay_body,
                     )?;
@@ -2080,6 +2094,8 @@ impl<P: StorePort> NodeCore<P> {
                     self.chain_id,
                     &self.engine,
                     self.cfg.stable_safety_activation_height,
+                    self.cfg
+                        .allow_refunded_wwm_terminal_receipts(ancestor.header.height),
                     &ancestor.header,
                     &ancestor.body,
                 )?;
@@ -2091,6 +2107,7 @@ impl<P: StorePort> NodeCore<P> {
             self.chain_id,
             &self.engine,
             self.cfg.stable_safety_activation_height,
+            self.cfg.allow_refunded_wwm_terminal_receipts(header.height),
             header,
             body,
         )?;
@@ -2258,6 +2275,8 @@ impl<P: StorePort> NodeCore<P> {
                     self.chain_id,
                     &self.engine,
                     self.cfg.stable_safety_activation_height,
+                    self.cfg
+                        .allow_refunded_wwm_terminal_receipts(block.header.height),
                     &block.header,
                     &block.body,
                 );
@@ -2353,6 +2372,8 @@ impl<P: StorePort> NodeCore<P> {
                 self.chain_id,
                 &self.engine,
                 self.cfg.stable_safety_activation_height,
+                self.cfg
+                    .allow_refunded_wwm_terminal_receipts(block.header.height),
                 &block.header,
                 &block.body,
             )?;
@@ -2374,6 +2395,7 @@ impl<P: StorePort> NodeCore<P> {
             self.chain_id,
             &self.engine,
             self.cfg.stable_safety_activation_height,
+            self.cfg.allow_refunded_wwm_terminal_receipts(header.height),
             header,
             body,
         )
@@ -2384,6 +2406,7 @@ impl<P: StorePort> NodeCore<P> {
         chain_id: Hash32,
         engine: &GrainContractEngine,
         stable_safety_activation_height: Option<u64>,
+        allow_refunded_wwm_terminal_receipts: bool,
         header: &BlockHeaderV1,
         body: &BlockBodyV1,
     ) -> Result<ExecResult, NodeError> {
@@ -2435,6 +2458,7 @@ impl<P: StorePort> NodeCore<P> {
         let ctx = BlockContext {
             chain_id,
             height: header.height,
+            allow_refunded_wwm_terminal_receipts,
         };
         let snapshot_started = Instant::now();
         let authorization_snapshot =
@@ -2558,6 +2582,17 @@ impl<P: StorePort> NodeCore<P> {
             gu.blob_bytes,
         ] != usage
         {
+            eprintln!(
+                "gas_used mismatch at height {}: claimed={:?} computed={usage:?}",
+                header.height,
+                [
+                    gu.bytes,
+                    gu.grain_steps,
+                    gu.proof_units,
+                    gu.state_word_epochs,
+                    gu.blob_bytes,
+                ],
+            );
             return Err(NodeError::RootMismatch { field: "gas_used" });
         }
         deltas.push(
@@ -2939,11 +2974,14 @@ impl<P: StorePort> NodeCore<P> {
                 what: "body blob missing",
             })?;
         let body = self.cfg.decode_stored_body(&bytes, ticket)?;
-        let encoded = encode_body(&self.cfg.da_form_bytes(&body))?;
-        if encoded.shard_root().as_bytes() != &header.body_da_root {
-            return Err(NodeError::BodyMismatch {
-                what: "stored body DA root",
-            });
+        let availability_root = noos_crypto::Hash32::from_bytes(header.body_da_root);
+        if !self.availability.body_available(&availability_root) {
+            let encoded = encode_body(&self.cfg.da_form_bytes(&body))?;
+            if encoded.shard_root().as_bytes() != &header.body_da_root {
+                return Err(NodeError::BodyMismatch {
+                    what: "stored body DA root",
+                });
+            }
         }
         Ok(body)
     }
@@ -3044,8 +3082,11 @@ impl<P: StorePort> NodeCore<P> {
             // block (no re-commit).
             self.exec_head = hash;
             self.exec_height = header.height;
-            let encoded = encode_body(&self.cfg.da_form_bytes(&body))?;
-            self.availability.record_encoded(&encoded);
+            let availability_root = noos_crypto::Hash32::from_bytes(header.body_da_root);
+            if !self.availability.body_available(&availability_root) {
+                let encoded = encode_body(&self.cfg.da_form_bytes(&body))?;
+                self.availability.record_encoded(&encoded);
+            }
             self.view.connect_block(&header, hash, exec.receipts);
             if header.height == finalized_height {
                 self.anchor = (hash, height, self.ledger.clone());
@@ -3183,6 +3224,9 @@ impl<P: StorePort> NodeCore<P> {
         let ctx = BlockContext {
             chain_id: self.chain_id,
             height: self.exec_height.saturating_add(1),
+            allow_refunded_wwm_terminal_receipts: self
+                .cfg
+                .allow_refunded_wwm_terminal_receipts(self.exec_height.saturating_add(1)),
         };
         self.ledger
             .simulate_transaction(&ctx, tx_bytes, wit_bytes, &self.engine, &NodeAuthVerifier)
@@ -3281,6 +3325,9 @@ impl<P: StorePort> NodeCore<P> {
         let ctx = BlockContext {
             chain_id: self.chain_id,
             height,
+            allow_refunded_wwm_terminal_receipts: self
+                .cfg
+                .allow_refunded_wwm_terminal_receipts(height),
         };
         let engine = self.engine.clone();
         let auth = NodeAuthVerifier;
