@@ -17,7 +17,7 @@ use noos_lumen::{
         CustodianCapabilityMutationV2, CustodyChallengeV2, CustodyPositionCommitmentV2,
         CustodyProbeV2, ExecutionProfileV1, FeePolicyV1, ModelCapsuleV2, QueryPolicyV1,
         RegisterFundProfilePayloadV1, ServiceDirectoryV1, ServingAliasTransitionV1,
-        TransitionWwmControlPayloadV1, WwmJobV1, WwmReceiptV1, WwmSettlementV1,
+        TransitionWwmControlPayloadV1, WwmJobV1, WwmReceiptV1, WwmSettlementV1, WwmTerminalCode,
         MAX_TX_WITNESS_BYTES,
     },
 };
@@ -208,12 +208,22 @@ impl DevnetWwmFlowV1 {
                 "WWM job carries a zero required identity".into(),
             ));
         }
+        let commitments_are_zero =
+            receipt.output_root == [0; 32] && receipt.token_history_root == [0; 32];
+        let terminal_output_is_valid = match receipt.terminal_code {
+            WwmTerminalCode::Complete => !commitments_are_zero,
+            WwmTerminalCode::Cancelled
+            | WwmTerminalCode::Deadline
+            | WwmTerminalCode::NoQuorum
+            | WwmTerminalCode::Rejected => {
+                commitments_are_zero && receipt.output_tokens == 0 && receipt.paid_amount == 0
+            }
+        };
         if receipt.receipt_id == [0; 32]
             || receipt.job_id != job.job_id
             || receipt.capsule_id != job.capsule_id
             || receipt.execution_profile_id != job.execution_profile_id
-            || receipt.output_root == [0; 32]
-            || receipt.token_history_root == [0; 32]
+            || !terminal_output_is_valid
             || receipt.input_tokens > job.max_input_tokens
             || receipt.output_tokens > job.max_output_tokens
         {
@@ -315,7 +325,7 @@ mod tests {
     use super::*;
     use noos_codec::NoosDecode;
     use noos_lumen::objects::{OptionalObject, ResourceVector};
-    use noos_lumen::wwm::{FundBucketTag, SignatureEntryV1, WwmEvidenceTier, WwmTerminalCode};
+    use noos_lumen::wwm::{FundBucketTag, SignatureEntryV1, WwmEvidenceTier};
 
     fn empty_tx() -> TransactionV1 {
         TransactionV1 {
@@ -402,6 +412,20 @@ mod tests {
             settlement,
         }
     }
+    fn terminal_failure_flow(terminal_code: WwmTerminalCode) -> DevnetWwmFlowV1 {
+        let mut flow = flow();
+        flow.receipt.output_tokens = 0;
+        flow.receipt.token_history_root = [0; 32];
+        flow.receipt.output_root = [0; 32];
+        flow.receipt.metered_amount = 0;
+        flow.receipt.paid_amount = 0;
+        flow.receipt.refunded_amount = flow.job.reserved_amount;
+        flow.receipt.terminal_code = terminal_code;
+        flow.settlement.paid_amount = 0;
+        flow.settlement.refunded_amount = flow.job.reserved_amount;
+        flow.settlement.released_amount = 0;
+        flow
+    }
 
     #[test]
     fn devnet_operator_flow_encodes_open_receipt_settlement_in_order() {
@@ -434,6 +458,38 @@ mod tests {
         let mut wrong_receipt = flow();
         wrong_receipt.settlement.receipt_id = [97; 32];
         assert!(wrong_receipt.canonical_actions().is_err());
+    }
+    #[test]
+    fn devnet_operator_flow_accepts_zero_commitment_failure_receipts() {
+        for terminal_code in [
+            WwmTerminalCode::Cancelled,
+            WwmTerminalCode::Deadline,
+            WwmTerminalCode::NoQuorum,
+            WwmTerminalCode::Rejected,
+        ] {
+            terminal_failure_flow(terminal_code)
+                .canonical_actions()
+                .unwrap();
+        }
+    }
+
+    #[test]
+    fn devnet_operator_flow_rejects_terminal_commitment_mismatches() {
+        let mut complete_without_commitments = flow();
+        complete_without_commitments.receipt.token_history_root = [0; 32];
+        complete_without_commitments.receipt.output_root = [0; 32];
+        assert!(complete_without_commitments.canonical_actions().is_err());
+
+        let mut failed_with_commitment = terminal_failure_flow(WwmTerminalCode::Deadline);
+        failed_with_commitment.receipt.output_root = [42; 32];
+        assert!(failed_with_commitment.canonical_actions().is_err());
+
+        let mut failed_with_payment = terminal_failure_flow(WwmTerminalCode::Cancelled);
+        failed_with_payment.receipt.paid_amount = 1;
+        failed_with_payment.receipt.refunded_amount -= 1;
+        failed_with_payment.settlement.paid_amount = 1;
+        failed_with_payment.settlement.refunded_amount -= 1;
+        assert!(failed_with_payment.canonical_actions().is_err());
     }
 
     #[test]
