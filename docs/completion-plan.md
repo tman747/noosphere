@@ -558,7 +558,7 @@ scenarios and wrote
 | `PROMOTE-07` | `OWNER_BLOCKED` | Canonical ceremony, Quiet-Week, anchor, DKG, genesis-reproduction, and authorization tooling is complete; owner scheduling, real post-freeze inputs, multiparty DKG, and all-AI-off production bootstrap remain. |
 | `PROMOTE-08` | `EXTERNAL_BLOCKED` | Threshold-signed cap, checkpoint, one-checkpoint disable, target-recovery, exit, WAN, blackout, and saturation controls are complete; run them for 180 real public days with independently controlled operators and observers. |
 | `PROMOTE-09` | `OWNER_BLOCKED` | Exact-byte multiparty final-freeze and cutover signing/verification tooling is complete; collect owner role keys and final signatures only after every lower gate passes. |
-| `PROMOTE-10` | `READY` | Rebaseline all base and WWM claims at one exact revision; run every actionable falsifier and preserve every negative or killed result append-only. |
+| `PROMOTE-10` | `DONE` | All 136 base and WWM claims are rebaselined: every one of the 71 locally implemented actionable claims and its rollback/falsifier ran at one revision, all six killed/disabled outcomes remain append-only, and the remaining 65 local gaps plus every external/owner blocker stay explicit and non-promoting. |
 
 At revision `b7dbc5a7d740268a572529352edbdb774a7f6324`,
 `tools/audit/build_handoff.py` produced
@@ -659,6 +659,29 @@ its 25-file artifact tree is
 It explicitly remains smoke-scale, local, non-public, non-authorizing, and
 blocked on two independently managed families, qualification scale, a public
 adversarial WAN run, and seven uninterrupted public AI-off days.
+
+The first full rebaseline attempt exposed four stale executable contracts after
+68 commands: `A-LOOM-MARKET` targeted a runner that did not admit the claim,
+`S-ARTIFACT` selected no current test, and the two Dream negative rollback
+paths did not emit their preserved `DISABLED`/`KILLED` dispositions. Revision
+`8daf7dad6ad80554809dfe911cb54a8798533272` repairs those paths and adds an
+immutable rebaseline wrapper. Its exact run passed 68 unique commands, rebound
+all 71 locally implemented actionable claims to 68 source-bound evidence
+files, and recorded all 136 claims: 71 implemented and 65 partial. The six
+append-only negative results remain `A-CLASS-GATE.v1`, `E-DEMAND-WASH-01`,
+`E-DREAM-02`, `M-HDF`, `S-DREAM-LANE`, and `S-HDF`. Revision
+`a329c2a1815193af781ddba4fae8b8e8af2096a2` persists the evidence and registry.
+The immutable summary is
+`E:/noosphere-evidence/claim-rebaseline-8daf7da.json`, SHA-256
+`3505fb8cf2881fdd3d612eead7a6ebe5a727f12239abf2c86d8d6460d5642bff`;
+the unique evidence manifest is
+`682a8dc5c52b0f23d6ce7edd114f7c8a4ea5bf596b39ddb2d8b529a506206ab8`
+and the updated registry SHA-256 is
+`7eabd6593b27d7cd6fe2689e42a1654aa085edd31a56aec5c6fe9f4461232499`.
+The rebaseline control contract passed, but promotion remains blocked: local
+incomplete claims and external/owner prerequisites were neither hidden nor
+upgraded, and the report records `production_authorized=false` and
+`promotion_effect=NONE`.
 
 ### Track M — external prerequisites
 
