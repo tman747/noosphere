@@ -502,7 +502,7 @@ evidence that any stronger suite is ready.
 
 | ID | State | Work and exit |
 |---|---|---|
-| `APP-01` | `ACTIVE` | MindScan now validates exact chain/genesis/API identity, durable index generation and finality order, labels each block, bounds canonical searches, and restarts statelessly; the exact source revision still requires deployment evidence. |
+| `APP-01` | `DONE` | MindScan is deployed on the existing public origin with fail-closed chain/genesis/API/finality validation, a durable index, exact service/indexer release identity, and a reboot-persistent supervisor whose child-restart and clean task lifecycle were exercised. |
 | `APP-02` | `DONE` | Bounded governance now freezes voter/delegation snapshots, quorum and approval, proposal deposits, treasury reservation/conservation, timelock execution, emergency pause, and voter exits before UI activation. |
 | `APP-03` | `DONE` | Unique assets now have immutable identity, one owner, nonce-bound transfer history, one active listing, atomic payment settlement, bounded royalties/fees, cancellation/expiry, replay rejection, and conservation checks. |
 | `APP-04` | `DONE` | The oracle control plane enforces five independently identified reporters, provider/region concentration caps, delayed rotation, monotonic freshness/confidence checks, bounded deviation, last-good/frozen modes, rejected-update counters, and conservative operation-specific prices. |
@@ -510,19 +510,23 @@ evidence that any stronger suite is ready.
 | `APP-06` | `EXTERNAL_BLOCKED` | Risk-increasing lending and any future bridge activation now fail closed behind exact-revision Ed25519 review targets requiring two independent organizations per required scope; repayment, redemption, and exits remain open. Independent reviews are not yet present. |
 | `APP-07` | `DONE` | The deterministic non-promoting campaign executes conservation, oracle divergence, liquidation cascade, thin redemption liquidity, explicit bad debt, zero-exposure bridge reconciliation, signed review integrity, wallet identity review, incident exits, and capped-value rejection. |
 
-Revision `8c4272349ac31515ec16151fbcf66dbc82169643` makes the
-MindScan gateway require a pinned chain and genesis, reject malformed or
-misordered durable index state, annotate blocks as unsafe/justified/finalized,
-and identity-bind transaction views. Nine MindScan/readiness tests passed.
-A local instance of that revision was browser-smoked against the live public
-indexer: it bound chain
+Revision `c2d5f4081ebd969d60440e295d1a48b71b21575d` is deployed at
+`https://wwm.mindchain.network/mindscan/`. Its health response binds service
+release `0.1.0+git.c2d5f4081ebd969d60440e295d1a48b71b21575d`, service source
+SHA-256 `561d419182d57abba6077dbfd9cc79536256662ef5902c2edb306326863f7b5a`,
+indexer release
+`0.1.0+git.49e097e3065dfc2c7522ba5cc5c7c56b88e6fd51`, chain
 `0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b`,
-genesis `8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e`,
-rendered 18 blocks, showed finalized height `312832`, and returned block
-`313260`/`4949f2651b777cdf13ad6275fb21196f355e5b802aa1a27c415873ab7d2d375c`
-as `unsafe`. Exact-revision CI run
-[`30304728080`](https://github.com/tman747/noosphere/actions/runs/30304728080)
-and an exact deployed restart smoke remain before `APP-01` closes.
+and genesis
+`8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e`;
+it also reports `production=false` and `promotion_effect=NONE`. A browser smoke
+observed index-ready state, all three consensus heads, 18 canonical blocks,
+and the application links on the public subpath. The logon-triggered
+`MindChainMindScan` task runs a named-mutex supervisor and a Windows
+kill-on-close job. A forced child failure restarted in 1.463 seconds. A
+scheduled-task stop killed both supervisor and child in 0.445 seconds, and a
+fresh start restored both in 0.842 seconds before the public health endpoint
+was rechecked successfully.
 
 Revision `730d0d7fa4da7eae015ea1cf3e859e6dc42564ef` freezes the
 governance/treasury and unique-asset marketplace state machines. The
