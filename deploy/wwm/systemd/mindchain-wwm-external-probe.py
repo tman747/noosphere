@@ -17,7 +17,7 @@ PUBLIC_URLS = (
     "https://wwm-rpc.mindchain.network/healthz",
     "https://wwm-artifacts.mindchain.network/healthz",
     "https://wwm-status.mindchain.network/status.json",
-    "https://mindscan.mindchain.network/api/health",
+    "https://wwm.mindchain.network/mindscan/api/health",
 )
 SEMVER_BASE = (
     r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"

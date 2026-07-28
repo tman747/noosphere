@@ -62,7 +62,7 @@ function blockRow(block, index) {
 async function loadBlocks() {
   const container = $("blocks");
   try {
-    const page = await api("/api/blocks?limit=18");
+    const page = await api("api/blocks?limit=18");
     container.replaceChildren();
     if (!Array.isArray(page.items) || page.items.length === 0) {
       const empty = document.createElement("p");
@@ -91,18 +91,29 @@ function showRecord(title, record) {
 async function lookup(raw) {
   const query = raw.trim().toLowerCase();
   if (!height.test(query) && !hex64.test(query)) throw new Error("Enter a canonical height or 64 lowercase hexadecimal characters.");
-  if (height.test(query)) return ["Block", await api(`/api/block/${query}`)];
+  if (height.test(query)) return ["Block", await api(`api/block/${query}`)];
   try {
-    return ["Block", await api(`/api/block/${query}`)];
+    return ["Block", await api(`api/block/${query}`)];
   } catch (error) {
     if (error.status !== 404) throw error;
   }
-  return ["Transaction", await api(`/api/transaction/${query}`)];
+  return ["Transaction", await api(`api/transaction/${query}`)];
 }
 
 function rewriteApplicationHosts() {
+  const publicOrigins = {
+    "18110": "https://wwm.mindchain.network",
+    "18120": "https://wwm-status.mindchain.network",
+    "18140": "https://wwm.mindchain.network",
+  };
   document.querySelectorAll("a[href^='http://localhost:']").forEach((link) => {
     const target = new URL(link.href);
+    if (location.protocol === "https:" && publicOrigins[target.port]) {
+      const origin = new URL(publicOrigins[target.port]);
+      origin.pathname = target.pathname;
+      link.href = origin.toString();
+      return;
+    }
     target.hostname = location.hostname;
     link.href = target.toString();
   });
@@ -110,7 +121,7 @@ function rewriteApplicationHosts() {
 
 async function refresh() {
   try {
-    renderStatus(await api("/api/status"));
+    renderStatus(await api("api/status"));
   } catch (error) {
     const live = $("live");
     live.className = "live error";

@@ -69,7 +69,7 @@
     "artifacts": "https://wwm-artifacts.mindchain.network",
     "neural_explorer": "https://wwm.mindchain.network/neural.html",
     "neural_manifest": "https://wwm.mindchain.network/neural-manifest.json",
-    "mindscan": "https://mindscan.mindchain.network"
+    "mindscan": "https://wwm.mindchain.network/mindscan"
   },
   "neural_publisher": {
     "schema": "noos/wwm-neural-publisher-state/v1",

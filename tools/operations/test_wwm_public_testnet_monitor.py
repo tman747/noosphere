@@ -45,7 +45,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
                 "read_gateway": "https://rpc.example",
                 "status": "https://status.example",
                 "artifacts": "https://artifacts.example",
-                "mindscan": "https://mindscan.example",
+                "mindscan": "https://mindscan.example/mindscan",
             },
             "monitoring": {
                 "validator_status_endpoints": [
@@ -132,7 +132,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
         self.assertEqual(config.chain_id, "11" * 32)
         self.assertEqual(config.release_version, f"0.1.0+git.{'55' * 20}")
         self.assertEqual(config.artifact_origin, "https://artifacts.example")
-        self.assertEqual(config.mindscan_origin, "https://mindscan.example")
+        self.assertEqual(config.mindscan_url, "https://mindscan.example/mindscan")
         self.assertEqual(config.worker_bearer_token, self.worker_token)
         self.assertEqual(len(config.validator_status_urls), 3)
         self.assertEqual(len(config.indexer_origins), 3)
@@ -199,7 +199,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
         ) as request:
             detail = monitor.mindscan_probe(config, 5.0)
         request.assert_called_once_with(
-            "https://mindscan.example/api/health",
+            "https://mindscan.example/mindscan/api/health",
             5.0,
         )
         self.assertEqual(detail["indexed_generation"], 17)

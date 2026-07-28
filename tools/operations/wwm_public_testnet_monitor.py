@@ -84,7 +84,7 @@ class MonitorConfig:
     rpc_origin: str
     status_origin: str
     artifact_origin: str
-    mindscan_origin: str
+    mindscan_url: str
     validator_status_urls: tuple[str, ...]
     indexer_origins: tuple[str, ...]
 
@@ -352,7 +352,11 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
         rpc_origin=exact_https_origin(endpoints.get("read_gateway"), "RPC endpoint"),
         status_origin=exact_https_origin(endpoints.get("status"), "status endpoint"),
         artifact_origin=exact_https_origin(endpoints.get("artifacts"), "artifact endpoint"),
-        mindscan_origin=exact_https_origin(endpoints.get("mindscan"), "MindScan endpoint"),
+        mindscan_url=exact_https_url(
+            endpoints.get("mindscan"),
+            "MindScan endpoint",
+            "/mindscan",
+        ),
         validator_status_urls=validator_status_urls,
         indexer_origins=indexer_origins,
     )
@@ -481,7 +485,7 @@ def worker_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
     return {"status": status, "ready": body.get("ready", True)}
 
 def mindscan_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
-    status, _, body = request_json(config.mindscan_origin + "/api/health", timeout)
+    status, _, body = request_json(config.mindscan_url + "/api/health", timeout)
     if (
         status != 200
         or body.get("schema") != "noos/mindscan-health/v1"
@@ -820,10 +824,9 @@ def collect_checks(config: MonitorConfig) -> list[CheckResult]:
         checks.extend(executor.map(rpc_check, rpc_targets))
     for label, origin in (
         ("site_tls", config.site_origin),
-        ("rpc_tls", config.rpc_origin),
+        ("mindscan_tls", config.mindscan_url),
         ("status_tls", config.status_origin),
         ("artifact_tls", config.artifact_origin),
-        ("mindscan_tls", config.mindscan_origin),
     ):
         checks.append(run_check(label, lambda origin=origin: tls_probe(origin, timeout)))
     return checks

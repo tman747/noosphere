@@ -19,8 +19,17 @@ APP = ROOT / "apps" / "mindscan"
 HASH = re.compile(r"^[0-9a-f]{64}$")
 REVISION = re.compile(r"^[0-9a-f]{40}$")
 REVISION_RELEASE = re.compile(r"^0\.1\.0\+git\.([0-9a-f]{40})$")
+BASE_PATH = re.compile(r"^/[a-z0-9][a-z0-9-]{0,63}$")
 HEIGHT = re.compile(r"^(0|[1-9][0-9]{0,19})$")
 MAX_UPSTREAM = 2 * 1024 * 1024
+
+
+def canonical_base_path(value: str) -> str:
+    if value == "":
+        return value
+    if not BASE_PATH.fullmatch(value):
+        raise ValueError("MindScan base path must be empty or one canonical segment")
+    return value
 
 
 def service_identity(source_revision: str, release_version: str) -> dict[str, object]:
@@ -219,6 +228,10 @@ class Handler(BaseHTTPRequestHandler):
     def identity(self) -> dict[str, object]:
         return self.server.identity  # type: ignore[attr-defined]
 
+    @property
+    def base_path(self) -> str:
+        return self.server.base_path  # type: ignore[attr-defined]
+
     def send_body(self, status: int, body: bytes, content_type: str, *, cache: str = "no-store") -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
@@ -234,9 +247,26 @@ class Handler(BaseHTTPRequestHandler):
     def json_response(self, value: dict[str, Any], status: int = 200) -> None:
         self.send_body(status, json.dumps(value, separators=(",", ":")).encode(), "application/json")
 
+    def redirect(self, location: str) -> None:
+        self.send_response(308)
+        self.send_header("Location", location)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_GET(self) -> None:  # noqa: N802
         parsed = urllib.parse.urlsplit(self.path)
-        path = parsed.path
+        raw_path = parsed.path
+        if self.base_path and raw_path == self.base_path:
+            self.redirect(self.base_path + "/")
+            return
+        if self.base_path:
+            if not raw_path.startswith(self.base_path + "/"):
+                self.json_response({"error": "not_found"}, 404)
+                return
+            path = raw_path[len(self.base_path):]
+        else:
+            path = raw_path
         try:
             if path == "/api/health":
                 status = self.data.status()
@@ -292,8 +322,13 @@ def main() -> int:
     parser.add_argument("--source-revision", required=True)
     parser.add_argument("--release-version", required=True)
     parser.add_argument("--listen", default="127.0.0.1:18130")
+    parser.add_argument("--base-path", default="")
     args = parser.parse_args()
-    identity = service_identity(args.source_revision, args.release_version)
+    base_path = canonical_base_path(args.base_path)
+    identity = {
+        **service_identity(args.source_revision, args.release_version),
+        "base_path": base_path,
+    }
     host, port_text = args.listen.rsplit(":", 1)
     server = ThreadingHTTPServer((host, int(port_text)), Handler)
     server.data = ExplorerData(
@@ -303,6 +338,7 @@ def main() -> int:
         args.indexer_release_version,
     )  # type: ignore[attr-defined]
     server.identity = identity  # type: ignore[attr-defined]
+    server.base_path = base_path  # type: ignore[attr-defined]
     print(
         json.dumps({
             "listen": args.listen,

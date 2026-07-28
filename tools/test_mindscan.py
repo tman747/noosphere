@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import http.client
 import io
 import json
 import sys
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -176,6 +178,10 @@ class MindScanGatewayTests(unittest.TestCase):
         self.assertRegex(identity["source_sha256"], r"^[0-9a-f]{64}$")
         self.assertFalse(identity["production"])
         self.assertEqual(identity["promotion_effect"], "NONE")
+        self.assertEqual(mindscan.canonical_base_path(""), "")
+        self.assertEqual(mindscan.canonical_base_path("/mindscan"), "/mindscan")
+        with self.assertRaisesRegex(ValueError, "base path"):
+            mindscan.canonical_base_path("/mindscan/")
         with self.assertRaisesRegex(ValueError, "release identity"):
             mindscan.service_identity(REVISION, "0.1.0")
         with self.assertRaisesRegex(ValueError, "indexer release"):
@@ -190,3 +196,51 @@ class MindScanGatewayTests(unittest.TestCase):
         with patch("urllib.request.urlopen", return_value=response(wrong_release)):
             with self.assertRaisesRegex(RuntimeError, "release identity mismatch"):
                 self.data().status()
+
+    def test_subpath_service_redirects_and_keeps_assets_and_api_scoped(self) -> None:
+        server = mindscan.ThreadingHTTPServer(("127.0.0.1", 0), mindscan.Handler)
+        data = self.data()
+        server.data = data
+        server.identity = {
+            **mindscan.service_identity(REVISION, RELEASE_VERSION),
+            "base_path": "/mindscan",
+        }
+        server.base_path = "/mindscan"
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        connection = http.client.HTTPConnection(
+            "127.0.0.1",
+            server.server_address[1],
+            timeout=5,
+        )
+        try:
+            with patch.object(data, "status", return_value=status()):
+                connection.request("GET", "/mindscan")
+                redirect = connection.getresponse()
+                redirect.read()
+                self.assertEqual(redirect.status, 308)
+                self.assertEqual(redirect.getheader("Location"), "/mindscan/")
+
+                connection.request("GET", "/mindscan/api/health")
+                health_response = connection.getresponse()
+                health = json.loads(health_response.read())
+                self.assertEqual(health_response.status, 200)
+                self.assertEqual(health["base_path"], "/mindscan")
+                self.assertEqual(health["indexer_release_version"], RELEASE_VERSION)
+
+                connection.request("GET", "/api/health")
+                unscoped = connection.getresponse()
+                unscoped.read()
+                self.assertEqual(unscoped.status, 404)
+
+                connection.request("GET", "/mindscan/")
+                page = connection.getresponse()
+                page_body = page.read()
+                self.assertEqual(page.status, 200)
+                self.assertIn(b'href="styles.css"', page_body)
+                self.assertIn(b'src="app.js"', page_body)
+        finally:
+            connection.close()
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)

@@ -224,6 +224,7 @@ $Specs = @(
         Args = @(
             $MindScanScript,
             '--listen', $MindScanListen,
+            '--base-path', '/mindscan',
             '--indexer', $MindScanIndexer,
             '--chain-id', $ChainId,
             '--genesis-hash', $GenesisHash,
