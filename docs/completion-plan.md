@@ -375,11 +375,22 @@ satisfy either gate.
 
 | ID | State | Work and exit |
 |---|---|---|
-| `MODEL-01` | `READY` | Complete tokenizer, W8A8 operators, KV evolution, logits, and greedy decoding across independent CPU, AMD, and NVIDIA implementations. |
-| `MODEL-02` | `EXTERNAL_BLOCKED` | Run at least one billion registered operator instances over adversarial and corpus vectors with zero unexplained mismatch. |
-| `MODEL-03` | `DURATION_BLOCKED` | Run 30 real days of five-custodian retrieval, churn, correlated loss, poison, replay, repair, and reconstruction measurement. |
-| `MODEL-04` | `EXTERNAL_BLOCKED` | Inject every registered deterministic execution fault with honest and frivolous challengers; prove exact settlement and no unrelated-job interruption. |
-| `MODEL-05` | `EXTERNAL_BLOCKED` | Measure committed-token latency, completion, goodput, memory, and base p95 degradation under independent committee load. |
+| `MODEL-01` | `EXTERNAL_BLOCKED` | The signed cross-vendor harness now requires two independent CPU lineages plus AMD and NVIDIA, exact segment replay, zero mismatch/fallback, pinned artifacts, and the registered 494M identity; independent implementations and real outputs remain external. |
+| `MODEL-02` | `EXTERNAL_BLOCKED` | The campaign runner requires at least one billion conserved operator instances per implementation and identical transcript roots; running it on registered independent hardware remains external. |
+| `MODEL-03` | `DURATION_BLOCKED` | The custody runner requires 30 complete real days, five independent custodians, three regions, daily coverage, 99.9% retrieval, poison/replay rejection, repair, and reconstruction; elapsed observations remain. |
+| `MODEL-04` | `EXTERNAL_BLOCKED` | The dispute runner requires every registered fault under honest and frivolous challengers, one million honest chunks, zero false slash, bounded cost, exact replay, conservation, and isolation; funded independent cases remain external. |
+| `MODEL-05` | `EXTERNAL_BLOCKED` | The latency runner recomputes the full concurrency/fault matrix across three independent regional committees, p50/p95/p99, completion, goodput, memory, and base/transaction p95 impact; real committee measurements remain external. |
+
+Revision `1be5737678ab4370eebc8ddcef5003bdc1654d82` adds
+`wwm_model_assurance_campaign.py`: exact non-promoting preregistration,
+participant-key-bound reports, campaign-authority sealing, and reproducible
+verification for all five model-assurance exits. Five contract tests cover
+passing matrices, one-billion-instance conservation, full 30-day custody
+coverage, every dispute fault/mode, latency and consensus thresholds,
+signature tampering, incomplete duration evidence, false slashing, weakened
+thresholds, premature sealing, and unauthorized result signing. A CLI smoke
+also froze and verified a future non-promoting preregistration; it did not
+manufacture external measurements.
 
 ### Track H — MindLink knowledge plane
 
