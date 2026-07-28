@@ -78,7 +78,7 @@ use crate::metrics::Metrics;
 use crate::roots::{
     body_cert_root, body_receipt_root, body_ticket_root, body_tx_root, body_witness_root,
     check_blob_descriptors, da_form_bytes, decode_da_form, decode_public_testnet_v1_da_form,
-    public_testnet_v1_da_form_bytes, sum_usage,
+    decode_public_testnet_v1_stored_body, public_testnet_v1_da_form_bytes, sum_usage,
 };
 use crate::store_port::{
     key_certificate, key_header, key_height, StorePort, KEY_FINALIZED, KEY_HEAD, KEY_JUSTIFIED,
@@ -185,6 +185,20 @@ impl NodeConfig {
             decode_public_testnet_v1_da_form(bytes)
         } else {
             decode_da_form(bytes)
+        }
+    }
+
+    fn decode_stored_body(
+        &self,
+        bytes: &[u8],
+        ticket: &GroundTicketV1,
+    ) -> Result<BlockBodyV1, NodeError> {
+        if self.public_testnet_genesis_v1 {
+            decode_public_testnet_v1_stored_body(bytes, ticket)
+        } else {
+            let mut body = decode_da_form(bytes)?;
+            body.ground_ticket = GroundTicketWire(*ticket);
+            Ok(body)
         }
     }
 }
@@ -2924,9 +2938,7 @@ impl<P: StorePort> NodeCore<P> {
             .ok_or(NodeError::BodyMismatch {
                 what: "body blob missing",
             })?;
-        let mut body = self.cfg.decode_da_form(&bytes)?;
-        body.ground_ticket = GroundTicketWire(*ticket);
-        Ok(body)
+        self.cfg.decode_stored_body(&bytes, ticket)
     }
 
     // -- restart recovery ----------------------------------------------------------

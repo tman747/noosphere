@@ -822,6 +822,7 @@ fn core_loop<P: StorePort>(
 async fn import_wire_block(
     consensus: &SyncSender<ConsensusMsg>,
     p2p: &P2pHandle,
+    public_testnet_genesis_v1: bool,
     peer: noos_p2p::PeerId,
     announced: &[u8],
     regossip: bool,
@@ -833,8 +834,16 @@ async fn import_wire_block(
         .await
         .map_err(|error| format!("request body: {error}"))?
         .ok_or_else(|| "body not found".to_owned())?;
-    // The body lane serves the exact ticket-independent DA form selected by
-    // the chain profile.
+    // Deployed public-testnet nodes served their full stored body, including
+    // the real ticket. Normalize it back to the ticket-independent DA form
+    // before validating the committed root and constructing shards.
+    let body = if public_testnet_genesis_v1 {
+        let decoded = crate::roots::decode_public_testnet_v1_stored_body(&body, &ticket)
+            .map_err(|error| format!("decode public-testnet body: {error}"))?;
+        crate::roots::public_testnet_v1_da_form_bytes(&decoded)
+    } else {
+        body
+    };
     let encoded = encode_body(&body).map_err(|error| format!("encode DA body: {error}"))?;
     if encoded.shard_root().as_bytes() != &header.body_da_root {
         return Err("DA root mismatch".to_owned());
@@ -887,9 +896,12 @@ async fn import_wire_header(
             .map_err(|error| format!("request certificate body: {error}"))?
             .ok_or_else(|| "certificate body not found".to_owned())?;
         let decoded = if public_testnet_genesis_v1 {
-            crate::roots::decode_public_testnet_v1_da_form(&body)
+            crate::roots::decode_public_testnet_v1_stored_body(&body, &ticket)
         } else {
-            crate::roots::decode_da_form(&body)
+            crate::roots::decode_da_form(&body).map(|mut body| {
+                body.ground_ticket = noos_braid::GroundTicketWire(ticket);
+                body
+            })
         };
         decoded
             .map_err(|error| format!("decode certificate body: {error}"))?
@@ -978,7 +990,15 @@ async fn sync_ready_peer(
             let result = if mode == NodeMode::Light {
                 import_wire_header(consensus, p2p, public_testnet_genesis_v1, peer, &header.0).await
             } else {
-                import_wire_block(consensus, p2p, peer, &header.0, false).await
+                import_wire_block(
+                    consensus,
+                    p2p,
+                    public_testnet_genesis_v1,
+                    peer,
+                    &header.0,
+                    false,
+                )
+                .await
             };
             if let Err(error) = result {
                 // Gossip may execute this height while the range body is in
@@ -1093,7 +1113,10 @@ fn spawn_network(
                 };
                 let mut config = P2pConfig::loopback(identity, keypair_seed);
                 config.listen_addr = settings.listen;
-                let protocol_store = Arc::new(NodeProtocolStore::new(store));
+                let protocol_store = Arc::new(NodeProtocolStore::new(
+                    store,
+                    public_testnet_genesis_v1,
+                ));
                 let (p2p, mut events) = match P2pNode::spawn(config, protocol_store) {
                     Ok(pair) => pair,
                     Err(error) => {
@@ -1208,7 +1231,12 @@ fn spawn_network(
                                                     .await;
                                                 } else {
                                                     let _ = import_wire_block(
-                                                        &consensus, &p2p, peer, &header, true,
+                                                        &consensus,
+                                                        &p2p,
+                                                        public_testnet_genesis_v1,
+                                                        peer,
+                                                        &header,
+                                                        true,
                                                     )
                                                     .await;
                                                 }

@@ -157,23 +157,46 @@ pub fn decode_da_form(bytes: &[u8]) -> Result<noos_braid::BlockBodyV1, NodeError
     Ok(noos_braid::BlockBodyV1::decode_canonical(&canonical)?)
 }
 
+fn decode_public_testnet_v1_canonical(bytes: &[u8]) -> Result<noos_braid::BlockBodyV1, NodeError> {
+    if bytes.len() > MAX_DA_FORM_RAW_BYTES {
+        return Err(NodeError::BodyMismatch {
+            what: "public-testnet v1 DA body limit",
+        });
+    }
+    Ok(noos_braid::BlockBodyV1::decode_canonical(bytes)?)
+}
+
 /// Decode the deployed public-testnet v1 DA form. This compatibility decoder
 /// is selected only by the explicit public-testnet profile; modern networks
 /// remain compression-frame-only.
 pub fn decode_public_testnet_v1_da_form(
     bytes: &[u8],
 ) -> Result<noos_braid::BlockBodyV1, NodeError> {
-    if bytes.len() > MAX_DA_FORM_RAW_BYTES {
-        return Err(NodeError::BodyMismatch {
-            what: "public-testnet v1 DA body limit",
-        });
-    }
-    let body = noos_braid::BlockBodyV1::decode_canonical(bytes)?;
+    let body = decode_public_testnet_v1_canonical(bytes)?;
     if body.ground_ticket.0 != zero_ticket() {
         return Err(NodeError::BodyMismatch {
             what: "public-testnet v1 DA ground ticket",
         });
     }
+    Ok(body)
+}
+
+/// Decode a body persisted by deployed public-testnet v1 nodes. Those nodes
+/// stored the full canonical body, including the separately committed real
+/// Ground ticket, under the ticket-independent DA root. New profile writes may
+/// instead contain the zero-ticket DA form. Both are accepted only when the
+/// stored ticket is zero or exactly matches the header record.
+pub fn decode_public_testnet_v1_stored_body(
+    bytes: &[u8],
+    expected_ticket: &GroundTicketV1,
+) -> Result<noos_braid::BlockBodyV1, NodeError> {
+    let mut body = decode_public_testnet_v1_canonical(bytes)?;
+    if body.ground_ticket.0 != zero_ticket() && body.ground_ticket.0 != *expected_ticket {
+        return Err(NodeError::BodyMismatch {
+            what: "public-testnet v1 stored ground ticket",
+        });
+    }
+    body.ground_ticket = noos_braid::GroundTicketWire(*expected_ticket);
     Ok(body)
 }
 
@@ -240,6 +263,32 @@ mod tests {
             decode_da_form(&trailing),
             Err(NodeError::BodyMismatch {
                 what: "DA compression frame"
+            })
+        ));
+    }
+
+    #[test]
+    fn public_testnet_v1_store_accepts_only_its_header_ticket() {
+        let ticket = GroundTicketV1 {
+            profile_id: 1,
+            nonce: 2,
+            extra_nonce: [3; 32],
+            digest: noos_crypto::Hash32::from_bytes([4; 32]),
+        };
+        let wrong_ticket = GroundTicketV1 { nonce: 5, ..ticket };
+        let mut body = noos_braid::vector_gen::minimal_body();
+        body.ground_ticket = noos_braid::GroundTicketWire(ticket);
+        let stored = body.encode_canonical();
+
+        assert_eq!(
+            decode_public_testnet_v1_stored_body(&stored, &ticket)
+                .expect("matching deployed store ticket"),
+            body
+        );
+        assert!(matches!(
+            decode_public_testnet_v1_stored_body(&stored, &wrong_ticket),
+            Err(NodeError::BodyMismatch {
+                what: "public-testnet v1 stored ground ticket"
             })
         ));
     }
