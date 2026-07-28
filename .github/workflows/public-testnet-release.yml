@@ -39,7 +39,9 @@ jobs:
         shell: bash
         run: |
           python tools/gates/check_api.py
-          python -m unittest tools.operations.test_wwm_release_bundle
+          python -m unittest \
+            tools.operations.test_wwm_release_bundle \
+            tools.operations.test_wwm_static_bundle_server
       - name: Seal exact-revision public-testnet bundle
         shell: bash
         run: |
