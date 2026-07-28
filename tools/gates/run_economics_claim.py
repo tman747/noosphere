@@ -17,6 +17,7 @@ import sys
 from experimental_gate import ROOT, base_continuity, cargo_test, emit, evidence_check
 
 CLAIMS = (
+    "A-LOOM-MARKET",
     "M-OMEGA",
     "M-ISSUANCE",
     "A-DUPLEX-ISSUANCE",
@@ -26,12 +27,15 @@ CLAIMS = (
 )
 
 COMMON_SOURCES = (
-    "protocol/claims/registry.json",
     "protocol/spec/constants-v1.toml",
     "tools/gates/run_economics_claim.py",
 )
 
 CLAIM_SOURCES = {
+    "A-LOOM-MARKET": (
+        "crates/noos-work-loom/src/lib.rs",
+        "crates/noos-work-loom/src/tests.rs",
+    ),
     "M-OMEGA": (
         "crates/noos-analytics/src/lib.rs",
         "crates/noos-work-loom/src/economics.rs",
@@ -54,6 +58,7 @@ CLAIM_SOURCES = {
 }
 
 PACKAGES = {
+    "A-LOOM-MARKET": ("noos-work-loom",),
     "M-OMEGA": ("noos-analytics", "noos-work-loom"),
     "M-ISSUANCE": ("noos-lumen",),
     "A-DUPLEX-ISSUANCE": ("noos-work-loom", "noos-lumen"),
@@ -63,6 +68,10 @@ PACKAGES = {
 }
 
 LIMITATIONS = {
+    "A-LOOM-MARKET": [
+        "The exact local market transition and 4,096-seed adversarial trace battery prove deterministic escrow termination and conservation, not independent or production operation.",
+        "Delivery, evaluation, and demand remain separate; this local implementation evidence grants no consensus credit.",
+    ],
     "M-OMEGA": [
         "Assumption boundary: local measurements are deterministic fixtures, not the required 99%-confidence cross-shape and cross-hardware cost-per-joule campaign or independent reproductions.",
         "Sustained admitted demand for one retarget half-life is unavailable; production Omega credit remains structurally zero.",
@@ -153,12 +162,24 @@ def main() -> int:
         )
 
     limitations = LIMITATIONS[args.claim]
-    emit(
-        gate="claim-" + args.claim.lower().replace(".", "-"),
-        claims=[args.claim],
-        result="EXTERNAL_BLOCKED",
-        expected="EXTERNAL_BLOCKED",
-        checks=[
+    result = "IMPLEMENTED" if args.claim == "A-LOOM-MARKET" else "EXTERNAL_BLOCKED"
+    if result == "IMPLEMENTED":
+        checks = [
+            evidence_check(
+                "local-deterministic-mechanism",
+                "implementation",
+                True,
+                observations,
+            ),
+            evidence_check(
+                "local-falsifier-battery",
+                "falsifier",
+                True,
+                observations,
+            ),
+        ]
+    else:
+        checks = [
             evidence_check(
                 "local-deterministic-mechanism",
                 "implementation",
@@ -177,7 +198,13 @@ def main() -> int:
                 False,
                 limitations,
             ),
-        ],
+        ]
+    emit(
+        gate="claim-" + args.claim.lower().replace(".", "-"),
+        claims=[args.claim],
+        result=result,
+        expected=result,
+        checks=checks,
         sources=COMMON_SOURCES + CLAIM_SOURCES[args.claim],
         limitations=limitations,
     )

@@ -75,7 +75,7 @@ jobs:
 
   cross-language-lab:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -99,7 +99,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check --only-binary=:all: "blake3==1.0.9" "cryptography==49.0.0" "py-ecc==8.0.0"
-          python -m unittest -v tools.gates.test_cross_language_lab tools.gates.test_check_vectors tools.gates.test_two_client_devnet_campaign
+          python -m unittest -v tools.gates.test_cross_language_lab tools.gates.test_check_vectors tools.gates.test_two_client_devnet_campaign tools.gates.test_rebaseline_claims tools.gates.test_claim_integrity
           python tools/gates/cross_language_lab.py run \
             --source-revision "${GITHUB_SHA}" \
             --profile smoke \
@@ -112,6 +112,11 @@ jobs:
             --seed 0x4e4f4f53 \
             --cargo-target-dir "${RUNNER_TEMP}/cross-language-cargo" \
             --output "${RUNNER_TEMP}/two-client-devnet-campaign.json"
+          python tools/gates/rebaseline_claims.py \
+            --source-revision "${GITHUB_SHA}" \
+            --cargo-target-dir "${RUNNER_TEMP}/cross-language-cargo" \
+            --timeout-seconds 7200 \
+            --output "${RUNNER_TEMP}/claim-rebaseline.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
@@ -121,6 +126,8 @@ jobs:
             ${{ runner.temp }}/cross-language-lab-artifacts/
             ${{ runner.temp }}/two-client-devnet-campaign.json
             ${{ runner.temp }}/two-client-devnet-campaign-artifacts/
+            ${{ runner.temp }}/claim-rebaseline.json
+            ${{ runner.temp }}/claim-rebaseline.matrix.log
           if-no-files-found: error
           retention-days: 30
 

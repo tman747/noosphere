@@ -127,7 +127,11 @@ def rollback_check(claim: str) -> int:
         require_disabled_controls(["dream_lane_enabled"])
     if not continuity["ordinary_base_live"] or not continuity["rollback_verified"]:
         raise SystemExit("ordinary-base rollback continuity failed")
-    print(f"RESULT {claim} rollback=PASSED")
+    negative_result = {"S-DREAM-LANE": "DISABLED", "E-DREAM-02": "KILLED"}.get(claim)
+    if negative_result is None:
+        print(f"RESULT rollback=PASSED claim={claim}")
+    else:
+        print(f"RESULT rollback={negative_result} claim={claim} base_continuity=PASSED")
     return 0
 
 

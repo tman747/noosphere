@@ -267,7 +267,9 @@ def write_bindings_if_valid(
     for row in doc["claims"]:
         if row["claim_id"] in bindings:
             row["evidence_sha256"] = bindings[row["claim_id"]]
-            row["local_evidence_state"] = "VERIFIED"
+            row["local_evidence_state"] = (
+                "VERIFIED" if row.get("expected_result") in PROMOTABLE_RESULTS else "PARTIAL"
+            )
     registry_path.write_text(
         json.dumps(doc, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
