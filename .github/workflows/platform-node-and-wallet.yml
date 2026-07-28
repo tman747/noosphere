@@ -467,6 +467,7 @@ jobs:
             tools.operations.test_wwm_public_inference \
             tools.operations.test_wwm_inference_metrics \
             tools.operations.test_wwm_plaintext_persistence_audit \
+            tools.operations.test_wwm_model_assurance_campaign \
             tools.operations.test_wwm_public_gateway \
             tools.operations.test_wwm_public_testnet_monitor \
             tools.operations.test_wwm_signed_monitor_burn_in \
