@@ -24,6 +24,7 @@ class SignedMonitorBurnInTests(unittest.TestCase):
         self.source_revision = "49" * 20
         self.release_version = f"0.1.0+git.{self.source_revision}"
         self.deployment_sha256 = "81" * 32
+        self.monitor_source_sha256 = "82" * 32
         self.start = datetime(2026, 7, 27, 0, 0, tzinfo=timezone.utc)
 
     def config(self, **overrides: object) -> burn_in.BurnInConfig:
@@ -33,6 +34,7 @@ class SignedMonitorBurnInTests(unittest.TestCase):
             "release_version": self.release_version,
             "deployment_sha256": self.deployment_sha256,
             "signer_key_id": self.signer_key_id,
+            "monitor_source_sha256": self.monitor_source_sha256,
             "duration_seconds": 60,
             "poll_seconds": 1,
             "maximum_sample_gap_seconds": 90,
@@ -50,6 +52,7 @@ class SignedMonitorBurnInTests(unittest.TestCase):
         previous_sample_id: str | None,
         checks: list[dict[str, object]] | None = None,
         source_revision: str | None = None,
+        monitor_source_sha256: str | None = None,
     ) -> dict[str, object]:
         payload: dict[str, object] = {
             "schema": monitor.SAMPLE_SCHEMA,
@@ -60,6 +63,9 @@ class SignedMonitorBurnInTests(unittest.TestCase):
             "source_revision": source_revision or self.source_revision,
             "release_version": self.release_version,
             "deployment_sha256": self.deployment_sha256,
+            "monitor_source_sha256": (
+                monitor_source_sha256 or self.monitor_source_sha256
+            ),
             "status": "ok",
             "observed_at_utc": burn_in.format_utc(observed),
             "previous_sample_id": previous_sample_id,
@@ -88,6 +94,10 @@ class SignedMonitorBurnInTests(unittest.TestCase):
         self.assertEqual(result["observed_span_seconds"], 60)
         self.assertEqual(result["first_sample_id"], first["sample_id"])
         self.assertEqual(result["last_sample_id"], second["sample_id"])
+        self.assertEqual(
+            result["release"]["monitor_source_sha256"],  # type: ignore[index]
+            self.monitor_source_sha256,
+        )
         self.assertTrue(result["acceptance"]["restart_recovery_supported"])  # type: ignore[index]
         self.assertTrue(config.output.exists())
         self.assertTrue(config.ledger_path.exists())
@@ -133,6 +143,15 @@ class SignedMonitorBurnInTests(unittest.TestCase):
         wrong_source = self.sample(self.start, previous_sample_id=None, source_revision="aa" * 20)
         with self.assertRaisesRegex(burn_in.BurnInError, "source_revision mismatch"):
             evidence.accept(wrong_source, now=self.start)
+        wrong_monitor = self.sample(
+            self.start,
+            previous_sample_id=None,
+            monitor_source_sha256="aa" * 32,
+        )
+        with self.assertRaisesRegex(
+            burn_in.BurnInError, "monitor_source_sha256 mismatch"
+        ):
+            evidence.accept(wrong_monitor, now=self.start)
 
         failed = self.sample(
             self.start,

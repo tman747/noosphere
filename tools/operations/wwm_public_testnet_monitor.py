@@ -71,6 +71,7 @@ class MonitorConfig:
     worker_bearer_token: str
     source_revision: str
     release_version: str
+    monitor_source_sha256: str
     interval_seconds: int
     request_timeout_seconds: float
     seed_rpc_port: int
@@ -324,6 +325,9 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
     evidence_dir.mkdir(parents=True, exist_ok=True)
     signing_key = args.signing_key.resolve(strict=True)
     r2_report = args.r2_report.resolve(strict=True)
+    monitor_source_sha256 = hashlib.sha256(
+        Path(__file__).resolve(strict=True).read_bytes()
+    ).hexdigest()
     return MonitorConfig(
         listen_host=listen_host,
         listen_port=listen_port,
@@ -334,6 +338,7 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
         worker_bearer_token=load_worker_bearer_token(args.worker_config),
         source_revision=args.source_revision,
         release_version=args.release_version,
+        monitor_source_sha256=monitor_source_sha256,
         interval_seconds=args.interval_seconds,
         request_timeout_seconds=args.request_timeout_seconds,
         seed_rpc_port=args.seed_rpc_port,
@@ -829,12 +834,14 @@ class EvidenceStore:
         source_revision: str,
         release_version: str,
         deployment_sha256: str,
+        monitor_source_sha256: str,
     ):
         self.root = root
         self.key = key
         self.source_revision = source_revision
         self.release_version = release_version
         self.deployment_sha256 = deployment_sha256
+        self.monitor_source_sha256 = monitor_source_sha256
         self.samples = root / "samples"
         self.summaries = root / "daily"
         self.samples.mkdir(parents=True, exist_ok=True)
@@ -888,6 +895,7 @@ class EvidenceStore:
                 "source_revision": self.source_revision,
                 "release_version": self.release_version,
                 "deployment_sha256": self.deployment_sha256,
+                "monitor_source_sha256": self.monitor_source_sha256,
                 "observed_at_utc": observed_at,
                 "previous_sample_id": self._append_predecessor(day, path),
                 "status": "ok" if all(check.ok for check in checks) else "degraded",
@@ -941,6 +949,7 @@ class EvidenceStore:
             "source_revision": self.source_revision,
             "release_version": self.release_version,
             "deployment_sha256": self.deployment_sha256,
+            "monitor_source_sha256": self.monitor_source_sha256,
             "day_utc": day,
             "observed_start_utc": timestamps[0],
             "observed_end_utc": timestamps[-1],
@@ -977,6 +986,7 @@ class MonitorState:
             config.source_revision,
             config.release_version,
             deployment_sha256,
+            config.monitor_source_sha256,
         )
         self.lock = threading.Lock()
         self.latest: dict[str, object] | None = None
@@ -1120,6 +1130,7 @@ def serve(config: MonitorConfig) -> None:
                 "production_authorized": False,
                 "source_revision": config.source_revision,
                 "release_version": config.release_version,
+                "monitor_source_sha256": config.monitor_source_sha256,
             },
             sort_keys=True,
         ),

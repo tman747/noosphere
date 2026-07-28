@@ -45,6 +45,7 @@ class BurnInConfig:
     maximum_observation_gap_seconds: int
     expected_check_count: int
     output: Path
+    monitor_source_sha256: str | None = None
 
     @property
     def ledger_path(self) -> Path:
@@ -66,6 +67,10 @@ class BurnInConfig:
             raise BurnInError("deployment SHA-256 must be canonical lowercase hex64")
         if not HEX64.fullmatch(self.signer_key_id):
             raise BurnInError("signer key ID must be canonical lowercase hex64")
+        if self.monitor_source_sha256 is not None and not HEX64.fullmatch(
+            self.monitor_source_sha256
+        ):
+            raise BurnInError("monitor source SHA-256 must be canonical lowercase hex64")
         if self.duration_seconds < 60:
             raise BurnInError("burn-in duration must be at least 60 seconds")
         if not 1 <= self.poll_seconds <= 60:
@@ -173,6 +178,8 @@ def validate_sample(config: BurnInConfig, sample: dict[str, object]) -> tuple[da
         "signer_key_id": config.signer_key_id,
         "status": "ok",
     }
+    if config.monitor_source_sha256 is not None:
+        expected["monitor_source_sha256"] = config.monitor_source_sha256
     for field, value in expected.items():
         if sample.get(field) != value:
             raise BurnInError(f"monitor sample {field} mismatch")
@@ -249,6 +256,7 @@ class BurnInEvidence:
             "source_revision": self.config.source_revision,
             "release_version": self.config.release_version,
             "deployment_sha256": self.config.deployment_sha256,
+            "monitor_source_sha256": self.config.monitor_source_sha256,
         }
         for field, value in expected.items():
             if checkpoint.get(field) != value:
@@ -336,6 +344,7 @@ class BurnInEvidence:
             "source_revision": self.config.source_revision,
             "release_version": self.config.release_version,
             "deployment_sha256": self.config.deployment_sha256,
+            "monitor_source_sha256": self.config.monitor_source_sha256,
             "started_at_utc": format_utc(state.started_at_utc),
             "first_observed_at_utc": format_utc(state.first_observed_at_utc),
             "last_observed_at_utc": format_utc(state.last_observed_at_utc),
@@ -375,6 +384,7 @@ class BurnInEvidence:
                 "source_revision": self.config.source_revision,
                 "release_version": self.config.release_version,
                 "deployment_sha256": self.config.deployment_sha256,
+                "monitor_source_sha256": self.config.monitor_source_sha256,
             },
             "signer_key_id": self.config.signer_key_id,
             "first_observed_at_utc": format_utc(state.first_observed_at_utc),
@@ -437,6 +447,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--release-version", required=True)
     parser.add_argument("--deployment-sha256", required=True)
     parser.add_argument("--signer-key-id", required=True)
+    parser.add_argument("--monitor-source-sha256")
     parser.add_argument("--duration-seconds", type=int, default=86_400)
     parser.add_argument("--poll-seconds", type=int, default=15)
     parser.add_argument("--maximum-sample-gap-seconds", type=int, default=90)
@@ -453,6 +464,7 @@ def config_from_args(args: argparse.Namespace) -> BurnInConfig:
         release_version=args.release_version,
         deployment_sha256=args.deployment_sha256,
         signer_key_id=args.signer_key_id,
+        monitor_source_sha256=args.monitor_source_sha256,
         duration_seconds=args.duration_seconds,
         poll_seconds=args.poll_seconds,
         maximum_sample_gap_seconds=args.maximum_sample_gap_seconds,

@@ -271,6 +271,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
             "55" * 20,
             f"0.1.0+git.{'55' * 20}",
             "66" * 32,
+            "77" * 32,
         )
         checks = [monitor.CheckResult("gateway", True, 12, {"status": 200})]
         first = store.append(checks, "2026-07-15T00:00:00Z")
@@ -279,6 +280,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
         monitor.verify_envelope(second, monitor.SAMPLE_DOMAIN, "sample_id")
         self.assertEqual(second["previous_sample_id"], first["sample_id"])
         self.assertEqual(first["release_version"], f"0.1.0+git.{'55' * 20}")
+        self.assertEqual(first["monitor_source_sha256"], "77" * 32)
 
         summary = store.summarize("2026-07-15")
         monitor.verify_envelope(summary, monitor.SUMMARY_DOMAIN, "summary_id")
