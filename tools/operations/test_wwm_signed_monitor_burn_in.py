@@ -5,6 +5,7 @@ import hashlib
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -53,6 +54,7 @@ class SignedMonitorBurnInTests(unittest.TestCase):
         checks: list[dict[str, object]] | None = None,
         source_revision: str | None = None,
         monitor_source_sha256: str | None = None,
+        status: str = "ok",
     ) -> dict[str, object]:
         payload: dict[str, object] = {
             "schema": monitor.SAMPLE_SCHEMA,
@@ -66,7 +68,7 @@ class SignedMonitorBurnInTests(unittest.TestCase):
             "monitor_source_sha256": (
                 monitor_source_sha256 or self.monitor_source_sha256
             ),
-            "status": "ok",
+            "status": status,
             "observed_at_utc": burn_in.format_utc(observed),
             "previous_sample_id": previous_sample_id,
             "checks": checks
@@ -193,6 +195,45 @@ class SignedMonitorBurnInTests(unittest.TestCase):
         partial_config.ledger_path.write_text("{}\n", encoding="utf-8")
         with self.assertRaisesRegex(burn_in.BurnInError, "must exist together"):
             burn_in.BurnInEvidence(partial_config)
+
+    def test_run_fails_immediately_and_seals_the_failing_sample(self) -> None:
+        config = self.config()
+        live_start = datetime.now(timezone.utc)
+        first = self.sample(live_start, previous_sample_id=None)
+        failed = self.sample(
+            live_start + timedelta(seconds=1),
+            previous_sample_id=str(first["sample_id"]),
+            checks=[
+                {"name": "artifact_range", "ok": False, "latency_ms": 30_001, "detail": {}},
+                {"name": "inference", "ok": True, "latency_ms": 18, "detail": {}},
+            ],
+            status="degraded",
+        )
+        samples = iter((first, failed))
+        request_count = 0
+
+        def requester(_url: str) -> dict[str, object]:
+            nonlocal request_count
+            request_count += 1
+            return next(samples)
+
+        with patch.object(burn_in.time, "sleep", return_value=None):
+            with self.assertRaisesRegex(
+                burn_in.BurnInError, "failed check artifact_range"
+            ):
+                burn_in.run(config, requester=requester)
+
+        self.assertEqual(request_count, 2)
+        result = json.loads(config.output.read_text(encoding="utf-8"))
+        self.assertEqual(result["result"], "FAIL")
+        self.assertEqual(
+            result["failure"]["reason"],  # type: ignore[index]
+            "monitor sample contains failed check artifact_range",
+        )
+        self.assertEqual(result["sample_count"], 1)
+        self.assertTrue(config.failure_sample_path.exists())
+        checkpoint = json.loads(config.checkpoint_path.read_text(encoding="utf-8"))
+        self.assertEqual(checkpoint["status"], "FAILED")
 
     def test_configuration_rejects_non_exact_release_and_insecure_url(self) -> None:
         with self.assertRaisesRegex(burn_in.BurnInError, "release identity is not exact"):

@@ -31,6 +31,10 @@ HEX64 = re.compile(r"^[0-9a-f]{64}$")
 class BurnInError(RuntimeError):
     pass
 
+class BurnInSampleError(BurnInError):
+    """A returned monitor sample proves the continuous burn-in failed."""
+
+
 
 @dataclass(frozen=True)
 class BurnInConfig:
@@ -54,6 +58,10 @@ class BurnInConfig:
     @property
     def checkpoint_path(self) -> Path:
         return self.output.with_suffix(self.output.suffix + ".checkpoint.json")
+
+    @property
+    def failure_sample_path(self) -> Path:
+        return self.output.with_suffix(self.output.suffix + ".failed-sample.json")
 
     def validate(self) -> None:
         parsed = urlsplit(self.url)
@@ -176,7 +184,6 @@ def validate_sample(config: BurnInConfig, sample: dict[str, object]) -> tuple[da
         "release_version": config.release_version,
         "deployment_sha256": config.deployment_sha256,
         "signer_key_id": config.signer_key_id,
-        "status": "ok",
     }
     if config.monitor_source_sha256 is not None:
         expected["monitor_source_sha256"] = config.monitor_source_sha256
@@ -192,14 +199,18 @@ def validate_sample(config: BurnInConfig, sample: dict[str, object]) -> tuple[da
         raise BurnInError("monitor sample check count mismatch")
     names: list[str] = []
     for check in checks:
-        if not isinstance(check, dict) or check.get("ok") is not True:
-            raise BurnInError("monitor sample contains a failed check")
+        if not isinstance(check, dict):
+            raise BurnInError("monitor sample check is malformed")
         name = check.get("name")
         if not isinstance(name, str) or not name:
             raise BurnInError("monitor sample check name is malformed")
+        if check.get("ok") is not True:
+            raise BurnInError(f"monitor sample contains failed check {name}")
         names.append(name)
     if len(set(names)) != len(names):
         raise BurnInError("monitor sample contains duplicate check names")
+    if sample.get("status") != "ok":
+        raise BurnInError("monitor sample status mismatch")
     return parse_utc(sample.get("observed_at_utc"), "sample observed_at_utc"), tuple(sorted(names))
 
 
@@ -289,25 +300,28 @@ class BurnInEvidence:
         return state
 
     def _apply_sample(self, state: BurnInState, sample: dict[str, object], *, persist: bool) -> bool:
-        observed, current_names = validate_sample(self.config, sample)
+        try:
+            observed, current_names = validate_sample(self.config, sample)
+        except BurnInError as error:
+            raise BurnInSampleError(str(error)) from error
         sample_id = sample.get("sample_id")
         if not isinstance(sample_id, str) or not HEX64.fullmatch(sample_id):
-            raise BurnInError("monitor sample ID is malformed")
+            raise BurnInSampleError("monitor sample ID is malformed")
         if sample_id == state.last_sample_id:
             return state.observed_span_seconds() >= self.config.duration_seconds
         if state.last_sample_id is not None:
             if sample.get("previous_sample_id") != state.last_sample_id:
-                raise BurnInError("monitor sample hash chain is discontinuous")
+                raise BurnInSampleError("monitor sample hash chain is discontinuous")
             if state.last_observed_at_utc is None:
-                raise BurnInError("burn-in state lost its last observation")
+                raise BurnInSampleError("burn-in state lost its last observation")
             gap = (observed - state.last_observed_at_utc).total_seconds()
             if gap <= 0:
-                raise BurnInError("monitor sample timestamps are not increasing")
+                raise BurnInSampleError("monitor sample timestamps are not increasing")
             if gap > self.config.maximum_sample_gap_seconds:
-                raise BurnInError("monitor sample gap exceeded the burn-in bound")
+                raise BurnInSampleError("monitor sample gap exceeded the burn-in bound")
             state.maximum_sample_gap_seconds = max(state.maximum_sample_gap_seconds, gap)
         if state.check_names is not None and current_names != state.check_names:
-            raise BurnInError("monitor check set changed during burn-in")
+            raise BurnInSampleError("monitor check set changed during burn-in")
         if persist:
             append_ledger(self.config.ledger_path, sample)
         if state.first_observed_at_utc is None:
@@ -322,10 +336,13 @@ class BurnInEvidence:
         return state.observed_span_seconds() >= self.config.duration_seconds
 
     def accept(self, sample: dict[str, object], *, now: datetime | None = None) -> bool:
-        observed = parse_utc(sample.get("observed_at_utc"), "sample observed_at_utc")
+        try:
+            observed = parse_utc(sample.get("observed_at_utc"), "sample observed_at_utc")
+        except BurnInError as error:
+            raise BurnInSampleError(str(error)) from error
         age = abs(((now or utc_now()) - observed).total_seconds())
         if age > self.config.maximum_observation_gap_seconds:
-            raise BurnInError("monitor observation freshness exceeded the burn-in bound")
+            raise BurnInSampleError("monitor observation freshness exceeded the burn-in bound")
         return self._apply_sample(self.state, sample, persist=True)
 
     def _checkpoint_document(self) -> dict[str, object]:
@@ -359,6 +376,80 @@ class BurnInEvidence:
 
     def _write_checkpoint(self) -> None:
         atomic_write(self.config.checkpoint_path, self._checkpoint_document())
+
+    def fail(
+        self,
+        reason: str,
+        *,
+        sample: dict[str, object] | None,
+        observed_at_utc: datetime | None = None,
+        wall_elapsed_seconds: int = 0,
+    ) -> dict[str, object]:
+        if self.config.output.exists():
+            raise BurnInError("burn-in result already exists")
+        failed_at = observed_at_utc or utc_now()
+        sample_descriptor: dict[str, object] | None = None
+        if sample is not None:
+            atomic_write(self.config.failure_sample_path, sample)
+            try:
+                sample_payload = self.config.failure_sample_path.read_bytes()
+            except OSError as error:
+                raise BurnInError("cannot read preserved failing monitor sample") from error
+            sample_descriptor = {
+                "path": str(self.config.failure_sample_path),
+                "bytes": len(sample_payload),
+                "sha256": hashlib.sha256(sample_payload).hexdigest(),
+                "sample_id": sample.get("sample_id"),
+                "previous_sample_id": sample.get("previous_sample_id"),
+                "observed_at_utc": sample.get("observed_at_utc"),
+            }
+        ledger_descriptor: dict[str, object] | None = None
+        if self.config.ledger_path.exists():
+            try:
+                ledger_payload = self.config.ledger_path.read_bytes()
+            except OSError as error:
+                raise BurnInError("cannot read failed burn-in ledger") from error
+            ledger_descriptor = {
+                "path": str(self.config.ledger_path),
+                "bytes": len(ledger_payload),
+                "sha256": hashlib.sha256(ledger_payload).hexdigest(),
+            }
+        if self.state.sample_count > 0:
+            checkpoint = self._checkpoint_document()
+            checkpoint.update(
+                {
+                    "status": "FAILED",
+                    "failed_at_utc": format_utc(failed_at),
+                    "failure_reason": reason,
+                }
+            )
+            atomic_write(self.config.checkpoint_path, checkpoint)
+        result: dict[str, object] = {
+            "schema": RESULT_SCHEMA,
+            "observed_at_utc": format_utc(failed_at),
+            "result": "FAIL",
+            "release": {
+                "source_revision": self.config.source_revision,
+                "release_version": self.config.release_version,
+                "deployment_sha256": self.config.deployment_sha256,
+                "monitor_source_sha256": self.config.monitor_source_sha256,
+            },
+            "signer_key_id": self.config.signer_key_id,
+            "started_at_utc": format_utc(self.state.started_at_utc),
+            "observed_span_seconds": self.state.observed_span_seconds(),
+            "wall_elapsed_seconds": wall_elapsed_seconds,
+            "sample_count": self.state.sample_count,
+            "first_sample_id": self.state.first_sample_id,
+            "last_sample_id": self.state.last_sample_id,
+            "maximum_sample_gap_seconds": self.state.maximum_sample_gap_seconds,
+            "failure": {
+                "reason": reason,
+                "sample": sample_descriptor,
+            },
+            "ledger": ledger_descriptor,
+        }
+        atomic_write(self.config.output, result)
+        return result
 
     def finalize(self, *, observed_at_utc: datetime | None = None, wall_elapsed_seconds: int = 0) -> dict[str, object]:
         state = self.state
@@ -426,15 +517,29 @@ def run(config: BurnInConfig, *, requester: RequestSample = request_sample) -> d
     last_success_monotonic = started_monotonic
     last_error = "monitor sample unavailable"
     while True:
+        sample: dict[str, object] | None = None
         try:
             sample = requester(config.url)
             completed = evidence.accept(sample)
             last_success_monotonic = time.monotonic()
             if completed:
                 break
+        except BurnInSampleError as error:
+            last_error = str(error)
+            evidence.fail(
+                last_error,
+                sample=sample,
+                wall_elapsed_seconds=int(time.monotonic() - started_monotonic),
+            )
+            raise BurnInError(f"signed monitor burn-in failed: {last_error}") from error
         except (BurnInError, OSError, ValueError, urllib.error.URLError) as error:
             last_error = str(error)
             if time.monotonic() - last_success_monotonic > config.maximum_observation_gap_seconds:
+                evidence.fail(
+                    last_error,
+                    sample=sample,
+                    wall_elapsed_seconds=int(time.monotonic() - started_monotonic),
+                )
                 raise BurnInError(f"signed monitor burn-in failed: {last_error}") from error
         time.sleep(config.poll_seconds)
     return evidence.finalize(wall_elapsed_seconds=int(time.monotonic() - started_monotonic))
