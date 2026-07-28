@@ -833,7 +833,8 @@ async fn import_wire_block(
         .await
         .map_err(|error| format!("request body: {error}"))?
         .ok_or_else(|| "body not found".to_owned())?;
-    // The body lane serves the exact compressed, ticket-independent DA form.
+    // The body lane serves the exact ticket-independent DA form selected by
+    // the chain profile.
     let encoded = encode_body(&body).map_err(|error| format!("encode DA body: {error}"))?;
     if encoded.shard_root().as_bytes() != &header.body_da_root {
         return Err("DA root mismatch".to_owned());
@@ -868,6 +869,7 @@ async fn import_wire_block(
 async fn import_wire_header(
     consensus: &SyncSender<ConsensusMsg>,
     p2p: &P2pHandle,
+    public_testnet_genesis_v1: bool,
     peer: noos_p2p::PeerId,
     announced: &[u8],
 ) -> Result<ImportOutcome, String> {
@@ -884,7 +886,12 @@ async fn import_wire_header(
             .await
             .map_err(|error| format!("request certificate body: {error}"))?
             .ok_or_else(|| "certificate body not found".to_owned())?;
-        crate::roots::decode_da_form(&body)
+        let decoded = if public_testnet_genesis_v1 {
+            crate::roots::decode_public_testnet_v1_da_form(&body)
+        } else {
+            crate::roots::decode_da_form(&body)
+        };
+        decoded
             .map_err(|error| format!("decode certificate body: {error}"))?
             .finality_certificates
     };
@@ -919,6 +926,7 @@ async fn sync_ready_peer(
     p2p: &P2pHandle,
     edge: &P2pNetworkEdge,
     peer: noos_p2p::PeerId,
+    public_testnet_genesis_v1: bool,
 ) {
     let Some(mode) = consensus_mode(consensus) else {
         return;
@@ -968,7 +976,7 @@ async fn sync_ready_peer(
         }
         for header in range.headers.0 {
             let result = if mode == NodeMode::Light {
-                import_wire_header(consensus, p2p, peer, &header.0).await
+                import_wire_header(consensus, p2p, public_testnet_genesis_v1, peer, &header.0).await
             } else {
                 import_wire_block(consensus, p2p, peer, &header.0, false).await
             };
@@ -1052,6 +1060,7 @@ fn spawn_network(
     settings: crate::network::NetworkSettings,
     chain_id: Hash32,
     genesis_hash: Hash32,
+    public_testnet_genesis_v1: bool,
     store: StoreClient,
     consensus: SyncSender<ConsensusMsg>,
     mut gossip_rx: tokio::sync::mpsc::Receiver<OutboundGossip>,
@@ -1117,7 +1126,14 @@ fn spawn_network(
                         }
                         let peer = peers[sync_cursor % peers.len()];
                         sync_cursor = sync_cursor.wrapping_add(1);
-                        sync_ready_peer(&sync_consensus, &sync_p2p, &sync_edge, peer).await;
+                        sync_ready_peer(
+                            &sync_consensus,
+                            &sync_p2p,
+                            &sync_edge,
+                            peer,
+                            public_testnet_genesis_v1,
+                        )
+                        .await;
                     }
                 });
                 let mut shutdown_rx = shutdown_rx;
@@ -1183,7 +1199,11 @@ fn spawn_network(
                                                     == Some(NodeMode::Light)
                                                 {
                                                     let _ = import_wire_header(
-                                                        &consensus, &p2p, peer, &header,
+                                                        &consensus,
+                                                        &p2p,
+                                                        public_testnet_genesis_v1,
+                                                        peer,
+                                                        &header,
                                                     )
                                                     .await;
                                                 } else {
@@ -1372,6 +1392,7 @@ pub fn start(
     let network_chain_id = built.chain_id;
     let network_genesis_hash = built.genesis_hash;
     let observer = cfg.observer;
+    let public_testnet_genesis_v1 = cfg.public_testnet_genesis_v1;
     let (gossip_sender, gossip_rx) = tokio::sync::mpsc::channel::<OutboundGossip>(256);
     let gossip_tx = network_settings.enabled.then_some(gossip_sender);
     let task_metrics = Arc::clone(&metrics);
@@ -1417,6 +1438,7 @@ pub fn start(
             network_settings,
             network_chain_id,
             network_genesis_hash,
+            public_testnet_genesis_v1,
             network_store,
             consensus_tx.clone(),
             gossip_rx,

@@ -629,6 +629,7 @@ fn main() -> ExitCode {
             NodeMode::Full
         },
         observer,
+        public_testnet_genesis_v1,
         view_retention_blocks: retention,
         contract_codes,
         social_checkpoint: social,

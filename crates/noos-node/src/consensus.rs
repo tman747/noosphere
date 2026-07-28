@@ -77,7 +77,8 @@ use crate::mempool::{AdmissionEnvelope, AdmitError, Mempool, MempoolConfig, Sour
 use crate::metrics::Metrics;
 use crate::roots::{
     body_cert_root, body_receipt_root, body_ticket_root, body_tx_root, body_witness_root,
-    check_blob_descriptors, da_form_bytes, decode_da_form, sum_usage,
+    check_blob_descriptors, da_form_bytes, decode_da_form, decode_public_testnet_v1_da_form,
+    public_testnet_v1_da_form_bytes, sum_usage,
 };
 use crate::store_port::{
     key_certificate, key_header, key_height, StorePort, KEY_FINALIZED, KEY_HEAD, KEY_JUSTIFIED,
@@ -143,6 +144,9 @@ pub struct NodeConfig {
     /// witnesses. `noosd` enables this only for `--validator` runs against
     /// parameters with `is_test_network = true`.
     pub devnet_fixture_finality: bool,
+    /// Preserve the deployed public-testnet v1 genesis and uncompressed DA
+    /// commitments. The CLI refuses this profile outside test networks.
+    pub public_testnet_genesis_v1: bool,
     /// Height at which every legacy lending market is deterministically
     /// backfilled with a zero-funded StableSafetyV1 object.
     pub stable_safety_activation_height: Option<u64>,
@@ -161,7 +165,26 @@ impl Default for NodeConfig {
             witness_bonds: Vec::new(),
             min_bond: 1,
             devnet_fixture_finality: false,
+            public_testnet_genesis_v1: false,
             stable_safety_activation_height: None,
+        }
+    }
+}
+
+impl NodeConfig {
+    fn da_form_bytes(&self, body: &BlockBodyV1) -> Vec<u8> {
+        if self.public_testnet_genesis_v1 {
+            public_testnet_v1_da_form_bytes(body)
+        } else {
+            da_form_bytes(body)
+        }
+    }
+
+    fn decode_da_form(&self, bytes: &[u8]) -> Result<BlockBodyV1, NodeError> {
+        if self.public_testnet_genesis_v1 {
+            decode_public_testnet_v1_da_form(bytes)
+        } else {
+            decode_da_form(bytes)
         }
     }
 }
@@ -425,6 +448,11 @@ impl<P: StorePort> NodeCore<P> {
         port: P,
         metrics: Arc<Metrics>,
     ) -> Result<Self, NodeError> {
+        if cfg.public_testnet_genesis_v1 != spec.public_testnet_genesis_v1 {
+            return Err(NodeError::Config(
+                "node DA profile differs from genesis compatibility profile".into(),
+            ));
+        }
         let genesis_block_hash = *built
             .header
             .block_hash()
@@ -438,7 +466,7 @@ impl<P: StorePort> NodeCore<P> {
         let tracker = FinalityTracker::genesis(built.chain_id, genesis_checkpoint);
         let mut availability = AvailabilityLedger::new();
         // The node holds the genesis body it just built.
-        let encoded = encode_body(&da_form_bytes(&built.body))?;
+        let encoded = encode_body(&cfg.da_form_bytes(&built.body))?;
         availability.record_encoded(&encoded);
 
         if cfg.contract_codes != spec.contract_codes {
@@ -1738,7 +1766,7 @@ impl<P: StorePort> NodeCore<P> {
         // Stage 0 for the body: canonical decode of the DA form. The
         // receipt-root interchange impossibility is a HEADER decode law;
         // body collection bounds (incl. hard-zero Loom claims) die here.
-        let mut body = decode_da_form(reconstructed.bytes())?;
+        let mut body = self.cfg.decode_da_form(reconstructed.bytes())?;
         body.ground_ticket = GroundTicketWire(*ticket);
 
         if header.evidence_root != ZERO_ROOT {
@@ -2754,7 +2782,7 @@ impl<P: StorePort> NodeCore<P> {
             let exec = self.execute_and_verify(&header, &body)?;
             // Replay updates memory + receipts/indices; the state delta is
             // recommitted so the state CF converges to the replayed branch.
-            let da_bytes = da_form_bytes(&body);
+            let da_bytes = self.cfg.da_form_bytes(&body);
             self.commit_executed_block(hash, &header, &ticket, exec, da_bytes)?;
         }
         Ok(())
@@ -2896,7 +2924,7 @@ impl<P: StorePort> NodeCore<P> {
             .ok_or(NodeError::BodyMismatch {
                 what: "body blob missing",
             })?;
-        let mut body = decode_da_form(&bytes)?;
+        let mut body = self.cfg.decode_da_form(&bytes)?;
         body.ground_ticket = GroundTicketWire(*ticket);
         Ok(body)
     }
@@ -2997,7 +3025,7 @@ impl<P: StorePort> NodeCore<P> {
             // block (no re-commit).
             self.exec_head = hash;
             self.exec_height = header.height;
-            let encoded = encode_body(&da_form_bytes(&body))?;
+            let encoded = encode_body(&self.cfg.da_form_bytes(&body))?;
             self.availability.record_encoded(&encoded);
             self.view.connect_block(&header, hash, exec.receipts);
             if header.height == finalized_height {
@@ -3391,7 +3419,7 @@ impl<P: StorePort> NodeCore<P> {
             let da_worker = scope.spawn(|| {
                 let started = Instant::now();
                 let result = (|| {
-                    let da_bytes = da_form_bytes(&body);
+                    let da_bytes = self.cfg.da_form_bytes(&body);
                     let encoded = encode_body(&da_bytes)?;
                     Ok::<_, NodeError>((da_bytes, encoded))
                 })();

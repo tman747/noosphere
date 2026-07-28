@@ -450,9 +450,9 @@ pub struct GenesisSpec {
     /// is installed as an unspendable zero-balance genesis account, binding
     /// the complete registry to `genesis_hash`.
     pub contract_codes: BTreeMap<Hash32, Vec<u8>>,
-    /// Reconstruct the deployed public-testnet v1 genesis, which predates the
-    /// lending and bridge review records. Missing records remain fail-closed.
-    /// This compatibility profile is refused outside test networks.
+    /// Reconstruct the deployed public-testnet v1 genesis and uncompressed DA
+    /// commitments. The genesis predates lending and bridge review records;
+    /// missing records remain fail-closed. Refused outside test networks.
     pub public_testnet_genesis_v1: bool,
     /// Install the exact Bonsai-27B registration graph at genesis. This is
     /// refused by the ledger unless `params.is_test_network` is true.
@@ -895,7 +895,11 @@ impl GenesisSpec {
 
         // The DA commitment covers the ticket-independent DA form and is
         // therefore fixed BEFORE the nonce search (ch01 §4.3 step 5-6).
-        let da_bytes = crate::roots::da_form_bytes(&body);
+        let da_bytes = if self.public_testnet_genesis_v1 {
+            crate::roots::public_testnet_v1_da_form_bytes(&body)
+        } else {
+            crate::roots::da_form_bytes(&body)
+        };
         let encoded = noos_da::encode_body(&da_bytes)?;
         header.body_da_root = encoded.shard_root().into_bytes();
 
@@ -917,9 +921,14 @@ impl GenesisSpec {
         header.ground_ticket_root = body_ticket_root(&ticket)?;
         body.ground_ticket = GroundTicketWire(ticket);
 
-        // Persist and serve the exact compressed, ticket-independent DA form;
-        // import substitutes the separately validated real ticket.
-        let body_bytes = da_bytes;
+        // Preserve the deployed genesis blob byte-for-byte in the explicit
+        // compatibility profile. Later public-testnet bodies use the
+        // ticket-independent v1 DA form selected by NodeConfig.
+        let body_bytes = if self.public_testnet_genesis_v1 {
+            body.encode_canonical()
+        } else {
+            da_bytes
+        };
 
         // Devnet proposer signature: BLS over the proposal commitment under
         // the registered D-BLS-PROPOSER DST.
@@ -1058,6 +1067,22 @@ mod production_proposal_refusal_tests {
             super::hex32(
                 "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
                 "deployed genesis hash",
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            *deployed.header.block_hash().unwrap().as_bytes(),
+            super::hex32(
+                "7d12787c77b9bbc6e8ff0ffca8e576efe05362404711774c2e57e3a6cf9c2412",
+                "deployed genesis block hash",
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            deployed.header.body_da_root,
+            super::hex32(
+                "bcab9e3bd2ec0310c10e2526e0a8f14deddc8fc23325a5fb080d2ea87b98372e",
+                "deployed genesis DA root",
             )
             .unwrap()
         );
