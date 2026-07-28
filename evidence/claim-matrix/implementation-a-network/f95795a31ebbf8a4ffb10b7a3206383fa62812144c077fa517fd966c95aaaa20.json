@@ -1,0 +1,114 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-p2p\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-p2p\"]}",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-p2p\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-p2p\"]}",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-NETWORK": "4b1d24b49d31b78ab7593637dc8c91b88148516e2bea39771ae39c37155da108"
+  },
+  "claims": [
+    "A-NETWORK"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-NETWORK"
+  ],
+  "evidence_sha256": "f95795a31ebbf8a4ffb10b7a3206383fa62812144c077fa517fd966c95aaaa20",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-network",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 1122,
+        "git_blob": "12df34eaa7be6b7497a0f54221723c38dcd62641",
+        "git_mode": "100644",
+        "path": "crates/noos-p2p/Cargo.toml",
+        "sha256": "3db161c8567dba192cb4a1aa693e3ab5786db52a17dbe41e4d15bce13057c107"
+      },
+      {
+        "bytes": 4019,
+        "git_blob": "56a08548b71c4f2d74130d94e4841717968ec7e5",
+        "git_mode": "100644",
+        "path": "crates/noos-p2p/src/lib.rs",
+        "sha256": "11fb3234ac91a118ba911c2651f499107877c1e3714cc892140a22bccd3245e7"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 4001,
+        "git_blob": "3a9320d991dba39a348dea0b43cf974122537ff2",
+        "git_mode": "100644",
+        "path": "tools/gates/run_implementation_claim.py",
+        "sha256": "f1754f72a93943b1e11fd838d920479474b9d1a59344bb1af9b5f9493872e44f"
+      }
+    ],
+    "manifest_sha256": "eade8f67590735e14de2a9f0ebaaf560fb64fbfe4fa2c0fc0353a2b002f2faab",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

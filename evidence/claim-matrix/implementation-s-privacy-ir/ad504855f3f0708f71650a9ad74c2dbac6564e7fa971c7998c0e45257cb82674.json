@@ -1,0 +1,114 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-umbra\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-umbra\"]}",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-umbra\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-umbra\"]}",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-PRIVACY-IR": "2c376a3cc9bd19043be7a2db07de775af6533f63c714eec90df6267053b3baab"
+  },
+  "claims": [
+    "S-PRIVACY-IR"
+  ],
+  "command": [
+    "tools/gates/run_privacy_claim.py",
+    "--claim",
+    "S-PRIVACY-IR"
+  ],
+  "evidence_sha256": "ad504855f3f0708f71650a9ad74c2dbac6564e7fa971c7998c0e45257cb82674",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-s-privacy-ir",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 592,
+        "git_blob": "764436bbc453680f6feac487ebbf3ed5d27587df",
+        "git_mode": "100644",
+        "path": "crates/noos-umbra/Cargo.toml",
+        "sha256": "23d437aa80e536627b6a8dcfab594b4fbb272d3d98d8781f95595e3fd15dcb8f"
+      },
+      {
+        "bytes": 23336,
+        "git_blob": "91254551aeafb88a9ab9f3191a03b96187a72192",
+        "git_mode": "100644",
+        "path": "crates/noos-umbra/src/privacy_ir.rs",
+        "sha256": "9e3fe38680022af3914e031f630b210536f383ab34a2275785900feeef602edf"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 6297,
+        "git_blob": "52c37e3cfcfdaf3fa97fe3668b67d75010876bda",
+        "git_mode": "100644",
+        "path": "tools/gates/run_privacy_claim.py",
+        "sha256": "52fb8249fec9fd240e706727608a17ab12bd1a2dbe4550975c00aacda10b5381"
+      }
+    ],
+    "manifest_sha256": "77764e1c3e5ed14d6fc61bdd44eb29afab3021cea596f7c58e7b5bb33bd1e0bc",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

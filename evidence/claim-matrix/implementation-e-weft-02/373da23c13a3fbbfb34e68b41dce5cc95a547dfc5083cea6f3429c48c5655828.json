@@ -1,0 +1,163 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-weft-syntax\",\"-p\",\"noos-weft-compile\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-weft-syntax\",\"noos-weft-compile\"]}",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-weft-syntax\",\"-p\",\"noos-weft-compile\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-weft-syntax\",\"noos-weft-compile\"]}",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-WEFT-02": "dc886293d3f7141c4d2f4f15a7b3d5dfa3b099714eb5ce28d7cdcbf67cc716e9"
+  },
+  "claims": [
+    "E-WEFT-02"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "E-WEFT-02"
+  ],
+  "evidence_sha256": "373da23c13a3fbbfb34e68b41dce5cc95a547dfc5083cea6f3429c48c5655828",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-e-weft-02",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 446,
+        "git_blob": "11eac14f6638bd3fc481c9aed1f4332f80a9be65",
+        "git_mode": "100644",
+        "path": "crates/noos-weft-compile/Cargo.toml",
+        "sha256": "3a98d2a6f7ed8a8b7f5b61abfc5bb9ed4dcaf70249ade80a417f27ff93d93fbd"
+      },
+      {
+        "bytes": 42451,
+        "git_blob": "0f6d18560135542c658644d0a312562abd5651d2",
+        "git_mode": "100644",
+        "path": "crates/noos-weft-compile/src/lib.rs",
+        "sha256": "1068f8249503c79a5dce5e5b1baa3954fa6278c2e9b2d4242cf127a93e9b9748"
+      },
+      {
+        "bytes": 8699,
+        "git_blob": "74af19daeb02c6bf7553c7d597a5c7ec6c0f6e93",
+        "git_mode": "100644",
+        "path": "crates/noos-weft-compile/tests/e_weft_02.rs",
+        "sha256": "fc4ccf0a1caf7ebd957821cf05f44af6bfbaae6c4961783bb7f24a4c094f1838"
+      },
+      {
+        "bytes": 240,
+        "git_blob": "724d2819dbf3aa2b76386ec4643dd839ceb26049",
+        "git_mode": "100644",
+        "path": "crates/noos-weft-syntax/Cargo.toml",
+        "sha256": "b410bc82cf5095fdbfe330e8fd3bf413f10bc0af7cd5cc9c4c0233569a2872dc"
+      },
+      {
+        "bytes": 48213,
+        "git_blob": "e3ae0eee59f6611a0d7ec9a1637439a68ef689c0",
+        "git_mode": "100644",
+        "path": "crates/noos-weft-syntax/src/lib.rs",
+        "sha256": "60411238e59320ca44173934d642564a2359091cb034e1f980f22012fe1ebd3f"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 25779,
+        "git_blob": "1724fc0f3deeb0b35558a411c2b2ef802ba39f52",
+        "git_mode": "100644",
+        "path": "protocol/schemas/weft-v0.md",
+        "sha256": "e474a2beab40d1994f83a487a6a7a749d756e9dad7d1ba608402ad63c111341f"
+      },
+      {
+        "bytes": 18346,
+        "git_blob": "cf6f309cc6ab564498740474829cd523eee78796",
+        "git_mode": "100644",
+        "path": "protocol/vectors/weft/weft-cost-v0.json",
+        "sha256": "e2733f5c6d2f81efb0ce6bd6547ff950f09f483b1e3db40914427928a01ffed2"
+      },
+      {
+        "bytes": 6571,
+        "git_blob": "768feea349e7511e939fb80d0abcae839ad3e5cc",
+        "git_mode": "100644",
+        "path": "protocol/vectors/weft/weft-profile-v0.json",
+        "sha256": "2391f6408ef2edf2adb2e65bd2878181f27be5db13988e3d8c8e233c95bde971"
+      },
+      {
+        "bytes": 43130,
+        "git_blob": "b897d0547714754253ee78db15003902952b134d",
+        "git_mode": "100644",
+        "path": "protocol/vectors/weft/weft-refs-v0.json",
+        "sha256": "dfb0f1c1abd23a969e6dcf600576b2c5bdbdae400e691a00a4daf1a7b299604f"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 4001,
+        "git_blob": "3a9320d991dba39a348dea0b43cf974122537ff2",
+        "git_mode": "100644",
+        "path": "tools/gates/run_implementation_claim.py",
+        "sha256": "f1754f72a93943b1e11fd838d920479474b9d1a59344bb1af9b5f9493872e44f"
+      }
+    ],
+    "manifest_sha256": "64fe6d983cf49dbab6160b8a8a4c8be0ee6e00ae77a939ee6691749d35f606aa",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

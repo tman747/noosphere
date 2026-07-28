@@ -1,0 +1,128 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-agent-class\",\"-p\",\"noos-contracts\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-agent-class\",\"noos-contracts\"]}]",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-agent-class\",\"-p\",\"noos-contracts\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-agent-class\",\"noos-contracts\"]}]",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-AGENT": "407bed8fa407eac02e990a5c6a7cc256a2354505e6cf62ef626fb5e26def1e80"
+  },
+  "claims": [
+    "S-AGENT"
+  ],
+  "command": [
+    "tools/gates/run_agent_commerce_claim.py",
+    "--claim",
+    "S-AGENT"
+  ],
+  "evidence_sha256": "0006d163c91a11e0ee96946e6ce1f9d8096451b991e5ee4fd3d8b246401205ba",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-s-agent",
+  "limitations": [
+    "This is deterministic local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 419,
+        "git_blob": "e58029e6750bc21bb8dd2fd49626136d306d66d8",
+        "git_mode": "100644",
+        "path": "crates/noos-agent-class/Cargo.toml",
+        "sha256": "2ddcb38e7a47ae5603301d92cc97707aaaaca359f91cf9f81b87c1b5498b8579"
+      },
+      {
+        "bytes": 41183,
+        "git_blob": "76a9d66df0a1ce340de01660d8b66f0f3e705c68",
+        "git_mode": "100644",
+        "path": "crates/noos-agent-class/src/lib.rs",
+        "sha256": "0479338e036da7e057191f12893a039b7f83a97111f0c34b59ac0ddfd734d318"
+      },
+      {
+        "bytes": 594,
+        "git_blob": "fc226e17346b87b5a116b8aef60655fd96e5b264",
+        "git_mode": "100644",
+        "path": "crates/noos-contracts/Cargo.toml",
+        "sha256": "17780b46cac4e57d2f390215f823095e30392eedcdeb7edc804c8207a2c77e9a"
+      },
+      {
+        "bytes": 30612,
+        "git_blob": "3fc9a490fc44ad5660c95da49fae23a582b10d65",
+        "git_mode": "100644",
+        "path": "crates/noos-contracts/src/router.rs",
+        "sha256": "77e2df7782b001d6998d30afee702784649f8d8bd1fa00a2b4b75913d5a7a694"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 5861,
+        "git_blob": "d3fe0ec290a101f169092616968f9721509ec0de",
+        "git_mode": "100644",
+        "path": "tools/gates/run_agent_commerce_claim.py",
+        "sha256": "8ce7d0a27edcce7df43ba25142112890fa7dfc3c137726f07dc76e8bd7c81cb7"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      }
+    ],
+    "manifest_sha256": "f6f3240d5d1ea42e306a7431aad00dc567d345880583543a0e54f376bf061c25",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

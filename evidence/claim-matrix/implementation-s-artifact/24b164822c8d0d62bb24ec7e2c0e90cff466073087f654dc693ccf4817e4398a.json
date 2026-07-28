@@ -1,0 +1,122 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-species\",\"artifact::tests::\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"filter\":\"artifact::tests::\",\"log_sha256\":\"49e09e2036e46fddf1f64c5e6da12c61a0082944d1016567ba664f16b2964c9c\",\"package\":\"noos-species\"}",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-species\",\"artifact::tests::\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"filter\":\"artifact::tests::\",\"log_sha256\":\"49e09e2036e46fddf1f64c5e6da12c61a0082944d1016567ba664f16b2964c9c\",\"package\":\"noos-species\"}",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-ARTIFACT": "5df76eaddebc8c28364e1ed62e2e98c46bf10cc78483201d4a5a4e17fa3e93af"
+  },
+  "claims": [
+    "S-ARTIFACT"
+  ],
+  "command": [
+    "tools/gates/run_species_reaction_claim.py",
+    "--claim",
+    "S-ARTIFACT"
+  ],
+  "evidence_sha256": "24b164822c8d0d62bb24ec7e2c0e90cff466073087f654dc693ccf4817e4398a",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-s-artifact",
+  "limitations": [
+    "The local erasure profile deliberately supports one XOR parity shard and declares a one-shard loss bound; broader Reed-Solomon profiles are not claimed.",
+    "No production promoted-artifact corpus or geographic E-WAN-01 run is represented by this local evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 229,
+        "git_blob": "06a4955a0642be2d272f3ff90fc9faf18a4f2a03",
+        "git_mode": "100644",
+        "path": "crates/noos-species/Cargo.toml",
+        "sha256": "0fad298a5f6b132ea9ca609fad23cbd251c0feb5340d4376d4d8a43e60466e4c"
+      },
+      {
+        "bytes": 29839,
+        "git_blob": "922a7504f709d66397d7b7093089c59181256864",
+        "git_mode": "100644",
+        "path": "crates/noos-species/src/artifact.rs",
+        "sha256": "3e33152f3a3e12e688c595c246a77a0feb6764dbe7211c9782f1435701a19760"
+      },
+      {
+        "bytes": 31984,
+        "git_blob": "2fbbe3967e50ee14fe3da005400d4fdcde258ab1",
+        "git_mode": "100644",
+        "path": "crates/noos-species/src/lib.rs",
+        "sha256": "cb9eb7f249e49fd5d692671d60521e2d5d79cbd0025a25306b996f60a9a2aec4"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 7818,
+        "git_blob": "2373d96cf6f808550d8d32d63bbfc4b863c474d1",
+        "git_mode": "100644",
+        "path": "tools/gates/run_species_reaction_claim.py",
+        "sha256": "0fa529cc4ea00fa51a1d586177d22759faafeb15ef0fc8dda955be0e59c85711"
+      }
+    ],
+    "manifest_sha256": "a8f85b8216f7d4f76a290b4e548b40d6efcaa97dd18e1862ec955391b0baee7f",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

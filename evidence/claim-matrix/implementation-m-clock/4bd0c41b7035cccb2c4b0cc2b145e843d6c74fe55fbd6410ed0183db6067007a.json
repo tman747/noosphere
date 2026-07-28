@@ -1,0 +1,156 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-reflex\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-reflex\"]},{\"cases\":100000,\"corpus_sha256\":\"59da008c5bc4fea38bda7f9e6e64caba30e3efd4b20a4f3d27ca8bc4edcc32d0\",\"go_command\":[\"go\",\"run\",\"./cmd/mclockdiff\"],\"passed\":true,\"rust_command\":[\"cargo\",\"run\",\"--quiet\",\"--locked\",\"-p\",\"noos-reflex\",\"--bin\",\"m-clock-diff\"],\"winner_sha256\":\"7e5237e71e655d36f504235550c0d987d13c847d382734e8549d11e804d664a6\"}]",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-reflex\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-reflex\"]},{\"cases\":100000,\"corpus_sha256\":\"59da008c5bc4fea38bda7f9e6e64caba30e3efd4b20a4f3d27ca8bc4edcc32d0\",\"go_command\":[\"go\",\"run\",\"./cmd/mclockdiff\"],\"passed\":true,\"rust_command\":[\"cargo\",\"run\",\"--quiet\",\"--locked\",\"-p\",\"noos-reflex\",\"--bin\",\"m-clock-diff\"],\"winner_sha256\":\"7e5237e71e655d36f504235550c0d987d13c847d382734e8549d11e804d664a6\"}]",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-CLOCK": "0affd55bc442d6117f17160beb304e629a16cacd6407d559bc63d9a8961e46a4"
+  },
+  "claims": [
+    "M-CLOCK"
+  ],
+  "command": [
+    "tools/gates/run_identity_reflex_claim.py",
+    "--claim",
+    "M-CLOCK"
+  ],
+  "evidence_sha256": "4bd0c41b7035cccb2c4b0cc2b145e843d6c74fe55fbd6410ed0183db6067007a",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-m-clock",
+  "limitations": [
+    "This is complete local two-client implementation evidence, not independent-vendor, public-duration, or production promotion evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 3362,
+        "git_blob": "80f86c4fb26be1cfa66590e822a1279b9572d487",
+        "git_mode": "100644",
+        "path": "crates/noos-braid/src/fork.rs",
+        "sha256": "2f44685d1b742e057c4330e39a025b9ad6e1ce7214064f0c870cdee71c5eed1f"
+      },
+      {
+        "bytes": 610,
+        "git_blob": "6b4f7cf2b7cab0524675789d67e65077175d72ab",
+        "git_mode": "100644",
+        "path": "crates/noos-reflex/Cargo.toml",
+        "sha256": "f947bf21e9789a7124212b141949b5d41d95544ade491c6caf07c6b33023c581"
+      },
+      {
+        "bytes": 1577,
+        "git_blob": "91656c03b4b2979a4a77095e0e6e36f3aed0bde7",
+        "git_mode": "100644",
+        "path": "crates/noos-reflex/src/bin/m-clock-diff.rs",
+        "sha256": "2ac1f8bcdc55204433a608e4f8a277d90ab5037a421882624fa09db9d4bfdaf1"
+      },
+      {
+        "bytes": 10773,
+        "git_blob": "0eb906984a73400d5a070f44bc15a43f5584e84c",
+        "git_mode": "100644",
+        "path": "crates/noos-reflex/src/clock.rs",
+        "sha256": "f921fd9186bf5b7d79adcbad68c632090d98473a01789a65d0b8682049c89be6"
+      },
+      {
+        "bytes": 40125,
+        "git_blob": "b7f497052fc3da1ba202eac5ba04e748dc286624",
+        "git_mode": "100644",
+        "path": "crates/noos-reflex/src/identity.rs",
+        "sha256": "ea6b560a2805d814275d44265acfcae9f145ca0515c29f99bca74241a8f07ad3"
+      },
+      {
+        "bytes": 40834,
+        "git_blob": "655e0c4b9cbf58162251f8c34552e6f3f8b35589",
+        "git_mode": "100644",
+        "path": "crates/noos-reflex/src/lib.rs",
+        "sha256": "2f2977f64306c1d44c7d78ece6ad56f95e6e38850db961b6da7aae2012b1cc19"
+      },
+      {
+        "bytes": 1375,
+        "git_blob": "e3b504e47e5737588f5be4f505566decb5a19f9c",
+        "git_mode": "100644",
+        "path": "go/braidref/forkchoice.go",
+        "sha256": "c06976d763e0e996f832ff52fdfdbfa61a53829ab31ca76d9cbce93855213f57"
+      },
+      {
+        "bytes": 1434,
+        "git_blob": "1e4d06334aa40b7dcf7215024d715c5c14e685f8",
+        "git_mode": "100644",
+        "path": "go/cmd/mclockdiff/main.go",
+        "sha256": "70772c92bdfc16bd3178203f381e49df569940c1c2f6aef6aeac0abc30ecce5a"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 8721,
+        "git_blob": "56f3c75c343f71bbaf5d284eeabe9dc04f4701ed",
+        "git_mode": "100644",
+        "path": "tools/gates/run_identity_reflex_claim.py",
+        "sha256": "8459678c3775c16b21512684ea7c182027d667794f3f1a93d8a970fa55ffed91"
+      }
+    ],
+    "manifest_sha256": "265391320e7e70d7244ec3a97489e9f8f48abeef29cd3ff606335acd9dc3f544",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"local\":{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-reflex\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-reflex\"]},\"sweep\":{\"artifact_sha256\":{\"C:/tmp/dream-lane/results-v2-p0.json\":\"fd05e1672ff50bc531d96874c15bad7a9e63e88e4c6613256c578439869b95a4\",\"C:/tmp/dream-lane/results-v2-p1084.json\":\"f6b3679b7868290cf9fe80027f6a4ef17eb76421d97ff753b2f2676f052cce62\",\"C:/tmp/dream-lane/results-v2-p271.json\":\"abdd8c6e192bb2c1dcba1cbb839f0baf4276aa2076750ac7c08ea86bace103d6\",\"C:/tmp/dream-lane/results-v2-p542.json\":\"d439b21219ae2b8563d18edc00acce88008ac25a5186c627a48495cc2866a2cb\",\"C:/tmp/dream-lane/results-v2-p813.json\":\"ef59e0efe344b7bf231f30d5bff4f5c9c5473808857cdaeda9b8fe3542c85fa1\"},\"common_manipulator_entry_uT_per_event\":\"1605.6299\",\"eligible_passes\":[],\"events_per_arm\":100000,\"name\":\"frozen preregistered premium sweep re-evaluation\",\"passed\":true,\"quality_threshold_mB\":\"75\",\"rows\":[{\"eligible\":false,\"honest_net_uT_per_event\":\"1139.0996\",\"main_improve_mB\":\"167.54353582132964\",\"manip_arm_improve_mB\":\"176.8064171907344\",\"manipulator_excluded\":true,\"manipulator_net_uT_per_event\":\"0.0\",\"passes\":false,\"premium_uT\":0},{\"eligible\":false,\"honest_net_uT_per_event\":\"1139.0996\",\"main_improve_mB\":\"167.64290868412635\",\"manip_arm_improve_mB\":\"215.09295823470697\",\"manipulator_excluded\":false,\"manipulator_net_uT_per_event\":\"1334.6299\",\"passes\":false,\"premium_uT\":271},{\"eligible\":true,\"honest_net_uT_per_event\":\"1139.0996\",\"main_improve_mB\":\"167.64290868412635\",\"manip_arm_improve_mB\":\"215.09295823470697\",\"manipulator_excluded\":false,\"manipulator_net_uT_per_event\":\"1063.6299\",\"passes\":false,\"premium_uT\":542},{\"eligible\":true,\"honest_net_uT_per_event\":\"1139.0996\",\"main_improve_mB\":\"167.64290868412635\",\"manip_arm_improve_mB\":\"215.09295823470697\",\"manipulator_excluded\":false,\"manipulator_net_uT_per_event\":\"792.6299\",\"passes\":false,\"premium_uT\":813},{\"eligible\":true,\"honest_net_uT_per_event\":\"1139.0996\",\"main_improve_mB\":\"167.64290868412635\",\"manip_arm_improve_mB\":\"215.09295823470697\",\"manipulator_excluded\":false,\"manipulator_net_uT_per_event\":\"521.6299\",\"passes\":false,\"premium_uT\":1084}],\"seed\":20260710,\"verdict\":\"KILLED\"}}",
+      "id": "registered-falsifier",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"controls\":[\"dream_lane_enabled\"]}",
+      "id": "activation-controls-disabled",
+      "kind": "disabled_control",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-DREAM-02": "313feee1bdd62755aa8a739e9d654666da32e98969caf96e6ac54318e7d43efd"
+  },
+  "claims": [
+    "E-DREAM-02"
+  ],
+  "command": [
+    "tools/gates/run_dream_chorus_claim.py",
+    "--claim",
+    "E-DREAM-02"
+  ],
+  "evidence_sha256": "446a3a5411ff3e5b785a19218e3b9eddca616f4054821da67d0f57c4d84d7fec",
+  "expected_result": "KILLED",
+  "gate": "e-dream-02-kill",
+  "limitations": [
+    "The frozen simulator artifacts are re-evaluated, not represented as independent or cross-vendor evidence.",
+    "The repository module is a deterministic instrument/lifecycle precursor; it does not regenerate the 100,000-event arms.",
+    "The kill is preserved without sweep extension or threshold adjustment."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "KILLED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 610,
+        "git_blob": "6b4f7cf2b7cab0524675789d67e65077175d72ab",
+        "git_mode": "100644",
+        "path": "crates/noos-reflex/Cargo.toml",
+        "sha256": "f947bf21e9789a7124212b141949b5d41d95544ade491c6caf07c6b33023c581"
+      },
+      {
+        "bytes": 52343,
+        "git_blob": "fe13558c1a28af46f8fc4839f2d4281ee9b52363",
+        "git_mode": "100644",
+        "path": "crates/noos-reflex/src/dream.rs",
+        "sha256": "27d73a5dcd36a8d2999478af4857f732875fccba989ec705e170074071a70128"
+      },
+      {
+        "bytes": 40834,
+        "git_blob": "655e0c4b9cbf58162251f8c34552e6f3f8b35589",
+        "git_mode": "100644",
+        "path": "crates/noos-reflex/src/lib.rs",
+        "sha256": "2f2977f64306c1d44c7d78ece6ad56f95e6e38850db961b6da7aae2012b1cc19"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 30076,
+        "git_blob": "8c8a6c498c37e1d1b0322cff5653f8bcf26178cb",
+        "git_mode": "100644",
+        "path": "protocol/spec/constants-v1.toml",
+        "sha256": "eaaf1a9680aab2cba1b8b972e2e80123b6ce27cfe84c5f02fb5c44bb68ec693e"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 11952,
+        "git_blob": "ae2a3fc15de3c78d1ce315b41a4849ff93f13a3e",
+        "git_mode": "100644",
+        "path": "tools/gates/run_dream_chorus_claim.py",
+        "sha256": "9f7d6d5981f306d1cf2f76286adfbd89ac11cae0405b9403b415fe46a473238f"
+      }
+    ],
+    "manifest_sha256": "4bd522fdaf04167331cd92ab4bd422ce1275b9264dcfa45127c6162828a2d60a",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

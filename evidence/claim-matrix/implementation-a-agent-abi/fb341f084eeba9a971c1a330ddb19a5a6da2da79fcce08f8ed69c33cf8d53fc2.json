@@ -1,0 +1,128 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-contracts\",\"-p\",\"noos-node\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-contracts\",\"noos-node\"]}",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-contracts\",\"-p\",\"noos-node\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-contracts\",\"noos-node\"]}",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-AGENT-ABI": "b43314d077a69c7bbe04704d02522c3744136cdba808d9f1abbb8dabf7aecb1e"
+  },
+  "claims": [
+    "A-AGENT-ABI"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "A-AGENT-ABI"
+  ],
+  "evidence_sha256": "fb341f084eeba9a971c1a330ddb19a5a6da2da79fcce08f8ed69c33cf8d53fc2",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-agent-abi",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 594,
+        "git_blob": "fc226e17346b87b5a116b8aef60655fd96e5b264",
+        "git_mode": "100644",
+        "path": "crates/noos-contracts/Cargo.toml",
+        "sha256": "17780b46cac4e57d2f390215f823095e30392eedcdeb7edc804c8207a2c77e9a"
+      },
+      {
+        "bytes": 15543,
+        "git_blob": "429e2fe3a675ccd57e3bf44a2442bc54e8aaafeb",
+        "git_mode": "100644",
+        "path": "crates/noos-contracts/src/lib.rs",
+        "sha256": "9459ffd0fd3cddabb8935ab3bfc39dbf9e04a53cd3ba3f6d52933981bc18d962"
+      },
+      {
+        "bytes": 1561,
+        "git_blob": "6c72a72afc72b9e302dfcf0c556f3a3be5303fc9",
+        "git_mode": "100644",
+        "path": "crates/noos-node/Cargo.toml",
+        "sha256": "1ce810898db25b0f4f3007d1b8d757e7f50045c675e2b2672243c9618721afba"
+      },
+      {
+        "bytes": 9844,
+        "git_blob": "96c0f54e48514633fdba078ad866983149e82934",
+        "git_mode": "100644",
+        "path": "crates/noos-node/src/lib.rs",
+        "sha256": "50b23f73a3ad054da3b4ff1855ded79a6eacbf8ee850c91c551058c64001a575"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 4001,
+        "git_blob": "3a9320d991dba39a348dea0b43cf974122537ff2",
+        "git_mode": "100644",
+        "path": "tools/gates/run_implementation_claim.py",
+        "sha256": "f1754f72a93943b1e11fd838d920479474b9d1a59344bb1af9b5f9493872e44f"
+      }
+    ],
+    "manifest_sha256": "234aa210d1dc22a900d799ec2e55d1539627e96f8810dda8f2ccff7237161d47",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

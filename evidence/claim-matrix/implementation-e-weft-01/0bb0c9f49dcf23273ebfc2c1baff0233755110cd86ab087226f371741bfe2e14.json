@@ -1,0 +1,177 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-weft-syntax\",\"-p\",\"noos-weft-compile\",\"-p\",\"noos-weftc\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-weft-syntax\",\"noos-weft-compile\",\"noos-weftc\"]}",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-weft-syntax\",\"-p\",\"noos-weft-compile\",\"-p\",\"noos-weftc\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-weft-syntax\",\"noos-weft-compile\",\"noos-weftc\"]}",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-WEFT-01": "e77950b1e1192c174db1d170981b068ed9390884e39620cd501d075f7697a2b5"
+  },
+  "claims": [
+    "E-WEFT-01"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "E-WEFT-01"
+  ],
+  "evidence_sha256": "0bb0c9f49dcf23273ebfc2c1baff0233755110cd86ab087226f371741bfe2e14",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-e-weft-01",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 446,
+        "git_blob": "11eac14f6638bd3fc481c9aed1f4332f80a9be65",
+        "git_mode": "100644",
+        "path": "crates/noos-weft-compile/Cargo.toml",
+        "sha256": "3a98d2a6f7ed8a8b7f5b61abfc5bb9ed4dcaf70249ade80a417f27ff93d93fbd"
+      },
+      {
+        "bytes": 42451,
+        "git_blob": "0f6d18560135542c658644d0a312562abd5651d2",
+        "git_mode": "100644",
+        "path": "crates/noos-weft-compile/src/lib.rs",
+        "sha256": "1068f8249503c79a5dce5e5b1baa3954fa6278c2e9b2d4242cf127a93e9b9748"
+      },
+      {
+        "bytes": 10665,
+        "git_blob": "46cbabe57502679ea1c151514d0d7cd364f95778",
+        "git_mode": "100644",
+        "path": "crates/noos-weft-compile/tests/e_weft_01.rs",
+        "sha256": "f9b5ffc0e97266269f9b3b6b08789ecf8a3f4f291699d0120d5bd51eb8156238"
+      },
+      {
+        "bytes": 240,
+        "git_blob": "724d2819dbf3aa2b76386ec4643dd839ceb26049",
+        "git_mode": "100644",
+        "path": "crates/noos-weft-syntax/Cargo.toml",
+        "sha256": "b410bc82cf5095fdbfe330e8fd3bf413f10bc0af7cd5cc9c4c0233569a2872dc"
+      },
+      {
+        "bytes": 48213,
+        "git_blob": "e3ae0eee59f6611a0d7ec9a1637439a68ef689c0",
+        "git_mode": "100644",
+        "path": "crates/noos-weft-syntax/src/lib.rs",
+        "sha256": "60411238e59320ca44173934d642564a2359091cb034e1f980f22012fe1ebd3f"
+      },
+      {
+        "bytes": 372,
+        "git_blob": "d973e47292b993e5b9efb9b6282e0d6490cd0593",
+        "git_mode": "100644",
+        "path": "crates/noos-weftc/Cargo.toml",
+        "sha256": "af5c5012d0cccff78315998b7fef645af7dd4b3de19edb980d7c60e8f25344b8"
+      },
+      {
+        "bytes": 1800,
+        "git_blob": "2b23ebfdb331e1f4584f05df55685cb15f3667f1",
+        "git_mode": "100644",
+        "path": "crates/noos-weftc/src/main.rs",
+        "sha256": "f1c7c72fcd23f1be11a1c95795ede7aae6dcb1f457ca76c64ea4a187a41e03ae"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 25779,
+        "git_blob": "1724fc0f3deeb0b35558a411c2b2ef802ba39f52",
+        "git_mode": "100644",
+        "path": "protocol/schemas/weft-v0.md",
+        "sha256": "e474a2beab40d1994f83a487a6a7a749d756e9dad7d1ba608402ad63c111341f"
+      },
+      {
+        "bytes": 18346,
+        "git_blob": "cf6f309cc6ab564498740474829cd523eee78796",
+        "git_mode": "100644",
+        "path": "protocol/vectors/weft/weft-cost-v0.json",
+        "sha256": "e2733f5c6d2f81efb0ce6bd6547ff950f09f483b1e3db40914427928a01ffed2"
+      },
+      {
+        "bytes": 6571,
+        "git_blob": "768feea349e7511e939fb80d0abcae839ad3e5cc",
+        "git_mode": "100644",
+        "path": "protocol/vectors/weft/weft-profile-v0.json",
+        "sha256": "2391f6408ef2edf2adb2e65bd2878181f27be5db13988e3d8c8e233c95bde971"
+      },
+      {
+        "bytes": 43130,
+        "git_blob": "b897d0547714754253ee78db15003902952b134d",
+        "git_mode": "100644",
+        "path": "protocol/vectors/weft/weft-refs-v0.json",
+        "sha256": "dfb0f1c1abd23a969e6dcf600576b2c5bdbdae400e691a00a4daf1a7b299604f"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 4001,
+        "git_blob": "3a9320d991dba39a348dea0b43cf974122537ff2",
+        "git_mode": "100644",
+        "path": "tools/gates/run_implementation_claim.py",
+        "sha256": "f1754f72a93943b1e11fd838d920479474b9d1a59344bb1af9b5f9493872e44f"
+      }
+    ],
+    "manifest_sha256": "60d4fad9632baa417a566ddc52805e4ad5890fb0ffb4510943bd04272c4538c8",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}
