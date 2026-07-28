@@ -93,6 +93,25 @@ impl FeeParamsV1 {
             min_activation_delay: 16,
         }
     }
+
+    /// Exact fee parameters committed by the deployed public-testnet v1
+    /// genesis. This identity fixture is only selected by the node's explicit,
+    /// test-network-only compatibility profile.
+    #[must_use]
+    pub fn public_testnet_genesis_v1_fixture() -> Self {
+        Self {
+            min_price: 1,
+            max_price: 1_000_000,
+            max_change_ppm: 125_000,
+            capacity_b: 1_048_576,
+            capacity_g: 100_000_000,
+            capacity_v: 100_000,
+            capacity_r: 1_000_000,
+            capacity_d: 4_194_304,
+            failure_fee: 1_000,
+            min_activation_delay: 16,
+        }
+    }
 }
 
 impl FeeStateV1 {

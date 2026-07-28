@@ -3664,8 +3664,14 @@ name = "noos-commerce"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "ed25519-dalek",
  "noos-lumen",
+ "noos-stable-operator",
+ "noos-stable-safety",
+ "noos-wallet",
  "noos-work-loom",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3816,6 +3822,7 @@ dependencies = [
  "noos-codec",
  "noos-crypto",
  "noos-stable-safety",
+ "sha2",
  "smallvec",
 ]
 
@@ -3823,6 +3830,7 @@ dependencies = [
 name = "noos-mind"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "hex",
  "noos-crypto",
  "serde",
@@ -3884,6 +3892,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "ctrlc",
+ "ed25519-dalek",
  "getrandom 0.2.17",
  "lz4_flex",
  "noos-braid",
@@ -3898,6 +3907,8 @@ dependencies = [
  "noos-store",
  "noos-witness",
  "serde_json",
+ "sha2",
+ "tempfile",
  "tokio",
 ]
 

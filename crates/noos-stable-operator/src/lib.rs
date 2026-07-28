@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+pub mod oracle_controls;
 
 use reqwest::blocking::Client;
 use serde::de::DeserializeOwned;

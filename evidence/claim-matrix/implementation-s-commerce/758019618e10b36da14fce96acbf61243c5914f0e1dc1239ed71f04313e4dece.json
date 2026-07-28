@@ -1,0 +1,114 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-commerce\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-commerce\"]}]",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-commerce\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-commerce\"]}]",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-COMMERCE": "40b9fad74acc3cafca62af1ae55aa4f1e6f087cf327f1650c47cd44c4a991b26"
+  },
+  "claims": [
+    "S-COMMERCE"
+  ],
+  "command": [
+    "tools/gates/run_agent_commerce_claim.py",
+    "--claim",
+    "S-COMMERCE"
+  ],
+  "evidence_sha256": "758019618e10b36da14fce96acbf61243c5914f0e1dc1239ed71f04313e4dece",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-s-commerce",
+  "limitations": [
+    "This is deterministic local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 525,
+        "git_blob": "2a911c7e6443536a2b6e6d42791fda628e195455",
+        "git_mode": "100644",
+        "path": "crates/noos-commerce/Cargo.toml",
+        "sha256": "e6ac1f33284daf4158e822cc28cb3dda3909d4d6047f3c601e86dad7974d9224"
+      },
+      {
+        "bytes": 57319,
+        "git_blob": "e9f6b0dfb305cb55805c043b6fa3d77dc969f3c1",
+        "git_mode": "100644",
+        "path": "crates/noos-commerce/src/lib.rs",
+        "sha256": "4e993880a4f0d087e48e8beb41f9a76278a05f650328bd4dc66ca280b4664c88"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 5861,
+        "git_blob": "d3fe0ec290a101f169092616968f9721509ec0de",
+        "git_mode": "100644",
+        "path": "tools/gates/run_agent_commerce_claim.py",
+        "sha256": "8ce7d0a27edcce7df43ba25142112890fa7dfc3c137726f07dc76e8bd7c81cb7"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      }
+    ],
+    "manifest_sha256": "3ca10751afeda0aaebeb7de3d8fd73eb4c8063ed169eeb8678c83f0ca1d9776c",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

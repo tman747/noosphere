@@ -98,6 +98,7 @@ pub fn node_config() -> NodeConfig {
 pub fn boot_node(dir: &std::path::Path, cfg: NodeConfig) -> NodeCore<InProcStore> {
     let mut spec = spec();
     spec.contract_codes = cfg.contract_codes.clone();
+    spec.public_testnet_genesis_v1 = cfg.public_testnet_genesis_v1;
     let built = spec.build().expect("genesis build");
     let port = InProcStore::open(dir.to_path_buf(), &built.chain_id, &built.genesis_hash)
         .expect("store open");

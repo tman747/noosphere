@@ -8,6 +8,7 @@
 
 use noos_crypto::{hash_domain, verify_domain, DomainId, Keypair, PublicKey, Signature};
 use std::collections::{BTreeMap, BTreeSet};
+pub mod assurance;
 
 pub mod service;
 pub mod snapshot;

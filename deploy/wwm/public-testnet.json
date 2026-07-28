@@ -59,7 +59,8 @@
     "artifact_store_api": "127.0.0.1:29682",
     "web_capacity_coordinator": "127.0.0.1:29772",
     "inference_worker_sidecar": "127.0.0.1:29807",
-    "prometheus": "127.0.0.1:29901"
+    "prometheus": "127.0.0.1:29901",
+    "mindscan": "127.0.0.1:29830"
   },
   "public_endpoints": {
     "site": "https://wwm.mindchain.network",
@@ -67,7 +68,8 @@
     "status": "https://wwm-status.mindchain.network",
     "artifacts": "https://wwm-artifacts.mindchain.network",
     "neural_explorer": "https://wwm.mindchain.network/neural.html",
-    "neural_manifest": "https://wwm.mindchain.network/neural-manifest.json"
+    "neural_manifest": "https://wwm.mindchain.network/neural-manifest.json",
+    "mindscan": "https://wwm.mindchain.network/mindscan"
   },
   "neural_publisher": {
     "schema": "noos/wwm-neural-publisher-state/v1",

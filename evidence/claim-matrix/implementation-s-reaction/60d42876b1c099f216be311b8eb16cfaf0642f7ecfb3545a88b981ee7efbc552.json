@@ -1,0 +1,149 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-training\",\"claim_reaction\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"filter\":\"claim_reaction\",\"log_sha256\":\"13435f76cf4c032e995f39b17eb8fc0e7f45fbd0461643070bd578c3d389b61d\",\"package\":\"noos-training\"}",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-training\",\"claim_reaction\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"filter\":\"claim_reaction\",\"log_sha256\":\"13435f76cf4c032e995f39b17eb8fc0e7f45fbd0461643070bd578c3d389b61d\",\"package\":\"noos-training\"}",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "S-REACTION": "ba01f78b76e9c475ab0b0bc99b982dd4e8448d8a8182f07686b5e17046abbe16"
+  },
+  "claims": [
+    "S-REACTION"
+  ],
+  "command": [
+    "tools/gates/run_species_reaction_claim.py",
+    "--claim",
+    "S-REACTION"
+  ],
+  "evidence_sha256": "60d42876b1c099f216be311b8eb16cfaf0642f7ecfb3545a88b981ee7efbc552",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-s-reaction",
+  "limitations": [
+    "This proves the local immutable transition, reproduction, delay, challenge, replay, and pointer rollback laws; it is not production or independent-operator evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 229,
+        "git_blob": "06a4955a0642be2d272f3ff90fc9faf18a4f2a03",
+        "git_mode": "100644",
+        "path": "crates/noos-species/Cargo.toml",
+        "sha256": "0fad298a5f6b132ea9ca609fad23cbd251c0feb5340d4376d4d8a43e60466e4c"
+      },
+      {
+        "bytes": 4885,
+        "git_blob": "d25284d185892fc9ff8f8bd4199e14cee2743a74",
+        "git_mode": "100644",
+        "path": "crates/noos-species/src/canonical.rs",
+        "sha256": "8af04645483584febb198f4d0e6d2944e68d5896dd0b2517044459dcf7cfd7cd"
+      },
+      {
+        "bytes": 31984,
+        "git_blob": "2fbbe3967e50ee14fe3da005400d4fdcde258ab1",
+        "git_mode": "100644",
+        "path": "crates/noos-species/src/lib.rs",
+        "sha256": "cb9eb7f249e49fd5d692671d60521e2d5d79cbd0025a25306b996f60a9a2aec4"
+      },
+      {
+        "bytes": 7930,
+        "git_blob": "376d21d7c953dbd9097f76e39f74d18d7f3eecd0",
+        "git_mode": "100644",
+        "path": "crates/noos-species/src/update.rs",
+        "sha256": "212a6542888ec902ab42abc1b69d12f1d3c40cb20463e2ab6639c403905237e2"
+      },
+      {
+        "bytes": 461,
+        "git_blob": "4d77f6ac563593630e4191572c4dab446db9deda",
+        "git_mode": "100644",
+        "path": "crates/noos-training/Cargo.toml",
+        "sha256": "7d7194458c14aef6afcda02c194797e07d903a44bc88ff261e2489ace778dd4d"
+      },
+      {
+        "bytes": 36575,
+        "git_blob": "b32d37d68c668d879f1500fe8f393ff66ed37097",
+        "git_mode": "100644",
+        "path": "crates/noos-training/src/lib.rs",
+        "sha256": "b9331a428805b2fbfdda0f9482c67afcd0c1eec19752c554329a3c6d42a75a72"
+      },
+      {
+        "bytes": 17803,
+        "git_blob": "339aa71e70776f30c083b14b383b3e10d904c545",
+        "git_mode": "100644",
+        "path": "crates/noos-training/src/reaction.rs",
+        "sha256": "12691b920bf283e90019c610d1be33142d32a1fbd2a76152897c1a59aac42a59"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 7818,
+        "git_blob": "2373d96cf6f808550d8d32d63bbfc4b863c474d1",
+        "git_mode": "100644",
+        "path": "tools/gates/run_species_reaction_claim.py",
+        "sha256": "0fa529cc4ea00fa51a1d586177d22759faafeb15ef0fc8dda955be0e59c85711"
+      }
+    ],
+    "manifest_sha256": "1cb5f4f40555eb12889d1b112b1935b16ea8ee2f716c7a43d00fc1e0efd20eeb",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

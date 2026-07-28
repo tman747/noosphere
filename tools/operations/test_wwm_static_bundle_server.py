@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import http.server
+import http.client
 import json
 import tempfile
 import threading
@@ -133,6 +134,19 @@ class StaticBundleServerTests(unittest.TestCase):
         self.assertEqual(status, 416)
         self.assertEqual(headers["Content-Range"], f"bytes */{static_host.SHARE_BYTES}")
         self.assertEqual(json.loads(body)["error"]["code"], "RANGE_NOT_SATISFIABLE")
+
+    def test_idle_keep_alive_client_does_not_block_health_checks(self) -> None:
+        blocker = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        self.addCleanup(blocker.close)
+        blocker.request("GET", "/healthz", headers={"Connection": "keep-alive"})
+        blocker_response = blocker.getresponse()
+        self.assertEqual(blocker_response.status, 200)
+        blocker_response.read()
+        self.assertFalse(blocker_response.will_close)
+
+        status, _, body = self.request("/healthz")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["status"], "ok")
 
     def test_paths_and_mutations_fail_closed_and_config_rejects_origin_mismatch(self) -> None:
         status, headers, body = self.request("/shares/../../LICENSE.txt")

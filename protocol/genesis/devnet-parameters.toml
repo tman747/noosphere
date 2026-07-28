@@ -44,8 +44,8 @@ min_bond_micro_noos_test = 1000000000000
 min_bond_is_test_fixture = true
 
 [controls]
-# The six genesis controls (plan §1.5, §6.8). ALL radical controls are off at
-# genesis on every network; devnet is no exception.
+# All ten genesis controls are fail-closed on every network; devnet is no
+# exception. Review gates remain off until an exact reviewed hard fork.
 work_loom_credit_enabled = false
 work_loom_weight_cap = 0
 witness_proofpower_bonus_enabled = false
@@ -54,6 +54,8 @@ reflex_lane_enabled = false
 umbra_suite_enabled = false     # applies to every Umbra suite; none registered
 dream_lane_enabled = false
 class_gate_irreversible_budget = 0
+lending_reviewed_enabled = false
+bridge_reviewed_enabled = false
 
 [faucet]
 # Fixed valueless faucet fixture (plan §2.5). The Ed25519 SIGNING SEED is the

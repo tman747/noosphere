@@ -64,6 +64,48 @@ class MultiNodeFaultHarnessTests(unittest.TestCase):
             relay.close()
             echo.close()
 
+    def test_udp_relay_isolates_clients_and_accounts_wan_impairment(self) -> None:
+        echo = UdpEcho()
+        relay_port = harness.reserve_port(socket.SOCK_DGRAM)
+        relay = harness.UdpRelay(relay_port, echo.port)
+        isolated = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        healthy = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        isolated.bind(("127.0.0.1", 0))
+        healthy.bind(("127.0.0.1", 0))
+        isolated.settimeout(0.3)
+        healthy.settimeout(0.3)
+        isolated_port = int(isolated.getsockname()[1])
+        try:
+            isolated.sendto(b"map-isolated", ("127.0.0.1", relay_port))
+            healthy.sendto(b"map-healthy", ("127.0.0.1", relay_port))
+            self.assertEqual(isolated.recvfrom(64)[0], b"map-isolated")
+            self.assertEqual(healthy.recvfrom(64)[0], b"map-healthy")
+            relay.partition({isolated_port})
+            isolated.sendto(b"drop", ("127.0.0.1", relay_port))
+            healthy.sendto(b"pass", ("127.0.0.1", relay_port))
+            with self.assertRaises(socket.timeout):
+                isolated.recvfrom(64)
+            self.assertEqual(healthy.recvfrom(64)[0], b"pass")
+            relay.heal({isolated_port})
+            relay.impair(
+                loss_permille=0,
+                latency_ms=25,
+                client_ports={isolated_port},
+            )
+            started = time.monotonic()
+            isolated.sendto(b"delayed", ("127.0.0.1", relay_port))
+            self.assertEqual(isolated.recvfrom(64)[0], b"delayed")
+            self.assertGreaterEqual(time.monotonic() - started, 0.04)
+            metrics = relay.metrics({isolated_port})
+            self.assertEqual(metrics["mapping_count"], 1)
+            self.assertGreaterEqual(metrics["dropped"], 1)
+            self.assertGreaterEqual(metrics["delayed"], 2)
+        finally:
+            isolated.close()
+            healthy.close()
+            relay.close()
+            echo.close()
+
     def make_cluster(self) -> harness.ClusterHarness:
         cluster = object.__new__(harness.ClusterHarness)
         cluster.identity = None

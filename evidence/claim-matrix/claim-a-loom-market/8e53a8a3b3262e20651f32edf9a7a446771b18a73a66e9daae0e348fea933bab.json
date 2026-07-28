@@ -1,0 +1,122 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-work-loom\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-work-loom\"]}]",
+      "id": "local-deterministic-mechanism",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-work-loom\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-work-loom\"]}]",
+      "id": "local-falsifier-battery",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-LOOM-MARKET": "c96e6935fe11798a64787f50fd591b9aeb740493e0a1f84ced210a8a87da2f59"
+  },
+  "claims": [
+    "A-LOOM-MARKET"
+  ],
+  "command": [
+    "tools/gates/run_economics_claim.py",
+    "--claim",
+    "A-LOOM-MARKET"
+  ],
+  "evidence_sha256": "8e53a8a3b3262e20651f32edf9a7a446771b18a73a66e9daae0e348fea933bab",
+  "expected_result": "IMPLEMENTED",
+  "gate": "claim-a-loom-market",
+  "limitations": [
+    "The exact local market transition and 4,096-seed adversarial trace battery prove deterministic escrow termination and conservation, not independent or production operation.",
+    "Delivery, evaluation, and demand remain separate; this local implementation evidence grants no consensus credit."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 48993,
+        "git_blob": "fe28ebb000ad8b94165b2b987090a434d5e2b45a",
+        "git_mode": "100644",
+        "path": "crates/noos-work-loom/src/lib.rs",
+        "sha256": "7cdd849b551bcfcb1bb70bebb0f6f067f8161a24619f460e1b864532b4b5cccd"
+      },
+      {
+        "bytes": 29632,
+        "git_blob": "b00f18fd93b4726371f30b7789a8e702f89eb1e9",
+        "git_mode": "100644",
+        "path": "crates/noos-work-loom/src/tests.rs",
+        "sha256": "75d0572526759d9032be6c6d9b5e6d86db2e7e990bdef9526dac2bc087d7d728"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 30076,
+        "git_blob": "8c8a6c498c37e1d1b0322cff5653f8bcf26178cb",
+        "git_mode": "100644",
+        "path": "protocol/spec/constants-v1.toml",
+        "sha256": "eaaf1a9680aab2cba1b8b972e2e80123b6ce27cfe84c5f02fb5c44bb68ec693e"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 7863,
+        "git_blob": "9871529b0988dfd0cb52406ac23ffd34401e6564",
+        "git_mode": "100644",
+        "path": "tools/gates/run_economics_claim.py",
+        "sha256": "1b6fc588d6e91c93463b94c908452df522629d6e02ad16bce5822551d9e36127"
+      }
+    ],
+    "manifest_sha256": "2376027aada35b8542ef7f9a3f37966cef20250f29f9c99bbb223893eb26bab9",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

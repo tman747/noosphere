@@ -70,9 +70,15 @@ type vecCase struct {
 	raw json.RawMessage
 }
 
+const (
+	wwmVectorFormat   = "noos/wwm-web-capacity/v1/vectors/v1"
+	wwmManifestFormat = "noos/wwm-web-capacity/v1/vector-manifest/v1"
+)
+
 type vecFile struct {
-	Schema string            `json:"schema"`
+	Schema json.RawMessage   `json:"schema"`
 	Cases  []json.RawMessage `json:"cases"`
+	Format string            `json:"format"`
 }
 
 func loadFile(path string) (string, []vecCase, error) {
@@ -84,6 +90,22 @@ func loadFile(path string) (string, []vecCase, error) {
 	if err := json.Unmarshal(blob, &f); err != nil {
 		return "", nil, fmt.Errorf("%s: %w", path, err)
 	}
+	if f.Format == wwmVectorFormat || f.Format == wwmManifestFormat {
+		return "", nil, nil
+	}
+	if len(f.Schema) == 0 {
+		return "", nil, fmt.Errorf("%s: missing schema", path)
+	}
+	var schema string
+	if err := json.Unmarshal(f.Schema, &schema); err != nil {
+		return "", nil, fmt.Errorf("%s: schema must be a string: %w", path, err)
+	}
+	if schema == "" {
+		return "", nil, fmt.Errorf("%s: schema must not be empty", path)
+	}
+	if f.Cases == nil {
+		return "", nil, fmt.Errorf("%s: missing cases", path)
+	}
 	cases := make([]vecCase, 0, len(f.Cases))
 	for i, raw := range f.Cases {
 		var c vecCase
@@ -93,7 +115,7 @@ func loadFile(path string) (string, []vecCase, error) {
 		c.raw = raw
 		cases = append(cases, c)
 	}
-	return f.Schema, cases, nil
+	return schema, cases, nil
 }
 
 func (c *vecCase) into(v any) error { return json.Unmarshal(c.raw, v) }

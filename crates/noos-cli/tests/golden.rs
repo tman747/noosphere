@@ -634,6 +634,73 @@ fn tx_build_encodes_transfers_and_private_payment_actions() {
 }
 
 #[test]
+fn tx_build_encodes_bonded_compute_dispute_actions() {
+    let mut spec = minimal_spec();
+    spec["actions"] = json!([
+        {
+            "type": "register_compute_worker",
+            "worker": h(0x81),
+            "capabilities": 1,
+            "cpu_threads": 1,
+            "memory_mb": 1024,
+            "gpu_memory_mb": 0,
+            "price_per_unit": "7",
+            "endpoint_commitment": h(0x82),
+            "bond": "100000"
+        },
+        {
+            "type": "challenge_compute_result",
+            "requester": h(0x83),
+            "job_id": h(0x84),
+            "seed": 7,
+            "start": 11
+        },
+        {
+            "type": "finalize_compute_result",
+            "worker": h(0x81),
+            "job_id": h(0x84),
+            "seed": 7,
+            "start": 11
+        },
+        {
+            "type": "expire_compute_job",
+            "job_id": h(0x85)
+        }
+    ]);
+    let built = noos_cli::tx_build(&spec.to_string()).unwrap();
+    let tx =
+        TransactionV1::decode_canonical(&from_hex(built["tx"].as_str().unwrap()).unwrap()).unwrap();
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[0].as_slice()).unwrap(),
+        ActionV1::RegisterComputeWorker {
+            bond: 100_000,
+            price_per_unit: 7,
+            ..
+        }
+    ));
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[1].as_slice()).unwrap(),
+        ActionV1::ChallengeComputeResult {
+            seed: 7,
+            start: 11,
+            ..
+        }
+    ));
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[2].as_slice()).unwrap(),
+        ActionV1::FinalizeComputeResult {
+            seed: 7,
+            start: 11,
+            ..
+        }
+    ));
+    assert!(matches!(
+        ActionV1::decode_canonical(tx.actions.as_slice()[3].as_slice()).unwrap(),
+        ActionV1::ExpireComputeJob { job_id } if job_id == [0x85; 32]
+    ));
+}
+
+#[test]
 fn tx_build_encodes_neural_oracle_commit_and_reveal_actions() {
     let mut spec = minimal_spec();
     spec["actions"] = json!([

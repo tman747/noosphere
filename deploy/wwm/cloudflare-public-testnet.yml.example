@@ -10,6 +10,9 @@ ingress:
     path: ^/api/wwm-web-capacity/v1(/.*)?$
     service: http://127.0.0.1:29772
   - hostname: wwm.mindchain.network
+    path: ^/mindscan(/.*)?$
+    service: http://127.0.0.1:29830
+  - hostname: wwm.mindchain.network
     service: http://127.0.0.1:29680
   - hostname: wwm-rpc.mindchain.network
     service: http://127.0.0.1:29680

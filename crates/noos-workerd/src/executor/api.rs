@@ -726,4 +726,39 @@ mod tests {
         assert!(body.contains(&job_id), "{body}");
         assert!(body.contains("/internal/wwm/v1/jobs/"), "{body}");
     }
+    #[tokio::test]
+    async fn authenticated_cancel_signals_the_exact_job() {
+        let state = test_state();
+        let job_id = "ad".repeat(32);
+        let cancellation = Cancellation::new();
+        let (sender, _) = broadcast::channel(8);
+        let inserted = state
+            .jobs
+            .lock()
+            .map(|mut jobs| {
+                jobs.insert(
+                    job_id.clone(),
+                    JobEntry {
+                        cancellation: cancellation.clone(),
+                        events: Arc::new(Mutex::new(Vec::new())),
+                        sender,
+                    },
+                );
+            })
+            .is_ok();
+        assert!(inserted);
+        let response = router(state)
+            .oneshot(
+                Request::builder()
+                    .method(Method::DELETE)
+                    .uri(format!("/internal/wwm/v1/jobs/{job_id}"))
+                    .header(header::AUTHORIZATION, format!("Bearer {}", "44".repeat(32)))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+        assert!(cancellation.is_cancelled());
+    }
 }

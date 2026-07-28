@@ -530,7 +530,7 @@ class ModelImprovementTests(unittest.TestCase):
         )
         self.assertEqual(improvement.verify_frozen_v2(), improvement.FROZEN_V2_SHA256)
         schema_hash = improvement.sha256_file(improvement.ROOT / "protocol" / "schemas" / "wwm-v2.md")
-        self.assertEqual(schema_hash, "eb6fbd2bb818c60b922d607b7e9a82989d11319e7eb847841b18025af6e01d51")
+        self.assertEqual(schema_hash, "60254a5efad3ce92fb465ac491a038f4f6dc9ed9c2fad64476323a761ac356ff")
 
     def test_deploy_probe_smoke_emits_precise_disabled_evidence(self) -> None:
         config_path = improvement.ROOT / "deploy" / "wwm" / "model-improvement.json"

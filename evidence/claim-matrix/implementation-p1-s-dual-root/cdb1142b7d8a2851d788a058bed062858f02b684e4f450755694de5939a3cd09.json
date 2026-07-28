@@ -1,0 +1,114 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-private-besi\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-private-besi\"]}",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-private-besi\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-private-besi\"]}",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "P1-S-DUAL-ROOT": "4c8f7e365c96254026ae9a416d237804dc33dabc9c5f6b0bf74b963fe94def8e"
+  },
+  "claims": [
+    "P1-S-DUAL-ROOT"
+  ],
+  "command": [
+    "tools/gates/run_privacy_claim.py",
+    "--claim",
+    "P1-S-DUAL-ROOT"
+  ],
+  "evidence_sha256": "cdb1142b7d8a2851d788a058bed062858f02b684e4f450755694de5939a3cd09",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-p1-s-dual-root",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 441,
+        "git_blob": "081dce9362e16c1c1e3bc684397910df8c54bcce",
+        "git_mode": "100644",
+        "path": "crates/noos-private-besi/Cargo.toml",
+        "sha256": "1a7fa58553b0285dfe833b02626c3479f85f6a464f0bd115531109b6267e9ac3"
+      },
+      {
+        "bytes": 7621,
+        "git_blob": "5c02cb4aa0014111d59eca0af2b22690752f0932",
+        "git_mode": "100644",
+        "path": "crates/noos-private-besi/src/dual_root.rs",
+        "sha256": "dd813430340140b5c2beb710c8b679bc44508601ef08bfb87224114bd813b90b"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 6297,
+        "git_blob": "52c37e3cfcfdaf3fa97fe3668b67d75010876bda",
+        "git_mode": "100644",
+        "path": "tools/gates/run_privacy_claim.py",
+        "sha256": "52fb8249fec9fd240e706727608a17ab12bd1a2dbe4550975c00aacda10b5381"
+      }
+    ],
+    "manifest_sha256": "9da0cec8fecebade8b6b078c9ede705766b73a48c68b35f1e1a4f2dfd605a65f",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

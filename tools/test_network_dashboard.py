@@ -37,6 +37,10 @@ WORKER = {
     "gpu_memory_mb": 512,
     "jobs_completed": "1",
     "units_completed": "8",
+    "bond_available": "9000",
+    "bond_locked": "1000",
+    "jobs_failed": "2",
+    "penalties_paid": "500",
 }
 JOB = {
     "job": "ff" * 32,
@@ -133,6 +137,11 @@ class DashboardDataTests(unittest.TestCase):
         self.assertEqual(compute["supply"]["cpu_threads"], 4)
         self.assertEqual(compute["supply"]["gpu_workers"], 1)
         self.assertEqual(compute["jobs_by_state"]["settled"], 1)
+        self.assertEqual(compute["supply"]["bond_available"], "9000")
+        self.assertEqual(compute["supply"]["bond_locked"], "1000")
+        self.assertEqual(compute["supply"]["failed_jobs"], 2)
+        self.assertEqual(compute["supply"]["penalties_paid"], "500")
+        self.assertEqual(compute["jobs_by_state"]["invalid"], 0)
         self.assertEqual(compute["settled_value"], "56")
         self.assertEqual(compute["currency"], "micro-NOOS_TEST")
 

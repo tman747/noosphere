@@ -33,8 +33,8 @@ use crate::neural_oracle::{
 };
 use crate::objects::{
     agent_private_payment_schema_root, agent_private_payment_scope, asset_id as derive_asset_id,
-    compute_job_id as derive_compute_job_id, debt_position_id as derive_debt_position_id,
-    lending_market_id as derive_lending_market_id,
+    compute_job_id as derive_compute_job_id, compute_mix32_input_root, compute_mix32_result_root,
+    debt_position_id as derive_debt_position_id, lending_market_id as derive_lending_market_id,
     liquidity_position_id as derive_liquidity_position_id, oracle_feed_id as derive_oracle_feed_id,
     oracle_report_id as derive_oracle_report_id, pool_id as derive_pool_id,
     private_payment_id as derive_private_payment_id, private_recipient_commitment,
@@ -47,13 +47,13 @@ use crate::objects::{
 };
 use crate::smt::{ReceiptSmt, Smt};
 use crate::wwm::{
-    genesis_fund_ledger, wwm_fixed_key, wwm_profile_key, CapabilityMutationV1, CapabilitySetV1,
-    CapabilityStatus, CustodianCapabilityMutationV2, CustodianCapabilitySetV1, FundBucketTag,
-    FundLedgerStatus, FundMutationLockRefV1, FundMutationLockStatus, FundMutationLockV1,
-    FundProfileV1, ModelCapsuleV2, RegisterFundProfilePayloadV1, RegistryEpochVectorV1,
-    ResolutionProofV1, TestnetModelRegistrationV1, TransitionWwmControlPayloadV1, WwmControlMode,
-    WwmControlStateV1, WwmEvidenceTier, WwmFundLedgerV1, WwmJobV1, WwmLeafKind, WwmReceiptV1,
-    WwmTerminalCode,
+    genesis_fund_ledger, wwm_fixed_key, wwm_profile_key, AvailabilityPolicyV2,
+    CapabilityMutationV1, CapabilitySetV1, CapabilityStatus, CustodianCapabilityMutationV2,
+    CustodianCapabilitySetV1, FundBucketTag, FundLedgerStatus, FundMutationLockRefV1,
+    FundMutationLockStatus, FundMutationLockV1, FundProfileV1, ModelCapsuleV2,
+    RegisterFundProfilePayloadV1, RegistryEpochVectorV1, ResolutionProofV1,
+    TestnetModelRegistrationV1, TransitionWwmControlPayloadV1, WwmControlMode, WwmControlStateV1,
+    WwmEvidenceTier, WwmFundLedgerV1, WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmTerminalCode,
 };
 use crate::Hash32;
 
@@ -124,6 +124,8 @@ pub const PARAM_EMERGENCY_AUTHORITY: &str = "noos.params.emrg-auth.v1";
 /// Feature-control key prefix: `noos.control.<name>`. Not writable by
 /// governance param updates; emergency can only write DISABLED.
 pub const CONTROL_PREFIX: &str = "noos.control.";
+pub const CONTROL_LENDING_REVIEWED: &str = "noos.control.lending_reviewed";
+pub const CONTROL_BRIDGE_REVIEWED: &str = "noos.control.bridge_reviewed";
 /// Registry key prefix for `GovernanceRegistryUpdate`.
 pub const REGISTRY_PREFIX: &str = "noos.registry.";
 
@@ -132,6 +134,9 @@ pub const REGISTRY_PREFIX: &str = "noos.registry.";
 pub struct BlockContext {
     pub chain_id: Hash32,
     pub height: u64,
+    /// Enables zero-commitment terminal WWM receipts for refunded outcomes.
+    /// Consensus sets this only after the network's explicit activation height.
+    pub allow_refunded_wwm_terminal_receipts: bool,
 }
 
 /// Genesis installation payload (plan §2.5: engineering networks use the
@@ -1144,6 +1149,14 @@ impl LumenLedger {
     #[must_use]
     pub fn emission_shares(&self) -> Option<EmissionSharesV1> {
         self.param_current(PARAM_SHARES)
+    }
+    /// Missing or malformed controls fail closed. Controls can only be enabled
+    /// by the exact genesis/hard-fork state; ordinary governance cannot write
+    /// the `noos.control.*` namespace.
+    #[must_use]
+    pub fn feature_enabled(&self, full_control_name: &str) -> bool {
+        self.param_current::<FeatureControlV1>(full_control_name)
+            .is_some_and(|control| control.enabled == 1)
     }
 
     fn issuance_fits_issued_supply(&self, issuance: &IssuanceParamsV1) -> bool {
@@ -2343,6 +2356,16 @@ impl LumenLedger {
                 ActionV1::SwapExactIn { trader, .. } if !signed(trader) => {
                     return Err(RejectReason::CapabilityDenied);
                 }
+                ActionV1::CreateLendingMarket { .. }
+                | ActionV1::WithdrawCollateral { .. }
+                | ActionV1::BorrowStable { .. }
+                | ActionV1::LiquidatePosition { .. }
+                | ActionV1::BackstopLiquidate { .. }
+                | ActionV1::PsmMint { .. }
+                    if !self.feature_enabled(CONTROL_LENDING_REVIEWED) =>
+                {
+                    return Err(RejectReason::GovernanceDenied);
+                }
                 ActionV1::CreateOracleFeed { .. }
                 | ActionV1::CreateLendingMarket { .. }
                 | ActionV1::SetOracleMode { .. }
@@ -2394,6 +2417,7 @@ impl LumenLedger {
                 ActionV1::OpenComputeJob { requester, .. }
                 | ActionV1::AcceptComputeResult { requester, .. }
                 | ActionV1::CancelComputeJob { requester, .. }
+                | ActionV1::ChallengeComputeResult { requester, .. }
                     if !signed(requester) =>
                 {
                     return Err(RejectReason::CapabilityDenied);
@@ -4212,6 +4236,7 @@ impl LumenLedger {
                     gpu_memory_mb,
                     price_per_unit,
                     endpoint_commitment,
+                    bond,
                 } => {
                     let known_capabilities =
                         ComputeWorkerV1::CAPABILITY_CPU | ComputeWorkerV1::CAPABILITY_GPU;
@@ -4223,12 +4248,34 @@ impl LumenLedger {
                             && *gpu_memory_mb == 0)
                         || *memory_mb == 0
                         || *price_per_unit == 0
+                        || *bond == 0
                         || overlay_account(&ov, self, worker).is_none()
                     {
                         return Err(FailCode::PostconditionFailed);
                     }
-                    let prior = overlay_object(&ov, self, worker)
-                        .and_then(|bytes| ComputeWorkerV1::decode_canonical(&bytes).ok());
+                    let prior = match overlay_object(&ov, self, worker) {
+                        Some(bytes) => Some(
+                            ComputeWorkerV1::decode_canonical(&bytes)
+                                .map_err(|_| FailCode::PostconditionFailed)?,
+                        ),
+                        None => None,
+                    };
+                    let prior_total = match prior.as_ref() {
+                        Some(value) => value
+                            .bond_available
+                            .checked_add(value.bond_locked)
+                            .ok_or(FailCode::Overflow)?,
+                        None => 0,
+                    };
+                    if *bond < prior_total {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let top_up = bond
+                        .checked_sub(prior_total)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    if top_up > 0 {
+                        debit_compute_noos(&mut ov, self, worker, top_up)?;
+                    }
                     let record = ComputeWorkerV1 {
                         worker: *worker,
                         capabilities: *capabilities,
@@ -4240,6 +4287,12 @@ impl LumenLedger {
                         active: 1,
                         jobs_completed: prior.as_ref().map_or(0, |value| value.jobs_completed),
                         units_completed: prior.as_ref().map_or(0, |value| value.units_completed),
+                        bond_available: bond
+                            .checked_sub(prior.as_ref().map_or(0, |value| value.bond_locked))
+                            .ok_or(FailCode::PostconditionFailed)?,
+                        bond_locked: prior.as_ref().map_or(0, |value| value.bond_locked),
+                        jobs_failed: prior.as_ref().map_or(0, |value| value.jobs_failed),
+                        penalties_paid: prior.as_ref().map_or(0, |value| value.penalties_paid),
                     };
                     ov.objects.insert(*worker, Some(record.encode_canonical()));
                     ov.write_count()?;
@@ -4253,11 +4306,15 @@ impl LumenLedger {
                     max_price_per_unit,
                     deadline_height,
                 } => {
-                    if *workload_kind > 1
+                    let operations = units
+                        .checked_mul(u64::from(*unit_size))
+                        .ok_or(FailCode::Overflow)?;
+                    if *workload_kind != 0
                         || *units == 0
                         || *units > 1_000_000_000
                         || *unit_size == 0
                         || *unit_size > 1_048_576
+                        || operations > ComputeJobV1::MAX_DISPUTE_OPERATIONS
                         || *max_price_per_unit == 0
                         || *deadline_height <= ctx.height
                         || overlay_account(&ov, self, requester).is_none()
@@ -4267,13 +4324,7 @@ impl LumenLedger {
                     let escrow = u128::from(*units)
                         .checked_mul(*max_price_per_unit)
                         .ok_or(FailCode::Overflow)?;
-                    let balance = overlay_balance(&ov, self, requester, &NOOS_ASSET);
-                    ov.balances.insert(
-                        (*requester, NOOS_ASSET),
-                        balance
-                            .checked_sub(escrow)
-                            .ok_or(FailCode::InsufficientBalance)?,
-                    );
+                    debit_compute_noos(&mut ov, self, requester, escrow)?;
                     let idx = u32::try_from(index).map_err(|_| FailCode::Overflow)?;
                     let id = derive_compute_job_id(txid, idx);
                     if overlay_object(&ov, self, &id).is_some() {
@@ -4294,15 +4345,19 @@ impl LumenLedger {
                         state: ComputeJobV1::STATE_OPEN,
                         result_root: [0; 32],
                         completed_units: 0,
+                        worker_bond: 0,
+                        claimed_height: 0,
+                        submitted_height: 0,
+                        review_deadline_height: 0,
+                        resolution: ComputeJobV1::RESOLUTION_NONE,
                     };
                     ov.objects.insert(id, Some(job.encode_canonical()));
-                    ov.write_count()?;
                     ov.write_count()?;
                 }
                 ActionV1::ClaimComputeJob { worker, job_id } => {
                     let worker_raw =
                         overlay_object(&ov, self, worker).ok_or(FailCode::PostconditionFailed)?;
-                    let worker_record = ComputeWorkerV1::decode_canonical(&worker_raw)
+                    let mut worker_record = ComputeWorkerV1::decode_canonical(&worker_raw)
                         .map_err(|_| FailCode::PostconditionFailed)?;
                     let job_raw =
                         overlay_object(&ov, self, job_id).ok_or(FailCode::PostconditionFailed)?;
@@ -4313,12 +4368,26 @@ impl LumenLedger {
                         || job.worker.0.is_some()
                         || ctx.height > job.deadline_height
                         || worker_record.price_per_unit > job.max_price_per_unit
+                        || worker_record.bond_available < job.escrow
                     {
                         return Err(FailCode::PostconditionFailed);
                     }
+                    worker_record.bond_available = worker_record
+                        .bond_available
+                        .checked_sub(job.escrow)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    worker_record.bond_locked = worker_record
+                        .bond_locked
+                        .checked_add(job.escrow)
+                        .ok_or(FailCode::Overflow)?;
                     job.worker = crate::objects::OptionalHash32(Some(*worker));
                     job.agreed_price_per_unit = worker_record.price_per_unit;
+                    job.worker_bond = job.escrow;
+                    job.claimed_height = ctx.height;
                     job.state = ComputeJobV1::STATE_CLAIMED;
+                    ov.objects
+                        .insert(*worker, Some(worker_record.encode_canonical()));
+                    ov.write_count()?;
                     ov.objects.insert(*job_id, Some(job.encode_canonical()));
                     ov.write_count()?;
                 }
@@ -4342,6 +4411,11 @@ impl LumenLedger {
                     }
                     job.result_root = *result_root;
                     job.completed_units = *completed_units;
+                    job.submitted_height = ctx.height;
+                    job.review_deadline_height = ctx
+                        .height
+                        .checked_add(ComputeJobV1::REVIEW_WINDOW_BLOCKS)
+                        .ok_or(FailCode::Overflow)?;
                     job.state = ComputeJobV1::STATE_SUBMITTED;
                     ov.objects.insert(*job_id, Some(job.encode_canonical()));
                     ov.write_count()?;
@@ -4349,7 +4423,7 @@ impl LumenLedger {
                 ActionV1::AcceptComputeResult { requester, job_id } => {
                     let raw =
                         overlay_object(&ov, self, job_id).ok_or(FailCode::PostconditionFailed)?;
-                    let mut job = ComputeJobV1::decode_canonical(&raw)
+                    let job = ComputeJobV1::decode_canonical(&raw)
                         .map_err(|_| FailCode::PostconditionFailed)?;
                     if job.requester != *requester
                         || job.state != ComputeJobV1::STATE_SUBMITTED
@@ -4360,69 +4434,199 @@ impl LumenLedger {
                     let worker_id = job.worker.0.ok_or(FailCode::PostconditionFailed)?;
                     let worker_raw = overlay_object(&ov, self, &worker_id)
                         .ok_or(FailCode::PostconditionFailed)?;
-                    let mut worker_record = ComputeWorkerV1::decode_canonical(&worker_raw)
+                    let worker_record = ComputeWorkerV1::decode_canonical(&worker_raw)
                         .map_err(|_| FailCode::PostconditionFailed)?;
-                    let payment = u128::from(job.units)
-                        .checked_mul(job.agreed_price_per_unit)
-                        .ok_or(FailCode::Overflow)?;
-                    let refund = job
-                        .escrow
-                        .checked_sub(payment)
-                        .ok_or(FailCode::PostconditionFailed)?;
-                    let worker_balance = overlay_balance(&ov, self, &worker_id, &NOOS_ASSET);
-                    let requester_balance = overlay_balance(&ov, self, requester, &NOOS_ASSET);
-                    ov.balances.insert(
-                        (worker_id, NOOS_ASSET),
-                        worker_balance
-                            .checked_add(payment)
-                            .ok_or(FailCode::Overflow)?,
-                    );
-                    ov.balances.insert(
-                        (*requester, NOOS_ASSET),
-                        requester_balance
-                            .checked_add(refund)
-                            .ok_or(FailCode::Overflow)?,
-                    );
-                    worker_record.jobs_completed = worker_record
-                        .jobs_completed
-                        .checked_add(1)
-                        .ok_or(FailCode::Overflow)?;
-                    worker_record.units_completed = worker_record
-                        .units_completed
-                        .checked_add(job.units)
-                        .ok_or(FailCode::Overflow)?;
-                    job.escrow = 0;
-                    job.state = ComputeJobV1::STATE_SETTLED;
-                    ov.objects
-                        .insert(worker_id, Some(worker_record.encode_canonical()));
-                    ov.objects.insert(*job_id, Some(job.encode_canonical()));
-                    ov.write_count()?;
-                    ov.write_count()?;
-                    ov.write_count()?;
-                    ov.write_count()?;
+                    settle_compute_success(
+                        &mut ov,
+                        self,
+                        job_id,
+                        job,
+                        worker_id,
+                        worker_record,
+                        0,
+                        ComputeJobV1::RESOLUTION_REQUESTER_ACCEPTED,
+                    )?;
                 }
                 ActionV1::CancelComputeJob { requester, job_id } => {
                     let raw =
                         overlay_object(&ov, self, job_id).ok_or(FailCode::PostconditionFailed)?;
                     let mut job = ComputeJobV1::decode_canonical(&raw)
                         .map_err(|_| FailCode::PostconditionFailed)?;
-                    let cancellable = job.state == ComputeJobV1::STATE_OPEN
-                        || (ctx.height > job.deadline_height
-                            && job.state != ComputeJobV1::STATE_SETTLED
-                            && job.state != ComputeJobV1::STATE_CANCELLED);
-                    if job.requester != *requester || !cancellable {
+                    if job.requester != *requester {
                         return Err(FailCode::PostconditionFailed);
                     }
-                    let balance = overlay_balance(&ov, self, requester, &NOOS_ASSET);
-                    ov.balances.insert(
-                        (*requester, NOOS_ASSET),
-                        balance.checked_add(job.escrow).ok_or(FailCode::Overflow)?,
-                    );
-                    job.escrow = 0;
-                    job.state = ComputeJobV1::STATE_CANCELLED;
-                    ov.objects.insert(*job_id, Some(job.encode_canonical()));
-                    ov.write_count()?;
-                    ov.write_count()?;
+                    if job.state == ComputeJobV1::STATE_OPEN {
+                        credit_compute_noos(&mut ov, self, requester, job.escrow)?;
+                        job.escrow = 0;
+                        job.state = ComputeJobV1::STATE_CANCELLED;
+                        job.resolution = ComputeJobV1::RESOLUTION_CANCELLED_OPEN;
+                        ov.objects.insert(*job_id, Some(job.encode_canonical()));
+                        ov.write_count()?;
+                    } else if job.state == ComputeJobV1::STATE_CLAIMED
+                        && ctx.height > job.deadline_height
+                    {
+                        let worker_id = job.worker.0.ok_or(FailCode::PostconditionFailed)?;
+                        let worker_raw = overlay_object(&ov, self, &worker_id)
+                            .ok_or(FailCode::PostconditionFailed)?;
+                        let worker_record = ComputeWorkerV1::decode_canonical(&worker_raw)
+                            .map_err(|_| FailCode::PostconditionFailed)?;
+                        fail_compute_worker_job(
+                            &mut ov,
+                            self,
+                            job_id,
+                            job,
+                            worker_id,
+                            worker_record,
+                            0,
+                            ComputeJobV1::STATE_TIMED_OUT,
+                            ComputeJobV1::RESOLUTION_TIMEOUT,
+                        )?;
+                    } else {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                }
+                ActionV1::ChallengeComputeResult {
+                    requester,
+                    job_id,
+                    seed,
+                    start,
+                } => {
+                    let raw =
+                        overlay_object(&ov, self, job_id).ok_or(FailCode::PostconditionFailed)?;
+                    let job = ComputeJobV1::decode_canonical(&raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if job.requester != *requester
+                        || job.state != ComputeJobV1::STATE_SUBMITTED
+                        || job.completed_units != job.units
+                        || ctx.height > job.review_deadline_height
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let (valid, operations) = verify_compute_result(&job, *seed, *start)?;
+                    grain_steps = grain_steps
+                        .checked_add(operations)
+                        .ok_or(FailCode::Overflow)?;
+                    let payment = u128::from(job.units)
+                        .checked_mul(job.agreed_price_per_unit)
+                        .ok_or(FailCode::Overflow)?;
+                    let challenge_bond = (payment / ComputeJobV1::CHALLENGE_BOND_DIVISOR).max(1);
+                    debit_compute_noos(&mut ov, self, requester, challenge_bond)?;
+                    let worker_id = job.worker.0.ok_or(FailCode::PostconditionFailed)?;
+                    let worker_raw = overlay_object(&ov, self, &worker_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let worker_record = ComputeWorkerV1::decode_canonical(&worker_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if valid {
+                        settle_compute_success(
+                            &mut ov,
+                            self,
+                            job_id,
+                            job,
+                            worker_id,
+                            worker_record,
+                            challenge_bond,
+                            ComputeJobV1::RESOLUTION_CHALLENGE_CONFIRMED_RESULT,
+                        )?;
+                    } else {
+                        fail_compute_worker_job(
+                            &mut ov,
+                            self,
+                            job_id,
+                            job,
+                            worker_id,
+                            worker_record,
+                            challenge_bond,
+                            ComputeJobV1::STATE_INVALID,
+                            ComputeJobV1::RESOLUTION_CHALLENGE_REJECTED_RESULT,
+                        )?;
+                    }
+                }
+                ActionV1::FinalizeComputeResult {
+                    worker,
+                    job_id,
+                    seed,
+                    start,
+                } => {
+                    let raw =
+                        overlay_object(&ov, self, job_id).ok_or(FailCode::PostconditionFailed)?;
+                    let job = ComputeJobV1::decode_canonical(&raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if job.worker.0 != Some(*worker)
+                        || job.state != ComputeJobV1::STATE_SUBMITTED
+                        || job.completed_units != job.units
+                        || ctx.height <= job.review_deadline_height
+                    {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    let (valid, operations) = verify_compute_result(&job, *seed, *start)?;
+                    grain_steps = grain_steps
+                        .checked_add(operations)
+                        .ok_or(FailCode::Overflow)?;
+                    let worker_raw =
+                        overlay_object(&ov, self, worker).ok_or(FailCode::PostconditionFailed)?;
+                    let worker_record = ComputeWorkerV1::decode_canonical(&worker_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if valid {
+                        settle_compute_success(
+                            &mut ov,
+                            self,
+                            job_id,
+                            job,
+                            *worker,
+                            worker_record,
+                            0,
+                            ComputeJobV1::RESOLUTION_OBJECTIVE_FINALIZED_VALID,
+                        )?;
+                    } else {
+                        fail_compute_worker_job(
+                            &mut ov,
+                            self,
+                            job_id,
+                            job,
+                            *worker,
+                            worker_record,
+                            0,
+                            ComputeJobV1::STATE_INVALID,
+                            ComputeJobV1::RESOLUTION_OBJECTIVE_FINALIZED_INVALID,
+                        )?;
+                    }
+                }
+                ActionV1::ExpireComputeJob { job_id } => {
+                    let raw =
+                        overlay_object(&ov, self, job_id).ok_or(FailCode::PostconditionFailed)?;
+                    let mut job = ComputeJobV1::decode_canonical(&raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    if ctx.height <= job.deadline_height {
+                        return Err(FailCode::PostconditionFailed);
+                    }
+                    if job.state == ComputeJobV1::STATE_OPEN {
+                        let requester = job.requester;
+                        credit_compute_noos(&mut ov, self, &requester, job.escrow)?;
+                        job.escrow = 0;
+                        job.state = ComputeJobV1::STATE_TIMED_OUT;
+                        job.resolution = ComputeJobV1::RESOLUTION_TIMEOUT;
+                        ov.objects.insert(*job_id, Some(job.encode_canonical()));
+                        ov.write_count()?;
+                    } else if job.state == ComputeJobV1::STATE_CLAIMED {
+                        let worker_id = job.worker.0.ok_or(FailCode::PostconditionFailed)?;
+                        let worker_raw = overlay_object(&ov, self, &worker_id)
+                            .ok_or(FailCode::PostconditionFailed)?;
+                        let worker_record = ComputeWorkerV1::decode_canonical(&worker_raw)
+                            .map_err(|_| FailCode::PostconditionFailed)?;
+                        fail_compute_worker_job(
+                            &mut ov,
+                            self,
+                            job_id,
+                            job,
+                            worker_id,
+                            worker_record,
+                            0,
+                            ComputeJobV1::STATE_TIMED_OUT,
+                            ComputeJobV1::RESOLUTION_TIMEOUT,
+                        )?;
+                    } else {
+                        return Err(FailCode::PostconditionFailed);
+                    }
                 }
                 ActionV1::RegisterArtifactDescriptor(v) => {
                     wwm_insert_unique(
@@ -4440,6 +4644,17 @@ impl LumenLedger {
                     if v.position_count != 12
                         || v.reconstruction_threshold != 8
                         || v.schedulable_minimum != 9
+                        || v.required_regions == 0
+                        || v.required_regions > v.position_count
+                        || v.max_positions_per_region == 0
+                        || v.max_positions_per_region > v.position_count
+                        || v.max_positions_per_asn == 0
+                        || v.max_positions_per_asn > v.position_count
+                        || v.max_positions_per_provider == 0
+                        || v.max_positions_per_provider > v.position_count
+                        || u16::from(v.required_regions)
+                            .checked_mul(u16::from(v.max_positions_per_region))
+                            .is_none_or(|capacity| capacity < u16::from(v.schedulable_minimum))
                         || v.samples_per_challenge == 0
                         || v.verifier_sample_size != 8
                         || v.verifier_threshold != 5
@@ -4458,12 +4673,43 @@ impl LumenLedger {
                 }
                 ActionV1::CommitCustodyPositions(v) => {
                     require_wwm(&ov, self, WwmLeafKind::Artifact, &v.artifact_id)?;
-                    require_wwm(&ov, self, WwmLeafKind::AvailabilityPolicy, &v.policy_id)?;
+                    let policy_raw =
+                        require_wwm(&ov, self, WwmLeafKind::AvailabilityPolicy, &v.policy_id)?;
+                    let policy = AvailabilityPolicyV2::decode_canonical(&policy_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
                     let registry = current_registry(&ov, self)?;
-                    if v.position >= 12
+                    let custodian_set = custodian_capability_set(
+                        &ov,
+                        self,
+                        &registry.custodian_set_id,
+                        registry.custodian_epoch,
+                    )?;
+                    let profile = custodian_set
+                        .entries
+                        .iter()
+                        .find(|profile| profile.profile_id == v.custodian_profile_id)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    let reserved_capacity = profile
+                        .staging_bytes
+                        .checked_add(profile.headroom_bytes)
+                        .ok_or(FailCode::Overflow)?;
+                    let available_capacity = profile
+                        .capacity_bytes
+                        .checked_sub(reserved_capacity)
+                        .ok_or(FailCode::PostconditionFailed)?;
+                    if v.artifact_id != policy.artifact_id
+                        || v.position >= policy.position_count
                         || v.custodian_set_id != registry.custodian_set_id
                         || v.custodian_set_epoch != registry.custodian_epoch
+                        || profile.status != CapabilityStatus::Active
+                        || profile.attestation_expiry < v.valid_until
+                        || v.committed_bytes == 0
+                        || v.committed_bytes > available_capacity
+                        || v.valid_from < policy.policy_start_height
+                        || v.valid_until > policy.policy_end_height
                         || v.valid_from >= v.valid_until
+                        || v.valid_until <= ctx.height
+                        || v.signature.is_empty()
                     {
                         return Err(FailCode::PostconditionFailed);
                     }
@@ -4500,15 +4746,93 @@ impl LumenLedger {
                     )?;
                 }
                 ActionV1::IssueAvailabilityCertificate(v) => {
-                    require_wwm(&ov, self, WwmLeafKind::AvailabilityPolicy, &v.policy_id)?;
-                    if v.availability_state > 2 {
+                    let policy_raw =
+                        require_wwm(&ov, self, WwmLeafKind::AvailabilityPolicy, &v.policy_id)?;
+                    let policy = AvailabilityPolicyV2::decode_canonical(&policy_raw)
+                        .map_err(|_| FailCode::PostconditionFailed)?;
+                    let registry = current_registry(&ov, self)?;
+                    let executor_set = executor_capability_set(
+                        &ov,
+                        self,
+                        &v.executor_set_id,
+                        v.executor_set_epoch,
+                    )?;
+                    let custodian_set = custodian_capability_set(
+                        &ov,
+                        self,
+                        &v.custodian_set_id,
+                        v.custodian_set_epoch,
+                    )?;
+                    let control = current_control(&ov, self)?;
+                    if !matches!(
+                        control.mode,
+                        WwmControlMode::Testnet
+                            | WwmControlMode::Canary
+                            | WwmControlMode::Production
+                    ) {
                         return Err(FailCode::PostconditionFailed);
                     }
-                    if v.selected_verifiers.len() != 8
-                        || v.signer_ids.len() != 5
+                    let require_lineage_diversity = control.mode != WwmControlMode::Testnet;
+                    let executor_root = crate::domain_hash(
+                        "NOOS/WWM/CAPABILITY-SET-ROOT/V1",
+                        &[&executor_set.encode_canonical()],
+                    );
+                    let custodian_root = crate::domain_hash(
+                        "NOOS/WWM/CUSTODIAN-CAPABILITY-SET-ROOT/V1",
+                        &[&custodian_set.encode_canonical()],
+                    );
+                    if v.certificate_id == [0; 32]
+                        || v.artifact_id != policy.artifact_id
+                        || v.assignment_root != policy.assignment_root
+                        || v.custodian_set_id != registry.custodian_set_id
+                        || v.custodian_set_epoch != registry.custodian_epoch
+                        || v.custodian_set_root != custodian_root
+                        || v.executor_set_id != registry.executor_set_id
+                        || v.executor_set_epoch != registry.executor_epoch
+                        || v.executor_set_root != executor_root
+                        || v.availability_state > 2
+                        || v.selected_verifiers.len() != usize::from(policy.verifier_sample_size)
+                        || v.signer_ids.len() != usize::from(policy.verifier_threshold)
+                        || v.signatures.len() != v.signer_ids.len()
                         || !strict_hashes(v.selected_verifiers.as_slice())
                         || !strict_hashes(v.signer_ids.as_slice())
-                        || v.valid_until <= v.issued_height
+                        || v.signer_ids
+                            .iter()
+                            .any(|signer| !v.selected_verifiers.as_slice().contains(signer))
+                        || v.signatures.iter().zip(v.signer_ids.iter()).any(
+                            |(signature, signer_id)| {
+                                signature.signer_id != *signer_id || signature.signature.is_empty()
+                            },
+                        )
+                        || v.result_root == [0; 32]
+                        || v.diversity_root == [0; 32]
+                        || v.challenge_root == [0; 32]
+                        || v.issued_height < policy.policy_start_height
+                        || v.issued_height > ctx.height
+                        || v.valid_until > policy.policy_end_height
+                        || v.valid_until <= ctx.height
+                        || !executor_set.selected_independent(
+                            v.selected_verifiers.as_slice(),
+                            v.valid_until,
+                            require_lineage_diversity,
+                        )
+                        || executor_set
+                            .entries
+                            .iter()
+                            .filter(|profile| {
+                                v.selected_verifiers
+                                    .as_slice()
+                                    .contains(&profile.profile_id)
+                            })
+                            .any(|profile| {
+                                profile.capability_bitmap & policy.verifier_capability_bitmap
+                                    != policy.verifier_capability_bitmap
+                            })
+                        || !custodian_set.policy_independent(
+                            &policy,
+                            v.valid_until,
+                            require_lineage_diversity,
+                        )
                     {
                         return Err(FailCode::PostconditionFailed);
                     }
@@ -4733,8 +5057,29 @@ impl LumenLedger {
                     }
                     if overlay_object(&ov, self, &neural_query_key(&job.job_id)).is_some() {
                         validate_neural_wwm_receipt(&ov, self, &job, v, ctx.height)?;
-                    } else if v.output_root == [0; 32] || v.token_history_root == [0; 32] {
-                        return Err(FailCode::PostconditionFailed);
+                    } else {
+                        let output_commitment_is_zero = v.output_root == [0; 32];
+                        let history_commitment_is_zero = v.token_history_root == [0; 32];
+                        let commitments_are_zero =
+                            output_commitment_is_zero && history_commitment_is_zero;
+                        let terminal_is_valid = if ctx.allow_refunded_wwm_terminal_receipts {
+                            match v.terminal_code {
+                                WwmTerminalCode::Complete => !commitments_are_zero,
+                                WwmTerminalCode::Cancelled
+                                | WwmTerminalCode::Deadline
+                                | WwmTerminalCode::NoQuorum
+                                | WwmTerminalCode::Rejected => {
+                                    commitments_are_zero
+                                        && v.output_tokens == 0
+                                        && v.paid_amount == 0
+                                }
+                            }
+                        } else {
+                            !output_commitment_is_zero && !history_commitment_is_zero
+                        };
+                        if !terminal_is_valid {
+                            return Err(FailCode::PostconditionFailed);
+                        }
                     }
                     wwm_insert_unique(
                         &mut ov,
@@ -4875,14 +5220,26 @@ impl LumenLedger {
                     {
                         return Err(FailCode::PostconditionFailed);
                     }
-                    let mut control_roots = BTreeSet::new();
-                    let mut operator_accounts = BTreeSet::new();
+                    let executor_set = executor_capability_set(
+                        &ov,
+                        self,
+                        &v.executor_set_id,
+                        v.executor_set_epoch,
+                    )?;
+                    if !executor_set.selected_independent(
+                        selected,
+                        v.reveal_deadline,
+                        control.mode != WwmControlMode::Testnet,
+                    ) {
+                        return Err(FailCode::PostconditionFailed);
+                    }
                     for profile_id in selected {
-                        let profile = neural_reporter_profile(&ov, self, v, profile_id)?;
-                        if overlay_account(&ov, self, &profile.operator_id).is_none()
-                            || !control_roots.insert(profile.beneficial_control_root)
-                            || !operator_accounts.insert(profile.operator_id)
-                        {
+                        let profile = executor_set
+                            .entries
+                            .iter()
+                            .find(|profile| profile.profile_id == *profile_id)
+                            .ok_or(FailCode::PostconditionFailed)?;
+                        if overlay_account(&ov, self, &profile.operator_id).is_none() {
                             return Err(FailCode::PostconditionFailed);
                         }
                     }
@@ -5349,6 +5706,35 @@ fn require_wwm(
     overlay_object(ov, base, &wwm_profile_key(kind, id)).ok_or(FailCode::PostconditionFailed)
 }
 
+fn executor_capability_set(
+    ov: &Overlay,
+    base: &LumenLedger,
+    set_id: &Hash32,
+    epoch: u64,
+) -> Result<CapabilitySetV1, FailCode> {
+    let raw = require_wwm(ov, base, WwmLeafKind::ExecutorCapabilitySet, set_id)?;
+    let set = CapabilitySetV1::decode_canonical(&raw).map_err(|_| FailCode::PostconditionFailed)?;
+    if set.set_id != *set_id || set.epoch != epoch {
+        return Err(FailCode::PostconditionFailed);
+    }
+    Ok(set)
+}
+
+fn custodian_capability_set(
+    ov: &Overlay,
+    base: &LumenLedger,
+    set_id: &Hash32,
+    epoch: u64,
+) -> Result<CustodianCapabilitySetV1, FailCode> {
+    let raw = require_wwm(ov, base, WwmLeafKind::CustodianCapabilitySet, set_id)?;
+    let set = CustodianCapabilitySetV1::decode_canonical(&raw)
+        .map_err(|_| FailCode::PostconditionFailed)?;
+    if set.set_id != *set_id || set.epoch != epoch {
+        return Err(FailCode::PostconditionFailed);
+    }
+    Ok(set)
+}
+
 fn neural_job_for_query(
     ov: &Overlay,
     base: &LumenLedger,
@@ -5380,16 +5766,7 @@ fn neural_reporter_profile(
     {
         return Err(FailCode::PostconditionFailed);
     }
-    let raw = require_wwm(
-        ov,
-        base,
-        WwmLeafKind::ExecutorCapabilitySet,
-        &query.executor_set_id,
-    )?;
-    let set = CapabilitySetV1::decode_canonical(&raw).map_err(|_| FailCode::PostconditionFailed)?;
-    if set.set_id != query.executor_set_id || set.epoch != query.executor_set_epoch {
-        return Err(FailCode::PostconditionFailed);
-    }
+    let set = executor_capability_set(ov, base, &query.executor_set_id, query.executor_set_epoch)?;
     let profile = set
         .entries
         .iter()
@@ -6151,6 +6528,160 @@ fn overlay_balance(ov: &Overlay, base: &LumenLedger, account: &Hash32, asset: &H
         Some(amount) => *amount,
         None => base.balance(account, asset),
     }
+}
+
+fn credit_compute_noos(
+    ov: &mut Overlay,
+    base: &LumenLedger,
+    account: &Hash32,
+    amount: u128,
+) -> Result<(), FailCode> {
+    if amount == 0 {
+        return Ok(());
+    }
+    let balance = overlay_balance(ov, base, account, &NOOS_ASSET);
+    ov.balances.insert(
+        (*account, NOOS_ASSET),
+        balance.checked_add(amount).ok_or(FailCode::Overflow)?,
+    );
+    ov.write_count()
+}
+
+fn debit_compute_noos(
+    ov: &mut Overlay,
+    base: &LumenLedger,
+    account: &Hash32,
+    amount: u128,
+) -> Result<(), FailCode> {
+    let balance = overlay_balance(ov, base, account, &NOOS_ASSET);
+    ov.balances.insert(
+        (*account, NOOS_ASSET),
+        balance
+            .checked_sub(amount)
+            .ok_or(FailCode::InsufficientBalance)?,
+    );
+    ov.write_count()
+}
+
+fn verify_compute_result(
+    job: &ComputeJobV1,
+    seed: u32,
+    start: u64,
+) -> Result<(bool, u64), FailCode> {
+    let operations = job
+        .units
+        .checked_mul(u64::from(job.unit_size))
+        .filter(|value| *value <= ComputeJobV1::MAX_DISPUTE_OPERATIONS)
+        .ok_or(FailCode::PostconditionFailed)?;
+    let input_root = compute_mix32_input_root(seed, start, job.units, job.unit_size)
+        .ok_or(FailCode::PostconditionFailed)?;
+    if input_root != job.input_root {
+        return Err(FailCode::PostconditionFailed);
+    }
+    let expected = compute_mix32_result_root(seed, start, job.units, job.unit_size)
+        .ok_or(FailCode::PostconditionFailed)?;
+    Ok((expected == job.result_root, operations))
+}
+
+fn settle_compute_success(
+    ov: &mut Overlay,
+    base: &LumenLedger,
+    job_id: &Hash32,
+    mut job: ComputeJobV1,
+    worker_id: Hash32,
+    mut worker: ComputeWorkerV1,
+    challenge_reward: u128,
+    resolution: u8,
+) -> Result<(), FailCode> {
+    if job.worker_bond == 0 || worker.bond_locked < job.worker_bond {
+        return Err(FailCode::PostconditionFailed);
+    }
+    let payment = u128::from(job.units)
+        .checked_mul(job.agreed_price_per_unit)
+        .ok_or(FailCode::Overflow)?;
+    let refund = job
+        .escrow
+        .checked_sub(payment)
+        .ok_or(FailCode::PostconditionFailed)?;
+    worker.bond_locked = worker
+        .bond_locked
+        .checked_sub(job.worker_bond)
+        .ok_or(FailCode::PostconditionFailed)?;
+    worker.bond_available = worker
+        .bond_available
+        .checked_add(job.worker_bond)
+        .ok_or(FailCode::Overflow)?;
+    worker.jobs_completed = worker
+        .jobs_completed
+        .checked_add(1)
+        .ok_or(FailCode::Overflow)?;
+    worker.units_completed = worker
+        .units_completed
+        .checked_add(job.units)
+        .ok_or(FailCode::Overflow)?;
+    credit_compute_noos(
+        ov,
+        base,
+        &worker_id,
+        payment
+            .checked_add(challenge_reward)
+            .ok_or(FailCode::Overflow)?,
+    )?;
+    credit_compute_noos(ov, base, &job.requester, refund)?;
+    job.escrow = 0;
+    job.worker_bond = 0;
+    job.state = ComputeJobV1::STATE_SETTLED;
+    job.resolution = resolution;
+    ov.objects
+        .insert(worker_id, Some(worker.encode_canonical()));
+    ov.write_count()?;
+    ov.objects.insert(*job_id, Some(job.encode_canonical()));
+    ov.write_count()
+}
+
+fn fail_compute_worker_job(
+    ov: &mut Overlay,
+    base: &LumenLedger,
+    job_id: &Hash32,
+    mut job: ComputeJobV1,
+    worker_id: Hash32,
+    mut worker: ComputeWorkerV1,
+    challenge_refund: u128,
+    state: u8,
+    resolution: u8,
+) -> Result<(), FailCode> {
+    if job.worker_bond == 0 || worker.bond_locked < job.worker_bond {
+        return Err(FailCode::PostconditionFailed);
+    }
+    let penalty = job.worker_bond;
+    worker.bond_locked = worker
+        .bond_locked
+        .checked_sub(penalty)
+        .ok_or(FailCode::PostconditionFailed)?;
+    worker.jobs_failed = worker
+        .jobs_failed
+        .checked_add(1)
+        .ok_or(FailCode::Overflow)?;
+    worker.penalties_paid = worker
+        .penalties_paid
+        .checked_add(penalty)
+        .ok_or(FailCode::Overflow)?;
+    worker.active = 0;
+    let refund = job
+        .escrow
+        .checked_add(penalty)
+        .and_then(|value| value.checked_add(challenge_refund))
+        .ok_or(FailCode::Overflow)?;
+    credit_compute_noos(ov, base, &job.requester, refund)?;
+    job.escrow = 0;
+    job.worker_bond = 0;
+    job.state = state;
+    job.resolution = resolution;
+    ov.objects
+        .insert(worker_id, Some(worker.encode_canonical()));
+    ov.write_count()?;
+    ov.objects.insert(*job_id, Some(job.encode_canonical()));
+    ov.write_count()
 }
 
 fn mul_bps(value: u128, bps: u16) -> Result<u128, FailCode> {

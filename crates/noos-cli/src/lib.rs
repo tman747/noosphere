@@ -610,6 +610,7 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
             gpu_memory_mb: spec_u32(spec, "gpu_memory_mb")?,
             price_per_unit: spec_u128(spec, "price_per_unit")?,
             endpoint_commitment: spec_hash(spec, "endpoint_commitment")?,
+            bond: spec_u128(spec, "bond")?,
         },
         "open_compute_job" => ActionV1::OpenComputeJob {
             requester: spec_hash(spec, "requester")?,
@@ -636,6 +637,21 @@ fn structured_action(spec: &Value) -> Result<BoundedBytes<65536>> {
         },
         "cancel_compute_job" => ActionV1::CancelComputeJob {
             requester: spec_hash(spec, "requester")?,
+            job_id: spec_hash(spec, "job_id")?,
+        },
+        "challenge_compute_result" => ActionV1::ChallengeComputeResult {
+            requester: spec_hash(spec, "requester")?,
+            job_id: spec_hash(spec, "job_id")?,
+            seed: spec_u32(spec, "seed")?,
+            start: spec_u64(spec, "start")?,
+        },
+        "finalize_compute_result" => ActionV1::FinalizeComputeResult {
+            worker: spec_hash(spec, "worker")?,
+            job_id: spec_hash(spec, "job_id")?,
+            seed: spec_u32(spec, "seed")?,
+            start: spec_u64(spec, "start")?,
+        },
+        "expire_compute_job" => ActionV1::ExpireComputeJob {
             job_id: spec_hash(spec, "job_id")?,
         },
         "commit_custody_positions" => {
@@ -1424,9 +1440,9 @@ fn read_spec_arg(args: &[String]) -> Result<String> {
 }
 
 pub const USAGE: &str = "noos-cli <command>\n\
-  keygen    --seed <hex> --purpose sign|view|agent|recovery|umbra:<suite> --account <n> --index <n>\n\
+  keygen    --seed-stdin --purpose sign|view|agent|recovery|umbra:<suite> --account <n> --index <n>\n\
   tx build  --spec <json> | --spec-file <path>\n\
-  tx sign   --tx <hex> --seed <hex> --account <n> --index <n> --chain-id <hex32> --genesis-hash <hex32> [--scope <n>] [--lock-reveal <hex>]...\n\
+  tx sign   --tx <hex> --seed-stdin --account <n> --index <n> --chain-id <hex32> --genesis-hash <hex32> [--scope <n>] [--lock-reveal <hex>]...\n\
   tx submit --node <addr> --token <t> --chain-id <hex32> --genesis-hash <hex32> --tx <hex> --witnesses <hex>\n\
   query     block <height|hash> --indexer <addr> | tx <txid> --indexer <addr> | neural-oracle <query-id> --node <addr> --token <t>\n\
   manifest  verify --file <path> --public-key <hex32> [--now-unix-ms <u64>]\n\

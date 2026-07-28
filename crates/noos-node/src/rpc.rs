@@ -641,11 +641,16 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
                 "capsule_id": hex(&receipt.capsule_id),
                 "artifact_id": hex(&receipt.artifact_id),
                 "execution_profile_id": hex(&receipt.execution_profile_id),
+                "input_tokens": receipt.input_tokens,
+                "output_tokens": receipt.output_tokens,
                 "output_root": hex(&receipt.output_root),
                 "token_history_root": hex(&receipt.token_history_root),
                 "anchor_height": receipt.anchor_height,
                 "anchor_block": hex(&receipt.anchor_block),
                 "terminal_code": receipt.terminal_code as u8,
+                "metered_amount": receipt.metered_amount.to_string(),
+                "paid_amount": receipt.paid_amount.to_string(),
+                "refunded_amount": receipt.refunded_amount.to_string(),
             }),
             _ => {
                 return json_error(
@@ -661,6 +666,9 @@ fn wwm_record_route(consensus_tx: &SyncSender<ConsensusMsg>, raw: &str) -> Strin
                 "job_id": hex(&settlement.job_id),
                 "receipt_id": hex(&settlement.receipt_id),
                 "fund_profile_id": hex(&settlement.fund_profile_id),
+                "paid_amount": settlement.paid_amount.to_string(),
+                "refunded_amount": settlement.refunded_amount.to_string(),
+                "released_amount": settlement.released_amount.to_string(),
                 "settled_height": settlement.settled_height,
             }),
             _ => {
@@ -1725,7 +1733,7 @@ fn compute_workers_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
         .iter()
         .map(|worker| {
             format!(
-                r#"{{"worker":"{}","capabilities":{},"cpu_threads":{},"memory_mb":{},"gpu_memory_mb":{},"price_per_unit":"{}","endpoint_commitment":"{}","active":{},"jobs_completed":"{}","units_completed":"{}"}}"#,
+                r#"{{"worker":"{}","capabilities":{},"cpu_threads":{},"memory_mb":{},"gpu_memory_mb":{},"price_per_unit":"{}","endpoint_commitment":"{}","active":{},"jobs_completed":"{}","units_completed":"{}","bond_available":"{}","bond_locked":"{}","jobs_failed":"{}","penalties_paid":"{}"}}"#,
                 hex(&worker.worker),
                 worker.capabilities,
                 worker.cpu_threads,
@@ -1736,6 +1744,10 @@ fn compute_workers_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
                 worker.active,
                 worker.jobs_completed,
                 worker.units_completed,
+                worker.bond_available,
+                worker.bond_locked,
+                worker.jobs_failed,
+                worker.penalties_paid,
             )
         })
         .collect::<Vec<_>>()
@@ -1766,7 +1778,7 @@ fn compute_jobs_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
                 .map(|value| format!(r#""{}""#, hex(value)))
                 .unwrap_or_else(|| "null".into());
             format!(
-                r#"{{"job_id":"{}","requester":"{}","worker":{},"workload_kind":{},"input_root":"{}","units":"{}","unit_size":{},"max_price_per_unit":"{}","agreed_price_per_unit":"{}","escrow":"{}","deadline_height":"{}","state":{},"result_root":"{}","completed_units":"{}"}}"#,
+                r#"{{"job_id":"{}","requester":"{}","worker":{},"workload_kind":{},"input_root":"{}","units":"{}","unit_size":{},"max_price_per_unit":"{}","agreed_price_per_unit":"{}","escrow":"{}","deadline_height":"{}","state":{},"result_root":"{}","completed_units":"{}","worker_bond":"{}","claimed_height":"{}","submitted_height":"{}","review_deadline_height":"{}","resolution":{}}}"#,
                 hex(&job.job_id),
                 hex(&job.requester),
                 worker,
@@ -1781,6 +1793,11 @@ fn compute_jobs_route(consensus_tx: &SyncSender<ConsensusMsg>) -> String {
                 job.state,
                 hex(&job.result_root),
                 job.completed_units,
+                job.worker_bond,
+                job.claimed_height,
+                job.submitted_height,
+                job.review_deadline_height,
+                job.resolution,
             )
         })
         .collect::<Vec<_>>()

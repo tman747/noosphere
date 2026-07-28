@@ -1,0 +1,128 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-jet\",\"-p\",\"noos-grain\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-jet\",\"noos-grain\"]}",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-jet\",\"-p\",\"noos-grain\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-jet\",\"noos-grain\"]}",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "M-JET": "d922b7e1b94b9d374f6308f8ddace011593b6248383ff8bedfe7b676ff5fcac7"
+  },
+  "claims": [
+    "M-JET"
+  ],
+  "command": [
+    "tools/gates/run_implementation_claim.py",
+    "--claim",
+    "M-JET"
+  ],
+  "evidence_sha256": "b8dd5b27a9700794dd0f8accf5167b86ce74d1bc9a14db7f9927a4355c250546",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-m-jet",
+  "limitations": [
+    "This is local implementation evidence, not independent or production evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 372,
+        "git_blob": "ad47b7da4c86036e61599bb50024ecc6b2929cc1",
+        "git_mode": "100644",
+        "path": "crates/noos-grain/Cargo.toml",
+        "sha256": "cb53cbb9f790cf60512c616f2cec30524cdaec3edddf99fb6c432e9840099a05"
+      },
+      {
+        "bytes": 9220,
+        "git_blob": "6126fe40087d0a1b7a17b01051a7d02ac05beef1",
+        "git_mode": "100644",
+        "path": "crates/noos-grain/src/lib.rs",
+        "sha256": "f5895e22606ee3f56db12a087d7401efbfe1a1dd08295b9033fe21976db2389e"
+      },
+      {
+        "bytes": 1179,
+        "git_blob": "70203a51ec5278e21ede38a141233ab800924ee2",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/Cargo.toml",
+        "sha256": "fb787eab322d76feca51801ad2e2086f6291b5753a2012e253b79a4623e280d6"
+      },
+      {
+        "bytes": 3192,
+        "git_blob": "ecd0c7085bc15712f6b60669941d73be498fe84d",
+        "git_mode": "100644",
+        "path": "crates/noos-jet/src/lib.rs",
+        "sha256": "b4d96be481d260b737c33f5d5c76fdd20d91dddfb0cb710a639d5f813db7099c"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 4001,
+        "git_blob": "3a9320d991dba39a348dea0b43cf974122537ff2",
+        "git_mode": "100644",
+        "path": "tools/gates/run_implementation_claim.py",
+        "sha256": "f1754f72a93943b1e11fd838d920479474b9d1a59344bb1af9b5f9493872e44f"
+      }
+    ],
+    "manifest_sha256": "37a31006b6ba89745d61e0205201083d4b08dd13ceee8810e9a6cb59b385efb2",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

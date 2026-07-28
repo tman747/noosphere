@@ -2,6 +2,8 @@ param(
     [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
     [string]$RuntimeRoot = 'C:\mindchain\wwm-testnet',
     [string]$NodeBinary = 'C:\mindchain\wwm-testnet\bin\noosd.exe',
+    [string]$BootstrapRegistry = 'C:\mindchain\wwm-testnet\network\bootstrap-registry.json',
+    [string]$BootstrapPublicKeyFile = 'C:\mindchain\wwm-testnet\network\bootstrap-registry.public',
     [string]$WalletCliBinary = 'C:\mindchain\wwm-testnet\bin\noos-cli.exe',
     [string]$WalletApiBase = 'https://wwm-seed-2.mindchain.network',
     [string]$WalletFaucetDb = 'C:\mindchain\wwm-testnet\wallet\faucet.sqlite3',
@@ -36,6 +38,9 @@ param(
     [string]$InferenceTokenizerSha256 = '2685f72d8b2c27c72c116d2c6af9bb180adb4bf2f4fc9adee052dbcfe7f266f4',
     [string]$SeedHostname = 'wwm-seed.mindchain.network',
     [string]$SeedIp = '20.15.164.29',
+    [string]$MindScanIndexer = 'https://wwm-seed.mindchain.network',
+    [string]$MindScanListen = '127.0.0.1:29830',
+    [UInt64]$PublicTestnetRefundActivationHeight = 0,
     [switch]$SkipTunnel
 )
 
@@ -60,6 +65,7 @@ $SiteRoot = Join-Path $RepoRoot 'site'
 $GatewayScript = Join-Path $RepoRoot 'tools\operations\wwm_public_gateway.py'
 $StaticHostScript = Join-Path $RepoRoot 'tools\operations\wwm_static_bundle_server.py'
 $MonitorScript = Join-Path $RepoRoot 'tools\operations\wwm_public_testnet_monitor.py'
+$MindScanScript = Join-Path $RepoRoot 'tools\mindscan.py'
 $DeploymentManifest = Join-Path $RepoRoot 'deploy\wwm\public-testnet.json'
 $NeuralPublisherScript = Join-Path $RepoRoot 'tools\operations\wwm_neural_publisher.py'
 
@@ -68,6 +74,8 @@ foreach ($directory in @($DataDir, $LogDir, $MonitorEvidenceDir, $NeuralPublishe
 }
 foreach ($file in @(
     $NodeBinary,
+    $BootstrapRegistry,
+    $BootstrapPublicKeyFile,
     $TokenFile,
     $Seed2RpcTokenFile,
     $SshBinary,
@@ -80,6 +88,7 @@ foreach ($file in @(
     $CoordinatorConfig,
     $CoordinatorSeedFile,
     $MonitorScript,
+    $MindScanScript,
     $DeploymentManifest,
     $MonitorSigningKey,
     $R2Report,
@@ -116,6 +125,10 @@ if ($Token.Length -lt 32 -or $Token -match '\s') {
     throw 'RPC token file must contain one non-whitespace token of at least 32 characters.'
 }
 Remove-Variable Token
+$BootstrapPublicKey = (Get-Content -LiteralPath $BootstrapPublicKeyFile -Raw).Trim()
+if ($BootstrapPublicKey -notmatch '^[0-9a-f]{64}$') {
+    throw 'Bootstrap registry public key must be canonical lowercase hex32.'
+}
 $CoordinatorSeed = (Get-Content -LiteralPath $CoordinatorSeedFile -Raw).Trim()
 if ($CoordinatorSeed -notmatch '^[0-9a-f]{64}$') {
     throw 'Web-capacity coordinator seed must be canonical lowercase hex32.'
@@ -140,26 +153,38 @@ if (
     throw 'Node binary is not bound to the exact repository source revision.'
 }
 $ReleaseVersion = $NodeVersionMatch.Groups['release'].Value
+$Deployment = Get-Content -LiteralPath $DeploymentManifest -Raw | ConvertFrom-Json
+$ChainId = [string]$Deployment.chain_binding.chain_id
+$GenesisHash = [string]$Deployment.chain_binding.genesis_hash
+if ($ChainId -notmatch '^[0-9a-f]{64}$' -or $GenesisHash -notmatch '^[0-9a-f]{64}$') {
+    throw 'Deployment manifest chain identity is not canonical.'
+}
 
 $GovernanceAccount = '17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce'
+$NodeArguments = @(
+    '--observer',
+    '--devnet-witness-fixture',
+    '--devnet-bonsai-fixture',
+    '--public-testnet-genesis-v1',
+    '--rpc', '127.0.0.1:29652',
+    '--rpc-token-file', $TokenFile,
+    '--devnet-governance-account', $GovernanceAccount,
+    '--p2p-listen', '/ip4/0.0.0.0/udp/29650/quic-v1',
+    '--bootstrap-registry', $BootstrapRegistry,
+    '--bootstrap-public-key', $BootstrapPublicKey,
+    '--data-dir', $DataDir
+)
+if ($PublicTestnetRefundActivationHeight -gt 0) {
+    $NodeArguments += @(
+        '--public-testnet-refund-activation-height',
+        $PublicTestnetRefundActivationHeight.ToString([Globalization.CultureInfo]::InvariantCulture)
+    )
+}
 $Specs = @(
     [pscustomobject]@{
         Name = 'node'
         Exe = $NodeBinary
-        Args = @(
-            '--observer',
-            '--devnet-witness-fixture',
-            '--devnet-bonsai-fixture',
-            '--rpc', '127.0.0.1:29652',
-            '--rpc-token-file', $TokenFile,
-            '--devnet-governance-account', $GovernanceAccount,
-            '--p2p-listen', '/ip4/0.0.0.0/udp/29650/quic-v1',
-            '--peer', '/ip4/20.15.164.29/udp/31004/quic-v1',
-            '--peer', '/ip4/172.202.41.123/udp/31005/quic-v1',
-            '--peer', '/ip4/48.217.51.122/udp/31006/quic-v1',
-            '--peer', '/ip4/48.217.51.122/udp/31007/quic-v1',
-            '--data-dir', $DataDir
-        )
+        Args = $NodeArguments
     },
     [pscustomobject]@{
         Name = 'artifact-store'
@@ -201,6 +226,21 @@ $Specs = @(
         Environment = @{
             NOOS_WWM_WEB_CAPACITY_SEED = $CoordinatorSeed
         }
+    },
+    [pscustomobject]@{
+        Name = 'mindscan'
+        Exe = $PythonBinary
+        Args = @(
+            $MindScanScript,
+            '--listen', $MindScanListen,
+            '--base-path', '/mindscan',
+            '--indexer', $MindScanIndexer,
+            '--chain-id', $ChainId,
+            '--genesis-hash', $GenesisHash,
+            '--source-revision', $SourceRevision,
+            '--indexer-release-version', $ReleaseVersion,
+            '--release-version', $ReleaseVersion
+        )
     },
     [pscustomobject]@{
         Name = 'monitor'
@@ -300,6 +340,7 @@ $ProcessMarkers = @{
     'static-host' = $StaticHostScript
     'web-capacity' = $CoordinatorConfig
     'monitor' = $MonitorScript
+    'mindscan' = $MindScanScript
     'neural-publisher' = $NeuralPublisherScript
     'gateway' = $GatewayScript
     'seed2-rpc-fallback-tunnel' = '127.0.0.1:39652:127.0.0.1:29652'

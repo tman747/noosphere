@@ -19,6 +19,7 @@ use crate::wwm::{
 };
 use crate::{domain_hash, domains, Hash32};
 use noos_codec::{define_object, CodecError, NoosDecode, NoosEncode, Reader, Writer};
+use sha2::{Digest, Sha256};
 
 // ---------------------------------------------------------------------------
 // Bounded helper types
@@ -698,6 +699,10 @@ define_object! {
         8 => active: u8,
         9 => jobs_completed: u64,
         10 => units_completed: u64,
+        11 => bond_available: u128,
+        12 => bond_locked: u128,
+        13 => jobs_failed: u64,
+        14 => penalties_paid: u128,
     }
 }
 
@@ -720,6 +725,11 @@ define_object! {
         12 => state: u8,
         13 => result_root: [u8; 32],
         14 => completed_units: u64,
+        15 => worker_bond: u128,
+        16 => claimed_height: u64,
+        17 => submitted_height: u64,
+        18 => review_deadline_height: u64,
+        19 => resolution: u8,
     }
 }
 
@@ -734,8 +744,65 @@ impl ComputeJobV1 {
     pub const STATE_SUBMITTED: u8 = 2;
     pub const STATE_SETTLED: u8 = 3;
     pub const STATE_CANCELLED: u8 = 4;
+    pub const STATE_INVALID: u8 = 5;
+    pub const STATE_TIMED_OUT: u8 = 6;
+    pub const RESOLUTION_NONE: u8 = 0;
+    pub const RESOLUTION_REQUESTER_ACCEPTED: u8 = 1;
+    pub const RESOLUTION_CHALLENGE_CONFIRMED_RESULT: u8 = 2;
+    pub const RESOLUTION_CHALLENGE_REJECTED_RESULT: u8 = 3;
+    pub const RESOLUTION_TIMEOUT: u8 = 4;
+    pub const RESOLUTION_CANCELLED_OPEN: u8 = 5;
+    pub const RESOLUTION_OBJECTIVE_FINALIZED_VALID: u8 = 6;
+    pub const RESOLUTION_OBJECTIVE_FINALIZED_INVALID: u8 = 7;
+    pub const REVIEW_WINDOW_BLOCKS: u64 = 100;
+    pub const MAX_DISPUTE_OPERATIONS: u64 = 1_000_000;
+    pub const CHALLENGE_BOND_DIVISOR: u128 = 10;
 }
 
+const MIX32_INPUT_DOMAIN: &[u8] = b"NOOS/COMPUTE/MIX32/INPUT/V1";
+const MIX32_RESULT_DOMAIN: &[u8] = b"NOOS/COMPUTE/MIX32/RESULT/V1";
+
+fn compute_mix32_value(seed: u32, global_index: u64, rounds: u32) -> u32 {
+    let mut value = seed ^ (global_index as u32) ^ 0x9E37_79B9;
+    for _ in 0..rounds {
+        value ^= value.wrapping_shl(13);
+        value ^= value.wrapping_shr(17);
+        value ^= value.wrapping_shl(5);
+        value = value.wrapping_mul(0x85EB_CA6B).wrapping_add(0xC2B2_AE35);
+    }
+    value
+}
+
+fn checked_mix32_meter(start: u64, units: u64, rounds: u32) -> Option<u64> {
+    if units == 0 || rounds == 0 {
+        return None;
+    }
+    start.checked_add(units.checked_sub(1)?)?;
+    let operations = units.checked_mul(u64::from(rounds))?;
+    (operations <= ComputeJobV1::MAX_DISPUTE_OPERATIONS).then_some(operations)
+}
+
+#[must_use]
+pub fn compute_mix32_input_root(seed: u32, start: u64, units: u64, rounds: u32) -> Option<Hash32> {
+    checked_mix32_meter(start, units, rounds)?;
+    let payload = format!(r#"{{"rounds":{rounds},"seed":{seed},"start":{start},"units":{units}}}"#);
+    let mut hasher = Sha256::new();
+    hasher.update(MIX32_INPUT_DOMAIN);
+    hasher.update(payload.as_bytes());
+    Some(hasher.finalize().into())
+}
+
+#[must_use]
+pub fn compute_mix32_result_root(seed: u32, start: u64, units: u64, rounds: u32) -> Option<Hash32> {
+    checked_mix32_meter(start, units, rounds)?;
+    let mut hasher = Sha256::new();
+    hasher.update(MIX32_RESULT_DOMAIN);
+    for offset in 0..units {
+        let global_index = start.checked_add(offset)?;
+        hasher.update(compute_mix32_value(seed, global_index, rounds).to_le_bytes());
+    }
+    Some(hasher.finalize().into())
+}
 #[must_use]
 pub fn asset_id(creating_txid: &Hash32, action_index: u32) -> Hash32 {
     domain_hash(
@@ -945,6 +1012,7 @@ pub enum ActionV1 {
         gpu_memory_mb: u32,
         price_per_unit: u128,
         endpoint_commitment: Hash32,
+        bond: u128,
     },
     /// 16 — lock requester NOOS for one independently executable shard.
     OpenComputeJob {
@@ -1156,10 +1224,28 @@ pub enum ActionV1 {
     CommitNeuralOracleReply(NeuralOracleCommitV1),
     RevealNeuralOracleReply(NeuralOracleRevealV1),
     FinalizeNeuralOracleQuery(FinalizeNeuralOracleQueryV1),
+    /// 66 — requester posts a bounded bond and objectively resolves a result.
+    ChallengeComputeResult {
+        requester: Hash32,
+        job_id: Hash32,
+        seed: u32,
+        start: u64,
+    },
+    /// 67 — permissionlessly finalize an unchallenged result by recomputation.
+    FinalizeComputeResult {
+        worker: Hash32,
+        job_id: Hash32,
+        seed: u32,
+        start: u64,
+    },
+    /// 68 — permissionlessly resolve an expired open or claimed job.
+    ExpireComputeJob {
+        job_id: Hash32,
+    },
 }
 
 impl ActionV1 {
-    pub const VARIANT_COUNT: u16 = 66;
+    pub const VARIANT_COUNT: u16 = 69;
 }
 
 impl NoosEncode for ActionV1 {
@@ -1332,6 +1418,7 @@ impl NoosEncode for ActionV1 {
                 gpu_memory_mb,
                 price_per_unit,
                 endpoint_commitment,
+                bond,
             } => {
                 w.put_u16(15);
                 w.put_array32(worker);
@@ -1341,6 +1428,7 @@ impl NoosEncode for ActionV1 {
                 w.put_u32(*gpu_memory_mb);
                 w.put_u128(*price_per_unit);
                 w.put_array32(endpoint_commitment);
+                w.put_u128(*bond);
             }
             ActionV1::OpenComputeJob {
                 requester,
@@ -1715,6 +1803,34 @@ impl NoosEncode for ActionV1 {
                 w.put_u16(65);
                 v.encode(w);
             }
+            ActionV1::ChallengeComputeResult {
+                requester,
+                job_id,
+                seed,
+                start,
+            } => {
+                w.put_u16(66);
+                w.put_array32(requester);
+                w.put_array32(job_id);
+                w.put_u32(*seed);
+                w.put_u64(*start);
+            }
+            ActionV1::FinalizeComputeResult {
+                worker,
+                job_id,
+                seed,
+                start,
+            } => {
+                w.put_u16(67);
+                w.put_array32(worker);
+                w.put_array32(job_id);
+                w.put_u32(*seed);
+                w.put_u64(*start);
+            }
+            ActionV1::ExpireComputeJob { job_id } => {
+                w.put_u16(68);
+                w.put_array32(job_id);
+            }
         }
     }
 }
@@ -1803,6 +1919,7 @@ impl NoosDecode for ActionV1 {
                 gpu_memory_mb: r.get_u32()?,
                 price_per_unit: r.get_u128()?,
                 endpoint_commitment: r.get_array32()?,
+                bond: r.get_u128()?,
             }),
             16 => Ok(ActionV1::OpenComputeJob {
                 requester: r.get_array32()?,
@@ -2022,6 +2139,21 @@ impl NoosDecode for ActionV1 {
             65 => Ok(ActionV1::FinalizeNeuralOracleQuery(
                 FinalizeNeuralOracleQueryV1::decode(r)?,
             )),
+            66 => Ok(ActionV1::ChallengeComputeResult {
+                requester: r.get_array32()?,
+                job_id: r.get_array32()?,
+                seed: r.get_u32()?,
+                start: r.get_u64()?,
+            }),
+            67 => Ok(ActionV1::FinalizeComputeResult {
+                worker: r.get_array32()?,
+                job_id: r.get_array32()?,
+                seed: r.get_u32()?,
+                start: r.get_u64()?,
+            }),
+            68 => Ok(ActionV1::ExpireComputeJob {
+                job_id: r.get_array32()?,
+            }),
             _ => Err(CodecError::UnknownDiscriminant),
         }
     }

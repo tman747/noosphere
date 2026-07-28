@@ -1,0 +1,121 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"controls\":[\"class_gate_irreversible_budget\"]}",
+      "id": "activation-controls-disabled",
+      "kind": "disabled_control",
+      "passed": true
+    },
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-agent-class\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-agent-class\"]}",
+      "id": "registered-falsifier",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-CLASS-GATE.v1": "9977315380c1b517d87aefef16e99496c60c6aba5b065b118f959511a72be14b"
+  },
+  "claims": [
+    "A-CLASS-GATE.v1"
+  ],
+  "command": [
+    "tools/gates/run_negative_claim.py",
+    "--claim",
+    "A-CLASS-GATE.v1"
+  ],
+  "evidence_sha256": "b38cb281274da77b9c5bde264d1ec23347b31619a0be3de0cc6183477cfd9f76",
+  "expected_result": "KILLED",
+  "gate": "negative-a-class-gate-v1",
+  "limitations": [
+    "The killed claim remains fail-closed; the replacement mechanism is a separate claim."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "KILLED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 419,
+        "git_blob": "e58029e6750bc21bb8dd2fd49626136d306d66d8",
+        "git_mode": "100644",
+        "path": "crates/noos-agent-class/Cargo.toml",
+        "sha256": "2ddcb38e7a47ae5603301d92cc97707aaaaca359f91cf9f81b87c1b5498b8579"
+      },
+      {
+        "bytes": 41183,
+        "git_blob": "76a9d66df0a1ce340de01660d8b66f0f3e705c68",
+        "git_mode": "100644",
+        "path": "crates/noos-agent-class/src/lib.rs",
+        "sha256": "0479338e036da7e057191f12893a039b7f83a97111f0c34b59ac0ddfd734d318"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 30076,
+        "git_blob": "8c8a6c498c37e1d1b0322cff5653f8bcf26178cb",
+        "git_mode": "100644",
+        "path": "protocol/spec/constants-v1.toml",
+        "sha256": "eaaf1a9680aab2cba1b8b972e2e80123b6ce27cfe84c5f02fb5c44bb68ec693e"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 1866,
+        "git_blob": "9cd34fd3e4eabf9099bab7bb3bbb00ac3b865508",
+        "git_mode": "100644",
+        "path": "tools/gates/run_negative_claim.py",
+        "sha256": "3db904937fb7e7c572b7ddf9447062acc74bb7b7aa6f5b844c2d5593b20c604f"
+      }
+    ],
+    "manifest_sha256": "514a0cb1023365c18abbf05dd0a5a8bf2d3407ead9cd565fe457022c698389c3",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-braid\",\"keyless::tests\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"stdout_sha256\":\"b075e2d7a93b688095d9a8c7ab736b188d81c54890fc124531a155b06bdb2c7d\"},{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-node\",\"claim_e_blackout_all_optional_controls_off_keeps_base_live\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"stdout_sha256\":\"5b6cf1149ec77e5af116b85b2406d21d7a931a15d70d4f9b9fea7b74d779c726\"}]",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-braid\",\"keyless::tests\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"stdout_sha256\":\"b075e2d7a93b688095d9a8c7ab736b188d81c54890fc124531a155b06bdb2c7d\"},{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-node\",\"claim_e_blackout_all_optional_controls_off_keeps_base_live\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"stdout_sha256\":\"5b6cf1149ec77e5af116b85b2406d21d7a931a15d70d4f9b9fea7b74d779c726\"}]",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "A-KEYLESS-CONSENSUS": "c66762e0446f8f9ce37e28ae10d4b5198cee85808aa62fea721d534a1abc1ad0"
+  },
+  "claims": [
+    "A-KEYLESS-CONSENSUS"
+  ],
+  "command": [
+    "tools/gates/run_base_network_claim.py",
+    "--claim",
+    "A-KEYLESS-CONSENSUS"
+  ],
+  "evidence_sha256": "bda53f58fbc494e10dc935622d6f9b7fee885b1ec865899ee69527a5b6881bf9",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-a-keyless-consensus",
+  "limitations": [
+    "Evidence exercises real local NodeCore/P2P paths; it is not external evidence."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 8391,
+        "git_blob": "d8417a2fd00eabaf827a32be5e0663fecdd1d996",
+        "git_mode": "100644",
+        "path": "crates/noos-braid/src/keyless.rs",
+        "sha256": "bf81aebe61f1460b3e547b570e6a522c91f84c7791fa1ae852d778b2731bfd0a"
+      },
+      {
+        "bytes": 2743,
+        "git_blob": "494a06a3cb21bd78242967fdc870367a640b0d47",
+        "git_mode": "100644",
+        "path": "crates/noos-braid/src/lib.rs",
+        "sha256": "4b12425b42a3dee80b50c2b4439dd9023933340f6902bbca90310a083d1d2a3c"
+      },
+      {
+        "bytes": 142003,
+        "git_blob": "965847887307108aaa354494405bb1f23a5d20b3",
+        "git_mode": "100644",
+        "path": "crates/noos-node/src/consensus.rs",
+        "sha256": "82c800529877d2c5606d6e5d2c7703dfdc956013a22952fb15753c3ff109ea7c"
+      },
+      {
+        "bytes": 19756,
+        "git_blob": "11c7e3919cfa068dd96fd88b5f859f1df86b67a8",
+        "git_mode": "100644",
+        "path": "crates/noos-node/src/network.rs",
+        "sha256": "588d204d584654dcba7af90e8c9697f0e76c1ea31ceb0392cc4ecb628d7fb5e2"
+      },
+      {
+        "bytes": 12895,
+        "git_blob": "1671f2e8e0cd95096a7a4e3a442005dea4ec09ed",
+        "git_mode": "100644",
+        "path": "crates/noos-node/src/tests/claims.rs",
+        "sha256": "eca57283006e2ff4abb65f41e0421d358bae6be8174f7bd24a13540fede118f0"
+      },
+      {
+        "bytes": 6327,
+        "git_blob": "b9da5e635147f353dc72775e24a43c7f5ce18a3b",
+        "git_mode": "100644",
+        "path": "crates/noos-p2p/src/fault.rs",
+        "sha256": "8e29557f117d51f6463764ef1d00f4abe5ef1ff7a97a78d23270e1d3cf4ae967"
+      },
+      {
+        "bytes": 4019,
+        "git_blob": "56a08548b71c4f2d74130d94e4841717968ec7e5",
+        "git_mode": "100644",
+        "path": "crates/noos-p2p/src/lib.rs",
+        "sha256": "11fb3234ac91a118ba911c2651f499107877c1e3714cc892140a22bccd3245e7"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 7035,
+        "git_blob": "b4f656e803b84471f29d3eb422c6a8bb02911536",
+        "git_mode": "100644",
+        "path": "tools/gates/run_base_network_claim.py",
+        "sha256": "b92143c473aa8b3448d3ef0aafc81137325392f169dcb57f36275120a662ebbf"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      }
+    ],
+    "manifest_sha256": "197cc97dddfc32fe99d2835c296b31dd03d4800fa2c8bd0e2b7baeab1013b7db",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

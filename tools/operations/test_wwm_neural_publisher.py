@@ -171,6 +171,135 @@ class NeuralPublisherTests(unittest.TestCase):
             self.assertEqual(persisted["active"]["phase"], "open_finalized")
             self.assertEqual(persisted["active"]["open_txid"], OPEN_TXID)
 
+    def test_finalized_close_recovers_transaction_from_completed_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            runtime, config = self.make_runtime(Path(temp))
+            plan = plan_fixture()
+            job_record = {
+                "schema": "noos/finalized-wwm-record/v1",
+                "kind": "job",
+                "id": JOB_ID,
+                "canonical_record_hex": "0101",
+                "finalized_height": 200,
+            }
+            receipt_record = {
+                "schema": "noos/finalized-wwm-record/v1",
+                "kind": "receipt",
+                "id": RECEIPT_ID,
+                "canonical_record_hex": "0202",
+                "finalized_height": 300,
+            }
+            settlement_record = {
+                "schema": "noos/finalized-wwm-record/v1",
+                "kind": "settlement",
+                "id": SETTLEMENT_ID,
+                "canonical_record_hex": "0303",
+                "finalized_height": 300,
+            }
+            inference = {
+                "output_tokens": 8,
+                "output_bytes": 20,
+                "output_root": OUTPUT_ROOT,
+                "token_history_root": TOKEN_ROOT,
+            }
+            close_plan = {
+                "schema": "noos/wwm-chain-bound-close-plan/v1",
+                "receipt": {"receipt_id": RECEIPT_ID},
+                "settlement": {"settlement_id": SETTLEMENT_ID},
+            }
+            active = {
+                "sequence": 2,
+                "run_id": plan["run_id"],
+                "phase": "close_prepared",
+                "started_at": "2026-07-21T11:00:00+00:00",
+                "plan": plan,
+                "job_record": job_record,
+                "inference": inference,
+                "close_plan": close_plan,
+            }
+            runtime.state["active"] = active
+            runtime._save_state()
+            indexed = {
+                "txid": CLOSE_TXID,
+                "state": "INCLUDED",
+                "fee": "1506",
+                "inclusion": {"height": "300", "hash": BLOCK_HASH, "index": "0"},
+            }
+            activity = {
+                "sequence": 2,
+                "label": "Neural pulse 02",
+                "transaction_id": CLOSE_TXID,
+                "included_height": 300,
+                "included_block": BLOCK_HASH,
+                "fee_charged": "1506",
+                "job_id": JOB_ID,
+                "receipt_id": RECEIPT_ID,
+                "settlement_id": SETTLEMENT_ID,
+                "prompt_commitment": plan["prompt_commitment"],
+                "input_tokens": publisher.PROMPT_INPUT_TOKENS,
+                "output_tokens": inference["output_tokens"],
+                "output_bytes": inference["output_bytes"],
+                "duration_milliseconds": 1250,
+                "output_root": OUTPUT_ROOT,
+                "token_history_root": TOKEN_ROOT,
+            }
+            evidence = {
+                "schema": publisher.EVIDENCE_SCHEMA,
+                "generated_at": "2026-07-21T11:01:00+00:00",
+                "environment": "public-testnet",
+                "production": False,
+                "promotion_effect": "NONE",
+                "chain_id": CHAIN_ID,
+                "genesis_hash": GENESIS_HASH,
+                "run_id": plan["run_id"],
+                "activity": activity,
+                "open_transaction_id": OPEN_TXID,
+                "close_transaction_id": CLOSE_TXID,
+                "finalized_job": job_record,
+                "finalized_receipt": receipt_record,
+                "finalized_settlement": settlement_record,
+                "indexer_confirmations": [
+                    {"origin": origin, "transaction": indexed}
+                    for origin in runtime.manifest["indexer_origins"]
+                ],
+                "claims": {
+                    "model_execution_off_chain": True,
+                    "job_receipt_settlement_finalized_on_chain": True,
+                    "three_indexers_agree": True,
+                    "production_claimed": False,
+                },
+            }
+            config.evidence_dir.mkdir(parents=True)
+            evidence_path = config.evidence_dir / f"pulse-0002-{plan['run_id']}.json"
+            evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+            records = {"receipt": receipt_record, "settlement": settlement_record}
+            with (
+                patch.object(demo, "verify_chain_bound_close", return_value=records),
+                patch.object(demo, "submit_chain_bound_close") as submit,
+            ):
+                observed = runtime._ensure_close(active, job_record, inference)
+
+            self.assertEqual(observed, records)
+            submit.assert_not_called()
+            self.assertEqual(active["open_txid"], OPEN_TXID)
+            self.assertEqual(active["close_txid"], CLOSE_TXID)
+            self.assertEqual(active["phase"], "close_finalized")
+            persisted = json.loads(config.state.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["active"]["close_txid"], CLOSE_TXID)
+
+    def test_begin_rejects_manifest_rollback_below_durable_frontier(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            runtime, _ = self.make_runtime(Path(temp))
+            runtime.state["last_completed"] = {
+                "sequence": 2,
+                "completed_at": "2026-07-21T11:00:00+00:00",
+                "finalized_height": 200,
+                "transaction_id": CLOSE_TXID,
+            }
+            with self.assertRaisesRegex(publisher.PublisherError, "completion frontier disagree"):
+                runtime._begin({})
+
     def test_forced_publish_persists_callbacks_evidence_and_newest_activity(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             runtime, config = self.make_runtime(Path(temp))

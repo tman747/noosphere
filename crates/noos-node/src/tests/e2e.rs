@@ -166,3 +166,20 @@ fn e2e_happy_path_finality_and_restart_recovery() {
     let _ = wit;
     let _ = ImportOutcome::Executed { hash: next }; // type anchor
 }
+
+#[test]
+fn public_testnet_v1_da_profile_replays_and_resumes() {
+    let dir = test_dir("public-testnet-v1-da-restart");
+    let mut config = node_config();
+    config.public_testnet_genesis_v1 = true;
+    let mut core = boot_node(&dir, config.clone());
+    let first = produce_next(&mut core);
+    let roots = core.ledger().roots();
+    drop(core);
+
+    let mut restarted = boot_node(&dir, config);
+    assert_eq!(restarted.head(), (1, first));
+    assert_eq!(restarted.ledger().roots(), roots);
+    let second = produce_next(&mut restarted);
+    assert_eq!(restarted.head(), (2, second));
+}

@@ -38,7 +38,7 @@ transaction submission as an explicit disabled feature (§8.1).
   under `D-CHAIN-ID`; the final genesis hash under `D-GENESIS-FINAL`
   binds chain id, the (devnet-zero) Bitcoin anchor, the DKG fixture root,
   and the canonical final body (identity-v1.md §4).
-* The eight genesis controls are bit-packed in `CONTROL_NAMES` order and
+* The ten genesis controls are bit-packed in `CONTROL_NAMES` order and
   are all zero at genesis. **Control-name law:** controls live in the
   Lumen params tree at `noos.control.<name>`; `noos-lumen` freezes full
   param keys at ≤ 32 bytes and the prefix is 13 bytes, so every control
@@ -46,7 +46,10 @@ transaction submission as an explicit disabled feature (§8.1).
   `genesis.rs`) are:
   `work_loom_credit`, `work_loom_weightcap`, `witness_proofpower`,
   `neural_lane`, `reflex_lane`, `umbra_suite`, `dream_lane`,
-  `class_gate_budget`.
+  `class_gate_budget`, `lending_reviewed`, `bridge_reviewed`.
+  The last two are exact-revision independent-review gates: missing,
+  malformed, or disabled records reject risk-increasing operations while
+  repayment, direct redemption, and other exit paths remain available.
 * `GenesisSpec.extra_accounts` pre-provisions fixture accounts
   (`account_id` = Ed25519 pubkey bytes; `auth_descriptor` = the same
   bytes). Lumen v1 has no account-creation action — deposit targets must
@@ -263,6 +266,28 @@ cache of already durable canonical bodies.
 
 Peer readiness enables request selection; disconnect/rejection removes the
 peer immediately. The transport owns deterministic reconnect backoff.
+
+Bootstrap discovery may be supplied through
+`--bootstrap-registry <path> --bootstrap-public-key <hex32>`. The
+`noos/bootstrap-registry/v1` snapshot is canonical-body Ed25519 signed and
+binds chain ID, genesis hash, positive sequence, direct predecessor, registry
+lifetime, stable libp2p PeerIds, and one to four IP/DNS QUIC addresses per
+node. A current snapshot must expose at least two independently addressable
+active nodes. The node derives its own chain/genesis identity before opening
+the network and refuses wrong-chain, wrong-genesis, untrusted, not-yet-valid,
+expired, malformed, or under-populated snapshots.
+
+Accepted snapshots are persisted as immutable sequence-and-ID-named files
+under the node data directory. A successor must increment the sequence by one
+and name the exact accepted predecessor. A stable PeerId may rotate addresses;
+a removed PeerId must remain as an explicit revoked record, and revocation is
+irreversible. Conflicting same-sequence snapshots, skipped predecessors, and
+rollback to an older signed snapshot fail closed. `--peer` is mutually
+exclusive with signed discovery so static arguments cannot bypass revocation.
+`tools/bootstrap_registry.py` generates the offline signing key, freezes the
+first multi-bootstrap snapshot, publishes direct rotation/revocation
+successors, and verifies the same transition law before output.
+
 Every range/header response is canonically decoded, every repaired body is
 re-encoded to its committed DA root, and all resulting objects enter the
 ordinary import pipeline. Transaction pushes carry canonical transaction

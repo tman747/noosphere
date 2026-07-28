@@ -106,12 +106,29 @@ test("finalized settlement accepts a newer canonical proof snapshot", async () =
       job_id: jobId,
       output_root: outputRoot,
       token_history_root: tokenHistoryRoot,
+      terminal_code: 0,
+      paid_amount: "0",
+      refunded_amount: "0",
     }),
     [`/api/wwm-record/settlement/${settlementId}`]: record("settlement", settlementId, {
       settlement_id: settlementId,
       job_id: jobId,
       receipt_id: receiptId,
+      paid_amount: "0",
+      refunded_amount: "0",
+      released_amount: "0",
     }),
+  };
+  const lifecycle = {
+    schema: "noos/wwm-public-inference-chain-settlement/v1",
+    job_id: jobId,
+    receipt_id: receiptId,
+    settlement_id: settlementId,
+    finalized: {
+      job: { finalized_height: 10, finalized_hash: hex32("b"), objects_root: hex32("c") },
+      receipt: { finalized_height: 20, finalized_hash: summaryHash, objects_root: hex32("d") },
+      settlement: { finalized_height: 20, finalized_hash: summaryHash, objects_root: hex32("d") },
+    },
   };
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => new Response(JSON.stringify(records[url]), {
@@ -127,19 +144,40 @@ test("finalized settlement accepts a newer canonical proof snapshot", async () =
       output_root: outputRoot,
       token_history_root: tokenHistoryRoot,
       output_tokens: 8,
+      terminal_status: "COMPLETED",
+      settlement_state: "FINALIZED_PAID",
       chain_anchor: summaryHash,
-      chain_settlement: {
-        schema: "noos/wwm-public-inference-chain-settlement/v1",
-        job_id: jobId,
-        receipt_id: receiptId,
-        settlement_id: settlementId,
-        finalized: {
-          job: { finalized_height: 10, finalized_hash: hex32("b"), objects_root: hex32("c") },
-          receipt: { finalized_height: 20, finalized_hash: summaryHash, objects_root: hex32("d") },
-          settlement: { finalized_height: 20, finalized_hash: summaryHash, objects_root: hex32("d") },
-        },
-      },
+      chain_settlement: lifecycle,
     });
+    records[`/api/wwm-record/receipt/${receiptId}`].record = {
+      receipt_id: receiptId,
+      job_id: jobId,
+      output_root: hex32("0"),
+      token_history_root: hex32("0"),
+      terminal_code: 1,
+      paid_amount: "0",
+      refunded_amount: "0",
+    };
+    const refunded = {
+      job_id: jobId,
+      receipt_id: receiptId,
+      capsule_id: capsuleId,
+      execution_profile_id: executionProfileId,
+      output_root: hex32("0"),
+      token_history_root: hex32("0"),
+      output_tokens: 0,
+      terminal_status: "CANCELLED",
+      error_code: "USER_REQUESTED",
+      settlement_state: "FINALIZED_REFUNDED",
+      chain_anchor: summaryHash,
+      chain_settlement: lifecycle,
+    };
+    await verifyFinalizedSettlement(refunded);
+    records[`/api/wwm-record/receipt/${receiptId}`].record.terminal_code = 0;
+    await assert.rejects(
+      () => verifyFinalizedSettlement(refunded),
+      /terminal binding/,
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

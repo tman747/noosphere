@@ -894,6 +894,7 @@ fn run(config: &Config) -> Result<serde_json::Value, String> {
     let context = BlockContext {
         chain_id: built.chain_id,
         height: BENCHMARK_HEIGHT,
+        allow_refunded_wwm_terminal_receipts: true,
     };
     let engine = GrainContractEngine::default();
     let auth = NodeAuthVerifier;

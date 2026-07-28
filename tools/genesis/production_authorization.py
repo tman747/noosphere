@@ -436,6 +436,21 @@ ZERO_CONTROLS = {
     "umbra_suite_enabled": False,
     "dream_lane_enabled": False,
     "class_gate_irreversible_budget": 0,
+    "lending_reviewed_enabled": False,
+    "bridge_reviewed_enabled": False,
+}
+
+CONTROL_PARAM_NAMES = {
+    "work_loom_credit_enabled": "work_loom_credit",
+    "work_loom_weight_cap": "work_loom_weightcap",
+    "witness_proofpower_bonus_enabled": "witness_proofpower",
+    "neural_lane_enabled": "neural_lane",
+    "reflex_lane_enabled": "reflex_lane",
+    "umbra_suite_enabled": "umbra_suite",
+    "dream_lane_enabled": "dream_lane",
+    "class_gate_irreversible_budget": "class_gate_budget",
+    "lending_reviewed_enabled": "lending_reviewed",
+    "bridge_reviewed_enabled": "bridge_reviewed",
 }
 
 
@@ -2234,14 +2249,7 @@ def build_canonical_production_genesis(
     for name, value in ZERO_CONTROLS.items():
         enabled = bool(value)
         control = _noos_object(((1, bytes([int(enabled)])),))
-        short = {
-            "work_loom_credit_enabled": "work_loom_credit",
-            "work_loom_weight_cap": "work_loom_weightcap",
-            "witness_proofpower_bonus_enabled": "witness_proofpower",
-            "neural_lane_enabled": "neural_lane", "reflex_lane_enabled": "reflex_lane",
-            "umbra_suite_enabled": "umbra_suite", "dream_lane_enabled": "dream_lane",
-            "class_gate_irreversible_budget": "class_gate_budget",
-        }[name]
+        short = CONTROL_PARAM_NAMES[name]
         params_leaves[_param_key(f"noos.control.{short}")] = _param_record(control)
 
     empty_root = _smt_root({}).hex()

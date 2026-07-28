@@ -26,13 +26,15 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools.gates import wwm_evidence_bundle as gate
+from tools.operations.wwm_static_host import StaticHostError, canonical_origin
 
 EXPERIMENT_MANIFEST = ROOT / "experiments" / "wwm-web-capacity" / "experiment.json"
-LEDGER_SCHEMA = "noos/e-wwm-23-pilot-ledger/v1"
+LEDGER_SCHEMA = "noos/e-wwm-23-pilot-ledger/v2"
 ENVELOPE_SCHEMA = "noos/e-wwm-23-daily-observation/v1"
-SUMMARY_SCHEMA = "noos/e-wwm-23-evidence-summary/v1"
+SUMMARY_SCHEMA = "noos/e-wwm-23-evidence-summary/v2"
 ENVELOPE_DOMAIN = b"NOOS/SIG/WWM/V1\0E-WWM-23-DAILY-OBSERVATION\0"
 SUMMARY_DOMAIN = b"NOOS/SIG/WWM/V1\0E-WWM-23-EVIDENCE-SUMMARY\0"
+FREEZE_DOMAIN = b"NOOS/SIG/WWM/V1\0E-WWM-23-PILOT-FREEZE\0"
 MINIMUM_DURATION = timedelta(days=30)
 MAX_FUTURE_SKEW = timedelta(0)
 MAX_ENVELOPE_BYTES = 64 * 1024
@@ -67,18 +69,27 @@ REQUIRED_PRIVACY = {
 CONFIG_KEYS = {
     "schema",
     "experiment_id",
+    "experiment_manifest_sha256",
     "model_id",
     "model_source_sha256",
     "source_revision",
+    "deployment_sha256",
+    "release_version",
     "evidence_scope",
     "pilot_start_utc",
     "initialized_at_utc",
+    "consent_version",
+    "authorized_origins",
+    "cohort_cells",
     "controls_enabled",
     "production_claim",
     "promotion_authorized",
     "trusted_observers",
+    "pilot_signer_key_id",
     "summary_signer_key_id",
+    "freeze_signature_base64",
 }
+DRAFT_KEYS = CONFIG_KEYS - {"freeze_signature_base64"}
 OBSERVER_KEYS = {
     "observer_id",
     "role",
@@ -135,6 +146,18 @@ def canonical_json(value: Any) -> bytes:
 
 def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
+
+
+def config_payload(config: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in config.items() if key != "freeze_signature_base64"}
+
+
+def freeze_message(config: dict[str, Any]) -> bytes:
+    return FREEZE_DOMAIN + canonical_json(config_payload(config))
+
+
+def freeze_id(config: dict[str, Any]) -> str:
+    return sha256_bytes(freeze_message(config))
 
 
 def parse_utc(value: Any, field: str) -> datetime:
@@ -203,15 +226,21 @@ def _manifest_contract() -> tuple[dict[str, Any], set[str]]:
 def validate_config(config: dict[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
     if set(config) != CONFIG_KEYS or config.get("schema") != LEDGER_SCHEMA:
         raise PilotError("pilot ledger fields do not match the closed contract")
-    manifest, _ = _manifest_contract()
+    manifest, required_cells = _manifest_contract()
     model = manifest["model_binding"]
+    source_revision = str(config["source_revision"])
+    release_match = re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+\+git\.([0-9a-f]{40})", str(config["release_version"]))
     if (
         config["experiment_id"] != "E-WWM-23"
+        or config["experiment_manifest_sha256"] != sha256_bytes(EXPERIMENT_MANIFEST.read_bytes())
         or config["model_id"] != model["artifact_id"]
         or config["model_source_sha256"] != model["source_sha256"]
-        or not HEX40.fullmatch(str(config["source_revision"]))
+        or not HEX40.fullmatch(source_revision)
+        or not HEX64.fullmatch(str(config["deployment_sha256"]))
+        or release_match is None
+        or release_match.group(1) != source_revision
     ):
-        raise PilotError("pilot experiment, model, or source revision is not exact")
+        raise PilotError("pilot experiment, deployment, model, or source revision is not exact")
     if config["evidence_scope"] not in {"REAL_PUBLIC_PILOT", "TEST_FIXTURE"}:
         raise PilotError("pilot evidence scope is invalid")
     if (
@@ -220,11 +249,27 @@ def validate_config(config: dict[str, Any], *, now: datetime | None = None) -> d
         or config["promotion_authorized"] is not False
     ):
         raise PilotError("pilot configuration cannot enable controls, production, or promotion")
+    consent_version = config["consent_version"]
+    if not isinstance(consent_version, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", consent_version):
+        raise PilotError("pilot consent version is invalid or unbounded")
+    origins = config["authorized_origins"]
+    if not isinstance(origins, list) or not origins or len(origins) > 128:
+        raise PilotError("pilot authorized-origin cohort is missing or unbounded")
+    try:
+        validated_origins = [canonical_origin(origin) for origin in origins]
+    except (StaticHostError, TypeError) as error:
+        raise PilotError(f"pilot authorized origin is not canonical: {error}") from error
+    if origins != sorted(set(validated_origins)):
+        raise PilotError("pilot authorized origins must be sorted and unique")
+    if config["evidence_scope"] == "REAL_PUBLIC_PILOT" and len(origins) < manifest["minimums"]["origins"]:
+        raise PilotError("real public pilot freezes fewer than 30 authorized origins")
+    if config["cohort_cells"] != sorted(required_cells):
+        raise PilotError("pilot browser, device, and storage cohort is not exact")
     start = parse_utc(config["pilot_start_utc"], "pilot_start_utc")
     initialized = parse_utc(config["initialized_at_utc"], "initialized_at_utc")
     observed_now = now or datetime.now(timezone.utc)
-    if start > initialized or initialized > observed_now + MAX_FUTURE_SKEW:
-        raise PilotError("pilot initialization timestamps are impossible or future-dated")
+    if initialized > start or initialized > observed_now + MAX_FUTURE_SKEW:
+        raise PilotError("pilot must be frozen no later than its start and never future-dated")
     observers = config["trusted_observers"]
     if not isinstance(observers, list) or not (3 <= len(observers) <= 32):
         raise PilotError("pilot requires a bounded trusted observer allowlist")
@@ -251,6 +296,27 @@ def validate_config(config: dict[str, Any], *, now: datetime | None = None) -> d
         raise PilotError("trusted observer allowlist lacks every independent role")
     if config["summary_signer_key_id"] not in key_ids:
         raise PilotError("summary signer is not a trusted observer key")
+    signer_key_id = config["pilot_signer_key_id"]
+    trusted_signer = _observer_map(config).get(signer_key_id)
+    if trusted_signer is None:
+        raise PilotError("pilot freeze signer is not a trusted observer key")
+    try:
+        signature = base64.b64decode(config["freeze_signature_base64"], validate=True)
+    except (TypeError, ValueError) as error:
+        raise PilotError("pilot freeze signature is not canonical base64") from error
+    if len(signature) != 64:
+        raise PilotError("pilot freeze signature has the wrong length")
+    try:
+        from cryptography.exceptions import InvalidSignature
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+        Ed25519PublicKey.from_public_bytes(
+            _decode_public(trusted_signer["public_key_base64"], signer_key_id)
+        ).verify(signature, freeze_message(config))
+    except ImportError as error:
+        raise PilotError("cryptography with Ed25519 support is required") from error
+    except (ValueError, InvalidSignature) as error:
+        raise PilotError("pilot freeze Ed25519 signature is forged or invalid") from error
     return config
 
 
@@ -704,6 +770,8 @@ def prepare_candidate_bundle(
             "observation_ledger_root": sha256_bytes(
                 canonical_json([row["envelope_id"] for row in envelopes])
             ),
+            "pilot_freeze_id": freeze_id(config),
+            "pilot_freeze": config,
         }
         measured = {
             "evidence_scope": config["evidence_scope"],
@@ -779,7 +847,52 @@ def _load_private_key(path: Path):
 
         return Ed25519PrivateKey.from_private_bytes(raw)
     except (OSError, ValueError, TypeError, ImportError) as error:
-        raise PilotError("summary private key must be 32 raw bytes or canonical base64") from error
+        raise PilotError("Ed25519 private key must be 32 raw bytes or canonical base64") from error
+
+
+def freeze_config(
+    draft_path: Path,
+    output: Path,
+    private_key_path: Path,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    if output.exists():
+        raise PilotError("pilot freeze output already exists; overwrite rejected")
+    draft = load_object(draft_path, maximum_bytes=MAX_ENVELOPE_BYTES)
+    if set(draft) != DRAFT_KEYS:
+        raise PilotError("pilot freeze draft fields do not match the closed contract")
+    private = _load_private_key(private_key_path)
+    from cryptography.hazmat.primitives import serialization
+
+    public = private.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw
+    )
+    key_id = sha256_bytes(public)
+    if key_id != draft["pilot_signer_key_id"]:
+        raise PilotError("pilot freeze private key does not match the configured signer")
+    config = dict(draft)
+    config["freeze_signature_base64"] = base64.b64encode(
+        private.sign(freeze_message(config))
+    ).decode("ascii")
+    validate_config(config, now=now)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with output.open("xb") as handle:
+            handle.write(canonical_json(config))
+    except FileExistsError as error:
+        raise PilotError("pilot freeze output already exists; overwrite rejected") from error
+    return {
+        "verdict": "FROZEN",
+        "freeze_id": freeze_id(config),
+        "source_revision": config["source_revision"],
+        "deployment_sha256": config["deployment_sha256"],
+        "authorized_origin_count": len(config["authorized_origins"]),
+        "cohort_cell_count": len(config["cohort_cells"]),
+        "pilot_signer_key_id": config["pilot_signer_key_id"],
+        "promotion_authorized": False,
+        "production_claim": False,
+    }
 
 
 def _trusted_bundle_attestations(
@@ -900,6 +1013,10 @@ def seal_candidate(
             "production_claim": False,
             "controls_enabled": False,
             "generated_at_utc": format_utc(observed_now),
+            "pilot_freeze_id": freeze_id(config),
+            "deployment_sha256": config["deployment_sha256"],
+            "consent_version": config["consent_version"],
+            "pilot_signer_key_id": config["pilot_signer_key_id"],
         }
         signed_summary = _sign_summary(summary, summary_private_key, config)
         with (staging / "EvidenceSummary.json").open("xb") as handle:
@@ -922,6 +1039,11 @@ def main() -> int:
     parser.add_argument("--experiments", type=Path, default=gate.DEFAULT_EXPERIMENTS)
     commands = parser.add_subparsers(dest="command", required=True)
 
+    freeze = commands.add_parser("freeze")
+    freeze.add_argument("--draft", type=Path, required=True)
+    freeze.add_argument("--output", type=Path, required=True)
+    freeze.add_argument("--private-key", type=Path, required=True)
+
     initialize = commands.add_parser("init")
     initialize.add_argument("--ledger", type=Path, required=True)
     initialize.add_argument("--config", type=Path, required=True)
@@ -943,7 +1065,9 @@ def main() -> int:
 
     args = parser.parse_args()
     try:
-        if args.command == "init":
+        if args.command == "freeze":
+            emit(freeze_config(args.draft, args.output, args.private_key))
+        elif args.command == "init":
             config = initialize_ledger(args.ledger, args.config)
             emit(
                 {

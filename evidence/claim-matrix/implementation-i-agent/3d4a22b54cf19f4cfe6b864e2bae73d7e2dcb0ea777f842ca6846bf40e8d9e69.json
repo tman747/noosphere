@@ -1,0 +1,150 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-agent-class\",\"-p\",\"noos-commerce\",\"-p\",\"noos-contracts\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-agent-class\",\"noos-commerce\",\"noos-contracts\"]},{\"command\":[\"C:\\\\Users\\\\ntrap\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python310\\\\python.exe\",\"chorus_adapter.py\"],\"fixture_sha256\":{\"README.md\":\"696049f9a2430ec20ec5e0e7870245967181159e865500fbb194fcc88868e59b\",\"chorus_adapter.py\":\"05756f05483a044e258fc77a2a3bf05b39e694c207a21e5867d52a076a908a7d\",\"lineage_quorum_engine.py\":\"fc67a6efeecc13442d3bffc5334077cdfbaa6f942c71b8004a39ea8e36cebe57\"},\"name\":\"canonical fixture chorus-quorum-lab\",\"output_sha256\":\"c5794776296b00f3191b5827ec97b094a2ed7974f8a7810bad623d9c008141b0\",\"passed\":true,\"required_metrics\":[\"METRIC mechanism_false_accept=0\",\"METRIC clone_collapsed_weight=1\",\"METRIC engine_invariant_gate=1\"]},{\"command\":[\"C:\\\\Users\\\\ntrap\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python310\\\\python.exe\",\"nel_adapter.py\"],\"fixture_sha256\":{\"README.md\":\"4431fcaa965018999c8ec4affaaef3b01ba0037a775fec2b5ee64e1352fc8759\",\"molecular_quarantine_test.py\":\"bc2ddd244b67e5ee378f65c10bbf39bf1e6697ce93c886b91c5c4ced434abe5b\",\"nel_adapter.py\":\"93a0324983106d37d0ab5b8f039eb468584625a435d8364c063ba5d130ca7c14\"},\"name\":\"canonical fixture nel-quarantine-lab\",\"output_sha256\":\"e466831f669d4d7b5dbc2fa76edb81f66c3072e9a1fbcd749cb8c2f6aa4a2512\",\"passed\":true,\"required_metrics\":[\"METRIC double_payouts=0\",\"METRIC gate_failures=0\",\"GATE cinder_execution_right_reuse_refused expected=True measured=True verdict=PASS\",\"GATE dryad_dispute_proof_reuse_refused expected=True measured=True verdict=PASS\"]}]",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "[{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-agent-class\",\"-p\",\"noos-commerce\",\"-p\",\"noos-contracts\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-agent-class\",\"noos-commerce\",\"noos-contracts\"]},{\"command\":[\"C:\\\\Users\\\\ntrap\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python310\\\\python.exe\",\"chorus_adapter.py\"],\"fixture_sha256\":{\"README.md\":\"696049f9a2430ec20ec5e0e7870245967181159e865500fbb194fcc88868e59b\",\"chorus_adapter.py\":\"05756f05483a044e258fc77a2a3bf05b39e694c207a21e5867d52a076a908a7d\",\"lineage_quorum_engine.py\":\"fc67a6efeecc13442d3bffc5334077cdfbaa6f942c71b8004a39ea8e36cebe57\"},\"name\":\"canonical fixture chorus-quorum-lab\",\"output_sha256\":\"c5794776296b00f3191b5827ec97b094a2ed7974f8a7810bad623d9c008141b0\",\"passed\":true,\"required_metrics\":[\"METRIC mechanism_false_accept=0\",\"METRIC clone_collapsed_weight=1\",\"METRIC engine_invariant_gate=1\"]},{\"command\":[\"C:\\\\Users\\\\ntrap\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python310\\\\python.exe\",\"nel_adapter.py\"],\"fixture_sha256\":{\"README.md\":\"4431fcaa965018999c8ec4affaaef3b01ba0037a775fec2b5ee64e1352fc8759\",\"molecular_quarantine_test.py\":\"bc2ddd244b67e5ee378f65c10bbf39bf1e6697ce93c886b91c5c4ced434abe5b\",\"nel_adapter.py\":\"93a0324983106d37d0ab5b8f039eb468584625a435d8364c063ba5d130ca7c14\"},\"name\":\"canonical fixture nel-quarantine-lab\",\"output_sha256\":\"e466831f669d4d7b5dbc2fa76edb81f66c3072e9a1fbcd749cb8c2f6aa4a2512\",\"passed\":true,\"required_metrics\":[\"METRIC double_payouts=0\",\"METRIC gate_failures=0\",\"GATE cinder_execution_right_reuse_refused expected=True measured=True verdict=PASS\",\"GATE dryad_dispute_proof_reuse_refused expected=True measured=True verdict=PASS\"]}]",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "I-AGENT": "b35eaabed4d832232444f49f2125b72c42317af0bb76ef1c8668691849fbaa9d"
+  },
+  "claims": [
+    "I-AGENT"
+  ],
+  "command": [
+    "tools/gates/run_agent_commerce_claim.py",
+    "--claim",
+    "I-AGENT"
+  ],
+  "evidence_sha256": "3d4a22b54cf19f4cfe6b864e2bae73d7e2dcb0ea777f842ca6846bf40e8d9e69",
+  "expected_result": "IMPLEMENTED",
+  "gate": "implementation-i-agent",
+  "limitations": [
+    "This is deterministic local implementation evidence, not independent or production evidence.",
+    "The composed drill and its lineage/quarantine dependencies are lab fixtures, not a production phone mesh or settlement deployment."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "IMPLEMENTED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 419,
+        "git_blob": "e58029e6750bc21bb8dd2fd49626136d306d66d8",
+        "git_mode": "100644",
+        "path": "crates/noos-agent-class/Cargo.toml",
+        "sha256": "2ddcb38e7a47ae5603301d92cc97707aaaaca359f91cf9f81b87c1b5498b8579"
+      },
+      {
+        "bytes": 41183,
+        "git_blob": "76a9d66df0a1ce340de01660d8b66f0f3e705c68",
+        "git_mode": "100644",
+        "path": "crates/noos-agent-class/src/lib.rs",
+        "sha256": "0479338e036da7e057191f12893a039b7f83a97111f0c34b59ac0ddfd734d318"
+      },
+      {
+        "bytes": 525,
+        "git_blob": "2a911c7e6443536a2b6e6d42791fda628e195455",
+        "git_mode": "100644",
+        "path": "crates/noos-commerce/Cargo.toml",
+        "sha256": "e6ac1f33284daf4158e822cc28cb3dda3909d4d6047f3c601e86dad7974d9224"
+      },
+      {
+        "bytes": 57319,
+        "git_blob": "e9f6b0dfb305cb55805c043b6fa3d77dc969f3c1",
+        "git_mode": "100644",
+        "path": "crates/noos-commerce/src/lib.rs",
+        "sha256": "4e993880a4f0d087e48e8beb41f9a76278a05f650328bd4dc66ca280b4664c88"
+      },
+      {
+        "bytes": 594,
+        "git_blob": "fc226e17346b87b5a116b8aef60655fd96e5b264",
+        "git_mode": "100644",
+        "path": "crates/noos-contracts/Cargo.toml",
+        "sha256": "17780b46cac4e57d2f390215f823095e30392eedcdeb7edc804c8207a2c77e9a"
+      },
+      {
+        "bytes": 1269,
+        "git_blob": "273da4a898d88ba2ea3338dc8f34863982e66bce",
+        "git_mode": "100644",
+        "path": "crates/noos-contracts/src/agent_object.rs",
+        "sha256": "e3a19a47d7ff756d04f349fd6e575e8bb464bc494b58c0264a2da6885a165847"
+      },
+      {
+        "bytes": 30612,
+        "git_blob": "3fc9a490fc44ad5660c95da49fae23a582b10d65",
+        "git_mode": "100644",
+        "path": "crates/noos-contracts/src/router.rs",
+        "sha256": "77e2df7782b001d6998d30afee702784649f8d8bd1fa00a2b4b75913d5a7a694"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 5861,
+        "git_blob": "d3fe0ec290a101f169092616968f9721509ec0de",
+        "git_mode": "100644",
+        "path": "tools/gates/run_agent_commerce_claim.py",
+        "sha256": "8ce7d0a27edcce7df43ba25142112890fa7dfc3c137726f07dc76e8bd7c81cb7"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      }
+    ],
+    "manifest_sha256": "c7ae22af4ad57a2a98a3d2025c4f5af00cdfe0117c8cc310b5aca21698a4c52a",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

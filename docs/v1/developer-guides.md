@@ -173,25 +173,61 @@ Contract admission binds canonical Grain formula bytes/hash, version, manifest, 
 
 ## Compute rental market
 
-The application-only V0 market uses consensus-owned worker and job records.
-`RegisterComputeWorker` advertises bounded CPU/GPU capability and an integer
-price. `OpenComputeJob` removes the maximum payment from the signed requester
-and locks it in the job. A signed worker may claim once and commit a result, but
-submission never releases payment. Only the signed requester can accept a
-matching submitted result; settlement pays the agreed price and refunds unused
-escrow atomically. Open jobs and expired unfinished jobs can be cancelled by
-the requester.
+The application-only deterministic market uses consensus-owned bonded-worker
+and escrowed-job records. `RegisterComputeWorker` advertises bounded CPU/GPU
+capability, an integer price, and a desired total NOOS bond. Claiming a job
+locks a per-job bond equal to its maximum escrow. Worker submission never
+releases payment. The signed requester may accept, or may challenge during the
+100-block review window by revealing the committed MIX32 seed/start.
+Consensus performs bounded full recomputation: an invalid result refunds
+escrow plus the slashed bond and deactivates the worker; a false challenge
+settles normally and transfers the challenge bond to the worker. After the
+review window, any fee payer can trigger the same objective finalization.
+Open jobs refund on cancellation. Expired claimed jobs refund and slash through
+requester cancellation or permissionless expiry. Submitted jobs cannot bypass
+objective resolution through cancellation.
 
-`tools/compute_market.py` opens deterministic MIX32 shards and independently
-recomputes each result root before acceptance. `tools/compute_worker.py` keeps a
-worker seed local, executes CPU shards, and signs claim/result transactions.
-The `/apps/compute-market` browser helper uses WebGPU when available and a
-bounded CPU fallback otherwise; it is suitable for a phone or laptop browser.
-Browser helpers use the coordinator's explicitly custodial test-network worker
-identity, so rewards accrue to that identity rather than to a browser-held
-wallet. The workload is deliberately registered and deterministic: arbitrary
-native code, neural-model rental, confidential inputs, production dispute
-proofs, and permissionless GPU kernels are not claimed.
+`tools/compute_workload_registry.py` freezes the only admitted V0 workload as
+a canonical, chain/genesis-bound Ed25519-signed registry. Its signed body binds
+the workload identity, payload schema, commitment domains, full-recomputation
+verifier, meter, operation limits, activation/retirement heights, and the
+fail-closed rejection vector set. Both `tools/compute_market.py` and
+`tools/compute_worker.py` require `--workload-registry` and an independently
+distributed `--registry-public-key`; a registry supplied by the coordinator is
+not a trust root. The worker additionally requires a locally created
+`--sandbox-policy`. The invitation-host installer generates and ACL-protects
+the registry key, freezes the registry once, and verifies it on every
+reconciliation.
+
+`tools/compute_market.py` opens deterministic MIX32 shards within both the
+signed registry limit and the consensus limit of 1,000,000 operations. It
+independently recomputes each result root, accepts a matching on-chain root,
+and challenges a mismatching on-chain root with the stored canonical
+preimage. `tools/compute_worker.py` opens a password-encrypted local payout
+identity, registers a desired total bond with `--bond`, refuses jobs whose
+escrow exceeds its available bond, and refuses unknown, inactive, retired,
+over-meter, commitment-mismatched, or local-policy-exceeding work before
+execution. It runs CPU shards in a separate resource-limited process, signs
+claim/result transactions without placing seed material on the process
+argument vector, and permissionlessly finalizes due submitted results by
+objective recomputation. The `/apps/compute-market` browser helper uses WebGPU
+when available and a bounded CPU fallback. Browser helpers use the
+coordinator's explicitly custodial test-network worker identity, so rewards
+accrue to that identity rather than to a browser-held wallet. MIX32 is
+deliberately deterministic: arbitrary native code, neural-model rental,
+confidential inputs, arbitrary proof systems, and permissionless GPU kernels
+are not admitted.
+
+`tools/worker_sandbox.py` freezes a canonical content-addressed local policy.
+Version 1 admits only the signed MIX32 builtin and one CPU thread; workload
+filesystem, network, scratch storage, GPU, inherited secret environment, and
+subprocess capabilities are denied. POSIX rlimits or a Windows Job Object bound
+memory and CPU time, while the parent enforces wall runtime, operation count,
+UTC schedule, coordinator byte budgets, temperature, and battery policy before
+and during execution. A policy can require temperature and battery sensors;
+required but unavailable observations reject work. Result evidence records the
+policy ID, effective limits, zero scratch use, repeated host-condition checks,
+and all denied capabilities.
 
 ## Neural execution reality
 

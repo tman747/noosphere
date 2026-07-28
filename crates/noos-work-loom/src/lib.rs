@@ -502,6 +502,19 @@ pub struct Dispute {
     pub evidence_root: Hash32,
     pub opened_height: u64,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChallengerEnrollment {
+    pub account: AccountId,
+    pub operator_id: Hash32,
+    pub beneficial_owner_root: Hash32,
+    pub control_cluster_id: Hash32,
+    pub funding_tx_id: Hash32,
+    pub funded_at_height: u64,
+    pub expires_at_height: u64,
+    pub minimum_bond: u128,
+    pub revoked_at_height: Option<u64>,
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DisputeVerdict {
     WorkerUpheld,
@@ -531,6 +544,9 @@ pub enum LoomError {
     DisputeWindowClosed,
     TerminalState,
     AccountConflict,
+    UnknownChallenger,
+    DuplicateChallenger,
+    InactiveChallenger,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -540,6 +556,7 @@ pub struct WorkLoom {
     jobs: BTreeMap<Hash32, JobRecord>,
     nullifiers: BTreeSet<Hash32>,
     quarantined_profiles: BTreeSet<RegistryId>,
+    challengers: BTreeMap<AccountId, ChallengerEnrollment>,
     locked: u128,
     burned: u128,
     initial_supply: u128,
@@ -567,6 +584,78 @@ impl WorkLoom {
     #[must_use]
     pub fn balance(&self, account: &AccountId) -> u128 {
         self.balances.get(account).copied().unwrap_or(0)
+    }
+    pub fn enroll_challenger(&mut self, enrollment: ChallengerEnrollment) -> Result<(), LoomError> {
+        if enrollment.account == [0; 32]
+            || enrollment.operator_id == [0; 32]
+            || enrollment.funding_tx_id == [0; 32]
+            || enrollment.beneficial_owner_root == [0; 32]
+            || enrollment.control_cluster_id == [0; 32]
+            || enrollment.minimum_bond == 0
+            || enrollment.funded_at_height >= enrollment.expires_at_height
+            || enrollment.revoked_at_height.is_some()
+            || self.balance(&enrollment.account) < enrollment.minimum_bond
+        {
+            return Err(LoomError::InvalidRegistryEntry);
+        }
+        if self.challengers.contains_key(&enrollment.account)
+            || self.challengers.values().any(|existing| {
+                existing.operator_id == enrollment.operator_id
+                    || existing.beneficial_owner_root == enrollment.beneficial_owner_root
+                    || existing.control_cluster_id == enrollment.control_cluster_id
+            })
+        {
+            return Err(LoomError::DuplicateChallenger);
+        }
+        self.challengers.insert(enrollment.account, enrollment);
+        Ok(())
+    }
+
+    pub fn revoke_challenger(
+        &mut self,
+        account: AccountId,
+        effective_height: u64,
+    ) -> Result<(), LoomError> {
+        let enrollment = self
+            .challengers
+            .get_mut(&account)
+            .ok_or(LoomError::UnknownChallenger)?;
+        if enrollment.revoked_at_height.is_some()
+            || effective_height < enrollment.funded_at_height
+            || effective_height >= enrollment.expires_at_height
+        {
+            return Err(LoomError::InactiveChallenger);
+        }
+        enrollment.revoked_at_height = Some(effective_height);
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn challenger(&self, account: &AccountId) -> Option<&ChallengerEnrollment> {
+        self.challengers.get(account)
+    }
+    #[must_use]
+    pub fn funded_challenger_count(&self, height: u64, minimum_bond: u128) -> usize {
+        if minimum_bond == 0 {
+            return 0;
+        }
+        self.challengers
+            .values()
+            .filter(|enrollment| {
+                enrollment.funded_at_height <= height
+                    && height < enrollment.expires_at_height
+                    && enrollment
+                        .revoked_at_height
+                        .is_none_or(|revoked| height < revoked)
+                    && enrollment.minimum_bond >= minimum_bond
+                    && self.balance(&enrollment.account) >= minimum_bond
+            })
+            .count()
+    }
+
+    #[must_use]
+    pub fn funded_challenger_gate(&self, height: u64, minimum_bond: u128) -> bool {
+        self.funded_challenger_count(height, minimum_bond) >= 2
     }
     #[must_use]
     pub fn locked(&self) -> u128 {
@@ -844,6 +933,24 @@ impl WorkLoom {
         if height < start || height > end {
             return Err(LoomError::DisputeWindowClosed);
         }
+        if bond == 0 {
+            return Err(LoomError::InvalidSettlement);
+        }
+        let enrollment = self
+            .challengers
+            .get(&challenger)
+            .ok_or(LoomError::UnknownChallenger)?;
+        if height < enrollment.funded_at_height
+            || height >= enrollment.expires_at_height
+            || enrollment
+                .revoked_at_height
+                .is_some_and(|revoked| height >= revoked)
+        {
+            return Err(LoomError::InactiveChallenger);
+        }
+        if bond < enrollment.minimum_bond || self.balance(&challenger) < bond {
+            return Err(LoomError::InvalidSettlement);
+        }
         debit(&mut self.balances, challenger, bond)?;
         self.locked = self
             .locked
@@ -878,7 +985,7 @@ impl WorkLoom {
             .clone();
         match verdict {
             DisputeVerdict::WorkerUpheld => {
-                self.release_locked(dispute.challenger, dispute.bond)?;
+                self.distribute_locked(&[], dispute.bond)?;
                 let record = self.jobs.get_mut(&job_id).ok_or(LoomError::UnknownJob)?;
                 record.state = JobState::Challengeable;
                 record.dispute = None;

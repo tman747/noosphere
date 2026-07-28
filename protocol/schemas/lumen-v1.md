@@ -142,20 +142,31 @@ transaction at step 1.
 13 CreatePool { provider, asset_a, asset_b, amount_a, amount_b, fee_bps }
 14 SwapExactIn { trader, pool_id, asset_in, amount_in, min_amount_out }
 15 RegisterComputeWorker { worker, capabilities, cpu_threads, memory_mb,
-     gpu_memory_mb, price_per_unit, endpoint_commitment }
+     gpu_memory_mb, price_per_unit, endpoint_commitment, bond }
 16 OpenComputeJob { requester, workload_kind, input_root, units, unit_size,
      max_price_per_unit, deadline_height }
 17 ClaimComputeJob { worker, job_id }
 18 SubmitComputeResult { worker, job_id, result_root, completed_units }
 19 AcceptComputeResult { requester, job_id }
 20 CancelComputeJob { requester, job_id }
+21 AddLiquidity; 22 RemoveLiquidity; 23 CreateOracleFeed;
+24 SubmitOracleReport; 25 CreateLendingMarket; 26 DepositCollateral;
+27 WithdrawCollateral; 28 BorrowStable; 29 RepayStable;
+30 LiquidatePosition; 31 OpenPrivatePayment; 32 ClaimPrivatePayment;
+33 RefundPrivatePayment; 34 OpenAgentPrivatePayment; 35 SetOracleMode;
+36 FundStableReserve; 37 BackstopLiquidate; 38 PsmMint; 39 PsmRedeem
+40–59 frozen WWM-v2 core actions, exactly as registered in `wwm-v2.md`
+60–65 neural-oracle extension actions, exactly as registered in `wwm-v2.md`
+66 ChallengeComputeResult { requester, job_id, seed, start }
+67 FinalizeComputeResult { worker, job_id, seed, start }
+68 ExpireComputeJob { job_id }
 ```
 
 **Closed action law (plan §4.7).** `CreateAsset` issues only a new,
 domain-derived user asset once; it cannot mint NOOS or increase an existing
 asset supply. The enum contains no variant that seizes user state, reverts
 finalized state, forges finality, admits code outside the registry path,
-exceeds caps, or activates a disabled suite. Discriminant 21+ rejects
+exceeds caps, or activates a disabled suite. Discriminant 69+ rejects
 (`unknown_discriminant`).
 
 ### 5.1 fixed-supply launch and constant-product swap
@@ -191,18 +202,50 @@ the corresponding transaction signature. Existing account authentication is
 never replaced by a deposit.
 
 Compute worker capability bits are `1 = CPU` and `2 = GPU`; unknown or zero
-capabilities reject. A registered worker has positive price and coherent
-nonzero hardware bounds. `compute_job_id =
+capabilities reject. A registration is worker-signed, has positive price and
+coherent nonzero hardware bounds, and declares the worker's desired total
+NOOS bond. Registration debits only the checked top-up, cannot reduce
+`bond_available + bond_locked`, preserves counters and locked bonds, and may
+reactivate a worker after it has replenished the required bond.
+
+`compute_job_id =
 H("NOOS/COMPUTE/JOB/ID/V1" || creating_txid || action_index_u32_le)`.
-Opening a job debits `units × max_price_per_unit` NOOS from the signed
-requester into job escrow, with checked integer arithmetic and a future
-deadline. Claiming binds one active signed worker whose registered price does
-not exceed the maximum. Submission binds the full unit count and nonzero result
-root but does not pay. The signed requester alone accepts a submitted result;
-acceptance pays `units × agreed_price_per_unit`, refunds the difference, zeros
-escrow, and increments worker counters atomically. The requester may cancel an
-open job, or any nonterminal unfinished job after its deadline, for a complete
-escrow refund.
+The only disputable workload is kind 0, canonical MIX32. Opening a job debits
+`units × max_price_per_unit` NOOS from the signed requester into escrow,
+requires a future deadline, and rejects unless `units × unit_size ≤ 1,000,000`.
+Claiming binds one active signed worker whose price does not exceed the
+maximum and moves an amount equal to the full escrow from `bond_available` to
+`bond_locked`. Submission requires every unit, a nonzero result root, and the
+job deadline; it starts an exact 100-block review window and releases no value.
+
+The signed requester may explicitly accept a submitted result without
+objective verification. Acceptance pays
+`units × agreed_price_per_unit`, refunds unused escrow, unlocks the worker
+bond, and increments worker counters atomically.
+
+Before the review deadline, the requester may instead invoke
+`ChallengeComputeResult` with the committed MIX32 `seed` and `start`. Consensus
+first recomputes the canonical input commitment; a mismatch fails without
+altering escrow or bond. Verification is full deterministic MIX32
+recomputation, charged as `units × unit_size` grain steps. The requester posts
+`max(1, floor(payment / 10))` NOOS as a challenge bond. A valid result settles
+normally and transfers that bond to the worker. An invalid result returns the
+challenge bond, refunds the full escrow plus the full per-job worker bond,
+marks the job invalid, increments failure and penalty counters, and
+deactivates the worker.
+
+After the review deadline, any fee payer may invoke `FinalizeComputeResult`
+with the bound worker and committed MIX32 preimage. It applies the same
+objective valid/invalid result law without a challenge bond. This makes
+settlement independent of worker cooperation.
+
+The requester may cancel an open job for a full escrow refund. After a claimed
+job's deadline, requester cancellation or permissionless `ExpireComputeJob`
+refunds escrow, transfers the full per-job worker bond to the requester,
+records a timeout, and deactivates the worker. A submitted job cannot be
+cancelled or expired; it resolves only by acceptance, challenge, or objective
+finalization. Every escrow, bond, payment, refund, reward, and penalty update
+uses checked integer arithmetic and commits atomically.
 
 ## 6. Transaction application (normative order, arch §6.6)
 

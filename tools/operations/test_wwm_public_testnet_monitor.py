@@ -45,6 +45,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
                 "read_gateway": "https://rpc.example",
                 "status": "https://status.example",
                 "artifacts": "https://artifacts.example",
+                "mindscan": "https://mindscan.example/mindscan",
             },
             "monitoring": {
                 "validator_status_endpoints": [
@@ -131,6 +132,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
         self.assertEqual(config.chain_id, "11" * 32)
         self.assertEqual(config.release_version, f"0.1.0+git.{'55' * 20}")
         self.assertEqual(config.artifact_origin, "https://artifacts.example")
+        self.assertEqual(config.mindscan_url, "https://mindscan.example/mindscan")
         self.assertEqual(config.worker_bearer_token, self.worker_token)
         self.assertEqual(len(config.validator_status_urls), 3)
         self.assertEqual(len(config.indexer_origins), 3)
@@ -174,6 +176,42 @@ class PublicTestnetMonitorTests(unittest.TestCase):
             headers={"Authorization": f"Bearer {self.worker_token}"},
         )
         self.assertNotIn(self.worker_token, json.dumps(detail))
+
+    def test_mindscan_probe_requires_exact_release_and_durable_generation(self) -> None:
+        config = monitor.load_config(self.arguments())
+        healthy = {
+            "schema": "noos/mindscan-health/v1",
+            "ok": True,
+            "production": False,
+            "promotion_effect": "NONE",
+            "chain_id": config.chain_id,
+            "genesis_hash": config.genesis_hash,
+            "source_revision": config.source_revision,
+            "release_version": config.release_version,
+            "indexer_release_version": config.release_version,
+            "source_sha256": "88" * 32,
+            "indexed_generation": "17",
+        }
+        with mock.patch.object(
+            monitor,
+            "request_json",
+            return_value=(200, {}, healthy),
+        ) as request:
+            detail = monitor.mindscan_probe(config, 5.0)
+        request.assert_called_once_with(
+            "https://mindscan.example/mindscan/api/health",
+            5.0,
+        )
+        self.assertEqual(detail["indexed_generation"], 17)
+        wrong_release = dict(healthy)
+        wrong_release["release_version"] = "0.1.0+git." + "99" * 20
+        with mock.patch.object(
+            monitor,
+            "request_json",
+            return_value=(200, {}, wrong_release),
+        ):
+            with self.assertRaisesRegex(monitor.MonitorError, "exact-release"):
+                monitor.mindscan_probe(config, 5.0)
 
     def test_network_probe_requires_a_coherent_validator_and_indexer_fleet(self) -> None:
         config = monitor.load_config(self.arguments())
@@ -271,6 +309,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
             "55" * 20,
             f"0.1.0+git.{'55' * 20}",
             "66" * 32,
+            "77" * 32,
         )
         checks = [monitor.CheckResult("gateway", True, 12, {"status": 200})]
         first = store.append(checks, "2026-07-15T00:00:00Z")
@@ -279,6 +318,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
         monitor.verify_envelope(second, monitor.SAMPLE_DOMAIN, "sample_id")
         self.assertEqual(second["previous_sample_id"], first["sample_id"])
         self.assertEqual(first["release_version"], f"0.1.0+git.{'55' * 20}")
+        self.assertEqual(first["monitor_source_sha256"], "77" * 32)
 
         summary = store.summarize("2026-07-15")
         monitor.verify_envelope(summary, monitor.SUMMARY_DOMAIN, "summary_id")
@@ -286,6 +326,29 @@ class PublicTestnetMonitorTests(unittest.TestCase):
         self.assertEqual(summary["passing_samples"], 2)
         self.assertFalse(summary["formal_e_wwm_23_evidence"])
         self.assertEqual(store.summarize("2026-07-15"), summary)
+
+        next_day = store.append(checks, "2026-07-16T00:00:00Z")
+        self.assertEqual(next_day["previous_sample_id"], second["sample_id"])
+        next_summary = store.summarize("2026-07-16")
+        self.assertEqual(next_summary["sample_count"], 1)
+        monitor.verify_envelope(next_summary, monitor.SUMMARY_DOMAIN, "summary_id")
+
+        broken_payload = {
+            name: value
+            for name, value in next_day.items()
+            if name
+            not in {"sample_id", "signer_key_id", "public_key_base64", "signature_base64"}
+        }
+        broken_payload["observed_at_utc"] = "2026-07-17T00:00:00Z"
+        broken_payload["previous_sample_id"] = "00" * 32
+        broken = monitor.sign_payload(
+            broken_payload, key, monitor.SAMPLE_DOMAIN, "sample_id"
+        )
+        store._sample_path("2026-07-17").write_bytes(  # noqa: SLF001
+            monitor.canonical_json(broken) + b"\n"
+        )
+        with self.assertRaisesRegex(monitor.MonitorError, "cross-ledger"):
+            store.summarize("2026-07-17")
 
         tampered = dict(second)
         tampered["status"] = "degraded"

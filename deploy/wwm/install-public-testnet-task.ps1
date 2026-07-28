@@ -2,8 +2,14 @@ param(
     [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
     [string]$RuntimeRoot = 'C:\mindchain\wwm-testnet',
     [string]$NodeBinarySource = 'D:\noosphere-targets\public-live\debug\noosd.exe',
+    [string]$WalletCliBinary = 'C:\mindchain\wwm-testnet\bin\noos-cli.exe',
+    [string]$ArtifactServiceBinary = 'D:\noosphere-targets\integration\release\noos-artifact-service.exe',
+    [string]$WorkerdBinary = 'D:\noosphere-targets\web-capacity\debug\noos-workerd.exe',
+    [string]$CoordinatorBinary = 'D:\noosphere-targets\web-capacity\debug\noos-web-capacityd.exe',
+    [string]$NeuralPublisherHostedConfig = 'C:\mindchain\wwm-testnet\secrets\hosted-model-publisher.json',
     [string]$TunnelConfig = 'C:\mindchain\wwm-testnet\cloudflared.yml',
     [string]$CloudflaredBinary = 'C:\mindchain\wwm-testnet\bin\cloudflared-2026.7.2.exe',
+    [UInt64]$PublicTestnetRefundActivationHeight = 0,
     [string]$TaskName = 'MindChainWWMTestnet',
     [switch]$StartNow
 )
@@ -20,8 +26,18 @@ $MonitorScript = Join-Path $RepoRoot 'tools\operations\wwm_public_testnet_monito
 $EvidenceDir = Join-Path $RuntimeRoot 'evidence'
 $MonitorSeed = Join-Path $SecretDir 'monitor-ed25519.seed'
 $MonitorPublicKey = Join-Path $EvidenceDir 'monitor-public-key.json'
-
-foreach ($file in @($Supervisor, $MonitorScript, $NodeBinarySource, $TunnelConfig, $CloudflaredBinary)) {
+foreach ($file in @(
+    $Supervisor,
+    $MonitorScript,
+    $NodeBinarySource,
+    $WalletCliBinary,
+    $ArtifactServiceBinary,
+    $WorkerdBinary,
+    $CoordinatorBinary,
+    $NeuralPublisherHostedConfig,
+    $TunnelConfig,
+    $CloudflaredBinary
+)) {
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
         throw "Required installer input is missing: $file"
     }
@@ -56,7 +72,13 @@ if (-not (Test-Path -LiteralPath $MonitorSeed -PathType Leaf)) {
 if ($LASTEXITCODE -ne 0) { throw 'Failed to restrict the testnet secret directory ACL.' }
 
 $PowerShell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
-$arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$Supervisor`" -RepoRoot `"$RepoRoot`" -RuntimeRoot `"$RuntimeRoot`" -NodeBinary `"$InstalledNode`" -CloudflaredBinary `"$CloudflaredBinary`" -TunnelConfig `"$TunnelConfig`""
+$arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$Supervisor`" -RepoRoot `"$RepoRoot`" -RuntimeRoot `"$RuntimeRoot`" -NodeBinary `"$InstalledNode`" -WalletCliBinary `"$WalletCliBinary`" -ArtifactServiceBinary `"$ArtifactServiceBinary`" -WorkerdBinary `"$WorkerdBinary`" -CoordinatorBinary `"$CoordinatorBinary`" -NeuralPublisherHostedConfig `"$NeuralPublisherHostedConfig`" -CloudflaredBinary `"$CloudflaredBinary`" -TunnelConfig `"$TunnelConfig`""
+if ($PublicTestnetRefundActivationHeight -gt 0) {
+    $height = $PublicTestnetRefundActivationHeight.ToString(
+        [Globalization.CultureInfo]::InvariantCulture
+    )
+    $arguments += " -PublicTestnetRefundActivationHeight $height"
+}
 $action = New-ScheduledTaskAction -Execute $PowerShell -Argument $arguments -WorkingDirectory $RepoRoot
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
 $settings = New-ScheduledTaskSettingsSet `

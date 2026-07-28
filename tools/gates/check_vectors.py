@@ -23,6 +23,7 @@ Exit codes: 0 ok (possibly with WARN), 1 validation errors, 2 bad usage.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -31,6 +32,104 @@ from pathlib import Path
 HEX_RE = re.compile(r"^(?:[0-9a-f]{2})*$")
 KINDS = {"positive", "negative"}
 RISC0_SCHEMA = "noos/jet/risc0-proof-v1"
+WWM_VECTOR_FORMAT = "noos/wwm-web-capacity/v1/vectors/v1"
+WWM_MANIFEST_FORMAT = "noos/wwm-web-capacity/v1/vector-manifest/v1"
+
+
+def check_wwm_document(doc: dict, path: Path) -> list[str]:
+    """Validate the alternate, schema-backed WWM conformance envelope."""
+    errors: list[str] = []
+    if doc.get("format") == WWM_MANIFEST_FORMAT:
+        counts = doc.get("counts")
+        if not isinstance(counts, dict) or any(
+            not isinstance(value, int) or isinstance(value, bool) or value < 0
+            for value in counts.values()
+        ):
+            errors.append("'counts' must be an object of non-negative integers")
+        references = (
+            ("files.vectors.json", doc.get("files", {}).get("vectors.json") if isinstance(doc.get("files"), dict) else None, path.parent / "vectors.json"),
+            ("schema", doc.get("schema"), path.parent / "../../schemas/wwm-web-capacity-v1.schema.json"),
+        )
+        for label, metadata, referenced_path in references:
+            if not isinstance(metadata, dict):
+                errors.append(f"'{label}' metadata must be an object")
+                continue
+            expected_bytes = metadata.get("bytes")
+            expected_hash = metadata.get("sha256")
+            if not isinstance(expected_bytes, int) or isinstance(expected_bytes, bool) or expected_bytes < 1:
+                errors.append(f"'{label}.bytes' must be a positive integer")
+            if not isinstance(expected_hash, str) or re.fullmatch(r"[0-9a-f]{64}", expected_hash) is None:
+                errors.append(f"'{label}.sha256' must be a lowercase SHA-256 digest")
+            try:
+                payload = referenced_path.resolve().read_bytes()
+            except OSError as exc:
+                errors.append(f"cannot read referenced {label}: {exc}")
+                continue
+            if isinstance(expected_bytes, int) and not isinstance(expected_bytes, bool) and len(payload) != expected_bytes:
+                errors.append(f"'{label}.bytes' does not match referenced bytes")
+            if isinstance(expected_hash, str) and hashlib.sha256(payload).hexdigest() != expected_hash:
+                errors.append(f"'{label}.sha256' does not match referenced bytes")
+        return errors
+
+    positives = doc.get("positives")
+    negatives = doc.get("negatives")
+    if not isinstance(positives, list) or not positives:
+        errors.append("'positives' must be a non-empty list")
+        positives = []
+    if not isinstance(negatives, list) or not negatives:
+        errors.append("'negatives' must be a non-empty list")
+        negatives = []
+    seen: set[str] = set()
+    observed_categories: set[str] = set()
+    for kind, rows, verdict in (("positive", positives, "ACCEPT"), ("negative", negatives, "REJECT")):
+        for index, row in enumerate(rows):
+            label = f"{kind}s[{index}]"
+            if not isinstance(row, dict):
+                errors.append(f"{label}: case must be an object")
+                continue
+            case_id = row.get("id")
+            if not isinstance(case_id, str) or not case_id:
+                errors.append(f"{label}: missing non-empty 'id'")
+            elif case_id in seen:
+                errors.append(f"{label}: duplicate id {case_id!r}")
+            else:
+                seen.add(case_id)
+            expected = row.get("expected")
+            if not isinstance(expected, dict) or expected.get("verdict") != verdict:
+                errors.append(f"{label}: expected.verdict must be {verdict}")
+            if "instance" not in row:
+                errors.append(f"{label}: missing 'instance'")
+            else:
+                try:
+                    canonical = json.dumps(
+                        row["instance"],
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        ensure_ascii=False,
+                        allow_nan=False,
+                    ).encode("utf-8")
+                    digest = hashlib.sha256(canonical).hexdigest()
+                except (TypeError, ValueError) as exc:
+                    errors.append(f"{label}: instance is not canonical I-JSON: {exc}")
+                else:
+                    if row.get("canonical_sha256") != digest:
+                        errors.append(f"{label}: canonical_sha256 mismatch")
+            if kind == "negative":
+                category = row.get("category")
+                if not isinstance(category, str) or not category:
+                    errors.append(f"{label}: missing non-empty 'category'")
+                else:
+                    observed_categories.add(category)
+    required_categories = doc.get("required_negative_categories")
+    if not isinstance(required_categories, list) or any(
+        not isinstance(category, str) or not category for category in required_categories
+    ):
+        errors.append("'required_negative_categories' must contain non-empty strings")
+    elif len(required_categories) != len(set(required_categories)):
+        errors.append("'required_negative_categories' must not contain duplicates")
+    elif set(required_categories) != observed_categories:
+        errors.append("'required_negative_categories' does not match negative cases")
+    return errors
 
 
 def check_hex(case: dict, field: str, label: str, errors: list[str], *, bytes_len: int | None = None) -> None:
@@ -78,6 +177,9 @@ def check_file(path: Path) -> list[str]:
     if not isinstance(doc, dict):
         return ["top level must be an object with 'schema' and 'cases'"]
 
+
+    if doc.get("format") in {WWM_VECTOR_FORMAT, WWM_MANIFEST_FORMAT}:
+        return check_wwm_document(doc, path)
     schema = doc.get("schema")
     if not isinstance(schema, str) or not schema.strip():
         errors.append("missing or empty 'schema' string")

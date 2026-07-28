@@ -7,7 +7,13 @@ license.workspace = true
 
 [dependencies]
 blake3 = "1.8"
+ed25519-dalek = "=2.2.0"
 noos-lumen = { path = "../noos-lumen" }
+noos-stable-operator = { path = "../noos-stable-operator" }
+noos-stable-safety = { path = "../noos-stable-safety" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+noos-wallet = { path = "../noos-wallet" }
 noos-work-loom = { path = "../noos-work-loom" }
 
 [lints]

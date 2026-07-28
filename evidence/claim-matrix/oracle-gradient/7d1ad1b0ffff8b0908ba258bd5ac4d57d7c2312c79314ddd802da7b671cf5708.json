@@ -1,0 +1,123 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-training\",\"-p\",\"noos-analytics\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-training\",\"noos-analytics\"]}",
+      "id": "claim-implementation",
+      "kind": "implementation",
+      "passed": true
+    },
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-training\",\"-p\",\"noos-analytics\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-training\",\"noos-analytics\"]}",
+      "id": "claim-falsifiers",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-GRAD-01": "9b536df1419dbf02343d07eba17cad07f3c9cb1988bcc1d9d4d2a9d1a48f870b",
+    "E-ORACLE-01": "8d0216c0aa26840670ff0e397a89aad3d18180380111d38b38805424fcdff0b7"
+  },
+  "claims": [
+    "E-GRAD-01",
+    "E-ORACLE-01"
+  ],
+  "command": [
+    "tools/gates/run_oracle_gradient.py",
+    "--claims",
+    "E-ORACLE-01,E-GRAD-01",
+    "--independent-implementations",
+    "2"
+  ],
+  "evidence_sha256": "7d1ad1b0ffff8b0908ba258bd5ac4d57d7c2312c79314ddd802da7b671cf5708",
+  "expected_result": "PASSED",
+  "gate": "oracle-gradient",
+  "limitations": [],
+  "registry_schema_version": "1.2.0",
+  "result": "PASSED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 29030,
+        "git_blob": "74ebc655031728788a29586a799c43877461d6fe",
+        "git_mode": "100644",
+        "path": "crates/noos-analytics/src/lib.rs",
+        "sha256": "89de4f7faee055767b3c05b5e5e1d70526583ee1a11d72c3006859529aa41dfb"
+      },
+      {
+        "bytes": 461,
+        "git_blob": "4d77f6ac563593630e4191572c4dab446db9deda",
+        "git_mode": "100644",
+        "path": "crates/noos-training/Cargo.toml",
+        "sha256": "7d7194458c14aef6afcda02c194797e07d903a44bc88ff261e2489ace778dd4d"
+      },
+      {
+        "bytes": 36575,
+        "git_blob": "b32d37d68c668d879f1500fe8f393ff66ed37097",
+        "git_mode": "100644",
+        "path": "crates/noos-training/src/lib.rs",
+        "sha256": "b9331a428805b2fbfdda0f9482c67afcd0c1eec19752c554329a3c6d42a75a72"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 835,
+        "git_blob": "cb7406396add488ba67666bf790b5e369a1395cf",
+        "git_mode": "100644",
+        "path": "tools/gates/run_oracle_gradient.py",
+        "sha256": "575cfb43f1d7f0c992a8d87801c03e9a8a7e4385d90fce3d23c33369c14284fe"
+      }
+    ],
+    "manifest_sha256": "603a72c8e30b35ed6bcc4863f43ff8ea026027826c92b54f0d70f74d0d79065a",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

@@ -167,7 +167,7 @@ def derive_identity(p: dict, genesis_time_ms: int = DEVNET_GENESIS_TIME_MS,
     if not p.get("dkg.is_test_fixture") or not p.get("is_test_network"):
         raise CeremonyError("real DKG root requires the multi-party ceremony transcript: OWNER_BLOCKED")
     dkg_root = domain_hash(
-        b"NOOS/DKG/TRANSCRIPT/V1",
+        b"NOOS/DKG/TRANSCRIPT/V2",
         b"noos-devnet/dkg-fixture/v1",
         _le(p["dkg.participants"], 4),
         _le(p["dkg.threshold"], 4),
@@ -196,8 +196,8 @@ def derive_identity(p: dict, genesis_time_ms: int = DEVNET_GENESIS_TIME_MS,
 
     fee_params = obj([
         (1, _le(1, 16)), (2, _le(1_000_000, 16)), (3, _le(125_000, 4)),
-        (4, _le(1_048_576, 8)), (5, _le(100_000_000, 8)),
-        (6, _le(100_000, 8)), (7, _le(1_000_000, 8)),
+        (4, _le(536_870_912, 8)), (5, _le(100_000_000, 8)),
+        (6, _le(100_000, 8)), (7, _le(64_000_000, 8)),
         (8, _le(4_194_304, 8)), (9, _le(1_000, 16)), (10, _le(16, 8)),
     ])
     fee_state = obj([(i + 1, _le(value, 16)) for i, value in enumerate((1, 1, 10, 2, 1))])
@@ -218,11 +218,126 @@ def derive_identity(p: dict, genesis_time_ms: int = DEVNET_GENESIS_TIME_MS,
     for control in (
         "work_loom_credit", "work_loom_weightcap", "witness_proofpower",
         "neural_lane", "reflex_lane", "umbra_suite", "dream_lane", "class_gate_budget",
+        "lending_reviewed", "bridge_reviewed",
     ):
         params[_param_key(f"noos.control.{control}")] = _param_record(obj([(1, b"\x00")]))
+
+    # Mirror the canonical zero-money WWM anchor installed by
+    # `GenesisSpec::build_ledger`. Keeping these bytes independently ordered
+    # catches drift between the ceremony tool and the consensus state builder.
+    zero = bytes(32)
+    policy_rows = []
+    fund_rows = []
+    for bucket in range(5):
+        policy_rows.append(
+            bytes([bucket])
+            + _le(1, 16)
+            + _le(1, 16)
+            + _le(0, 8)
+            + _le((1 << 64) - 1, 8)
+            + _le(1, 8)
+            + _le(1, 16)
+            + _le(1, 16)
+        )
+        fund_rows.append(
+            bytes([bucket])
+            + bytes(16 * 7)
+            + b"\x00"
+            + bytes(8)
+        )
+
+    def bounded_list(values: list[bytes]) -> bytes:
+        return _le(len(values), 4) + b"".join(values)
+
+    def fund_profile(profile_id: bytes) -> bytes:
+        return obj([
+            (1, profile_id),
+            (2, zero),
+            (3, bytes([0xB0]) * 32),
+            (4, bytes([0xE0]) * 32),
+            (5, zero),
+            (6, bounded_list(policy_rows)),
+            (7, bytes(8)),
+            (8, _le(0, 4)),
+        ])
+
+    profile_id = domain_hash(
+        b"NOOS/WWM/FUND-PROFILE/V1",
+        fund_profile(zero),
+    )
+    profile = fund_profile(profile_id)
+    fund_ledger = obj([
+        (1, profile_id),
+        (2, b"\x01"),
+        (3, bounded_list(fund_rows)),
+        (4, bytes(8)),
+        (5, b"\x00"),
+    ])
+
+    def registry(vector_id: bytes) -> bytes:
+        return obj([
+            (1, vector_id),
+            (2, zero),
+            (3, bytes(8)),
+            (4, zero),
+            (5, bytes(8)),
+            (6, zero),
+            (7, bytes(8)),
+            (8, profile_id),
+            (9, bytes(8)),
+            (10, zero),
+            (11, bytes(8)),
+        ])
+
+    vector_id = domain_hash(
+        b"NOOS/WWM/REGISTRY-EPOCH-VECTOR/V1",
+        registry(zero),
+    )
+    control = obj([
+        (1, b"\x00"),
+        (2, b"\x00"),
+        (3, b"\x00"),
+        (4, bytes(8)),
+        (5, b"\x00"),
+        (6, b"\x00"),
+        (7, b"\x00"),
+        (8, b"\x00"),
+        (9, b"\x00"),
+        (10, zero),
+        (11, zero),
+        (12, zero),
+        (13, zero),
+        (14, zero),
+        (15, zero),
+        (16, zero),
+        (17, zero),
+    ])
+
+    def fixed_key(kind: int) -> bytes:
+        return domain_hash(b"NOOS/WWM/OBJECT-KEY/V2", bytes([kind]))
+
+    def profile_key(kind: int) -> bytes:
+        return domain_hash(
+            b"NOOS/WWM/OBJECT-KEY/V2",
+            bytes([kind]),
+            profile_id,
+        )
+
+    object_leaves = {
+        profile_key(14): profile,
+        profile_key(15): fund_ledger,
+        fixed_key(8): registry(vector_id),
+        fixed_key(1): control,
+    }
+
     empty = _smt_root({})
     roots = (
-        empty, empty, _smt_root(account_leaves), empty, empty, _smt_root(params),
+        empty,
+        empty,
+        _smt_root(account_leaves),
+        _smt_root(object_leaves),
+        empty,
+        _smt_root(params),
     )
     body = bytearray()
     body += _le(1, 2)

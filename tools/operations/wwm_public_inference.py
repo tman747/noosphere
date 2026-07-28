@@ -22,8 +22,9 @@ from typing import Callable, Final, Iterable, Mapping, Protocol
 from urllib.parse import urlsplit
 
 from blake3 import blake3
-from cryptography.exceptions import InvalidSignature
+from cryptography.exceptions import InvalidSignature, InvalidTag
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 CHAIN_ID: Final[str] = "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b"
@@ -57,6 +58,8 @@ JOB_LIMIT: Final[int] = 3
 GLOBAL_JOB_LIMIT: Final[int] = 24
 MAX_RUNNING: Final[int] = 1
 MAX_QUEUED: Final[int] = 2
+JOB_DEADLINE_SECONDS: Final[int] = 300
+EXECUTOR_CANCEL_POLL_SECONDS: Final[float] = 0.1
 QUOTE_HEIGHT_TTL: Final[int] = 256
 SPONSOR_REFERENCE: Final[str] = "PUBLIC_TESTNET_SPONSOR_V1"
 HEX16 = re.compile(r"^[0-9a-f]{32}$")
@@ -67,6 +70,8 @@ JOB_CANCEL_ROUTE = re.compile(r"^/api/wwm/v2/jobs/([0-9a-f]{64})/cancel$")
 WORKER_STREAM_ROUTE = re.compile(r"^/internal/wwm/v1/jobs/[0-9a-f]{64}/stream$")
 PROMPT_DOMAIN: Final[bytes] = b"NOOS/WWM/PROMPT-COMMITMENT/V2\0"
 SIGNING_DOMAIN: Final[bytes] = b"NOOS/SIG/WWM/PUBLIC-INFERENCE/V1\0"
+STORAGE_DOMAIN: Final[bytes] = b"NOOS/WWM/PUBLIC-INFERENCE/PRIVATE-STORAGE/V1\0"
+STORAGE_PREFIX: Final[str] = "enc:v1:"
 MONITOR_DOMAIN: Final[bytes] = b"NOOS/SIG/WWM/V1\0PUBLIC-TESTNET-MONITOR-SAMPLE\0"
 MONITOR_OMITTED: Final[frozenset[str]] = frozenset(
     {"sample_id", "signer_key_id", "public_key_base64", "signature_base64"}
@@ -118,6 +123,7 @@ class Executor(Protocol):
         prompt: str,
         maximum_output_tokens: int,
         on_chunk: Callable[[bytes, str], None],
+        abort_code: Callable[[], str | None],
     ) -> ExecutionResult: ...
 
 class SettlementBackend(Protocol):
@@ -400,8 +406,49 @@ class WorkerdExecutor:
                 },
                 method="POST",
             ),
-            timeout=300,
+            timeout=JOB_DEADLINE_SECONDS,
         )
+
+    @staticmethod
+    def _raise_abort(code: str) -> None:
+        if code == "USER_REQUESTED":
+            raise InferenceError(409, code, "Inference execution was cancelled by the user.")
+        if code == "JOB_DEADLINE_EXPIRED":
+            raise InferenceError(504, code, "The bounded inference deadline expired.")
+        raise InferenceError(500, "EXECUTION_CONTROL_INVALID", "Inference execution control returned an invalid state.")
+
+    def _cancel_job(self, job_id: str) -> None:
+        request = urllib.request.Request(
+            self.origin + f"/internal/wwm/v1/jobs/{job_id}",
+            headers={
+                "Accept": "application/json",
+                "Authorization": f"Bearer {self.token}",
+                "User-Agent": "mindchain-public-inference/1",
+            },
+            method="DELETE",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                status = int(response.status)
+                if status not in {202, 204}:
+                    raise InferenceError(
+                        503,
+                        "EXECUTOR_CANCEL_FAILED",
+                        "Private inference worker rejected execution cancellation.",
+                    )
+        except urllib.error.HTTPError as error:
+            if error.code != 404:
+                raise InferenceError(
+                    503,
+                    "EXECUTOR_CANCEL_FAILED",
+                    "Private inference worker rejected execution cancellation.",
+                ) from error
+        except (OSError, urllib.error.URLError) as error:
+            raise InferenceError(
+                503,
+                "EXECUTOR_CANCEL_FAILED",
+                "Private inference worker cancellation became unavailable.",
+            ) from error
 
     def run(
         self,
@@ -409,13 +456,23 @@ class WorkerdExecutor:
         prompt: str,
         maximum_output_tokens: int,
         on_chunk: Callable[[bytes, str], None],
+        abort_code: Callable[[], str | None],
     ) -> ExecutionResult:
         started = time.monotonic()
+        abort = abort_code()
+        if abort is not None:
+            self._raise_abort(abort)
         prompt_ids = self.tokenizer.tokenize(prompt.encode("utf-8"), MAX_INPUT_TOKENS)
+        abort = abort_code()
+        if abort is not None:
+            self._raise_abort(abort)
         self._json(
             "/internal/wwm/v1/capacity-quotes",
             {"prompt_tokens": len(prompt_ids), "max_output_tokens": maximum_output_tokens},
         )
+        abort = abort_code()
+        if abort is not None:
+            self._raise_abort(abort)
         accepted = self._json(
             "/internal/wwm/v1/jobs",
             {
@@ -441,8 +498,27 @@ class WorkerdExecutor:
         output = bytearray()
         terminal: dict | None = None
         expected_sequence = 1
+        watcher_stop = threading.Event()
+        cancellation_errors: list[InferenceError] = []
+
+        def watch_execution() -> None:
+            while not watcher_stop.wait(EXECUTOR_CANCEL_POLL_SECONDS):
+                if abort_code() is None:
+                    continue
+                try:
+                    self._cancel_job(job_id)
+                except InferenceError as error:
+                    cancellation_errors.append(error)
+                return
+
+        watcher = threading.Thread(
+            target=watch_execution,
+            name=f"wwm-public-inference-cancel-{job_id[:8]}",
+            daemon=True,
+        )
+        watcher.start()
         try:
-            with urllib.request.urlopen(request, timeout=300) as response:
+            with urllib.request.urlopen(request, timeout=JOB_DEADLINE_SECONDS) as response:
                 if response.headers.get_content_type() != "text/event-stream":
                     raise InferenceError(502, "INVALID_EXECUTOR_STREAM", "Inference worker returned a non-SSE stream.")
                 while True:
@@ -488,6 +564,16 @@ class WorkerdExecutor:
             raise InferenceError(502, "EXECUTOR_REJECTED", f"Inference worker returned HTTP {error.code}.") from error
         except (OSError, urllib.error.URLError) as error:
             raise InferenceError(503, "EXECUTOR_UNAVAILABLE", "Private inference worker became unavailable.") from error
+        finally:
+            watcher_stop.set()
+            watcher.join(timeout=1)
+        abort = abort_code()
+        if abort is not None:
+            self._raise_abort(abort)
+        if cancellation_errors:
+            raise cancellation_errors[0]
+        if terminal is not None and terminal.get("code") == "runtime_timeout":
+            self._raise_abort("JOB_DEADLINE_EXPIRED")
         if terminal is None or terminal.get("code") != "completed":
             raise InferenceError(502, "EXECUTOR_INCOMPLETE", "Inference worker did not emit a completed terminal event.")
         output_root = terminal.get("output_root")
@@ -525,6 +611,9 @@ class InferenceService:
         self.public_key_base64 = base64.b64encode(public_key).decode("ascii")
         self.signing_key_id = hashlib.sha256(public_key).hexdigest()
         self.client_pepper = hmac.new(signing_seed, b"NOOS/WWM/PUBLIC-INFERENCE/CLIENT-PEPPER/V1", hashlib.sha256).digest()
+        self._storage = AESGCM(
+            hmac.new(signing_seed, STORAGE_DOMAIN + b"KEY", hashlib.sha256).digest()
+        )
         self.provider = provider
         self.executor = executor
         self.settlement_backend = settlement_backend
@@ -551,12 +640,85 @@ class InferenceService:
             for job_id in pending_settlements:
                 self._settlement_queue.put_nowait(job_id)
 
+    @staticmethod
+    def _storage_aad(kind: str, job_id: str) -> bytes:
+        return STORAGE_DOMAIN + kind.encode("ascii") + b"\0" + bytes.fromhex(job_id)
+
+    def _seal_storage(self, kind: str, job_id: str, plaintext: bytes) -> str:
+        nonce = secrets.token_bytes(12)
+        ciphertext = self._storage.encrypt(
+            nonce,
+            plaintext,
+            self._storage_aad(kind, job_id),
+        )
+        return STORAGE_PREFIX + base64.b64encode(nonce + ciphertext).decode("ascii")
+
+    def _open_storage(self, kind: str, job_id: str, sealed: str) -> bytes:
+        if not sealed.startswith(STORAGE_PREFIX):
+            raise InferenceError(
+                500,
+                "PRIVATE_STORAGE_INVALID",
+                "Private inference storage is not encrypted.",
+            )
+        try:
+            payload = base64.b64decode(sealed[len(STORAGE_PREFIX) :], validate=True)
+            if len(payload) < 28:
+                raise ValueError("sealed payload is too short")
+            return self._storage.decrypt(
+                payload[:12],
+                payload[12:],
+                self._storage_aad(kind, job_id),
+            )
+        except (InvalidTag, ValueError) as error:
+            raise InferenceError(
+                500,
+                "PRIVATE_STORAGE_INVALID",
+                "Private inference storage authentication failed.",
+            ) from error
+
+    def _open_prompt(self, job_id: str, sealed: str) -> str:
+        try:
+            return self._open_storage("PROMPT", job_id, sealed).decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise InferenceError(
+                500,
+                "PRIVATE_STORAGE_INVALID",
+                "Private inference prompt storage is not UTF-8.",
+            ) from error
+
+    def _seal_event(self, job_id: str, event_id: int, payload: Mapping[str, object]) -> str:
+        return self._seal_storage(
+            f"EVENT:{event_id}",
+            job_id,
+            canonical_json(payload),
+        )
+
+    def _open_event(self, job_id: str, event_id: int, sealed: str) -> dict:
+        try:
+            payload = json.loads(
+                self._open_storage(f"EVENT:{event_id}", job_id, sealed)
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise InferenceError(
+                500,
+                "PRIVATE_STORAGE_INVALID",
+                "Private inference event storage is not valid JSON.",
+            ) from error
+        if not isinstance(payload, dict):
+            raise InferenceError(
+                500,
+                "PRIVATE_STORAGE_INVALID",
+                "Private inference event storage is not an object.",
+            )
+        return payload
+
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=10)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("PRAGMA synchronous=FULL")
         connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute("PRAGMA secure_delete=ON")
         connection.execute("PRAGMA busy_timeout=10000")
         return connection
 
@@ -584,6 +746,9 @@ class InferenceService:
                     prompt TEXT,
                     prompt_commitment TEXT NOT NULL,
                     maximum_output_tokens INTEGER NOT NULL,
+                    deadline_at_ms INTEGER NOT NULL,
+                    queue_depth_at_submit INTEGER NOT NULL,
+                    started_ms INTEGER,
                     status TEXT NOT NULL,
                     receipt_json TEXT,
                     created_ms INTEGER NOT NULL,
@@ -623,6 +788,75 @@ class InferenceService:
             }
             if "settlement_binding_json" not in quote_columns:
                 db.execute("ALTER TABLE inference_quotes ADD COLUMN settlement_binding_json TEXT")
+            job_columns = {
+                str(row["name"])
+                for row in db.execute("PRAGMA table_info(inference_jobs)").fetchall()
+            }
+            if "deadline_at_ms" not in job_columns:
+                db.execute("ALTER TABLE inference_jobs ADD COLUMN deadline_at_ms INTEGER")
+                db.execute(
+                    "UPDATE inference_jobs SET deadline_at_ms=created_ms+? WHERE deadline_at_ms IS NULL",
+                    (JOB_DEADLINE_SECONDS * 1000,),
+                )
+            if "queue_depth_at_submit" not in job_columns:
+                db.execute("ALTER TABLE inference_jobs ADD COLUMN queue_depth_at_submit INTEGER")
+                db.execute(
+                    "UPDATE inference_jobs SET queue_depth_at_submit=0 WHERE queue_depth_at_submit IS NULL"
+                )
+            if "started_ms" not in job_columns:
+                db.execute("ALTER TABLE inference_jobs ADD COLUMN started_ms INTEGER")
+        self._migrate_plaintext_storage()
+
+    def _migrate_plaintext_storage(self) -> None:
+        migrated = False
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            prompts = db.execute(
+                "SELECT job_id,prompt FROM inference_jobs WHERE prompt IS NOT NULL"
+            ).fetchall()
+            for row in prompts:
+                job_id = str(row["job_id"])
+                prompt = str(row["prompt"])
+                if prompt.startswith(STORAGE_PREFIX):
+                    continue
+                db.execute(
+                    "UPDATE inference_jobs SET prompt=? WHERE job_id=?",
+                    (self._seal_storage("PROMPT", job_id, prompt.encode("utf-8")), job_id),
+                )
+                migrated = True
+            events = db.execute(
+                "SELECT job_id,event_id,payload_json FROM inference_events"
+            ).fetchall()
+            for row in events:
+                job_id = str(row["job_id"])
+                event_id = int(row["event_id"])
+                saved = str(row["payload_json"])
+                if saved.startswith(STORAGE_PREFIX):
+                    continue
+                try:
+                    payload = json.loads(saved)
+                except json.JSONDecodeError as error:
+                    raise InferenceError(
+                        500,
+                        "PRIVATE_STORAGE_INVALID",
+                        "Legacy private inference event storage is malformed.",
+                    ) from error
+                if not isinstance(payload, dict):
+                    raise InferenceError(
+                        500,
+                        "PRIVATE_STORAGE_INVALID",
+                        "Legacy private inference event storage is not an object.",
+                    )
+                db.execute(
+                    "UPDATE inference_events SET payload_json=? WHERE job_id=? AND event_id=?",
+                    (self._seal_event(job_id, event_id, payload), job_id, event_id),
+                )
+                migrated = True
+        if migrated:
+            with self._connect() as db:
+                db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+                db.execute("VACUUM")
+                db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
 
     def _recover_interrupted_jobs(self) -> None:
         with self._connect() as db:
@@ -937,7 +1171,7 @@ class InferenceService:
         client_hash = self._client_hash(client)
         with self._admission_lock, self._connect() as db:
             replay = db.execute(
-                "SELECT job_id,quote_id,prompt_commitment,status FROM inference_jobs WHERE client_hash=? AND idempotency_key=?",
+                "SELECT job_id,quote_id,prompt_commitment,status,deadline_at_ms,queue_depth_at_submit FROM inference_jobs WHERE client_hash=? AND idempotency_key=?",
                 (client_hash, key),
             ).fetchone()
             if replay is not None:
@@ -945,7 +1179,14 @@ class InferenceService:
                     raise InferenceError(409, "IDEMPOTENCY_CONFLICT", "Idempotency key is already bound to another request.")
                 return InferenceReply(
                     200,
-                    {"schema": "noos/wwm-job/v2", "job_id": replay["job_id"], "status": replay["status"], "replayed": True},
+                    {
+                        "schema": "noos/wwm-job/v2",
+                        "job_id": replay["job_id"],
+                        "status": replay["status"],
+                        "deadline_at_ms": int(replay["deadline_at_ms"]),
+                        "queue_depth_at_submit": replay["queue_depth_at_submit"],
+                        "replayed": True,
+                    },
                 )
             quote_row = db.execute(
                 "SELECT client_hash,quote_json,used_job_id,expires_height,settlement_binding_json FROM inference_quotes WHERE quote_id=?",
@@ -1022,9 +1263,24 @@ class InferenceService:
             if queued >= MAX_QUEUED:
                 raise InferenceError(429, "EXECUTOR_QUEUE_FULL", "The bounded two-job waiting queue is full.", retry_after=30)
             job_id = secrets.token_hex(32)
+            deadline_at_ms = now + JOB_DEADLINE_SECONDS * 1000
+            queue_depth_at_submit = queued + 1
             db.execute(
-                "INSERT INTO inference_jobs(job_id,quote_id,client_hash,idempotency_key,prompt,prompt_commitment,maximum_output_tokens,status,created_ms,updated_ms) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                (job_id, quote_id, client_hash, key, prompt, commitment, quote["maximum_output_tokens"], "QUEUED", now, now),
+                "INSERT INTO inference_jobs(job_id,quote_id,client_hash,idempotency_key,prompt,prompt_commitment,maximum_output_tokens,deadline_at_ms,queue_depth_at_submit,status,created_ms,updated_ms) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    job_id,
+                    quote_id,
+                    client_hash,
+                    key,
+                    self._seal_storage("PROMPT", job_id, encoded_prompt),
+                    commitment,
+                    quote["maximum_output_tokens"],
+                    deadline_at_ms,
+                    queue_depth_at_submit,
+                    "QUEUED",
+                    now,
+                    now,
+                ),
             )
             db.execute("UPDATE inference_quotes SET used_job_id=? WHERE quote_id=?", (job_id, quote_id))
         try:
@@ -1032,21 +1288,43 @@ class InferenceService:
         except queue.Full:
             self._complete_without_output(job_id, "FAILED", "EXECUTOR_QUEUE_DESYNCHRONIZED")
             raise InferenceError(503, "EXECUTOR_QUEUE_FULL", "Bounded executor queue became unavailable.", retry_after=30)
-        return InferenceReply(202, {"schema": "noos/wwm-job/v2", "job_id": job_id, "status": "QUEUED", "replayed": False})
+        return InferenceReply(
+            202,
+            {
+                "schema": "noos/wwm-job/v2",
+                "job_id": job_id,
+                "status": "QUEUED",
+                "deadline_at_ms": deadline_at_ms,
+                "queue_depth_at_submit": queue_depth_at_submit,
+                "replayed": False,
+            },
+        )
 
     def _cancel(self, job_id: str, body: dict) -> InferenceReply:
         reason = body.get("reason", "USER_REQUESTED")
         if reason != "USER_REQUESTED":
             raise InferenceError(400, "INVALID_CANCEL_REASON", "Only USER_REQUESTED cancellation is accepted.")
         now = self.now_ms()
+        deadline_expired = False
         with self._connect() as db:
-            row = db.execute("SELECT status FROM inference_jobs WHERE job_id=?", (job_id,)).fetchone()
+            row = db.execute(
+                "SELECT status,deadline_at_ms FROM inference_jobs WHERE job_id=?",
+                (job_id,),
+            ).fetchone()
             if row is None:
                 raise InferenceError(404, "JOB_NOT_FOUND", "Inference job was not found.")
             status = str(row["status"])
             if status not in TERMINAL_STATUSES:
-                status = "CANCEL_REQUESTED"
-                db.execute("UPDATE inference_jobs SET status=?,updated_ms=? WHERE job_id=?", (status, now, job_id))
+                deadline_expired = now >= int(row["deadline_at_ms"])
+                if not deadline_expired:
+                    status = "CANCEL_REQUESTED"
+                    db.execute(
+                        "UPDATE inference_jobs SET status=?,updated_ms=? WHERE job_id=?",
+                        (status, now, job_id),
+                    )
+        if deadline_expired:
+            self._complete_without_output(job_id, "FAILED", "JOB_DEADLINE_EXPIRED")
+            status = "FAILED"
         with self._condition:
             self._condition.notify_all()
         return InferenceReply(200, {"schema": "noos/wwm-cancel/v2", "job_id": job_id, "status": status})
@@ -1088,17 +1366,19 @@ class InferenceService:
                     (job_id,),
                 ).fetchone()
             for row in rows:
-                payload = json.loads(str(row["payload_json"]))
+                payload = self._open_event(
+                    job_id,
+                    int(row["event_id"]),
+                    str(row["payload_json"]),
+                )
                 cursor = int(row["event_id"])
                 yield payload
             if status_row is None:
                 return
             status = str(status_row["status"])
             settlement_state = status_row["settlement_state"]
-            if status in TERMINAL_STATUSES and not (
-                status == "COMPLETED"
-                and settlement_state is not None
-                and str(settlement_state) != "FINALIZED"
+            if status in TERMINAL_STATUSES and (
+                settlement_state is None or str(settlement_state) == "FINALIZED"
             ):
                 return
             with self._condition:
@@ -1121,7 +1401,13 @@ class InferenceService:
         payload = self._sign({"id": event_id, "type": event_type, "data": data}, "STREAM-EVENT")
         db.execute(
             "INSERT INTO inference_events(job_id,event_id,event_type,payload_json,created_ms) VALUES(?,?,?,?,?)",
-            (job_id, event_id, event_type, canonical_json(payload).decode("utf-8"), self.now_ms()),
+            (
+                job_id,
+                event_id,
+                event_type,
+                self._seal_event(job_id, event_id, payload),
+                self.now_ms(),
+            ),
         )
         return payload
 
@@ -1151,6 +1437,24 @@ class InferenceService:
         evidence: str,
         error_code: str | None = None,
     ) -> dict:
+        if self.settlement_backend is None:
+            disclosure = (
+                "Gateway-signed off-chain interactive execution receipt. It is not a "
+                "factuality certificate and has not been settled on MindChain."
+            )
+        elif status == "COMPLETED":
+            disclosure = (
+                "Gateway-signed off-chain interactive execution receipt. Successful "
+                "execution is awaiting canonical zero-value sponsored settlement on "
+                "MindChain; execution evidence remains provisional and is not a "
+                "factuality certificate."
+            )
+        else:
+            disclosure = (
+                "Gateway-signed off-chain interactive execution receipt. The terminal "
+                "failure is awaiting canonical zero-value sponsored refund settlement "
+                "on MindChain and contains no output evidence."
+            )
         value = {
             "schema": "noos/wwm-receipt/v2",
             "receipt_id": self._lifecycle_id(job_id, "receipt"),
@@ -1162,6 +1466,8 @@ class InferenceService:
             "prompt_commitment": quote["prompt_commitment"],
             "output_commitment": "0" * 64,
             "output_tokens": 0,
+            "output_root": "0" * 64,
+            "token_history_root": "0" * 64,
             "terminal_status": status,
             "evidence_state": evidence,
             "chain_anchor": None,
@@ -1172,11 +1478,7 @@ class InferenceService:
             "execution_scope": "OFF_CHAIN_INTERACTIVE_TESTNET",
             "production": False,
             "promotion_effect": "NONE",
-            "disclosure": (
-                "Gateway-signed off-chain interactive execution receipt. Successful execution is awaiting canonical zero-value sponsored settlement on MindChain; execution evidence remains provisional and is not a factuality certificate."
-                if self.settlement_backend is not None and status == "COMPLETED"
-                else "Gateway-signed off-chain interactive execution receipt. It is not a factuality certificate and has not been settled on MindChain."
-            ),
+            "disclosure": disclosure,
             "completed_at_ms": self.now_ms(),
         }
         if error_code is not None:
@@ -1192,29 +1494,51 @@ class InferenceService:
             raise InferenceError(404, "JOB_NOT_FOUND", "Inference job was not found.")
         return row, json.loads(str(row["quote_json"]))
 
-    def _store_receipt(self, job_id: str, status: str, receipt: dict) -> None:
+    def _store_receipt(
+        self,
+        job_id: str,
+        status: str,
+        receipt: dict,
+        *,
+        expected_status: str | None = None,
+    ) -> bool:
         now = self.now_ms()
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            db.execute(
-                "UPDATE inference_jobs SET status=?,receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=?",
-                (status, canonical_json(receipt).decode("utf-8"), now, job_id),
-            )
+            if expected_status is None:
+                updated = db.execute(
+                    "UPDATE inference_jobs SET status=?,receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=?",
+                    (status, canonical_json(receipt).decode("utf-8"), now, job_id),
+                )
+            else:
+                updated = db.execute(
+                    "UPDATE inference_jobs SET status=?,receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=? AND status=?",
+                    (
+                        status,
+                        canonical_json(receipt).decode("utf-8"),
+                        now,
+                        job_id,
+                        expected_status,
+                    ),
+                )
+            if updated.rowcount != 1:
+                return False
             self._append_event_in_db(db, job_id, "receipt.completed", receipt)
         with self._condition:
             self._condition.notify_all()
+        return True
 
-    def _store_completed_receipt(
+    def _store_chain_pending_receipt(
         self,
         job_id: str,
         row: sqlite3.Row,
         quote: dict,
-        result: ExecutionResult,
+        status: str,
         receipt: dict,
-    ) -> None:
-        if self.settlement_backend is None:
-            self._store_receipt(job_id, "COMPLETED", receipt)
-            return
+        inference: Mapping[str, object],
+        *,
+        expected_status: str | None = None,
+    ) -> bool:
         binding_json = row["settlement_binding_json"]
         if binding_json is None:
             raise InferenceError(
@@ -1227,21 +1551,33 @@ class InferenceService:
             "job_id": job_id,
             "receipt_id": receipt["receipt_id"],
             "settlement_id": self._lifecycle_id(job_id, "settlement"),
+            "terminal_status": status,
+            "error_code": receipt.get("error_code"),
             "quote": quote,
             "binding": json.loads(str(binding_json)),
-            "inference": {
-                "output_root": result.output_root,
-                "token_history_root": result.token_history_root,
-                "output_tokens": result.output_tokens,
-            },
+            "inference": dict(inference),
         }
         now = self.now_ms()
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            db.execute(
-                "UPDATE inference_jobs SET status='COMPLETED',receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=?",
-                (canonical_json(receipt).decode("utf-8"), now, job_id),
-            )
+            if expected_status is None:
+                updated = db.execute(
+                    "UPDATE inference_jobs SET status=?,receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=?",
+                    (status, canonical_json(receipt).decode("utf-8"), now, job_id),
+                )
+            else:
+                updated = db.execute(
+                    "UPDATE inference_jobs SET status=?,receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=? AND status=?",
+                    (
+                        status,
+                        canonical_json(receipt).decode("utf-8"),
+                        now,
+                        job_id,
+                        expected_status,
+                    ),
+                )
+            if updated.rowcount != 1:
+                return False
             db.execute(
                 """
                 INSERT INTO inference_settlements(
@@ -1261,17 +1597,66 @@ class InferenceService:
         with self._condition:
             self._condition.notify_all()
         self._settlement_queue.put_nowait(job_id)
+        return True
+
+    def _store_completed_receipt(
+        self,
+        job_id: str,
+        row: sqlite3.Row,
+        quote: dict,
+        result: ExecutionResult,
+        receipt: dict,
+    ) -> bool:
+        if self.settlement_backend is None:
+            return self._store_receipt(
+                job_id,
+                "COMPLETED",
+                receipt,
+                expected_status="RUNNING",
+            )
+        return self._store_chain_pending_receipt(
+            job_id,
+            row,
+            quote,
+            "COMPLETED",
+            receipt,
+            {
+                "output_root": result.output_root,
+                "token_history_root": result.token_history_root,
+                "output_tokens": result.output_tokens,
+            },
+            expected_status="RUNNING",
+        )
 
     def _complete_without_output(self, job_id: str, status: str, error_code: str) -> None:
         with self._connect() as db:
             row, quote = self._job_quote(db, job_id)
             if str(row["status"]) in TERMINAL_STATUSES and row["receipt_json"] is not None:
                 return
-        receipt = self._sign(
-            self._receipt_base(job_id, quote, status, evidence="NONE", error_code=error_code),
-            "RECEIPT",
+        unsigned = self._receipt_base(
+            job_id,
+            quote,
+            status,
+            evidence="NONE",
+            error_code=error_code,
         )
-        self._store_receipt(job_id, status, receipt)
+        unsigned["deadline_at_ms"] = int(row["deadline_at_ms"])
+        receipt = self._sign(unsigned, "RECEIPT")
+        if self.settlement_backend is None:
+            self._store_receipt(job_id, status, receipt)
+            return
+        self._store_chain_pending_receipt(
+            job_id,
+            row,
+            quote,
+            status,
+            receipt,
+            {
+                "output_root": "0" * 64,
+                "token_history_root": "0" * 64,
+                "output_tokens": 0,
+            },
+        )
 
     def _worker_loop(self) -> None:
         while not self._closed.is_set():
@@ -1325,6 +1710,24 @@ class InferenceService:
             raise InferenceError(502, "SETTLEMENT_PROOF_INVALID", f"Finalized {kind} proof is malformed.")
         return selected
 
+    @staticmethod
+    def _expected_terminal_code(request: Mapping[str, object]) -> int:
+        status = request.get("terminal_status")
+        error_code = request.get("error_code")
+        if status == "COMPLETED":
+            return 0
+        if status == "CANCELLED":
+            return 1
+        if status == "FAILED":
+            return 2 if error_code == "JOB_DEADLINE_EXPIRED" else 4
+        if status == "NO_QUORUM":
+            return 3
+        raise InferenceError(
+            500,
+            "SETTLEMENT_STATE_INVALID",
+            "Settlement request terminal status is invalid.",
+        )
+
     def _settlement_lifecycle(
         self,
         request: Mapping[str, object],
@@ -1346,6 +1749,7 @@ class InferenceService:
         quote = request.get("quote")
         inference = request.get("inference")
         binding = request.get("binding")
+        expected_terminal_code = self._expected_terminal_code(request)
         if not isinstance(quote, dict) or not isinstance(inference, dict) or not isinstance(binding, dict):
             raise InferenceError(502, "SETTLEMENT_PROOF_INVALID", "Settlement request binding is malformed.")
         job_value = job["record"]
@@ -1359,10 +1763,16 @@ class InferenceService:
             or receipt_value.get("job_id") != job_id
             or receipt_value.get("output_root") != inference.get("output_root")
             or receipt_value.get("token_history_root") != inference.get("token_history_root")
+            or receipt_value.get("terminal_code") != expected_terminal_code
+            or receipt_value.get("paid_amount") != "0"
+            or receipt_value.get("refunded_amount") != "0"
             or settlement_value.get("settlement_id") != settlement_id
             or settlement_value.get("job_id") != job_id
             or settlement_value.get("receipt_id") != receipt_id
             or settlement_value.get("fund_profile_id") != binding.get("fund_profile_id")
+            or settlement_value.get("paid_amount") != "0"
+            or settlement_value.get("refunded_amount") != "0"
+            or settlement_value.get("released_amount") != "0"
         ):
             raise InferenceError(502, "SETTLEMENT_PROOF_INVALID", "Canonical settlement records changed execution bindings.")
         heights = [
@@ -1441,6 +1851,16 @@ class InferenceService:
         provisional = json.loads(str(row["receipt_json"]))
         if not isinstance(provisional, dict):
             raise InferenceError(500, "SETTLEMENT_STATE_INVALID", "Provisional receipt is malformed.")
+        completed = provisional.get("terminal_status") == "COMPLETED"
+        settlement_state = "FINALIZED_PAID" if completed else "FINALIZED_REFUNDED"
+        disclosure = (
+            "Gateway-signed off-chain interactive execution receipt with a canonical "
+            "zero-value sponsored job, receipt, and settlement finalized on MindChain. "
+            "Execution evidence remains provisional and is not a factuality certificate."
+            if completed
+            else "Gateway-signed terminal inference receipt with a canonical zero-value "
+            "sponsored refund settlement finalized on MindChain and no output evidence."
+        )
         unsigned = {
             key: value
             for key, value in provisional.items()
@@ -1449,10 +1869,10 @@ class InferenceService:
         unsigned.update(
             {
                 "chain_anchor": chain_anchor,
-                "settlement_state": "FINALIZED_PAID",
+                "settlement_state": settlement_state,
                 "chain_settlement": lifecycle,
                 "settled_at_ms": self.now_ms(),
-                "disclosure": "Gateway-signed off-chain interactive execution receipt with a canonical zero-value sponsored job, receipt, and settlement finalized on MindChain. Execution evidence remains provisional and is not a factuality certificate.",
+                "disclosure": disclosure,
             }
         )
         finalized = self._sign(unsigned, "RECEIPT")
@@ -1520,32 +1940,64 @@ class InferenceService:
                 self._settlement_queue.task_done()
 
     def _execute_job(self, job_id: str) -> None:
+        terminal_before_start: tuple[str, str] | None = None
         with self._connect() as db:
             row, quote = self._job_quote(db, job_id)
-            if row["status"] == "CANCEL_REQUESTED":
-                pass
-            elif row["status"] != "QUEUED":
+            status = str(row["status"])
+            deadline_at_ms = int(row["deadline_at_ms"])
+            if status == "CANCEL_REQUESTED":
+                terminal_before_start = ("CANCELLED", "USER_REQUESTED")
+            elif status != "QUEUED":
                 return
             else:
-                db.execute(
-                    "UPDATE inference_jobs SET status='RUNNING',updated_ms=? WHERE job_id=?",
-                    (self.now_ms(), job_id),
-                )
-        if row["status"] == "CANCEL_REQUESTED":
-            self._complete_without_output(job_id, "CANCELLED", "USER_REQUESTED")
+                started_ms = self.now_ms()
+                if started_ms >= deadline_at_ms:
+                    terminal_before_start = ("FAILED", "JOB_DEADLINE_EXPIRED")
+                else:
+                    claimed = db.execute(
+                        "UPDATE inference_jobs SET status='RUNNING',started_ms=?,updated_ms=? WHERE job_id=? AND status='QUEUED'",
+                        (started_ms, started_ms, job_id),
+                    )
+                    if claimed.rowcount != 1:
+                        current = db.execute(
+                            "SELECT status,deadline_at_ms FROM inference_jobs WHERE job_id=?",
+                            (job_id,),
+                        ).fetchone()
+                        if current is None:
+                            return
+                        current_status = str(current["status"])
+                        if current_status == "CANCEL_REQUESTED":
+                            terminal_before_start = ("CANCELLED", "USER_REQUESTED")
+                        elif self.now_ms() >= int(current["deadline_at_ms"]):
+                            terminal_before_start = ("FAILED", "JOB_DEADLINE_EXPIRED")
+                        else:
+                            return
+        if terminal_before_start is not None:
+            self._complete_without_output(job_id, *terminal_before_start)
             return
-        prompt = str(row["prompt"])
+
+        def execution_abort_code() -> str | None:
+            with self._connect() as control_db:
+                current = control_db.execute(
+                    "SELECT status,deadline_at_ms FROM inference_jobs WHERE job_id=?",
+                    (job_id,),
+                ).fetchone()
+            if current is None or str(current["status"]) == "CANCEL_REQUESTED":
+                return "USER_REQUESTED"
+            if self.now_ms() >= int(current["deadline_at_ms"]):
+                return "JOB_DEADLINE_EXPIRED"
+            return None
+
+        prompt = self._open_prompt(job_id, str(row["prompt"]))
         maximum = int(row["maximum_output_tokens"])
         decoder = codecs.getincrementaldecoder("utf-8")("strict")
         output_bytes = 0
 
         def on_chunk(chunk: bytes, incremental_root: str) -> None:
             nonlocal output_bytes
-            output_bytes += len(chunk)
-            with self._connect() as event_db:
-                current = event_db.execute("SELECT status FROM inference_jobs WHERE job_id=?", (job_id,)).fetchone()
-            if current is None or current["status"] == "CANCEL_REQUESTED":
+            if execution_abort_code() is not None:
                 return
+            output_bytes += len(chunk)
             delta = decoder.decode(chunk, final=False)
             if delta:
                 self._append_event(
@@ -1562,7 +2014,18 @@ class InferenceService:
                 )
 
         try:
-            result = self.executor.run(job_id, prompt, maximum, on_chunk)
+            result = self.executor.run(
+                job_id,
+                prompt,
+                maximum,
+                on_chunk,
+                execution_abort_code,
+            )
+            abort = execution_abort_code()
+            if abort is not None:
+                status = "CANCELLED" if abort == "USER_REQUESTED" else "FAILED"
+                self._complete_without_output(job_id, status, abort)
+                return
             tail = decoder.decode(b"", final=True)
             if tail:
                 self._append_event(
@@ -1577,10 +2040,9 @@ class InferenceService:
                         "output_bytes": len(result.output),
                     },
                 )
-            with self._connect() as db:
-                current = db.execute("SELECT status FROM inference_jobs WHERE job_id=?", (job_id,)).fetchone()
-            if current is not None and current["status"] == "CANCEL_REQUESTED":
-                self._complete_without_output(job_id, "CANCELLED", "USER_REQUESTED")
+            completed_at_ms = self.now_ms()
+            if completed_at_ms >= deadline_at_ms:
+                self._complete_without_output(job_id, "FAILED", "JOB_DEADLINE_EXPIRED")
                 return
             receipt = self._receipt_base(job_id, quote, "COMPLETED", evidence="PROVISIONAL_SIGNED")
             receipt.update(
@@ -1591,16 +2053,31 @@ class InferenceService:
                     "output_tokens": result.output_tokens,
                     "output_bytes": len(result.output),
                     "duration_ms": result.duration_ms,
+                    "deadline_at_ms": deadline_at_ms,
+                    "completed_at_ms": completed_at_ms,
                     "tokenizer_executable_sha256": result.tokenizer_sha256,
                 }
             )
-            self._store_completed_receipt(
+            stored = self._store_completed_receipt(
                 job_id,
                 row,
                 quote,
                 result,
                 self._sign(receipt, "RECEIPT"),
             )
+            if not stored:
+                abort = execution_abort_code()
+                if abort is None:
+                    raise InferenceError(
+                        500,
+                        "JOB_STATE_TRANSITION_INVALID",
+                        "Inference completion lost its durable running state.",
+                    )
+                status = "CANCELLED" if abort == "USER_REQUESTED" else "FAILED"
+                self._complete_without_output(job_id, status, abort)
         except (InferenceError, UnicodeDecodeError) as error:
-            code = error.code if isinstance(error, InferenceError) else "INVALID_UTF8_OUTPUT"
-            self._complete_without_output(job_id, "FAILED", code)
+            code = execution_abort_code()
+            if code is None:
+                code = error.code if isinstance(error, InferenceError) else "INVALID_UTF8_OUTPUT"
+            status = "CANCELLED" if code == "USER_REQUESTED" else "FAILED"
+            self._complete_without_output(job_id, status, code)

@@ -71,6 +71,7 @@ class MonitorConfig:
     worker_bearer_token: str
     source_revision: str
     release_version: str
+    monitor_source_sha256: str
     interval_seconds: int
     request_timeout_seconds: float
     seed_rpc_port: int
@@ -83,6 +84,7 @@ class MonitorConfig:
     rpc_origin: str
     status_origin: str
     artifact_origin: str
+    mindscan_url: str
     validator_status_urls: tuple[str, ...]
     indexer_origins: tuple[str, ...]
 
@@ -324,6 +326,9 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
     evidence_dir.mkdir(parents=True, exist_ok=True)
     signing_key = args.signing_key.resolve(strict=True)
     r2_report = args.r2_report.resolve(strict=True)
+    monitor_source_sha256 = hashlib.sha256(
+        Path(__file__).resolve(strict=True).read_bytes()
+    ).hexdigest()
     return MonitorConfig(
         listen_host=listen_host,
         listen_port=listen_port,
@@ -334,6 +339,7 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
         worker_bearer_token=load_worker_bearer_token(args.worker_config),
         source_revision=args.source_revision,
         release_version=args.release_version,
+        monitor_source_sha256=monitor_source_sha256,
         interval_seconds=args.interval_seconds,
         request_timeout_seconds=args.request_timeout_seconds,
         seed_rpc_port=args.seed_rpc_port,
@@ -346,6 +352,11 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
         rpc_origin=exact_https_origin(endpoints.get("read_gateway"), "RPC endpoint"),
         status_origin=exact_https_origin(endpoints.get("status"), "status endpoint"),
         artifact_origin=exact_https_origin(endpoints.get("artifacts"), "artifact endpoint"),
+        mindscan_url=exact_https_url(
+            endpoints.get("mindscan"),
+            "MindScan endpoint",
+            "/mindscan",
+        ),
         validator_status_urls=validator_status_urls,
         indexer_origins=indexer_origins,
     )
@@ -472,6 +483,33 @@ def worker_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
     if status != 200:
         raise MonitorError("inference worker is not ready")
     return {"status": status, "ready": body.get("ready", True)}
+
+def mindscan_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
+    status, _, body = request_json(config.mindscan_url + "/api/health", timeout)
+    if (
+        status != 200
+        or body.get("schema") != "noos/mindscan-health/v1"
+        or body.get("ok") is not True
+        or body.get("chain_id") != config.chain_id
+        or body.get("genesis_hash") != config.genesis_hash
+        or body.get("source_revision") != config.source_revision
+        or body.get("production") is not False
+        or body.get("promotion_effect") != "NONE"
+        or body.get("release_version") != config.release_version
+        or body.get("indexer_release_version") != config.release_version
+    ):
+        raise MonitorError("MindScan availability or exact-release identity mismatch")
+    source_sha256 = require_hex32(body.get("source_sha256"), "MindScan source SHA-256")
+    indexed_generation = canonical_uint(
+        body.get("indexed_generation"),
+        "MindScan indexed generation",
+    )
+    return {
+        "status": status,
+        "indexed_generation": indexed_generation,
+        "source_sha256": source_sha256,
+    }
+
 
 def canonical_uint(value: object, label: str) -> int:
     if isinstance(value, bool):
@@ -761,6 +799,7 @@ def collect_checks(config: MonitorConfig) -> list[CheckResult]:
         run_check("browser_coordinator", coordinator),
         run_check("inference_worker", worker),
         run_check("r2_private_mirror", r2),
+        run_check("mindscan", lambda: mindscan_probe(config, timeout)),
     ]
     rpc_targets: list[tuple[str, SeedHost, int]] = []
     default_rpc_port = config.seed_rpc_port
@@ -785,7 +824,7 @@ def collect_checks(config: MonitorConfig) -> list[CheckResult]:
         checks.extend(executor.map(rpc_check, rpc_targets))
     for label, origin in (
         ("site_tls", config.site_origin),
-        ("rpc_tls", config.rpc_origin),
+        ("mindscan_tls", config.mindscan_url),
         ("status_tls", config.status_origin),
         ("artifact_tls", config.artifact_origin),
     ):
@@ -829,12 +868,14 @@ class EvidenceStore:
         source_revision: str,
         release_version: str,
         deployment_sha256: str,
+        monitor_source_sha256: str,
     ):
         self.root = root
         self.key = key
         self.source_revision = source_revision
         self.release_version = release_version
         self.deployment_sha256 = deployment_sha256
+        self.monitor_source_sha256 = monitor_source_sha256
         self.samples = root / "samples"
         self.summaries = root / "daily"
         self.samples.mkdir(parents=True, exist_ok=True)
@@ -864,6 +905,17 @@ class EvidenceStore:
             raise MonitorError("daily sample ledger tail has no sample ID")
         return sample_id
 
+    def _previous_ledger_id(self, day: str) -> str | None:
+        candidates = sorted(
+            path
+            for path in self.samples.glob("*.jsonl")
+            if path.stem < day
+        )
+        return self._last_id(candidates[-1]) if candidates else None
+
+    def _append_predecessor(self, day: str, path: Path) -> str | None:
+        return self._last_id(path) or self._previous_ledger_id(day)
+
     def append(self, checks: list[CheckResult], observed_at: str) -> dict[str, object]:
         day = observed_at[:10]
         path = self._sample_path(day)
@@ -877,8 +929,9 @@ class EvidenceStore:
                 "source_revision": self.source_revision,
                 "release_version": self.release_version,
                 "deployment_sha256": self.deployment_sha256,
+                "monitor_source_sha256": self.monitor_source_sha256,
                 "observed_at_utc": observed_at,
-                "previous_sample_id": self._last_id(path),
+                "previous_sample_id": self._append_predecessor(day, path),
                 "status": "ok" if all(check.ok for check in checks) else "degraded",
                 "checks": [check.document() for check in checks],
             }
@@ -897,6 +950,7 @@ class EvidenceStore:
         if not path.is_file() or path.stat().st_size > MAX_DAY_BYTES:
             raise MonitorError("daily sample ledger is missing or oversized")
         envelopes: list[dict[str, object]] = []
+        previous_day_id = self._previous_ledger_id(day)
         previous: str | None = None
         for raw in path.read_bytes().splitlines():
             if not raw:
@@ -905,7 +959,14 @@ class EvidenceStore:
             if not isinstance(value, dict):
                 raise MonitorError("daily sample entry is not an object")
             verify_envelope(value, SAMPLE_DOMAIN, "sample_id")
-            if value.get("previous_sample_id") != previous:
+            linked = value.get("previous_sample_id")
+            if not envelopes:
+                # Ledgers created before global chaining used a per-day null
+                # root. Keep those historical files summarizable, but require
+                # every non-null root to bind the actual preceding ledger.
+                if linked is not None and linked != previous_day_id:
+                    raise MonitorError("daily sample cross-ledger hash chain is discontinuous")
+            elif linked != previous:
                 raise MonitorError("daily sample hash chain is discontinuous")
             previous = str(value["sample_id"])
             envelopes.append(value)
@@ -922,6 +983,7 @@ class EvidenceStore:
             "source_revision": self.source_revision,
             "release_version": self.release_version,
             "deployment_sha256": self.deployment_sha256,
+            "monitor_source_sha256": self.monitor_source_sha256,
             "day_utc": day,
             "observed_start_utc": timestamps[0],
             "observed_end_utc": timestamps[-1],
@@ -958,6 +1020,7 @@ class MonitorState:
             config.source_revision,
             config.release_version,
             deployment_sha256,
+            config.monitor_source_sha256,
         )
         self.lock = threading.Lock()
         self.latest: dict[str, object] | None = None
@@ -1101,6 +1164,7 @@ def serve(config: MonitorConfig) -> None:
                 "production_authorized": False,
                 "source_revision": config.source_revision,
                 "release_version": config.release_version,
+                "monitor_source_sha256": config.monitor_source_sha256,
             },
             sort_keys=True,
         ),

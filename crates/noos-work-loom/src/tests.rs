@@ -154,12 +154,75 @@ fn open() -> OpenJob {
     }
 }
 
+fn challenger_enrollment() -> ChallengerEnrollment {
+    ChallengerEnrollment {
+        account: h(6),
+        operator_id: h(60),
+        beneficial_owner_root: h(62),
+        control_cluster_id: h(63),
+        funding_tx_id: h(61),
+        funded_at_height: 1,
+        expires_at_height: 100,
+        minimum_bond: 10,
+        revoked_at_height: None,
+    }
+}
+
 fn loom() -> WorkLoom {
     let mut loom = WorkLoom::new(registries());
     loom.credit_genesis(h(1), 1_000).unwrap();
     loom.credit_genesis(h(2), 1_000).unwrap();
     loom.credit_genesis(h(6), 1_000).unwrap();
+    loom.enroll_challenger(challenger_enrollment()).unwrap();
     loom
+}
+
+#[test]
+fn challenger_enrollment_requires_funding_diversity_and_revokes_prospectively() {
+    let mut loom = WorkLoom::new(registries());
+    loom.credit_genesis(h(6), 9).unwrap();
+    loom.credit_genesis(h(7), 10).unwrap();
+    assert_eq!(
+        loom.enroll_challenger(challenger_enrollment()),
+        Err(LoomError::InvalidRegistryEntry)
+    );
+    loom.credit_genesis(h(6), 1).unwrap();
+    loom.enroll_challenger(challenger_enrollment()).unwrap();
+    assert!(!loom.funded_challenger_gate(10, 10));
+
+    let mut correlated = challenger_enrollment();
+    correlated.account = h(7);
+    correlated.operator_id = h(64);
+    correlated.funding_tx_id = h(65);
+    assert_eq!(
+        loom.enroll_challenger(correlated),
+        Err(LoomError::DuplicateChallenger)
+    );
+
+    let mut independent = challenger_enrollment();
+    independent.account = h(7);
+    independent.operator_id = h(64);
+    independent.beneficial_owner_root = h(66);
+    independent.control_cluster_id = h(67);
+    independent.funding_tx_id = h(68);
+    loom.enroll_challenger(independent).unwrap();
+    assert!(loom.funded_challenger_gate(10, 10));
+    assert_eq!(loom.funded_challenger_count(10, 10), 2);
+
+    assert_eq!(
+        loom.enroll_challenger(challenger_enrollment()),
+        Err(LoomError::DuplicateChallenger)
+    );
+    loom.revoke_challenger(h(6), 20).unwrap();
+    assert!(!loom.funded_challenger_gate(20, 10));
+    assert_eq!(
+        loom.revoke_challenger(h(6), 21),
+        Err(LoomError::InactiveChallenger)
+    );
+    assert_eq!(
+        loom.challenger(&h(6)).and_then(|row| row.revoked_at_height),
+        Some(20)
+    );
 }
 
 fn commit(job_id: Hash32, profile: RegistryId) -> WorkerCommit {
@@ -357,15 +420,25 @@ fn successful_dispute_refunds_and_slashes_without_mint() {
 }
 
 #[test]
-fn failed_dispute_returns_challenger_bond_and_job_continues() {
+fn failed_dispute_burns_challenger_bond_and_job_continues() {
     let mut l = loom();
     let id = reach_submitted(&mut l, 45);
     l.finalize_availability(id, availability()).unwrap();
+    assert_eq!(
+        l.open_dispute(id, h(8), 10, h(7), 36),
+        Err(LoomError::UnknownChallenger)
+    );
+    assert_eq!(
+        l.open_dispute(id, h(6), 0, h(7), 36),
+        Err(LoomError::InvalidSettlement)
+    );
     l.open_dispute(id, h(6), 10, h(7), 36).unwrap();
     l.resolve_dispute(id, DisputeVerdict::WorkerUpheld, payout(), accounts())
         .unwrap();
-    assert_eq!(l.balance(&h(6)), 1_000);
+    assert_eq!(l.balance(&h(6)), 990);
+    assert_eq!(l.burned(), 10);
     assert_eq!(l.job(&id).unwrap().state, JobState::Challengeable);
+    l.assert_conserved().unwrap();
 }
 
 #[test]

@@ -24,6 +24,7 @@ EVIDENCE_SCHEMA = "noos/wwm-neural-pulse-evidence/v1"
 MANIFEST_SCHEMA = "noos/neural-explorer-manifest/v3"
 MAX_MANIFEST_BYTES = 1_048_576
 MAX_STATE_BYTES = 4_194_304
+MAX_EVIDENCE_BYTES = 4_194_304
 MAX_ACTIVITY = 32
 PROMPT_INPUT_TOKENS = 4
 
@@ -400,6 +401,13 @@ class NeuralPublisher:
         return True
 
     def _begin(self, resolution: Mapping[str, Any]) -> dict[str, Any]:
+        latest = self.manifest["activity"][0]
+        last = self.state["last_completed"]
+        if (
+            latest["sequence"] != last["sequence"]
+            or latest["transaction_id"] != last["transaction_id"]
+        ):
+            raise PublisherError("publisher state and manifest completion frontier disagree")
         sequence = self.manifest["activity"][0]["sequence"] + 1
         run_id = hashlib.sha256(
             f"{self.manifest['chain_id']}:{self.manifest['genesis_hash']}:neural-pulse:{sequence}".encode()
@@ -498,6 +506,144 @@ class NeuralPublisher:
         )
         return inference
 
+    def _recover_completed_evidence(
+        self,
+        active: Mapping[str, Any],
+        records: Mapping[str, Any],
+    ) -> dict[str, str] | None:
+        evidence_path = (
+            self.config.evidence_dir
+            / f"pulse-{active['sequence']:04d}-{active['run_id']}.json"
+        )
+        if not evidence_path.exists():
+            return None
+        evidence = bounded_object(
+            evidence_path,
+            MAX_EVIDENCE_BYTES,
+            "completed neural pulse evidence",
+        )
+        plan = active["plan"]
+        inference = active.get("inference")
+        if not isinstance(plan, dict) or not isinstance(inference, dict):
+            raise PublisherError("completed neural pulse evidence has no resumable lifecycle")
+        if (
+            evidence.get("schema") != EVIDENCE_SCHEMA
+            or evidence.get("environment") != "public-testnet"
+            or evidence.get("production") is not False
+            or evidence.get("promotion_effect") != "NONE"
+            or evidence.get("chain_id") != self.manifest["chain_id"]
+            or evidence.get("genesis_hash") != self.manifest["genesis_hash"]
+            or evidence.get("run_id") != active["run_id"]
+        ):
+            raise PublisherError("completed neural pulse evidence binding changed")
+        parse_utc(evidence.get("generated_at"), "completed neural pulse generated_at")
+
+        activity = evidence.get("activity")
+        if not isinstance(activity, dict):
+            raise PublisherError("completed neural pulse evidence lacks activity")
+        expected_activity = {
+            "sequence": active["sequence"],
+            "label": f"Neural pulse {active['sequence']:02d}",
+            "job_id": plan.get("job_id"),
+            "receipt_id": plan.get("receipt_id"),
+            "settlement_id": plan.get("settlement_id"),
+            "prompt_commitment": plan.get("prompt_commitment"),
+            "input_tokens": PROMPT_INPUT_TOKENS,
+            "output_tokens": inference.get("output_tokens"),
+            "output_bytes": inference.get("output_bytes"),
+            "output_root": inference.get("output_root"),
+            "token_history_root": inference.get("token_history_root"),
+        }
+        for key, expected in expected_activity.items():
+            if activity.get(key) != expected:
+                raise PublisherError(f"completed neural pulse activity changed: {key}")
+        txid = canonical_hex(
+            evidence.get("close_transaction_id"),
+            "completed neural pulse close transaction",
+        )
+        if canonical_hex(activity.get("transaction_id"), "completed neural pulse transaction") != txid:
+            raise PublisherError("completed neural pulse transaction binding changed")
+        positive_int(activity.get("included_height"), "completed neural pulse inclusion height")
+        canonical_hex(activity.get("included_block"), "completed neural pulse inclusion block")
+        positive_int(activity.get("duration_milliseconds"), "completed neural pulse duration")
+        fee = activity.get("fee_charged")
+        if not isinstance(fee, str) or not fee.isdigit():
+            raise PublisherError("completed neural pulse fee is invalid")
+
+        expected_records = (
+            ("finalized_job", active.get("job_record"), "job", plan.get("job_id")),
+            ("finalized_receipt", records.get("receipt"), "receipt", plan.get("receipt_id")),
+            (
+                "finalized_settlement",
+                records.get("settlement"),
+                "settlement",
+                plan.get("settlement_id"),
+            ),
+        )
+        for key, current, kind, identifier in expected_records:
+            saved = evidence.get(key)
+            if (
+                not isinstance(current, Mapping)
+                or not isinstance(saved, dict)
+                or saved.get("schema") != "noos/finalized-wwm-record/v1"
+                or saved.get("kind") != kind
+                or saved.get("id") != identifier
+                or saved.get("canonical_record_hex") != current.get("canonical_record_hex")
+            ):
+                raise PublisherError(f"completed neural pulse {kind} record changed")
+
+        confirmations = evidence.get("indexer_confirmations")
+        origins = self.manifest["indexer_origins"]
+        if not isinstance(confirmations, list) or len(confirmations) != len(origins):
+            raise PublisherError("completed neural pulse indexer evidence is incomplete")
+        canonical_confirmation: str | None = None
+        for origin, confirmation in zip(origins, confirmations, strict=True):
+            if not isinstance(confirmation, dict) or confirmation.get("origin") != origin:
+                raise PublisherError("completed neural pulse indexer origin changed")
+            transaction = confirmation.get("transaction")
+            if not isinstance(transaction, dict):
+                raise PublisherError("completed neural pulse indexer transaction is missing")
+            inclusion = transaction.get("inclusion")
+            if (
+                transaction.get("txid") != txid
+                or transaction.get("state") != "INCLUDED"
+                or transaction.get("fee") != fee
+                or not isinstance(inclusion, dict)
+                or inclusion.get("height") != str(activity["included_height"])
+                or inclusion.get("hash") != activity["included_block"]
+            ):
+                raise PublisherError("completed neural pulse indexer transaction changed")
+            projection = json.dumps(
+                {key: transaction.get(key) for key in ("txid", "state", "fee", "inclusion")},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            if canonical_confirmation is not None and projection != canonical_confirmation:
+                raise PublisherError("completed neural pulse indexers disagree")
+            canonical_confirmation = projection
+
+        if evidence.get("claims") != {
+            "model_execution_off_chain": True,
+            "job_receipt_settlement_finalized_on_chain": True,
+            "three_indexers_agree": True,
+            "production_claimed": False,
+        }:
+            raise PublisherError("completed neural pulse claims changed")
+        last = self.state["last_completed"]
+        if last["sequence"] > active["sequence"] or (
+            last["sequence"] == active["sequence"]
+            and last["transaction_id"] != txid
+        ):
+            raise PublisherError("completed neural pulse contradicts durable publisher state")
+        recovered = {"close_txid": txid}
+        open_txid = evidence.get("open_transaction_id")
+        if open_txid is not None:
+            recovered["open_txid"] = canonical_hex(
+                open_txid,
+                "completed neural pulse open transaction",
+            )
+        return recovered
+
     def _ensure_close(
         self,
         active: dict[str, Any],
@@ -523,11 +669,24 @@ class NeuralPublisher:
             if not self._missing_record(error):
                 raise
         else:
+            recovered = False
             if not isinstance(active.get("close_txid"), str):
-                raise PublisherError("close records finalized without a durable transaction id")
+                durable = self._recover_completed_evidence(active, records)
+                if durable is None:
+                    raise PublisherError(
+                        "close records finalized without a durable transaction id"
+                    )
+                active.update(durable)
+                recovered = True
             active["close_records"] = records
             active["phase"] = "close_finalized"
             self._save_state()
+            if recovered:
+                self._emit(
+                    "close_reconciled",
+                    sequence=active["sequence"],
+                    transaction_id=active["close_txid"],
+                )
             return records
 
         close_txid = active.get("close_txid")

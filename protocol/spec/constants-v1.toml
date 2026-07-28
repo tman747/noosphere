@@ -207,6 +207,8 @@ reflex_lane_enabled = false              # source: plan section 6.8; plan sectio
 umbra_suite_enabled = false              # source: plan section 6.8 ("every umbra_suite_enabled=false")
 dream_lane_enabled = false               # source: ch01 section 8.5 falsifier ("dream_lane_enabled remains false"); plan section 6.8; E-DREAM-02 KILLED
 class_gate_irreversible_budget = 0       # source: plan section 6.8 / section 12.12 (A-CLASS-GATE.v2 budget constants open per addendum A.4; exactly zero on every network)
+lending_reviewed_enabled = false         # exact-revision independent oracle/liquidation/exposure/failure/emergency reviews required before risk-increasing lending
+bridge_reviewed_enabled = false          # exact-revision independent cross-chain/exposure/failure/emergency reviews required before any bridge activation
 loom_theoretical_max = 0.10              # source: ch01 section 12 ("increase work_loom_weight_cap above 0.10" is prohibited) and ch05 section 1.5 (c_L <= 0.10); theoretical ceiling only — production value is 0
 
 [emission]

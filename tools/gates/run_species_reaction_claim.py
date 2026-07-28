@@ -19,7 +19,7 @@ from experimental_gate import ROOT, base_continuity, emit, evidence_check
 CLAIMS = {
     "S-ARTIFACT": {
         "package": "noos-species",
-        "filter": "claim_artifact",
+        "filter": "artifact::tests::",
         "sources": ("crates/noos-species/src/artifact.rs",),
         "implemented": True,
         "limitations": (

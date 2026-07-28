@@ -23,22 +23,24 @@ use crate::neural_oracle::{
 };
 use crate::objects::{
     agent_private_payment_schema_root, agent_private_payment_scope, asset_id, compute_job_id,
-    debt_position_id, lending_market_id, liquidity_position_id, note_id, oracle_feed_id, pool_id,
-    private_recipient_commitment, stable_asset_id, txid, witness_root, AccessEntry, AccountV1,
-    ActionV1, BoundedBytes, BoundedList, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1,
-    FeatureControlV1, IntentV1, NoteV1, ObjectV1, OptionalHash32, OptionalObject, PrivatePaymentV1,
-    ResourceVector, SignedIntentV1, TransactionV1, TransactionWitnessesV1,
+    compute_mix32_input_root, compute_mix32_result_root, debt_position_id, lending_market_id,
+    liquidity_position_id, note_id, oracle_feed_id, pool_id, private_recipient_commitment,
+    stable_asset_id, txid, witness_root, AccessEntry, AccountV1, ActionV1, BoundedBytes,
+    BoundedList, CapabilityGrantV1, ComputeJobV1, ComputeWorkerV1, FeatureControlV1, IntentV1,
+    NoteV1, ObjectV1, OptionalHash32, OptionalObject, PrivatePaymentV1, ResourceVector,
+    SignedIntentV1, TransactionV1, TransactionWitnessesV1,
 };
 use crate::state::{
     param_key, ApplyOutcome, BlockContext, FailCode, GenesisConfig, GenesisError, LumenLedger,
-    LumenRoots, RejectReason, SimulationOutcome, StateDelta, TreeId, CONTROL_PREFIX, NOOS_ASSET,
-    PARAM_ISSUANCE,
+    LumenRoots, RejectReason, SimulationOutcome, StateDelta, TreeId, CONTROL_BRIDGE_REVIEWED,
+    CONTROL_LENDING_REVIEWED, CONTROL_PREFIX, NOOS_ASSET, PARAM_ISSUANCE,
 };
 use crate::test_util::SplitMix64;
 use crate::wwm::{
-    wwm_profile_key, CapabilityProfileV1, CapabilitySetV1, CapabilityStatus, FundBucketTag,
-    ModelCapsuleV2, RegistryEpochVectorV1, SignatureEntryV1, WwmControlMode, WwmControlStateV1,
-    WwmEvidenceTier, WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmSettlementV1, WwmTerminalCode,
+    wwm_profile_key, AvailabilityPolicyV2, CapabilityProfileV1, CapabilitySetV1, CapabilityStatus,
+    CustodianCapabilitySetV1, CustodianProfileV2, FundBucketTag, ModelCapsuleV2,
+    RegistryEpochVectorV1, SignatureEntryV1, WwmControlMode, WwmControlStateV1, WwmEvidenceTier,
+    WwmJobV1, WwmLeafKind, WwmReceiptV1, WwmSettlementV1, WwmTerminalCode,
 };
 use crate::Hash32;
 
@@ -148,7 +150,12 @@ fn genesis() -> LumenLedger {
             fee_state: FeeStateV1::testnet_fixture(),
             issuance: IssuanceParamsV1::testnet_fixture(),
             shares: EmissionSharesV1::testnet_fixture(),
-            controls: &[("neural_lane", false), ("dream_lane", false)],
+            controls: &[
+                ("neural_lane", false),
+                ("dream_lane", false),
+                ("lending_reviewed", true),
+                ("bridge_reviewed", false),
+            ],
             accounts: &accounts,
             gov_authority: GOV,
             emergency_authority: EMERGENCY,
@@ -161,6 +168,7 @@ fn ctx(height: u64) -> BlockContext {
     BlockContext {
         chain_id: CHAIN,
         height,
+        allow_refunded_wwm_terminal_receipts: true,
     }
 }
 
@@ -1806,6 +1814,7 @@ fn compute_market_escrow_requires_requester_acceptance_before_payment() {
             gpu_memory_mb: 8_192,
             price_per_unit: 7,
             endpoint_commitment: [0x44; 32],
+            bond: 10_000,
         }],
         vec![],
     );
@@ -1859,6 +1868,9 @@ fn compute_market_escrow_requires_requester_acceptance_before_payment() {
             .unwrap(),
         ApplyOutcome::Applied { .. }
     ));
+    let claimed_worker = ledger.get_compute_worker(&worker).unwrap();
+    assert_eq!(claimed_worker.bond_available, 9_000);
+    assert_eq!(claimed_worker.bond_locked, 1_000);
     let worker_before_submit = ledger.balance(&worker, &NOOS_ASSET);
 
     let (submit, submit_witnesses, _) = build_tx(
@@ -1916,6 +1928,426 @@ fn compute_market_escrow_requires_requester_acceptance_before_payment() {
         ledger.get_compute_worker(&worker).unwrap().jobs_completed,
         1
     );
+    let settled_worker = ledger.get_compute_worker(&worker).unwrap();
+    assert_eq!(settled_worker.bond_available, 10_000);
+    assert_eq!(settled_worker.bond_locked, 0);
+}
+
+fn apply_compute_actions(
+    ledger: &mut LumenLedger,
+    height: u64,
+    signers: Vec<Hash32>,
+    actions: Vec<ActionV1>,
+) -> (ApplyOutcome, TransactionV1) {
+    let (bytes, witnesses, tx) = build_tx(height, vec![], signers, actions, vec![]);
+    let outcome = ledger
+        .apply_transaction(&ctx(height), &bytes, &witnesses, &StubEngine, &AcceptAll)
+        .unwrap();
+    (outcome, tx)
+}
+
+fn register_bonded_compute_worker(
+    ledger: &mut LumenLedger,
+    worker: Hash32,
+    bond: u128,
+    price_per_unit: u128,
+) {
+    let (funded, _) = apply_compute_actions(
+        ledger,
+        1,
+        vec![PAYER],
+        vec![
+            ActionV1::WithdrawFromAccount {
+                account_id: PAYER,
+                asset_id: NOOS_ASSET,
+                amount: 100_000,
+            },
+            ActionV1::DepositToAccount {
+                account_id: worker,
+                asset_id: NOOS_ASSET,
+                amount: 100_000,
+            },
+        ],
+    );
+    assert!(matches!(funded, ApplyOutcome::Applied { .. }));
+    let (registered, _) = apply_compute_actions(
+        ledger,
+        2,
+        vec![PAYER, worker],
+        vec![ActionV1::RegisterComputeWorker {
+            worker,
+            capabilities: ComputeWorkerV1::CAPABILITY_CPU,
+            cpu_threads: 1,
+            memory_mb: 1024,
+            gpu_memory_mb: 0,
+            price_per_unit,
+            endpoint_commitment: [0x44; 32],
+            bond,
+        }],
+    );
+    assert!(matches!(registered, ApplyOutcome::Applied { .. }));
+}
+
+fn submit_mix32_job(ledger: &mut LumenLedger, worker: Hash32, result_root: Hash32) -> Hash32 {
+    const SEED: u32 = 7;
+    const START: u64 = 11;
+    const UNITS: u64 = 2;
+    const ROUNDS: u32 = 3;
+    register_bonded_compute_worker(ledger, worker, 100, 7);
+    let input_root = compute_mix32_input_root(SEED, START, UNITS, ROUNDS).unwrap();
+    let (opened, open_tx) = apply_compute_actions(
+        ledger,
+        3,
+        vec![PAYER],
+        vec![ActionV1::OpenComputeJob {
+            requester: PAYER,
+            workload_kind: 0,
+            input_root,
+            units: UNITS,
+            unit_size: ROUNDS,
+            max_price_per_unit: 10,
+            deadline_height: 20,
+        }],
+    );
+    assert!(matches!(opened, ApplyOutcome::Applied { .. }));
+    let job_id = compute_job_id(&txid(&open_tx), 0);
+    let (claimed, _) = apply_compute_actions(
+        ledger,
+        4,
+        vec![PAYER, worker],
+        vec![ActionV1::ClaimComputeJob { worker, job_id }],
+    );
+    assert!(matches!(claimed, ApplyOutcome::Applied { .. }));
+    let (submitted, _) = apply_compute_actions(
+        ledger,
+        5,
+        vec![PAYER, worker],
+        vec![ActionV1::SubmitComputeResult {
+            worker,
+            job_id,
+            result_root,
+            completed_units: UNITS,
+        }],
+    );
+    assert!(matches!(submitted, ApplyOutcome::Applied { .. }));
+    job_id
+}
+
+#[test]
+fn mix32_consensus_verifier_matches_canonical_python_vectors() {
+    assert_eq!(
+        compute_mix32_input_root(7, 11, 2, 3).unwrap(),
+        [
+            0x1c, 0xf4, 0xc1, 0xa6, 0xac, 0xac, 0x71, 0x3b, 0x15, 0x9a, 0x76, 0xf9, 0x26, 0xe3,
+            0xcf, 0xa1, 0x6c, 0xfe, 0x97, 0xe7, 0xc2, 0xb7, 0x8e, 0xf7, 0xea, 0xfa, 0x69, 0x93,
+            0x8b, 0xb7, 0xa7, 0x8d,
+        ]
+    );
+    assert_eq!(
+        compute_mix32_result_root(7, 11, 2, 3).unwrap(),
+        [
+            0x1d, 0x5d, 0xd1, 0x23, 0x0a, 0x46, 0x18, 0xe0, 0x03, 0x48, 0x60, 0x79, 0xc6, 0xf5,
+            0xe0, 0xd4, 0xcc, 0x57, 0xc7, 0x4f, 0xb9, 0x29, 0x56, 0xfa, 0x26, 0xcf, 0x2e, 0xf3,
+            0xa4, 0xf5, 0xe9, 0xc2,
+        ]
+    );
+    assert!(compute_mix32_result_root(1, 0, 1_000_001, 1).is_none());
+    assert!(compute_mix32_result_root(1, u64::MAX, 2, 1).is_none());
+}
+
+#[test]
+fn invalid_compute_result_challenge_refunds_and_slashes_worker() {
+    let mut ledger = genesis();
+    let worker = [0xA8; 32];
+    let mut invalid_root = compute_mix32_result_root(7, 11, 2, 3).unwrap();
+    invalid_root[0] ^= 0xff;
+    let job_id = submit_mix32_job(&mut ledger, worker, invalid_root);
+
+    let (cancelled, _) = apply_compute_actions(
+        &mut ledger,
+        6,
+        vec![PAYER],
+        vec![ActionV1::CancelComputeJob {
+            requester: PAYER,
+            job_id,
+        }],
+    );
+    assert!(matches!(
+        cancelled,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    let still_submitted = ledger.get_compute_job(&job_id).unwrap();
+    assert_eq!(still_submitted.state, ComputeJobV1::STATE_SUBMITTED);
+    assert_eq!(still_submitted.escrow, 20);
+    assert_eq!(still_submitted.worker_bond, 20);
+
+    let (wrong_payload, _) = apply_compute_actions(
+        &mut ledger,
+        7,
+        vec![PAYER],
+        vec![ActionV1::ChallengeComputeResult {
+            requester: PAYER,
+            job_id,
+            seed: 8,
+            start: 11,
+        }],
+    );
+    assert!(matches!(
+        wrong_payload,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert_eq!(
+        ledger.get_compute_job(&job_id).unwrap().state,
+        ComputeJobV1::STATE_SUBMITTED
+    );
+    assert_eq!(ledger.get_compute_worker(&worker).unwrap().bond_locked, 20);
+
+    let (challenged, _) = apply_compute_actions(
+        &mut ledger,
+        8,
+        vec![PAYER],
+        vec![ActionV1::ChallengeComputeResult {
+            requester: PAYER,
+            job_id,
+            seed: 7,
+            start: 11,
+        }],
+    );
+    let ApplyOutcome::Applied { receipt, .. } = challenged else {
+        panic!("valid challenge must settle");
+    };
+    assert_eq!(receipt.resources_used.grain_steps, 6);
+    let job = ledger.get_compute_job(&job_id).unwrap();
+    assert_eq!(job.state, ComputeJobV1::STATE_INVALID);
+    assert_eq!(
+        job.resolution,
+        ComputeJobV1::RESOLUTION_CHALLENGE_REJECTED_RESULT
+    );
+    assert_eq!(job.escrow, 0);
+    assert_eq!(job.worker_bond, 0);
+    let record = ledger.get_compute_worker(&worker).unwrap();
+    assert_eq!(record.active, 0);
+    assert_eq!(record.bond_available, 80);
+    assert_eq!(record.bond_locked, 0);
+    assert_eq!(record.jobs_failed, 1);
+    assert_eq!(record.penalties_paid, 20);
+    assert_eq!(ledger.balance(&worker, &NOOS_ASSET), 99_900);
+}
+
+#[test]
+fn false_compute_challenge_pays_worker_and_forfeits_challenge_bond() {
+    let mut ledger = genesis();
+    let worker = [0xA9; 32];
+    let result_root = compute_mix32_result_root(7, 11, 2, 3).unwrap();
+    let job_id = submit_mix32_job(&mut ledger, worker, result_root);
+
+    let (challenged, _) = apply_compute_actions(
+        &mut ledger,
+        6,
+        vec![PAYER],
+        vec![ActionV1::ChallengeComputeResult {
+            requester: PAYER,
+            job_id,
+            seed: 7,
+            start: 11,
+        }],
+    );
+    assert!(matches!(challenged, ApplyOutcome::Applied { .. }));
+    let job = ledger.get_compute_job(&job_id).unwrap();
+    assert_eq!(job.state, ComputeJobV1::STATE_SETTLED);
+    assert_eq!(
+        job.resolution,
+        ComputeJobV1::RESOLUTION_CHALLENGE_CONFIRMED_RESULT
+    );
+    let record = ledger.get_compute_worker(&worker).unwrap();
+    assert_eq!(record.bond_available, 100);
+    assert_eq!(record.bond_locked, 0);
+    assert_eq!(record.jobs_completed, 1);
+    assert_eq!(ledger.balance(&worker, &NOOS_ASSET), 99_915);
+}
+
+#[test]
+fn permissionless_compute_expiry_refunds_and_slashes_timeout() {
+    let mut ledger = genesis();
+    let worker = [0xAA; 32];
+    register_bonded_compute_worker(&mut ledger, worker, 100, 7);
+    let input_root = compute_mix32_input_root(7, 11, 2, 3).unwrap();
+    let (opened, open_tx) = apply_compute_actions(
+        &mut ledger,
+        3,
+        vec![PAYER],
+        vec![ActionV1::OpenComputeJob {
+            requester: PAYER,
+            workload_kind: 0,
+            input_root,
+            units: 2,
+            unit_size: 3,
+            max_price_per_unit: 10,
+            deadline_height: 4,
+        }],
+    );
+    assert!(matches!(opened, ApplyOutcome::Applied { .. }));
+    let job_id = compute_job_id(&txid(&open_tx), 0);
+    let (claimed, _) = apply_compute_actions(
+        &mut ledger,
+        4,
+        vec![PAYER, worker],
+        vec![ActionV1::ClaimComputeJob { worker, job_id }],
+    );
+    assert!(matches!(claimed, ApplyOutcome::Applied { .. }));
+
+    let (expired, _) = apply_compute_actions(
+        &mut ledger,
+        5,
+        vec![PAYER],
+        vec![ActionV1::ExpireComputeJob { job_id }],
+    );
+    assert!(matches!(expired, ApplyOutcome::Applied { .. }));
+    let job = ledger.get_compute_job(&job_id).unwrap();
+    assert_eq!(job.state, ComputeJobV1::STATE_TIMED_OUT);
+    assert_eq!(job.resolution, ComputeJobV1::RESOLUTION_TIMEOUT);
+    assert_eq!(job.escrow, 0);
+    assert_eq!(job.worker_bond, 0);
+    let record = ledger.get_compute_worker(&worker).unwrap();
+    assert_eq!(record.active, 0);
+    assert_eq!(record.bond_available, 80);
+    assert_eq!(record.bond_locked, 0);
+    assert_eq!(record.jobs_failed, 1);
+    assert_eq!(record.penalties_paid, 20);
+}
+
+#[test]
+fn permissionless_finalize_verifies_result_only_after_review_window() {
+    let mut ledger = genesis();
+    let worker = [0xAB; 32];
+    let result_root = compute_mix32_result_root(7, 11, 2, 3).unwrap();
+    let job_id = submit_mix32_job(&mut ledger, worker, result_root);
+    assert_eq!(
+        ledger
+            .get_compute_job(&job_id)
+            .unwrap()
+            .review_deadline_height,
+        105
+    );
+
+    let (early, _) = apply_compute_actions(
+        &mut ledger,
+        105,
+        vec![PAYER],
+        vec![ActionV1::FinalizeComputeResult {
+            worker,
+            job_id,
+            seed: 7,
+            start: 11,
+        }],
+    );
+    assert!(matches!(
+        early,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert_eq!(
+        ledger.get_compute_job(&job_id).unwrap().state,
+        ComputeJobV1::STATE_SUBMITTED
+    );
+
+    let (finalized, _) = apply_compute_actions(
+        &mut ledger,
+        106,
+        vec![PAYER],
+        vec![ActionV1::FinalizeComputeResult {
+            worker,
+            job_id,
+            seed: 7,
+            start: 11,
+        }],
+    );
+    assert!(matches!(finalized, ApplyOutcome::Applied { .. }));
+    let job = ledger.get_compute_job(&job_id).unwrap();
+    assert_eq!(job.state, ComputeJobV1::STATE_SETTLED);
+    assert_eq!(
+        job.resolution,
+        ComputeJobV1::RESOLUTION_OBJECTIVE_FINALIZED_VALID
+    );
+    assert_eq!(ledger.balance(&worker, &NOOS_ASSET), 99_914);
+}
+
+#[test]
+fn compute_open_rejects_unbounded_dispute_work() {
+    let mut ledger = genesis();
+    let payer_before = ledger.balance(&PAYER, &NOOS_ASSET);
+    let (outcome, open_tx) = apply_compute_actions(
+        &mut ledger,
+        1,
+        vec![PAYER],
+        vec![ActionV1::OpenComputeJob {
+            requester: PAYER,
+            workload_kind: 0,
+            input_root: [0x55; 32],
+            units: 1_001,
+            unit_size: 1_000,
+            max_price_per_unit: 1,
+            deadline_height: 20,
+        }],
+    );
+    assert!(matches!(
+        outcome,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert!(ledger
+        .get_compute_job(&compute_job_id(&txid(&open_tx), 0))
+        .is_none());
+    assert_eq!(
+        payer_before - ledger.balance(&PAYER, &NOOS_ASSET),
+        FeeParamsV1::testnet_fixture().failure_fee
+    );
+}
+
+#[test]
+fn compute_market_rejects_unregistered_workload_before_escrow() {
+    let mut ledger = genesis();
+    let before = ledger.roots();
+    let payer_before = ledger.balance(&PAYER, &NOOS_ASSET);
+    let (open, open_witnesses, open_tx) = build_tx(
+        1,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::OpenComputeJob {
+            requester: PAYER,
+            workload_kind: 1,
+            input_root: [0x55; 32],
+            units: 100,
+            unit_size: 4096,
+            max_price_per_unit: 10,
+            deadline_height: 20,
+        }],
+        vec![],
+    );
+    let job_id = compute_job_id(&txid(&open_tx), 0);
+    let outcome = ledger
+        .apply_transaction(&ctx(1), &open, &open_witnesses, &StubEngine, &AcceptAll)
+        .unwrap();
+    let ApplyOutcome::Failed { receipt, code, .. } = outcome else {
+        panic!("expected unregistered workload to fail, got {outcome:?}");
+    };
+
+    assert_eq!(code, FailCode::PostconditionFailed);
+    assert!(ledger.get_compute_job(&job_id).is_none());
+    assert_eq!(before.objects_root, ledger.roots().objects_root);
+    let charged = payer_before - ledger.balance(&PAYER, &NOOS_ASSET);
+    assert_eq!(charged, FeeParamsV1::testnet_fixture().failure_fee);
+    assert_eq!(receipt.fee_charged, charged);
 }
 
 #[test]
@@ -2463,19 +2895,23 @@ fn neural_reporter_profile(
     }
 }
 
-fn install_neural_reporters(ledger: &mut LumenLedger, job: &mut WwmJobV1) -> (Hash32, [Hash32; 3]) {
-    let set_id = [0x60; 32];
-    let profile_ids = [[0x61; 32], [0x62; 32], [0x63; 32]];
+fn install_neural_reporter_set(
+    ledger: &mut LumenLedger,
+    job: &mut WwmJobV1,
+    set_id: Hash32,
+    entries: Vec<CapabilityProfileV1>,
+) -> [Hash32; 3] {
+    let profile_ids: [Hash32; 3] = entries
+        .iter()
+        .map(|profile| profile.profile_id)
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
     let executor_set = CapabilitySetV1 {
         set_id,
         prior_set_id: [0x5f; 32],
         epoch: 1,
-        entries: BoundedList::new(vec![
-            neural_reporter_profile(profile_ids[0], PAYER, 0x71),
-            neural_reporter_profile(profile_ids[1], GOV, 0x72),
-            neural_reporter_profile(profile_ids[2], EMERGENCY, 0x73),
-        ])
-        .unwrap(),
+        entries: BoundedList::new(entries).unwrap(),
     };
     assert!(executor_set.validate());
     let registry = RegistryEpochVectorV1 {
@@ -2493,7 +2929,156 @@ fn install_neural_reporters(ledger: &mut LumenLedger, job: &mut WwmJobV1) -> (Ha
     };
     ledger.install_neural_oracle_fixture_for_test(&registry, &executor_set);
     job.selected_executor_ids = BoundedList::new(profile_ids.to_vec()).unwrap();
-    (set_id, profile_ids)
+    profile_ids
+}
+
+fn install_neural_reporters(ledger: &mut LumenLedger, job: &mut WwmJobV1) -> (Hash32, [Hash32; 3]) {
+    let set_id = [0x60; 32];
+    let profile_ids = [[0x61; 32], [0x62; 32], [0x63; 32]];
+    let entries = vec![
+        neural_reporter_profile(profile_ids[0], PAYER, 0x71),
+        neural_reporter_profile(profile_ids[1], GOV, 0x72),
+        neural_reporter_profile(profile_ids[2], EMERGENCY, 0x73),
+    ];
+    let installed_ids = install_neural_reporter_set(ledger, job, set_id, entries);
+    (set_id, installed_ids)
+}
+
+#[test]
+fn capability_selection_rejects_collocated_executor_committees() {
+    for collision in 0_u8..4 {
+        let (mut ledger, mut job, _, _) = wwm_flow_fixture(WwmControlMode::Canary);
+        let profile_ids = [[0x61; 32], [0x62; 32], [0x63; 32]];
+        let mut entries = vec![
+            neural_reporter_profile(profile_ids[0], PAYER, 0x71),
+            neural_reporter_profile(profile_ids[1], GOV, 0x72),
+            neural_reporter_profile(profile_ids[2], EMERGENCY, 0x73),
+        ];
+        match collision {
+            0 => entries[1].beneficial_control_root = entries[0].beneficial_control_root,
+            1 => entries[1].provider_root = entries[0].provider_root,
+            2 => entries[1].region_id = entries[0].region_id,
+            3 => {
+                let lineage = entries[0].software_lineage_root;
+                for profile in &mut entries {
+                    profile.software_lineage_root = lineage;
+                }
+            }
+            _ => unreachable!(),
+        }
+        let set_id = [0x80_u8 + collision; 32];
+        install_neural_reporter_set(&mut ledger, &mut job, set_id, entries);
+        assert!(matches!(
+            apply_wwm_action(&mut ledger, 10, ActionV1::OpenWwmJob(job.clone())),
+            ApplyOutcome::Applied { .. }
+        ));
+        let query = NeuralOracleQueryV1 {
+            query_id: job.job_id,
+            job_id: job.job_id,
+            requester: PAYER,
+            executor_set_id: set_id,
+            executor_set_epoch: 1,
+            input_root: job.offchain_envelope_root,
+            max_response_bytes: 128,
+            threshold: 2,
+            commit_deadline: 13,
+            reveal_deadline: 18,
+        };
+        assert!(
+            matches!(
+                apply_wwm_action(&mut ledger, 11, ActionV1::OpenNeuralOracleQuery(query)),
+                ApplyOutcome::Failed {
+                    code: FailCode::PostconditionFailed,
+                    ..
+                }
+            ),
+            "collision dimension {collision} was admitted"
+        );
+    }
+}
+
+#[test]
+fn custodian_policy_rejects_concentration_and_single_lineage() {
+    let policy = AvailabilityPolicyV2 {
+        policy_id: [0x91; 32],
+        artifact_id: [0x92; 32],
+        manifest_root: [0x93; 32],
+        assignment_root: [0x94; 32],
+        geometry_root: [0x95; 32],
+        position_count: 12,
+        reconstruction_threshold: 8,
+        schedulable_minimum: 9,
+        required_regions: 4,
+        max_positions_per_region: 3,
+        max_positions_per_asn: 2,
+        max_positions_per_provider: 3,
+        challenge_period: 10,
+        response_deadline: 5,
+        max_probe_age: 20,
+        repair_horizon: 30,
+        evidence_retention_horizon: 40,
+        samples_per_challenge: 1,
+        verifier_sample_size: 8,
+        verifier_threshold: 5,
+        verifier_capability_bitmap: 1,
+        reconstructor_sample_size: 5,
+        reconstructor_threshold: 3,
+        policy_start_height: 1,
+        policy_end_height: 100,
+    };
+    let entries = (0_u8..12)
+        .map(|index| CustodianProfileV2 {
+            profile_id: [index + 1; 32],
+            status: CapabilityStatus::Active,
+            beneficial_control_root: [0x10 + index; 32],
+            region_id: [0x30 + index % 4; 32],
+            asn: 64_000 + u32::from(index),
+            provider_root: [0x40 + index % 6; 32],
+            software_lineage_root: [0x50 + index % 2; 32],
+            attestation_epoch: 1,
+            attestation_expiry: 100,
+            capability_bitmap: 1,
+            selection_weight: 1,
+            endpoint_root: [0x60 + index; 32],
+            staging_bytes: 1,
+            capacity_bytes: 4,
+            headroom_bytes: 1,
+            operator_id: [0x70 + index; 32],
+            signing_key: [0x80 + index; 32],
+            reviewer_id: [0x90 + index; 32],
+            reviewer_signature: BoundedBytes::new(vec![index + 1]).unwrap(),
+        })
+        .collect::<Vec<_>>();
+    let set = CustodianCapabilitySetV1 {
+        set_id: [0xa0; 32],
+        prior_set_id: [0; 32],
+        epoch: 1,
+        entries: BoundedList::new(entries.clone()).unwrap(),
+    };
+    assert!(set.policy_independent(&policy, 80, true));
+
+    let mut concentrated = entries.clone();
+    let provider = concentrated[0].provider_root;
+    for profile in &mut concentrated[..4] {
+        profile.provider_root = provider;
+    }
+    let concentrated = CustodianCapabilitySetV1 {
+        entries: BoundedList::new(concentrated).unwrap(),
+        ..set.clone()
+    };
+    assert!(!concentrated.policy_independent(&policy, 80, true));
+
+    let mut single_lineage = entries;
+    let lineage = single_lineage[0].software_lineage_root;
+    for profile in &mut single_lineage {
+        profile.software_lineage_root = lineage;
+    }
+    let single_lineage = CustodianCapabilitySetV1 {
+        entries: BoundedList::new(single_lineage).unwrap(),
+        ..set
+    };
+    assert!(!single_lineage.policy_independent(&policy, 80, true));
+    assert!(single_lineage.policy_independent(&policy, 80, false));
 }
 
 #[test]
@@ -2806,6 +3391,175 @@ fn neural_wwm_timeout_finalizes_explicit_no_quorum_receipt() {
 }
 
 #[test]
+fn testnet_wwm_failure_receipts_refund_without_output_commitments() {
+    for (index, terminal_code) in [
+        WwmTerminalCode::Cancelled,
+        WwmTerminalCode::Deadline,
+        WwmTerminalCode::NoQuorum,
+        WwmTerminalCode::Rejected,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (mut ledger, job, mut receipt, mut settlement) =
+            wwm_flow_fixture(WwmControlMode::Testnet);
+        receipt.receipt_id = [0xb0 + u8::try_from(index).unwrap(); 32];
+        receipt.output_tokens = 0;
+        receipt.output_root = [0; 32];
+        receipt.token_history_root = [0; 32];
+        receipt.signer_ids = BoundedList::default();
+        receipt.control_cluster_ids = BoundedList::default();
+        receipt.evidence_tier = if terminal_code == WwmTerminalCode::NoQuorum {
+            WwmEvidenceTier::NoQuorum
+        } else {
+            WwmEvidenceTier::LocalVerified
+        };
+        receipt.metered_amount = 0;
+        receipt.paid_amount = 0;
+        receipt.refunded_amount = job.reserved_amount;
+        receipt.terminal_code = terminal_code;
+        settlement.settlement_id = [0xc0 + u8::try_from(index).unwrap(); 32];
+        settlement.receipt_id = receipt.receipt_id;
+        settlement.paid_amount = 0;
+        settlement.refunded_amount = job.reserved_amount;
+        settlement.released_amount = 0;
+        assert!(matches!(
+            apply_wwm_action(&mut ledger, 10, ActionV1::OpenWwmJob(job)),
+            ApplyOutcome::Applied { .. }
+        ));
+        assert!(matches!(
+            apply_wwm_action(&mut ledger, 11, ActionV1::RecordWwmReceipt(receipt)),
+            ApplyOutcome::Applied { .. }
+        ));
+        assert!(matches!(
+            apply_wwm_action(&mut ledger, 12, ActionV1::SettleWwmJob(settlement)),
+            ApplyOutcome::Applied { .. }
+        ));
+    }
+}
+
+#[test]
+fn refunded_wwm_terminal_receipt_activation_preserves_historical_execution() {
+    let (base, job, mut receipt, mut settlement) = wwm_flow_fixture(WwmControlMode::Testnet);
+    receipt.receipt_id = [0xbd; 32];
+    receipt.output_tokens = 0;
+    receipt.output_root = [0; 32];
+    receipt.token_history_root = [0; 32];
+    receipt.signer_ids = BoundedList::default();
+    receipt.control_cluster_ids = BoundedList::default();
+    receipt.metered_amount = 0;
+    receipt.paid_amount = 0;
+    receipt.refunded_amount = job.reserved_amount;
+    receipt.terminal_code = WwmTerminalCode::Deadline;
+    settlement.settlement_id = [0xcd; 32];
+    settlement.receipt_id = receipt.receipt_id;
+    settlement.paid_amount = 0;
+    settlement.refunded_amount = job.reserved_amount;
+    settlement.released_amount = 0;
+    settlement.settled_height = 11;
+
+    let mut legacy = base.clone();
+    let mut activated = base;
+    assert!(matches!(
+        apply_wwm_action(&mut legacy, 10, ActionV1::OpenWwmJob(job.clone())),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply_wwm_action(&mut activated, 10, ActionV1::OpenWwmJob(job)),
+        ApplyOutcome::Applied { .. }
+    ));
+    let (tx, witnesses, _) = build_tx(
+        11,
+        vec![],
+        vec![PAYER, GOV],
+        vec![
+            ActionV1::RecordWwmReceipt(receipt.clone()),
+            ActionV1::SettleWwmJob(settlement.clone()),
+        ],
+        vec![],
+    );
+
+    let legacy_outcome = legacy
+        .apply_transaction(
+            &BlockContext {
+                chain_id: CHAIN,
+                height: 11,
+                allow_refunded_wwm_terminal_receipts: false,
+            },
+            &tx,
+            &witnesses,
+            &StubEngine,
+            &AcceptAll,
+        )
+        .unwrap();
+    assert!(matches!(
+        &legacy_outcome,
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+    assert_eq!(
+        legacy_outcome.receipt().status,
+        FailCode::PostconditionFailed.status()
+    );
+    assert_eq!(legacy_outcome.receipt().resources_used.state_writes, 0);
+
+    let activated_outcome = activated
+        .apply_transaction(
+            &BlockContext {
+                chain_id: CHAIN,
+                height: 11,
+                allow_refunded_wwm_terminal_receipts: true,
+            },
+            &tx,
+            &witnesses,
+            &StubEngine,
+            &AcceptAll,
+        )
+        .unwrap();
+    assert!(matches!(&activated_outcome, ApplyOutcome::Applied { .. }));
+    assert_eq!(activated_outcome.receipt().status, 0);
+    assert_eq!(activated_outcome.receipt().resources_used.state_writes, 4);
+
+    let receipt_key = wwm_profile_key(WwmLeafKind::Receipt, &receipt.receipt_id);
+    let settlement_key = wwm_profile_key(WwmLeafKind::Settlement, &settlement.settlement_id);
+    assert!(matches!(
+        legacy.finalized_object_proof(receipt_key).value,
+        crate::wwm::ResolutionValueV1::Absent
+    ));
+    assert!(matches!(
+        activated.finalized_object_proof(receipt_key).value,
+        crate::wwm::ResolutionValueV1::Present(_)
+    ));
+    assert!(matches!(
+        activated.finalized_object_proof(settlement_key).value,
+        crate::wwm::ResolutionValueV1::Present(_)
+    ));
+}
+
+#[test]
+fn testnet_wwm_complete_receipt_requires_output_commitments() {
+    let (mut ledger, job, mut receipt, _) = wwm_flow_fixture(WwmControlMode::Testnet);
+    receipt.output_tokens = 0;
+    receipt.output_root = [0; 32];
+    receipt.token_history_root = [0; 32];
+    receipt.paid_amount = 0;
+    receipt.refunded_amount = job.reserved_amount;
+    assert!(matches!(
+        apply_wwm_action(&mut ledger, 10, ActionV1::OpenWwmJob(job)),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        apply_wwm_action(&mut ledger, 11, ActionV1::RecordWwmReceipt(receipt)),
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn testnet_wwm_job_receipt_settlement_flow_is_insert_once_and_bound() {
     let (mut ledger, job, receipt, settlement) = wwm_flow_fixture(WwmControlMode::Testnet);
     assert!(matches!(
@@ -3079,6 +3833,70 @@ fn emergency_can_only_disable_and_quarantine() {
     let r = ledger.apply_transaction(&ctx(4), &txb, &witb, &StubEngine, &AcceptAll);
     assert_eq!(r.unwrap_err(), RejectReason::ObjectQuarantined);
     assert_roots_eq(&before, &ledger.roots());
+}
+
+#[test]
+fn lending_review_control_blocks_risk_and_preserves_exit_paths() {
+    let mut ledger = genesis();
+    assert!(ledger.feature_enabled(CONTROL_LENDING_REVIEWED));
+    assert!(!ledger.feature_enabled(CONTROL_BRIDGE_REVIEWED));
+
+    let (txb, witb, _) = build_tx(
+        2,
+        vec![],
+        vec![PAYER, EMERGENCY],
+        vec![ActionV1::EmergencyDisable {
+            control_key: param_key(CONTROL_LENDING_REVIEWED),
+        }],
+        vec![],
+    );
+    assert!(matches!(
+        ledger
+            .apply_transaction(&ctx(2), &txb, &witb, &StubEngine, &AcceptAll)
+            .unwrap(),
+        ApplyOutcome::Applied { .. }
+    ));
+    assert!(!ledger.feature_enabled(CONTROL_LENDING_REVIEWED));
+
+    let unknown_market = [0x44; 32];
+    let (txb, witb, _) = build_tx(
+        3,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::BorrowStable {
+            owner: PAYER,
+            market_id: unknown_market,
+            amount: 1,
+        }],
+        vec![],
+    );
+    assert_eq!(
+        ledger
+            .apply_transaction(&ctx(3), &txb, &witb, &StubEngine, &AcceptAll)
+            .unwrap_err(),
+        RejectReason::GovernanceDenied
+    );
+
+    let (txb, witb, _) = build_tx(
+        4,
+        vec![],
+        vec![PAYER],
+        vec![ActionV1::RepayStable {
+            owner: PAYER,
+            market_id: unknown_market,
+            amount: 1,
+        }],
+        vec![],
+    );
+    assert!(matches!(
+        ledger
+            .apply_transaction(&ctx(4), &txb, &witb, &StubEngine, &AcceptAll)
+            .unwrap(),
+        ApplyOutcome::Failed {
+            code: FailCode::PostconditionFailed,
+            ..
+        }
+    ));
 }
 
 // ---------------------------------------------------------------------------

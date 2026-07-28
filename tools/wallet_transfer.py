@@ -74,8 +74,14 @@ def api_json(base: str, path: str, *, body: dict | None = None, timeout: float =
     return value
 
 
-def cli_json(exe: Path, *args: str) -> dict:
-    completed = subprocess.run([str(exe), *args], cwd=ROOT, text=True, capture_output=True)
+def cli_json(exe: Path, *args: str, stdin_text: str | None = None) -> dict:
+    completed = subprocess.run(
+        [str(exe), *args],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        input=stdin_text,
+    )
     if completed.returncode != 0:
         raise SystemExit(completed.stderr.strip() or completed.stdout.strip() or "noos-cli failed")
     try:
@@ -126,7 +132,18 @@ def checked_status(profile: dict) -> dict:
 
 
 def derive(exe: Path, seed: str, account: int, index: int) -> dict:
-    return cli_json(exe, "keygen", "--seed", seed, "--purpose", "sign", "--account", str(account), "--index", str(index))
+    return cli_json(
+        exe,
+        "keygen",
+        "--seed-stdin",
+        "--purpose",
+        "sign",
+        "--account",
+        str(account),
+        "--index",
+        str(index),
+        stdin_text=seed + "\n",
+    )
 
 
 def action(discriminant: int, account: str, asset: str, amount: int) -> str:
@@ -177,10 +194,23 @@ def send(args: argparse.Namespace, exe: Path, profile: dict) -> dict:
     }
     built = cli_json(exe, "tx", "build", "--spec", json.dumps(spec, separators=(",", ":")))
     signed = cli_json(
-        exe, "tx", "sign", "--tx", str(built["tx"]), "--seed", seed,
-        "--account", str(args.account), "--index", str(args.index),
-        "--chain-id", str(profile["chain_id"]), "--genesis-hash", str(profile["genesis_hash"]),
-        "--scope", "0",
+        exe,
+        "tx",
+        "sign",
+        "--tx",
+        str(built["tx"]),
+        "--seed-stdin",
+        "--account",
+        str(args.account),
+        "--index",
+        str(args.index),
+        "--chain-id",
+        str(profile["chain_id"]),
+        "--genesis-hash",
+        str(profile["genesis_hash"]),
+        "--scope",
+        "0",
+        stdin_text=seed + "\n",
     )
     if signed.get("txid") != built.get("txid") or signed.get("verifying_key") != sender:
         raise SystemExit("local signature binding failed")

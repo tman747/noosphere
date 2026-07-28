@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+blake3 = "1.8"
 noos-crypto = { path = "../noos-crypto" }
 hex = "=0.4.3"
 serde = { version = "=1.0.228", features = ["derive"] }

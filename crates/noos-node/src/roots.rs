@@ -98,6 +98,14 @@ pub fn zero_ticket() -> GroundTicketV1 {
     }
 }
 
+/// Deployed public-testnet v1 DA form: uncompressed canonical body bytes with
+/// the Ground ticket replaced by [`zero_ticket`]. This remains explicit so
+/// existing headers retain their exact DA commitment during rolling upgrades.
+#[must_use]
+pub fn public_testnet_v1_da_form_bytes(body: &noos_braid::BlockBodyV1) -> Vec<u8> {
+    body.encode_canonical_with_ground_ticket(zero_ticket())
+}
+
 /// The compressed DA body form (node-v1.md §3.2): canonical
 /// `BlockBodyV1` bytes with `ground_ticket` canonicalized to
 /// [`zero_ticket`], framed by `NOOSLZ41` and deterministic LZ4 block
@@ -107,7 +115,7 @@ pub fn zero_ticket() -> GroundTicketV1 {
 /// separately by `ground_ticket_root`.
 #[must_use]
 pub fn da_form_bytes(body: &noos_braid::BlockBodyV1) -> Vec<u8> {
-    let canonical = body.encode_canonical_with_ground_ticket(zero_ticket());
+    let canonical = public_testnet_v1_da_form_bytes(body);
     let compressed = lz4_flex::block::compress_prepend_size(&canonical);
     let mut framed = Vec::with_capacity(DA_FORM_LZ4_MAGIC.len().saturating_add(compressed.len()));
     framed.extend_from_slice(DA_FORM_LZ4_MAGIC);
@@ -147,6 +155,44 @@ pub fn decode_da_form(bytes: &[u8]) -> Result<noos_braid::BlockBodyV1, NodeError
         });
     }
     Ok(noos_braid::BlockBodyV1::decode_canonical(&canonical)?)
+}
+
+fn decode_public_testnet_v1_canonical(bytes: &[u8]) -> Result<noos_braid::BlockBodyV1, NodeError> {
+    if bytes.len() > MAX_DA_FORM_RAW_BYTES {
+        return Err(NodeError::BodyMismatch {
+            what: "public-testnet v1 DA body limit",
+        });
+    }
+    Ok(noos_braid::BlockBodyV1::decode_canonical(bytes)?)
+}
+
+/// Decode the deployed public-testnet v1 DA form. This compatibility decoder
+/// is selected only by the explicit public-testnet profile; modern networks
+/// remain compression-frame-only.
+pub fn decode_public_testnet_v1_da_form(
+    bytes: &[u8],
+) -> Result<noos_braid::BlockBodyV1, NodeError> {
+    let body = decode_public_testnet_v1_canonical(bytes)?;
+    if body.ground_ticket.0 != zero_ticket() {
+        return Err(NodeError::BodyMismatch {
+            what: "public-testnet v1 DA ground ticket",
+        });
+    }
+    Ok(body)
+}
+
+/// Decode a body persisted by deployed public-testnet v1 nodes. Those nodes
+/// stored the full canonical body under a ticket-independent DA root. Equal
+/// bodies at different heights therefore shared one blob key and could replace
+/// the redundant stored ticket. The caller supplies the authoritative header
+/// ticket and MUST re-verify the normalized DA root.
+pub fn decode_public_testnet_v1_stored_body(
+    bytes: &[u8],
+    expected_ticket: &GroundTicketV1,
+) -> Result<noos_braid::BlockBodyV1, NodeError> {
+    let mut body = decode_public_testnet_v1_canonical(bytes)?;
+    body.ground_ticket = noos_braid::GroundTicketWire(*expected_ticket);
+    Ok(body)
 }
 
 /// Blob-descriptor validation for consensus bodies (delegated to noos-da's
@@ -190,6 +236,57 @@ mod tests {
         let mut expected = body;
         expected.ground_ticket = noos_braid::GroundTicketWire(zero_ticket());
         assert_eq!(decoded, expected);
+    }
+
+    #[test]
+    fn public_testnet_v1_da_form_is_exact_uncompressed_legacy_wire() {
+        let body = noos_braid::vector_gen::minimal_body();
+        let legacy = public_testnet_v1_da_form_bytes(&body);
+        assert!(!legacy.starts_with(DA_FORM_LZ4_MAGIC));
+        assert_ne!(legacy, da_form_bytes(&body));
+
+        let decoded =
+            decode_public_testnet_v1_da_form(&legacy).expect("valid public-testnet v1 DA form");
+        let mut expected = body;
+        expected.ground_ticket = noos_braid::GroundTicketWire(zero_ticket());
+        assert_eq!(decoded, expected);
+
+        let mut trailing = legacy;
+        trailing.push(0);
+        assert!(decode_public_testnet_v1_da_form(&trailing).is_err());
+        assert!(matches!(
+            decode_da_form(&trailing),
+            Err(NodeError::BodyMismatch {
+                what: "DA compression frame"
+            })
+        ));
+    }
+
+    #[test]
+    fn public_testnet_v1_store_normalizes_its_redundant_ticket() {
+        let ticket = GroundTicketV1 {
+            profile_id: 1,
+            nonce: 2,
+            extra_nonce: [3; 32],
+            digest: noos_crypto::Hash32::from_bytes([4; 32]),
+        };
+        let wrong_ticket = GroundTicketV1 { nonce: 5, ..ticket };
+        let mut body = noos_braid::vector_gen::minimal_body();
+        body.ground_ticket = noos_braid::GroundTicketWire(ticket);
+        let stored = body.encode_canonical();
+
+        assert_eq!(
+            decode_public_testnet_v1_stored_body(&stored, &ticket)
+                .expect("matching deployed store ticket"),
+            body
+        );
+        let normalized = decode_public_testnet_v1_stored_body(&stored, &wrong_ticket)
+            .expect("shared body root may carry another block's ticket");
+        assert_eq!(normalized.ground_ticket.0, wrong_ticket);
+        assert_eq!(
+            public_testnet_v1_da_form_bytes(&normalized),
+            public_testnet_v1_da_form_bytes(&body)
+        );
     }
 
     #[test]

@@ -374,7 +374,7 @@ class DashboardData:
         active_workers = [item for item in worker_items if int_value(item.get("active")) == 1]
         completed_units = sum(int_value(item.get("units_completed")) for item in worker_items)
         settled_jobs = sum(1 for item in job_items if int_value(item.get("state"), -1) == 3)
-        active_escrow = sum(int_value(item.get("escrow")) for item in job_items if int_value(item.get("state"), -1) < 3)
+        active_escrow = sum(int_value(item.get("escrow")) for item in job_items if int_value(item.get("escrow")) > 0)
         justified_epoch = int_value((status.get("justified") or {}).get("epoch"))
         finalized_epoch = int_value((status.get("finalized") or {}).get("epoch"))
         mempool = status.get("mempool") if isinstance(status.get("mempool"), dict) else {}
@@ -658,11 +658,16 @@ class DashboardData:
                 "memory_mb": sum(int_value(worker.get("memory_mb")) for worker in active),
                 "gpu_workers": sum(1 for worker in active if int_value(worker.get("capabilities")) & 2),
                 "completed_units": sum(int_value(worker.get("units_completed")) for worker in workers),
+                "bond_available": str(sum(int_value(worker.get("bond_available")) for worker in workers)),
+                "bond_locked": str(sum(int_value(worker.get("bond_locked")) for worker in workers)),
+                "failed_jobs": sum(int_value(worker.get("jobs_failed")) for worker in workers),
+                "penalties_paid": str(sum(int_value(worker.get("penalties_paid")) for worker in workers)),
             },
             "jobs_by_state": {
-                "open": states[0], "claimed": states[1], "submitted": states[2], "settled": states[3], "cancelled": states[4],
+                "open": states[0], "claimed": states[1], "submitted": states[2], "settled": states[3],
+                "cancelled": states[4], "invalid": states[5], "timed_out": states[6],
             },
-            "active_escrow": str(sum(int_value(job.get("escrow")) for job in jobs if int_value(job.get("state"), -1) < 3)),
+            "active_escrow": str(sum(int_value(job.get("escrow")) for job in jobs if int_value(job.get("escrow")) > 0)),
             "settled_value": str(settled_value),
             "workers": workers,
             "jobs": jobs,

@@ -8,16 +8,145 @@ on:
       - "crates/**"
       - "wallet/**"
       - "apps/mind-market/wallet/**"
-      - "tools/e2e/market_gateway.py"
+      - "tools/e2e/**"
+      - "go/**"
+      - "tools/gates/**"
+      - "tools/genesis/**"
+      - "protocol/vectors/**"
       - "tools/gates/check_throughput.py"
       - "tools/operations/**"
+      - "tools/*.py"
+      - "site/**"
+      - "experiments/wwm-web-capacity/**"
+      - "protocol/api/openapi-wwm-web-capacity-v1.yaml"
+      - "protocol/schemas/wwm-web-capacity-v1.schema.json"
+      - "protocol/vectors/wwm-web-capacity-v1/**"
       - "tools/lan_testnet.py"
+      - "deploy/host_lifecycle.py"
+      - "deploy/test_host_lifecycle.py"
       - ".github/workflows/platform-node-and-wallet.yml"
 
 permissions:
   contents: read
 
 jobs:
+  host-lifecycle:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, windows-2025, macos-14]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13.5"
+      - name: Verify signed host lifecycle
+        working-directory: deploy
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: "cryptography==49.0.0"
+          python -m unittest -v test_host_lifecycle.py
+
+  worker-security-contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, windows-2025, macos-14]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13.5"
+      - name: Verify encrypted worker custody and sandbox enforcement
+        shell: bash
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: "cryptography==49.0.0"
+          python -m unittest -v \
+            tools.test_worker_payout_identity \
+            tools.test_compute_worker_network \
+            tools.test_worker_sandbox
+
+  cross-language-lab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13.5"
+      - name: Install pinned Go toolchain
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: "1.25.4"
+          cache: false
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.1 --profile minimal
+          rustup default 1.96.1
+      - name: Bind runner libclang 18
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang_version="$(clang --version | sed -n '1p')"
+          [[ "${clang_version}" == *"clang version 18."* ]] || {
+            echo "expected runner clang 18, observed: ${clang_version}" >&2
+            exit 1
+          }
+          clang_resource="$(clang -print-resource-dir)"
+          libclang_path="$(dirname "$(dirname "${clang_resource}")")"
+          compgen -G "${libclang_path}/libclang.so*" >/dev/null || {
+            echo "libclang shared library is absent from ${libclang_path}" >&2
+            exit 1
+          }
+          printf 'LIBCLANG_PATH=%s\n' "${libclang_path}" >> "${GITHUB_ENV}"
+      - name: Run deterministic cross-language laboratory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --only-binary=:all: "blake3==1.0.9" "cryptography==49.0.0" "py-ecc==8.0.0"
+          python -m unittest -v tools.gates.test_cross_language_lab tools.gates.test_check_vectors tools.gates.test_two_client_devnet_campaign tools.gates.test_rebaseline_claims tools.gates.test_claim_integrity
+          python tools/gates/cross_language_lab.py run \
+            --source-revision "${GITHUB_SHA}" \
+            --profile smoke \
+            --seed 0x4e4f4f53 \
+            --cargo-target-dir "${RUNNER_TEMP}/cross-language-cargo" \
+            --output "${RUNNER_TEMP}/cross-language-lab.json"
+          python tools/gates/two_client_devnet_campaign.py run \
+            --source-revision "${GITHUB_SHA}" \
+            --profile smoke \
+            --seed 0x4e4f4f53 \
+            --cargo-target-dir "${RUNNER_TEMP}/cross-language-cargo" \
+            --output "${RUNNER_TEMP}/two-client-devnet-campaign.json"
+          python tools/gates/rebaseline_claims.py \
+            --source-revision "${GITHUB_SHA}" \
+            --cargo-target-dir "${RUNNER_TEMP}/cross-language-cargo" \
+            --timeout-seconds 7200 \
+            --output "${RUNNER_TEMP}/claim-rebaseline.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: mindchain-cross-language-lab-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/cross-language-lab.json
+            ${{ runner.temp }}/cross-language-lab-artifacts/
+            ${{ runner.temp }}/two-client-devnet-campaign.json
+            ${{ runner.temp }}/two-client-devnet-campaign-artifacts/
+            ${{ runner.temp }}/claim-rebaseline.json
+            ${{ runner.temp }}/claim-rebaseline.matrix.log
+          if-no-files-found: error
+          retention-days: 30
+
   native:
     strategy:
       fail-fast: false
@@ -53,6 +182,28 @@ jobs:
           cargo test --locked -p noos-node --lib -- --test-threads=1
           cargo test --locked -p noos-lumen
           cargo test --locked -p noos-cli
+          cargo test --locked -p noos-workerd
+          cargo test --locked -p noos-mind
+          cargo run --locked -p noos-mind --bin knowledge_assurance_campaign -- --source-revision "${GITHUB_SHA}" --seed 20260727 --output "${RUNNER_TEMP}/knowledge-assurance-campaign.json"
+          cargo test --locked -p noos-commerce
+          cargo run --locked -p noos-commerce --bin application_economy_campaign -- --source-revision "${GITHUB_SHA}" --seed 20260727 --output "${RUNNER_TEMP}/application-economy-campaign.json"
+          cargo test --locked -p noos-stable-operator
+          cargo test --locked -p noos-stable-safety
+          cargo test --locked -p noos-umbra
+          cargo test --locked -p noos-private-besi
+          cargo test --locked -p noos-route
+          cargo test --locked -p noos-mix
+          cargo test --locked -p noos-wallet
+      - name: Verify genesis ceremony reproduction
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --only-binary=:all: "blake3==1.0.9" "cryptography==49.0.0" "py-ecc==8.0.0"
+          cargo build --locked --release -p noos-node --bin noos-genesis-vector
+          cargo run --quiet --locked --release -p noos-node --bin noos-genesis-vector -- --params protocol/genesis/devnet-parameters.toml --genesis-time 1760000000000
+          python -m unittest -v tools.genesis.test_production_authorization
+          python tools/genesis/ceremony.py --self-test
       - name: Test mobile wallet SDK boundary
         shell: bash
         run: cargo test --locked -p noos-wallet-sdk
@@ -153,5 +304,350 @@ jobs:
         with:
           name: mindchain-${{ matrix.platform }}-${{ github.sha }}
           path: platform-evidence/${{ matrix.platform }}/
+          if-no-files-found: error
+          retention-days: 30
+  android:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux
+          - runner: windows-2025
+            platform: windows
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    env:
+      ANDROID_NDK_VERSION: "27.3.13750724"
+      NOOS_SOURCE_REVISION: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+      - name: Install pinned Android toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then sdkmanager="${sdkmanager}.bat"; fi
+          yes | "${sdkmanager}" --licenses >/dev/null || true
+          "${sdkmanager}" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;${ANDROID_NDK_VERSION}"
+          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}" >> "${GITHUB_ENV}"
+      - name: Install pinned Rust and cargo-ndk
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.1 --profile minimal
+          rustup default 1.96.1
+          cargo install cargo-ndk --version 4.1.2 --locked
+          rustc -vV
+          cargo ndk --version
+      - name: Build Android bindings libraries and application
+        shell: bash
+        run: |
+          set -euo pipefail
+          python wallet/mobile/build_bindings.py android \
+            --profile release \
+            --ndk-home "${ANDROID_NDK_HOME}"
+          python -m json.tool wallet/mobile/android-bindings.manifest.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mindchain-android-${{ matrix.platform }}-${{ github.sha }}
+          path: |
+            wallet/mobile/android-bindings.manifest.json
+            wallet/mobile/android/core/src/main/java/org/noosphere/wallet/core/noos_wallet_sdk.kt
+            wallet/mobile/android/core/src/main/java/org/noosphere/wallet/core/MobileNodeSynchronizer.kt
+            wallet/mobile/android/core/src/main/java/org/noosphere/wallet/core/WalletApiTransport.kt
+            wallet/mobile/android/core/src/main/jniLibs/
+            wallet/mobile/android/app/src/
+            wallet/mobile/android/app/build.gradle.kts
+            wallet/mobile/android/app/build/outputs/apk/release/*.apk
+            wallet/mobile/android/core/build/outputs/aar/*.aar
+            wallet/mobile/android/security/build/outputs/aar/*.aar
+          if-no-files-found: error
+          retention-days: 30
+
+  ios:
+    runs-on: macos-14
+    timeout-minutes: 120
+    env:
+      XCODEGEN_VERSION: "2.46.0"
+      XCODEGEN_SHA256: "4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806"
+      NOOS_SOURCE_REVISION: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Select pinned Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo xcode-select --switch /Applications/Xcode_16.2.app/Contents/Developer
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.1 --profile minimal
+          rustup default 1.96.1
+          rustc -vV
+      - name: Install pinned XcodeGen
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="${RUNNER_TEMP}/xcodegen.zip"
+          install_root="${RUNNER_TEMP}/xcodegen"
+          curl --fail --location --retry 3 \
+            --output "${archive}" \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
+          echo "${XCODEGEN_SHA256}  ${archive}" | shasum -a 256 --check
+          mkdir -p "${install_root}"
+          unzip -q "${archive}" -d "${install_root}"
+          echo "${install_root}/xcodegen/bin" >> "${GITHUB_PATH}"
+      - name: Build Swift package bindings and iOS application
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodegen --version
+          swift test --package-path wallet/mobile/ios
+          python wallet/mobile/build_bindings.py ios --profile release
+          python -m json.tool wallet/mobile/ios-bindings.manifest.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mindchain-ios-${{ github.sha }}
+          path: |
+            wallet/mobile/ios-bindings.manifest.json
+            wallet/mobile/ios/CoreBindings/MindChainWalletCore.swift
+            wallet/mobile/ios/CoreBindings/MobileNodeSynchronizer.swift
+            wallet/mobile/ios/CoreBindings/MindChainWalletCoreFFI.h
+            wallet/mobile/ios/App/project.yml
+            wallet/mobile/ios/App/**/*.swift
+            wallet/mobile/ios/App/**/*.plist
+            wallet/mobile/ios/App/**/*.entitlements
+            wallet/mobile/ios/App/**/*.json
+            wallet/mobile/ios/App/**/*.png
+            wallet/mobile/ios/Artifacts/MindChainWalletCoreNative.xcframework/
+            wallet/mobile/ios/Artifacts/AppDerivedData/Build/Products/Release-iphonesimulator/*.app/
+          if-no-files-found: error
+          retention-days: 30
+
+  browser-capacity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.4.1"
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13.5"
+      - name: Verify browser capacity contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p browser-capacity-evidence
+          python -m pip install --disable-pip-version-check --only-binary=:all: "blake3==1.0.9" "cryptography==49.0.0"
+          python -m pip show cryptography > browser-capacity-evidence/python-cryptography.txt
+          python -m pip show blake3 > browser-capacity-evidence/python-blake3.txt
+          node --version | tee browser-capacity-evidence/node-version.txt
+          node --test \
+            site/wwm/client.test.mjs \
+            site/wwm/verifier-v1.test.mjs \
+            site/wwm/web-capacity.test.mjs \
+            2>&1 | tee browser-capacity-evidence/node-tests.tap
+          python --version 2>&1 | tee browser-capacity-evidence/python-version.txt
+          python -m unittest -v \
+            tools.operations.test_wwm_web_capacity \
+            tools.operations.test_wwm_web_capacity_experiment \
+            tools.operations.test_wwm_web_capacity_topology \
+            tools.operations.test_wwm_web_capacity_vectors \
+            tools.operations.test_wwm_web_capacity_devnet \
+            tools.operations.test_wwm_web_capacity_pilot \
+            tools.operations.test_wwm_web_capacity_resilience \
+            tools.operations.test_wwm_model_improvement \
+            tools.operations.test_wwm_continuous_learning \
+            tools.operations.test_wwm_poison_memorization_evaluation \
+            tools.g4.test_capped_value_canary \
+            tools.operations.test_wwm_public_inference \
+            tools.operations.test_wwm_inference_metrics \
+            tools.operations.test_wwm_plaintext_persistence_audit \
+            tools.operations.test_wwm_model_assurance_campaign \
+            tools.operations.test_wwm_public_gateway \
+            tools.operations.test_wwm_public_testnet_monitor \
+            tools.operations.test_wwm_signed_monitor_burn_in \
+            tools.operations.test_wwm_exact_release_evidence \
+            tools.test_mindscan \
+            tools.test_network_readiness \
+            2>&1 | tee browser-capacity-evidence/python-tests.txt
+      - name: Record exact browser capacity evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+
+          root = pathlib.Path("browser-capacity-evidence")
+          subjects = []
+          for path in sorted(root.iterdir()):
+              if path.is_file():
+                  subjects.append({
+                      "file": path.name,
+                      "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                  })
+          evidence = {
+              "schema": "noos/browser-capacity-ci-evidence/v1",
+              "source_revision": os.environ["GITHUB_SHA"],
+              "runner_os": os.environ["RUNNER_OS"],
+              "runner_arch": os.environ["RUNNER_ARCH"],
+              "subjects": subjects,
+          }
+          (root / "evidence.json").write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mindchain-browser-capacity-${{ github.sha }}
+          path: browser-capacity-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+  mobile-evidence-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13.5"
+      - name: Verify mobile evidence contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mobile-evidence-contracts
+          python -m pip install --disable-pip-version-check --only-binary=:all: "cryptography==49.0.0"
+          python --version 2>&1 | tee mobile-evidence-contracts/python-version.txt
+          python -m pip show cryptography > mobile-evidence-contracts/python-cryptography.txt
+          python -m unittest -v \
+            tools.operations.test_mobile_release_supply \
+            tools.operations.test_mobile_device_evidence \
+            tools.operations.test_mobile_release_reproduction \
+            2>&1 | tee mobile-evidence-contracts/tests.txt
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+
+          root = pathlib.Path("mobile-evidence-contracts")
+          subjects = [
+              {
+                  "file": path.name,
+                  "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+              }
+              for path in sorted(root.iterdir())
+              if path.is_file()
+          ]
+          (root / "evidence.json").write_text(
+              json.dumps(
+                  {
+                      "schema": "noos/mobile-evidence-contract-ci/v1",
+                      "source_revision": os.environ["GITHUB_SHA"],
+                      "runner_os": os.environ["RUNNER_OS"],
+                      "runner_arch": os.environ["RUNNER_ARCH"],
+                      "subjects": subjects,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mindchain-mobile-evidence-contracts-${{ github.sha }}
+          path: mobile-evidence-contracts/
+          if-no-files-found: error
+          retention-days: 30
+
+  mobile-release-supply:
+    needs: [native, android, ios, mobile-evidence-contracts]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: mindchain-android-linux-${{ github.sha }}
+          path: mobile-subjects/android-linux
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: mindchain-android-windows-${{ github.sha }}
+          path: mobile-subjects/android-windows
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: mindchain-ios-${{ github.sha }}
+          path: mobile-subjects/ios
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: mindchain-windows-${{ github.sha }}
+          path: mobile-subjects/native-windows
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: mindchain-macos-${{ github.sha }}
+          path: mobile-subjects/native-macos
+      - name: Seal exact mobile release subjects
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/operations/mobile_release_supply.py seal \
+            --revision "${GITHUB_SHA}" \
+            --input android-linux=mobile-subjects/android-linux \
+            --input android-windows=mobile-subjects/android-windows \
+            --input ios=mobile-subjects/ios \
+            --input native-windows=mobile-subjects/native-windows \
+            --input native-macos=mobile-subjects/native-macos \
+            --output mobile-release
+          python tools/operations/mobile_release_supply.py verify \
+            --manifest mobile-release/subject-manifest.json \
+            --checksums mobile-release/SHA256SUMS
+      - name: Sign mobile subject provenance
+        id: attest
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
+        with:
+          subject-path: |
+            mobile-release/subject-manifest.json
+            mobile-release/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mindchain-mobile-release-supply-${{ github.sha }}
+          path: |
+            mobile-release/
+            ${{ steps.attest.outputs.bundle-path }}
           if-no-files-found: error
           retention-days: 30

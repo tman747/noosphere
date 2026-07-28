@@ -57,14 +57,14 @@ pub const EMERGENCY_AUTHORITY_ACCOUNT: Hash32 = [0xE0; 32];
 /// Seed of the devnet fixture BLS proposer key (test networks only).
 pub const DEVNET_PROPOSER_SEED: [u8; 32] = [0x47; 32];
 
-/// The eight genesis controls, in manifest bit order (plan §6.8).
+/// The ten genesis controls, in manifest bit order (plan §6.8).
 ///
 /// These are the params-tree key names under `noos.control.<name>`;
 /// `noos-lumen::state::param_key` freezes full names at <= 32 bytes and
 /// `CONTROL_PREFIX` is 13 bytes, so every name here MUST be <= 19 bytes
 /// (enforced by `control_key_names_fit_frozen_param_law`). The long plan
 /// aliases are recorded next to each entry.
-pub const CONTROL_NAMES: [&str; 8] = [
+pub const CONTROL_NAMES: [&str; 10] = [
     "work_loom_credit",    // work_loom_credit_enabled
     "work_loom_weightcap", // work_loom_weight_cap != 0
     "witness_proofpower",  // witness_proofpower_bonus_enabled
@@ -73,7 +73,10 @@ pub const CONTROL_NAMES: [&str; 8] = [
     "umbra_suite",         // umbra_suite_enabled (all suites)
     "dream_lane",          // dream_lane_enabled
     "class_gate_budget",   // class_gate_irreversible_budget != 0
+    "lending_reviewed",    // exact-revision independent review gate
+    "bridge_reviewed",     // exact-revision independent review gate
 ];
+const PUBLIC_TESTNET_GENESIS_V1_CONTROL_COUNT: usize = 8;
 
 // ---------------------------------------------------------------------------
 // Parameters file
@@ -267,7 +270,7 @@ impl DevnetParams {
     }
 
     fn validate(&self, map: &std::collections::BTreeMap<String, String>) -> Result<(), NodeError> {
-        // The six genesis controls: ALL radical controls must be off.
+        // All ten genesis controls are fail-closed.
         for (key, expect) in [
             ("controls.work_loom_credit_enabled", "false"),
             ("controls.work_loom_weight_cap", "0"),
@@ -277,6 +280,8 @@ impl DevnetParams {
             ("controls.umbra_suite_enabled", "false"),
             ("controls.dream_lane_enabled", "false"),
             ("controls.class_gate_irreversible_budget", "0"),
+            ("controls.lending_reviewed_enabled", "false"),
+            ("controls.bridge_reviewed_enabled", "false"),
         ] {
             if req(map, key)? != expect {
                 return Err(NodeError::Config(format!(
@@ -445,6 +450,10 @@ pub struct GenesisSpec {
     /// is installed as an unspendable zero-balance genesis account, binding
     /// the complete registry to `genesis_hash`.
     pub contract_codes: BTreeMap<Hash32, Vec<u8>>,
+    /// Reconstruct the deployed public-testnet v1 genesis and uncompressed DA
+    /// commitments. The genesis predates lending and bridge review records;
+    /// missing records remain fail-closed. Refused outside test networks.
+    pub public_testnet_genesis_v1: bool,
     /// Install the exact Bonsai-27B registration graph at genesis. This is
     /// refused by the ledger unless `params.is_test_network` is true.
     pub wwm_bonsai_fixture: bool,
@@ -528,6 +537,7 @@ impl GenesisSpec {
             gov_authority: GOV_AUTHORITY_ACCOUNT,
             contract_codes: BTreeMap::new(),
             wwm_bonsai_fixture: false,
+            public_testnet_genesis_v1: false,
         }
     }
 
@@ -761,16 +771,31 @@ impl GenesisSpec {
     /// authority and emission-recipient accounts, and the disabled-control
     /// records.
     pub fn build_ledger(&self) -> Result<LumenLedger, NodeError> {
+        if self.public_testnet_genesis_v1 && !self.params.is_test_network {
+            return Err(NodeError::Config(
+                "public-testnet genesis v1 compatibility requires is_test_network = true".into(),
+            ));
+        }
+        let fee_params = if self.public_testnet_genesis_v1 {
+            FeeParamsV1::public_testnet_genesis_v1_fixture()
+        } else {
+            FeeParamsV1::testnet_fixture()
+        };
         let mut ledger = LumenLedger::new();
         let accounts = self.canonical_accounts()?;
-        let controls: Vec<(&str, bool)> = CONTROL_NAMES.iter().map(|n| (*n, false)).collect();
+        let controls = CONTROL_NAMES.map(|name| (name, false));
+        let controls = if self.public_testnet_genesis_v1 {
+            &controls[..PUBLIC_TESTNET_GENESIS_V1_CONTROL_COUNT]
+        } else {
+            &controls[..]
+        };
         ledger
             .install_genesis(&GenesisConfig {
-                fee_params: FeeParamsV1::testnet_fixture(),
+                fee_params,
                 fee_state: FeeStateV1::testnet_fixture(),
                 issuance: IssuanceParamsV1::testnet_fixture(),
                 shares: EmissionSharesV1::testnet_fixture(),
-                controls: &controls,
+                controls,
                 accounts: &accounts,
                 gov_authority: self.gov_authority,
                 emergency_authority: EMERGENCY_AUTHORITY_ACCOUNT,
@@ -870,7 +895,11 @@ impl GenesisSpec {
 
         // The DA commitment covers the ticket-independent DA form and is
         // therefore fixed BEFORE the nonce search (ch01 §4.3 step 5-6).
-        let da_bytes = crate::roots::da_form_bytes(&body);
+        let da_bytes = if self.public_testnet_genesis_v1 {
+            crate::roots::public_testnet_v1_da_form_bytes(&body)
+        } else {
+            crate::roots::da_form_bytes(&body)
+        };
         let encoded = noos_da::encode_body(&da_bytes)?;
         header.body_da_root = encoded.shard_root().into_bytes();
 
@@ -892,9 +921,14 @@ impl GenesisSpec {
         header.ground_ticket_root = body_ticket_root(&ticket)?;
         body.ground_ticket = GroundTicketWire(ticket);
 
-        // Persist and serve the exact compressed, ticket-independent DA form;
-        // import substitutes the separately validated real ticket.
-        let body_bytes = da_bytes;
+        // Preserve the deployed genesis blob byte-for-byte in the explicit
+        // compatibility profile. Later public-testnet bodies use the
+        // ticket-independent v1 DA form selected by NodeConfig.
+        let body_bytes = if self.public_testnet_genesis_v1 {
+            body.encode_canonical()
+        } else {
+            da_bytes
+        };
 
         // Devnet proposer signature: BLS over the proposal commitment under
         // the registered D-BLS-PROPOSER DST.
@@ -964,7 +998,8 @@ pub fn mine_ticket(
 
 #[cfg(test)]
 mod production_proposal_refusal_tests {
-    use super::{DevnetParams, GenesisSpec};
+    use super::{DevnetParams, GenesisSpec, NodeError};
+    use noos_lumen::state::{CONTROL_BRIDGE_REVIEWED, CONTROL_LENDING_REVIEWED};
 
     const DEVNET: &str = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -1000,6 +1035,77 @@ mod production_proposal_refusal_tests {
             first.genesis_hash().unwrap(),
             second.genesis_hash().unwrap()
         );
+    }
+
+    #[test]
+    fn public_testnet_genesis_v1_preserves_deployed_identity_and_fails_closed() {
+        let params = DevnetParams::parse(DEVNET).unwrap();
+        let governance = super::hex32(
+            "17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce",
+            "test governance account",
+        )
+        .unwrap();
+        let mut modern = GenesisSpec::devnet(params, 1_760_000_000_000);
+        modern.extra_accounts = vec![(governance, 0)];
+        modern.gov_authority = governance;
+        modern.wwm_bonsai_fixture = true;
+        let mut deployed = modern.clone();
+        deployed.public_testnet_genesis_v1 = true;
+
+        let modern = modern.build().unwrap();
+        let deployed = deployed.build().unwrap();
+        assert_eq!(
+            deployed.chain_id,
+            super::hex32(
+                "0106bef48c350fd9633bac1718f8d9ecb1824c78bd127feee6405c65a63afa8b",
+                "deployed chain id",
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            deployed.genesis_hash,
+            super::hex32(
+                "8c182c6e9d622f77f082332da1a514ecf061ef4c504b5dde466ca4c93e35167e",
+                "deployed genesis hash",
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            *deployed.header.block_hash().unwrap().as_bytes(),
+            super::hex32(
+                "7d12787c77b9bbc6e8ff0ffca8e576efe05362404711774c2e57e3a6cf9c2412",
+                "deployed genesis block hash",
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            deployed.header.body_da_root,
+            super::hex32(
+                "bcab9e3bd2ec0310c10e2526e0a8f14deddc8fc23325a5fb080d2ea87b98372e",
+                "deployed genesis DA root",
+            )
+            .unwrap()
+        );
+        assert_eq!(modern.chain_id, deployed.chain_id);
+        assert_ne!(modern.genesis_hash, deployed.genesis_hash);
+        assert!(!deployed.ledger.feature_enabled(CONTROL_LENDING_REVIEWED));
+        assert!(!deployed.ledger.feature_enabled(CONTROL_BRIDGE_REVIEWED));
+    }
+
+    #[test]
+    fn public_testnet_genesis_v1_is_refused_outside_test_networks() {
+        let mut params = DevnetParams::parse(DEVNET).unwrap();
+        params.is_test_network = false;
+        let mut spec = GenesisSpec::devnet(params, 1_760_000_000_000);
+        spec.public_testnet_genesis_v1 = true;
+
+        match spec.build_ledger() {
+            Err(NodeError::Config(message)) => {
+                assert!(message.contains("requires is_test_network = true"));
+            }
+            Err(_) => panic!("compatibility profile returned the wrong error"),
+            Ok(_) => panic!("compatibility profile accepted a production network"),
+        }
     }
 
     #[test]
@@ -1139,7 +1245,7 @@ mod production_proposal_refusal_tests {
         );
         assert_eq!(
             super::hex32_for_test(built.genesis_hash),
-            "4c6500d9dcfef3de56ac941797968de9d58c8fe2a21dc8aa6aa28be7742795d2"
+            "3bdf2c7be6c03dde5e707a8864ef3999c8e110896797b383d91b1a5d2f00319c"
         );
     }
 }

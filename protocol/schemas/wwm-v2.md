@@ -1,6 +1,6 @@
 # World Wide Mind protocol identity v2
 
-Status: **FROZEN WWM CORE + NEURAL-ORACLE EXTENSION CANDIDATE / BLOCKED**. Tags 0–59 retain their frozen meanings. Tags 60–65 define the additive neural-oracle extension. This document does not pass G0, enable a lane, authorize valuable traffic, authorize DNS cutover, or give neural results consensus-system weight.
+Status: **FROZEN WWM CORE + NEURAL-ORACLE AND COMPUTE-DISPUTE EXTENSIONS CANDIDATE / BLOCKED**. Tags 0–65 retain their meanings. Tags 66–68 define the additive deterministic compute-dispute extension. This document does not pass G0, enable a lane, authorize valuable traffic, authorize DNS cutover, or give neural or compute-market results consensus-system weight beyond their isolated application settlement.
 
 ## 1. Version boundary and canonical codec
 
@@ -120,7 +120,7 @@ Both modes are application state only. A neural program, query, commit, reveal, 
 
 ## 4. Closed action registry
 
-The existing `ActionV1` envelope is retained. Discriminants 0–39 are historical, 40–59 are the frozen WWM core, and 60–65 are the additive neural-oracle extension. `ActionV1::VARIANT_COUNT` is exactly 66:
+The existing `ActionV1` envelope is retained. Discriminants 0–39 are historical, 40–59 are the frozen WWM core, 60–65 are the additive neural-oracle extension, and 66–68 are the additive deterministic compute-dispute extension. `ActionV1::VARIANT_COUNT` is exactly 69:
 
 | Tag | Action | Closed payload |
 |---:|---|---|
@@ -150,6 +150,9 @@ The existing `ActionV1` envelope is retained. Discriminants 0–39 are historica
 | 63 | `CommitNeuralOracleReply` | one complete `NeuralOracleCommitV1` |
 | 64 | `RevealNeuralOracleReply` | one complete `NeuralOracleRevealV1` |
 | 65 | `FinalizeNeuralOracleQuery` | one complete `FinalizeNeuralOracleQueryV1` |
+| 66 | `ChallengeComputeResult` | requester, job ID, canonical MIX32 seed and start |
+| 67 | `FinalizeComputeResult` | bound worker, job ID, canonical MIX32 seed and start |
+| 68 | `ExpireComputeJob` | job ID |
 
 Actions 41 and 50 use exactly:
 
@@ -205,7 +208,7 @@ Each `LightUpdateItemV1` is at most 262,144 canonical bytes: `BlockHeaderV1` at 
 
 Existing `BoundedBytes<65536>` action/call arguments remain. A transaction is accepted only when `tx_bytes.len + witness_bytes.len <= 65,532`. `TxPushV1.tx` is exactly `u32 tx_len || tx_bytes || witness_bytes`, so the prefixed carrier is at most 65,536 bytes. No nested length, action wrapper, or signature is exempt.
 
-An operational-authorization transaction contains exactly one action 59. `OperationalReconfigurationV1 <= 47,104`; action/tag wrapper `<=2,048`; every remaining transaction/access/witness byte combined `<=16,380`; total `<=65,532`. Oversize rejects before allocation, hashing, signature work, mempool admission, relay, or state access. Unknown action 66+, unknown nested payload tag, trailing byte, mixed V1 body, and a v2 transaction announced by a v1 peer all reject.
+An operational-authorization transaction contains exactly one action 59. `OperationalReconfigurationV1 <= 47,104`; action/tag wrapper `<=2,048`; every remaining transaction/access/witness byte combined `<=16,380`; total `<=65,532`. Oversize rejects before allocation, hashing, signature work, mempool admission, relay, or state access. Unknown action 69+, unknown nested payload tag, trailing byte, mixed V1 body, and a v2 transaction announced by a v1 peer all reject.
 
 ## 8. Security and negative-vector requirements
 

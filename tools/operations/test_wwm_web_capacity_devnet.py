@@ -18,7 +18,7 @@ from typing import Any
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
-from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = ROOT / "tools" / "operations" / "wwm_web_capacity_devnet.py"
@@ -52,6 +52,28 @@ def create_tls(root: Path) -> tuple[Path, Path, Path]:
         .not_valid_before(now - timedelta(minutes=1))
         .not_valid_after(now + timedelta(days=1))
         .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+        .add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(ca_key.public_key()),
+            critical=False,
+        )
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
+            critical=False,
+        )
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=True,
+                encipher_only=None,
+                decipher_only=None,
+            ),
+            critical=True,
+        )
         .sign(ca_key, hashes.SHA256())
     )
     leaf_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -71,6 +93,32 @@ def create_tls(root: Path) -> tuple[Path, Path, Path]:
             critical=False,
         )
         .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(leaf_key.public_key()),
+            critical=False,
+        )
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
+            critical=False,
+        )
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=True,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=None,
+                decipher_only=None,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),
+            critical=False,
+        )
         .sign(ca_key, hashes.SHA256())
     )
     cert_path = root / "leaf.pem"

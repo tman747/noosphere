@@ -1,0 +1,135 @@
+{
+  "base_continuity": {
+    "files": {
+      "evidence/base-ai-blackout.json": "914cbf991e6715e349a4bdb084c05a735aec7690f6d81db88e7c157d31564426",
+      "evidence/base-base-transfer-contract.json": "7d32d67b6575e4d1864fc88fcd785d3dac54759aca873df70f91139d2050e463",
+      "evidence/base-crash-matrix.json": "662624e0fab67c66f952e4575b0bb632fff0ada6ebe1b639511f4a334d387885"
+    },
+    "observations": {
+      "evidence/base-ai-blackout.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-base-transfer-contract.json": {
+        "rollback": "PASS",
+        "runs": 1
+      },
+      "evidence/base-crash-matrix.json": {
+        "rollback": "PASS",
+        "runs": 1
+      }
+    },
+    "ordinary_base_live": true,
+    "rollback_verified": true
+  },
+  "checks": [
+    {
+      "detail": "{\"controls\":[\"work_loom_credit_enabled\",\"work_loom_weight_cap\",\"witness_proofpower_bonus_enabled\"]}",
+      "id": "activation-controls-disabled",
+      "kind": "disabled_control",
+      "passed": true
+    },
+    {
+      "detail": "{\"command\":[\"cargo\",\"test\",\"--locked\",\"-p\",\"noos-work-loom\",\"-p\",\"noos-analytics\",\"--\",\"--test-threads=1\"],\"exit_code\":0,\"packages\":[\"noos-work-loom\",\"noos-analytics\"]}",
+      "id": "registered-falsifier",
+      "kind": "falsifier",
+      "passed": true
+    },
+    {
+      "detail": "{\"ordinary_base_live\":true,\"rollback_verified\":true}",
+      "id": "ordinary-base-rollback",
+      "kind": "rollback",
+      "passed": true
+    }
+  ],
+  "claim_fingerprints": {
+    "E-DEMAND-WASH-01": "1b0a528e4a81ed4c74b65f8ff4e462526566d1ee3676e285c846cd0c25b82fe9"
+  },
+  "claims": [
+    "E-DEMAND-WASH-01"
+  ],
+  "command": [
+    "tools/gates/run_negative_claim.py",
+    "--claim",
+    "E-DEMAND-WASH-01"
+  ],
+  "evidence_sha256": "1770f0a6a09e6995dc778d545bb0d58cffb111e34e595ff64639748a3029412c",
+  "expected_result": "KILLED",
+  "gate": "negative-e-demand-wash-01",
+  "limitations": [
+    "The killed claim remains fail-closed; the replacement mechanism is a separate claim."
+  ],
+  "registry_schema_version": "1.2.0",
+  "result": "KILLED",
+  "schema_version": "noos.experimental-evidence.v2",
+  "source_binding": {
+    "entries": [
+      {
+        "bytes": 282,
+        "git_blob": "956e41073a56658fe0f7aa9d5516cf9dd1ce7814",
+        "git_mode": "100644",
+        "path": "crates/noos-analytics/Cargo.toml",
+        "sha256": "d1af1318d679b7efc79ecd514f963d194e3cbd7285017955628f0369dee93d87"
+      },
+      {
+        "bytes": 29030,
+        "git_blob": "74ebc655031728788a29586a799c43877461d6fe",
+        "git_mode": "100644",
+        "path": "crates/noos-analytics/src/lib.rs",
+        "sha256": "89de4f7faee055767b3c05b5e5e1d70526583ee1a11d72c3006859529aa41dfb"
+      },
+      {
+        "bytes": 441,
+        "git_blob": "7b235cd9c115ec7188fc087409b8a7e8623e7ad8",
+        "git_mode": "100644",
+        "path": "crates/noos-work-loom/Cargo.toml",
+        "sha256": "6a40cb7475a21b36ca25207579cc429e7b4b7c025f0c90719ed2b690f5f6ba0b"
+      },
+      {
+        "bytes": 48993,
+        "git_blob": "fe28ebb000ad8b94165b2b987090a434d5e2b45a",
+        "git_mode": "100644",
+        "path": "crates/noos-work-loom/src/lib.rs",
+        "sha256": "7cdd849b551bcfcb1bb70bebb0f6f067f8161a24619f460e1b864532b4b5cccd"
+      },
+      {
+        "bytes": 3054,
+        "git_blob": "2001603917f8e5c9b1817ec4062f89d3264e204a",
+        "git_mode": "100644",
+        "path": "protocol/claims/experimental-evidence-schema-v2.json",
+        "sha256": "33294bf6d8cf33ec29b1277b633adf9e2f826b39dee4fbd43c621249b19b12b9"
+      },
+      {
+        "bytes": 30076,
+        "git_blob": "8c8a6c498c37e1d1b0322cff5653f8bcf26178cb",
+        "git_mode": "100644",
+        "path": "protocol/spec/constants-v1.toml",
+        "sha256": "eaaf1a9680aab2cba1b8b972e2e80123b6ce27cfe84c5f02fb5c44bb68ec693e"
+      },
+      {
+        "bytes": 11625,
+        "git_blob": "d8bf109b3a095e7a9ec013ee63e7a5be5820a06e",
+        "git_mode": "100644",
+        "path": "tools/gates/experimental_gate.py",
+        "sha256": "de98b15db02c5bef2076dfcb1c3725ca9367341325cea0ba1ef31a1569bbdbfd"
+      },
+      {
+        "bytes": 17330,
+        "git_blob": "bb48c14b2d6445e00526b88264ef9a2fdbc8a87b",
+        "git_mode": "100644",
+        "path": "tools/gates/run_claim_matrix.py",
+        "sha256": "c3be6f49ed227643dc49dfac6d75f5f3626df6c7c45cb9b677ee2d93ac251a6f"
+      },
+      {
+        "bytes": 1866,
+        "git_blob": "9cd34fd3e4eabf9099bab7bb3bbb00ac3b865508",
+        "git_mode": "100644",
+        "path": "tools/gates/run_negative_claim.py",
+        "sha256": "3db904937fb7e7c572b7ddf9447062acc74bb7b7aa6f5b844c2d5593b20c604f"
+      }
+    ],
+    "manifest_sha256": "fb9b22d2385746b6e3511168c8f4827d3fd002e895b6f4513aea92972ac5f019",
+    "source_revision": "8daf7dad6ad80554809dfe911cb54a8798533272",
+    "source_tree": "92967ca0e8c0f2bbd5b3a2950bf220deb08dfdf8"
+  }
+}

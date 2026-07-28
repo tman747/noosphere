@@ -78,6 +78,14 @@ const fn smaller_sync_range_page(current: u32) -> Option<u32> {
     }
 }
 
+const fn range_sync_failure_backoff(current: u32, ready_peer_count: usize) -> Option<u32> {
+    if ready_peer_count > 1 {
+        None
+    } else {
+        smaller_sync_range_page(current)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Store task
 // ---------------------------------------------------------------------------
@@ -814,6 +822,7 @@ fn core_loop<P: StorePort>(
 async fn import_wire_block(
     consensus: &SyncSender<ConsensusMsg>,
     p2p: &P2pHandle,
+    public_testnet_genesis_v1: bool,
     peer: noos_p2p::PeerId,
     announced: &[u8],
     regossip: bool,
@@ -825,7 +834,16 @@ async fn import_wire_block(
         .await
         .map_err(|error| format!("request body: {error}"))?
         .ok_or_else(|| "body not found".to_owned())?;
-    // The body lane serves the exact compressed, ticket-independent DA form.
+    // Deployed public-testnet nodes served their full stored body, including
+    // the real ticket. Normalize it back to the ticket-independent DA form
+    // before validating the committed root and constructing shards.
+    let body = if public_testnet_genesis_v1 {
+        let decoded = crate::roots::decode_public_testnet_v1_stored_body(&body, &ticket)
+            .map_err(|error| format!("decode public-testnet body: {error}"))?;
+        crate::roots::public_testnet_v1_da_form_bytes(&decoded)
+    } else {
+        body
+    };
     let encoded = encode_body(&body).map_err(|error| format!("encode DA body: {error}"))?;
     if encoded.shard_root().as_bytes() != &header.body_da_root {
         return Err("DA root mismatch".to_owned());
@@ -860,6 +878,7 @@ async fn import_wire_block(
 async fn import_wire_header(
     consensus: &SyncSender<ConsensusMsg>,
     p2p: &P2pHandle,
+    public_testnet_genesis_v1: bool,
     peer: noos_p2p::PeerId,
     announced: &[u8],
 ) -> Result<ImportOutcome, String> {
@@ -876,7 +895,15 @@ async fn import_wire_header(
             .await
             .map_err(|error| format!("request certificate body: {error}"))?
             .ok_or_else(|| "certificate body not found".to_owned())?;
-        crate::roots::decode_da_form(&body)
+        let decoded = if public_testnet_genesis_v1 {
+            crate::roots::decode_public_testnet_v1_stored_body(&body, &ticket)
+        } else {
+            crate::roots::decode_da_form(&body).map(|mut body| {
+                body.ground_ticket = noos_braid::GroundTicketWire(ticket);
+                body
+            })
+        };
+        decoded
             .map_err(|error| format!("decode certificate body: {error}"))?
             .finality_certificates
     };
@@ -911,6 +938,7 @@ async fn sync_ready_peer(
     p2p: &P2pHandle,
     edge: &P2pNetworkEdge,
     peer: noos_p2p::PeerId,
+    public_testnet_genesis_v1: bool,
 ) {
     let Some(mode) = consensus_mode(consensus) else {
         return;
@@ -933,19 +961,22 @@ async fn sync_ready_peer(
                     );
                     return;
                 }
-                match smaller_sync_range_page(page_headers) {
+                let ready_peer_count = edge.peers().len();
+                match range_sync_failure_backoff(page_headers, ready_peer_count) {
                     Some(smaller_page) => {
                         eprintln!(
-                            "range-sync page backoff for peer {peer} at height {start_height}: \
-                             {error} (page_headers={page_headers}->{smaller_page})"
+                            "range-sync page backoff for sole peer {peer} at height \
+                             {start_height}: {error} \
+                             (page_headers={page_headers}->{smaller_page})"
                         );
                         page_headers = smaller_page;
                         continue;
                     }
                     None => {
                         eprintln!(
-                            "range-sync request failed from peer {peer} at height {start_height}: \
-                             {error} (page_headers={page_headers})"
+                            "range-sync request failed from peer {peer} at height \
+                             {start_height}: {error} (page_headers={page_headers}, \
+                             ready_peers={ready_peer_count}); yielding to peer rotation"
                         );
                         return;
                     }
@@ -957,9 +988,17 @@ async fn sync_ready_peer(
         }
         for header in range.headers.0 {
             let result = if mode == NodeMode::Light {
-                import_wire_header(consensus, p2p, peer, &header.0).await
+                import_wire_header(consensus, p2p, public_testnet_genesis_v1, peer, &header.0).await
             } else {
-                import_wire_block(consensus, p2p, peer, &header.0, false).await
+                import_wire_block(
+                    consensus,
+                    p2p,
+                    public_testnet_genesis_v1,
+                    peer,
+                    &header.0,
+                    false,
+                )
+                .await
             };
             if let Err(error) = result {
                 // Gossip may execute this height while the range body is in
@@ -1041,6 +1080,7 @@ fn spawn_network(
     settings: crate::network::NetworkSettings,
     chain_id: Hash32,
     genesis_hash: Hash32,
+    public_testnet_genesis_v1: bool,
     store: StoreClient,
     consensus: SyncSender<ConsensusMsg>,
     mut gossip_rx: tokio::sync::mpsc::Receiver<OutboundGossip>,
@@ -1073,7 +1113,10 @@ fn spawn_network(
                 };
                 let mut config = P2pConfig::loopback(identity, keypair_seed);
                 config.listen_addr = settings.listen;
-                let protocol_store = Arc::new(NodeProtocolStore::new(store));
+                let protocol_store = Arc::new(NodeProtocolStore::new(
+                    store,
+                    public_testnet_genesis_v1,
+                ));
                 let (p2p, mut events) = match P2pNode::spawn(config, protocol_store) {
                     Ok(pair) => pair,
                     Err(error) => {
@@ -1106,7 +1149,14 @@ fn spawn_network(
                         }
                         let peer = peers[sync_cursor % peers.len()];
                         sync_cursor = sync_cursor.wrapping_add(1);
-                        sync_ready_peer(&sync_consensus, &sync_p2p, &sync_edge, peer).await;
+                        sync_ready_peer(
+                            &sync_consensus,
+                            &sync_p2p,
+                            &sync_edge,
+                            peer,
+                            public_testnet_genesis_v1,
+                        )
+                        .await;
                     }
                 });
                 let mut shutdown_rx = shutdown_rx;
@@ -1172,12 +1222,21 @@ fn spawn_network(
                                                     == Some(NodeMode::Light)
                                                 {
                                                     let _ = import_wire_header(
-                                                        &consensus, &p2p, peer, &header,
+                                                        &consensus,
+                                                        &p2p,
+                                                        public_testnet_genesis_v1,
+                                                        peer,
+                                                        &header,
                                                     )
                                                     .await;
                                                 } else {
                                                     let _ = import_wire_block(
-                                                        &consensus, &p2p, peer, &header, true,
+                                                        &consensus,
+                                                        &p2p,
+                                                        public_testnet_genesis_v1,
+                                                        peer,
+                                                        &header,
+                                                        true,
                                                     )
                                                     .await;
                                                 }
@@ -1361,6 +1420,7 @@ pub fn start(
     let network_chain_id = built.chain_id;
     let network_genesis_hash = built.genesis_hash;
     let observer = cfg.observer;
+    let public_testnet_genesis_v1 = cfg.public_testnet_genesis_v1;
     let (gossip_sender, gossip_rx) = tokio::sync::mpsc::channel::<OutboundGossip>(256);
     let gossip_tx = network_settings.enabled.then_some(gossip_sender);
     let task_metrics = Arc::clone(&metrics);
@@ -1406,6 +1466,7 @@ pub fn start(
             network_settings,
             network_chain_id,
             network_genesis_hash,
+            public_testnet_genesis_v1,
             network_store,
             consensus_tx.clone(),
             gossip_rx,
@@ -1465,6 +1526,8 @@ mod tests {
 
         assert_eq!(pages, vec![16, 8, 4, 2, 1]);
         assert_eq!(smaller_sync_range_page(1), None);
+        assert_eq!(range_sync_failure_backoff(16, 1), Some(8));
+        assert_eq!(range_sync_failure_backoff(16, 2), None);
     }
 
     #[test]

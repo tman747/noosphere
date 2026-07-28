@@ -8,6 +8,7 @@ import difflib
 import hashlib
 import json
 import os
+import re
 import platform
 import shutil
 import subprocess
@@ -58,6 +59,29 @@ def output(argv: list[str]) -> str:
 
 def cargo_metadata() -> dict[str, object]:
     return json.loads(output(["cargo", "metadata", "--locked", "--format-version", "1", "--no-deps"]))
+
+
+def source_identity() -> tuple[str, str, str]:
+    revision = os.environ.get("NOOS_SOURCE_REVISION") or output(
+        ["git", "rev-parse", "HEAD"]
+    )
+    if re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+        raise BuildError("mobile build source revision must be lowercase hex40")
+    metadata = cargo_metadata()
+    packages = metadata.get("packages")
+    if not isinstance(packages, list):
+        raise BuildError("cargo metadata did not return packages")
+    versions = {
+        package.get("version")
+        for package in packages
+        if isinstance(package, dict) and package.get("name") == SDK_CRATE
+    }
+    if len(versions) != 1:
+        raise BuildError("cargo metadata did not return one wallet SDK version")
+    version = versions.pop()
+    if not isinstance(version, str) or not version:
+        raise BuildError("wallet SDK version is malformed")
+    return revision, version, f"{version}+git.{revision}"
 
 
 def target_directory() -> Path:
@@ -210,20 +234,33 @@ def sha256(path: Path) -> str:
 
 def write_manifest(platform_name: str, files: list[Path], profile: str) -> None:
     root = ROOT / "wallet" / "mobile"
+    revision, crate_version, release_version = source_identity()
+    unique_files = sorted({path.resolve() for path in files})
     entries = []
-    for path in sorted(files):
+    for path in unique_files:
+        if not path.is_file():
+            raise BuildError(f"mobile release subject is missing: {path}")
+        try:
+            relative = path.relative_to(ROOT).as_posix()
+        except ValueError as error:
+            raise BuildError(f"mobile release subject escapes the source root: {path}") from error
         entries.append(
             {
-                "path": path.relative_to(ROOT).as_posix(),
+                "path": relative,
                 "bytes": path.stat().st_size,
                 "sha256": sha256(path),
             }
         )
+    if not entries:
+        raise BuildError("mobile release manifest cannot be empty")
     manifest = {
-        "schema": "noos/mobile-wallet-bindings/v1",
+        "schema": "noos/mobile-wallet-bindings/v2",
         "platform": platform_name,
         "profile": profile,
         "crate": SDK_CRATE,
+        "crate_version": crate_version,
+        "source_revision": revision,
+        "release_version": release_version,
         "files": entries,
     }
     destination = root / f"{platform_name}-bindings.manifest.json"
@@ -295,9 +332,22 @@ def build_android(profile: str, ndk_home: Path) -> None:
             f":app:lint{variant}",
         ]
     )
+    apk_files = sorted(
+        path
+        for path in (android_app / "build" / "outputs" / "apk").rglob("*.apk")
+        if path.is_file()
+    )
+    aar_files = sorted(
+        path
+        for module in ("core", "security")
+        for path in (android_root / module / "build" / "outputs" / "aar").rglob("*.aar")
+        if path.is_file()
+    )
+    if not apk_files or len(aar_files) < 2:
+        raise BuildError("Android application or library release packages are missing")
     write_manifest(
         "android",
-        [generated, android_runtime, wallet_transport, *native_files, *app_files],
+        [generated, android_runtime, wallet_transport, *native_files, *app_files, *apk_files, *aar_files],
         profile,
     )
 
@@ -397,6 +447,17 @@ def build_ios(profile: str) -> None:
         *app_root.rglob("*.json"),
         *app_root.rglob("*.png"),
     ]
+    framework_files = sorted(path for path in framework.rglob("*") if path.is_file())
+    app_product_files = sorted(
+        path
+        for app in (derived_data / "Build" / "Products" / "Release-iphonesimulator").glob(
+            "*.app"
+        )
+        for path in app.rglob("*")
+        if path.is_file()
+    )
+    if not framework_files or not app_product_files:
+        raise BuildError("Apple framework or application release packages are missing")
 
     swift_source = bindings / "MindChainWalletCore.swift"
     info_plist = framework / "Info.plist"
@@ -406,10 +467,10 @@ def build_ios(profile: str) -> None:
         swift_source,
         bindings / "MobileNodeSynchronizer.swift",
         bindings / "MindChainWalletCoreFFI.h",
-        info_plist,
+        *framework_files,
+        *app_product_files,
         *app_files,
     ]
-    package_files.extend(path for path in framework.rglob("*.a") if path.is_file())
     write_manifest("ios", package_files, profile)
 
 

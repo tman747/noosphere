@@ -357,8 +357,9 @@ class StaticBundleHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(body)
 
 
-class StaticHostServer(http.server.HTTPServer):
+class StaticHostServer(http.server.ThreadingHTTPServer):
     allow_reuse_address = True
+    daemon_threads = True
 
     def __init__(self, config: StaticHostConfig):
         super().__init__((config.listen_host, config.listen_port), StaticBundleHandler)

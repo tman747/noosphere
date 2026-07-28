@@ -100,12 +100,13 @@ def post_json(addr: str, path: str, token: str, value: dict, timeout: float = 5)
         raise RuntimeError(message or f"node refused request with HTTP {error.code}") from error
 
 
-def cli_json(exe: Path, *args: str) -> dict:
+def cli_json(exe: Path, *args: str, stdin_text: str | None = None) -> dict:
     completed = subprocess.run(
         [str(exe), *args],
         cwd=ROOT,
         capture_output=True,
         text=True,
+        input=stdin_text,
     )
     if completed.returncode != 0:
         detail = completed.stderr.strip() or completed.stdout.strip() or "noos-cli failed"
@@ -156,8 +157,7 @@ def submit_actions(metadata: dict, exe: Path, actions: list[dict]) -> dict:
         "sign",
         "--tx",
         built["tx"],
-        "--seed",
-        metadata["developer_seed_hex"],
+        "--seed-stdin",
         "--account",
         "0",
         "--index",
@@ -166,6 +166,7 @@ def submit_actions(metadata: dict, exe: Path, actions: list[dict]) -> dict:
         metadata["chain_id"],
         "--genesis-hash",
         metadata["genesis_hash"],
+        stdin_text=metadata["developer_seed_hex"] + "\n",
     )
     submitted = cli_json(
         exe,

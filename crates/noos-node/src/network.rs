@@ -8,7 +8,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use noos_braid::{BlockHeaderV1, FinalityCertificateV1};
+use noos_braid::{BlockBodyV1, BlockHeaderV1, FinalityCertificateV1};
 use noos_codec::{NoosDecode, NoosEncode};
 use noos_da::{content_root, encode_body, BodyDaClaimV1, ShardCandidateV1};
 use noos_ground::GroundTicketV1;
@@ -161,14 +161,16 @@ impl CachedBody {
 
 pub struct NodeProtocolStore {
     store: StoreClient,
+    public_testnet_genesis_v1: bool,
     body: Mutex<Option<CachedBody>>,
 }
 
 impl NodeProtocolStore {
     #[must_use]
-    pub fn new(store: StoreClient) -> Self {
+    pub fn new(store: StoreClient, public_testnet_genesis_v1: bool) -> Self {
         Self {
             store,
+            public_testnet_genesis_v1,
             body: Mutex::new(None),
         }
     }
@@ -199,6 +201,15 @@ impl ProtocolStore for NodeProtocolStore {
         }
 
         let bytes = self.store.get_blob(block_hash).ok().flatten()?;
+        if self.public_testnet_genesis_v1 && bytes.len() > crate::roots::MAX_DA_FORM_RAW_BYTES {
+            return None;
+        }
+        let bytes = if self.public_testnet_genesis_v1 {
+            let body = BlockBodyV1::decode_canonical(&bytes).ok()?;
+            crate::roots::public_testnet_v1_da_form_bytes(&body)
+        } else {
+            bytes
+        };
         let cached = CachedBody {
             block_hash: *block_hash,
             content_root: content_root(&bytes).ok()?.into_bytes(),
