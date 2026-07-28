@@ -1,0 +1,66 @@
+{
+  "events_per_arm": 100000,
+  "quality_threshold_mB": "75",
+  "registered_verdict": "KILLED",
+  "rows": [
+    {
+      "eligible": false,
+      "honest_net_uT_per_event": "1139.0996",
+      "main_improve_mB": "167.54353582132964",
+      "manip_arm_improve_mB": "176.8064171907344",
+      "manipulator_excluded": true,
+      "manipulator_net_uT_per_event": "0.0",
+      "passes": false,
+      "premium_uT": 0
+    },
+    {
+      "eligible": false,
+      "honest_net_uT_per_event": "1139.0996",
+      "main_improve_mB": "167.64290868412635",
+      "manip_arm_improve_mB": "215.09295823470697",
+      "manipulator_excluded": false,
+      "manipulator_net_uT_per_event": "1334.6299",
+      "passes": false,
+      "premium_uT": 271
+    },
+    {
+      "eligible": true,
+      "honest_net_uT_per_event": "1139.0996",
+      "main_improve_mB": "167.64290868412635",
+      "manip_arm_improve_mB": "215.09295823470697",
+      "manipulator_excluded": false,
+      "manipulator_net_uT_per_event": "1063.6299",
+      "passes": false,
+      "premium_uT": 542
+    },
+    {
+      "eligible": true,
+      "honest_net_uT_per_event": "1139.0996",
+      "main_improve_mB": "167.64290868412635",
+      "manip_arm_improve_mB": "215.09295823470697",
+      "manipulator_excluded": false,
+      "manipulator_net_uT_per_event": "792.6299",
+      "passes": false,
+      "premium_uT": 813
+    },
+    {
+      "eligible": true,
+      "honest_net_uT_per_event": "1139.0996",
+      "main_improve_mB": "167.64290868412635",
+      "manip_arm_improve_mB": "215.09295823470697",
+      "manipulator_excluded": false,
+      "manipulator_net_uT_per_event": "521.6299",
+      "passes": false,
+      "premium_uT": 1084
+    }
+  ],
+  "schema": "noos/e-dream-02-frozen-sweep-projection/v1",
+  "seed": 20260710,
+  "source_artifact_sha256": {
+    "results-v2-p0.json": "fd05e1672ff50bc531d96874c15bad7a9e63e88e4c6613256c578439869b95a4",
+    "results-v2-p1084.json": "f6b3679b7868290cf9fe80027f6a4ef17eb76421d97ff753b2f2676f052cce62",
+    "results-v2-p271.json": "abdd8c6e192bb2c1dcba1cbb839f0baf4276aa2076750ac7c08ea86bace103d6",
+    "results-v2-p542.json": "d439b21219ae2b8563d18edc00acce88008ac25a5186c627a48495cc2866a2cb",
+    "results-v2-p813.json": "ef59e0efe344b7bf231f30d5bff4f5c9c5473808857cdaeda9b8fe3542c85fa1"
+  }
+}

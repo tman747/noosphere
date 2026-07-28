@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "tools" / "gates"))
 import rebaseline_claims as rebaseline
 import run_claim_matrix as matrix
 import run_dream_chorus_claim as dream
+import run_agent_commerce_claim as agent
 import run_economics_claim as economics
 import run_species_reaction_claim as species
 
@@ -45,6 +46,32 @@ class ClaimRebaselineTests(unittest.TestCase):
             self.assertEqual(status, 0)
             self.assertIn(f"RESULT rollback={expected}", stdout.getvalue())
             self.assertIn("base_continuity=PASSED", stdout.getvalue())
+
+    def test_dream_projection_is_portable_and_hash_bound(self) -> None:
+        sweep = dream.load_dream_sweep()
+        self.assertEqual(sweep["verdict"], "KILLED")
+        self.assertEqual(len(sweep["rows"]), 5)
+        self.assertEqual(sweep["eligible_passes"], [])
+        self.assertEqual(
+            sweep["projection"]["sha256"],
+            dream.DREAM_SWEEP_PROJECTION_SHA256,
+        )
+        with tempfile.TemporaryDirectory(prefix="noos-dream-projection-") as directory:
+            tampered = Path(directory) / "sweep.json"
+            tampered.write_bytes(dream.DREAM_SWEEP_PROJECTION.read_bytes() + b" ")
+            with (
+                patch.object(dream, "DREAM_SWEEP_PROJECTION", tampered),
+                self.assertRaisesRegex(SystemExit, "projection hash changed"),
+            ):
+                dream.load_dream_sweep()
+
+    def test_agent_fixtures_execute_from_repository(self) -> None:
+        for fixture in agent.FIXTURES:
+            directory = fixture[0]
+            self.assertTrue(directory.is_relative_to(ROOT))
+            result = agent.run_fixture(*fixture)
+            self.assertIs(result["passed"], True)
+            self.assertEqual(len(result["output_sha256"]), 64)
 
     def test_binding_update_keeps_external_evidence_partial(self) -> None:
         document = {

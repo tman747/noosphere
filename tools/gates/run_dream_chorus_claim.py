@@ -25,11 +25,12 @@ CLAIMS = (
     "S-GLOBAL-ORGANISM",
     "E-DREAM-02",
 )
-DREAM_ARTIFACT_ROOT = Path("C:/tmp/dream-lane")
+DREAM_SWEEP_PROJECTION = ROOT / "tools/gates/fixtures/e_dream_02_sweep.json"
 PREMIUMS = (0, 271, 542, 813, 1084)
 EVENTS = 100_000
 SEED = 20_260_710
 QUALITY_THRESHOLD_MB = Decimal("75")
+DREAM_SWEEP_PROJECTION_SHA256 = "b886a5825377358961628e0cf79dfaa963285ec806160727804c79533bb00c06"
 
 
 def file_sha256(path: Path) -> str:
@@ -41,33 +42,71 @@ def file_sha256(path: Path) -> str:
 
 
 def load_dream_sweep() -> dict[str, object]:
+    path = DREAM_SWEEP_PROJECTION
+    if not path.is_file():
+        raise SystemExit(f"frozen E-DREAM-02 projection missing: {path}")
+    projection_sha256 = file_sha256(path)
+    if projection_sha256 != DREAM_SWEEP_PROJECTION_SHA256:
+        raise SystemExit("frozen E-DREAM-02 projection hash changed")
+    document = json.loads(path.read_text(encoding="utf-8"), parse_float=Decimal)
+    required_fields = {
+        "schema",
+        "source_artifact_sha256",
+        "events_per_arm",
+        "seed",
+        "quality_threshold_mB",
+        "registered_verdict",
+        "rows",
+    }
+    if set(document) != required_fields:
+        raise SystemExit("frozen E-DREAM-02 projection fields changed")
+    if (
+        document["schema"] != "noos/e-dream-02-frozen-sweep-projection/v1"
+        or document["events_per_arm"] != EVENTS
+        or document["seed"] != SEED
+        or Decimal(document["quality_threshold_mB"]) != QUALITY_THRESHOLD_MB
+        or document["registered_verdict"] != "KILLED"
+    ):
+        raise SystemExit("frozen E-DREAM-02 preregistration changed")
+    hashes = document["source_artifact_sha256"]
+    expected_names = {f"results-v2-p{premium}.json" for premium in PREMIUMS}
+    if (
+        not isinstance(hashes, dict)
+        or set(hashes) != expected_names
+        or any(
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(character not in "0123456789abcdef" for character in value)
+            for value in hashes.values()
+        )
+    ):
+        raise SystemExit("frozen E-DREAM-02 source artifact hashes changed")
+
+    raw_rows = document["rows"]
+    if not isinstance(raw_rows, list) or len(raw_rows) != len(PREMIUMS):
+        raise SystemExit("frozen E-DREAM-02 projection arm count changed")
+    row_fields = {
+        "premium_uT",
+        "eligible",
+        "manipulator_excluded",
+        "manipulator_net_uT_per_event",
+        "honest_net_uT_per_event",
+        "main_improve_mB",
+        "manip_arm_improve_mB",
+        "passes",
+    }
     rows: list[dict[str, object]] = []
-    hashes: dict[str, str] = {}
     eligible_passes: list[int] = []
     common_manipulator_entry: Decimal | None = None
-    for premium in PREMIUMS:
-        path = DREAM_ARTIFACT_ROOT / f"results-v2-p{premium}.json"
-        if not path.is_file():
-            raise SystemExit(f"frozen E-DREAM-02 artifact missing: {path}")
-        document = json.loads(path.read_text(encoding="utf-8"), parse_float=Decimal)
-        main = document.get("runs", {}).get("main", {})
-        v2 = document.get("v2", {})
-        gates = document.get("gates", [])
-        if main.get("events") != EVENTS or main.get("seed") != SEED:
-            raise SystemExit(f"wrong E-DREAM-02 event/seed preregistration: {path}")
-        if v2.get("influence_premium_uT") != premium or v2.get("insulated_only") is not True:
-            raise SystemExit(f"wrong E-DREAM-02 premium/insulation arm: {path}")
+    for premium, raw in zip(PREMIUMS, raw_rows, strict=True):
+        if not isinstance(raw, dict) or set(raw) != row_fields or raw["premium_uT"] != premium:
+            raise SystemExit("frozen E-DREAM-02 projection arm fields changed")
         expected_exclusion = premium == 0
-        if v2.get("manipulator_excluded") is not expected_exclusion:
-            raise SystemExit(f"wrong E-DREAM-02 exclusion policy: {path}")
-        if not gates or any(gate.get("ok") is not True for gate in gates):
-            raise SystemExit(f"E-DREAM-02 mechanism gate failure in frozen artifact: {path}")
-
-        manipulator_net = Decimal(v2["manipulator_net_uT_per_event"])
-        honest_net = Decimal(v2["honest_net_uT_per_event"])
-        main_quality = Decimal(v2["main_improve_mB"])
-        manipulation_quality = Decimal(v2["manip_arm_improve_mB"])
         eligible = 542 <= premium <= 1084
+        manipulator_net = Decimal(raw["manipulator_net_uT_per_event"])
+        honest_net = Decimal(raw["honest_net_uT_per_event"])
+        main_quality = Decimal(raw["main_improve_mB"])
+        manipulation_quality = Decimal(raw["manip_arm_improve_mB"])
         passes = (
             eligible
             and manipulator_net <= 0
@@ -75,6 +114,12 @@ def load_dream_sweep() -> dict[str, object]:
             and main_quality >= QUALITY_THRESHOLD_MB
             and manipulation_quality >= QUALITY_THRESHOLD_MB
         )
+        if (
+            raw["eligible"] is not eligible
+            or raw["manipulator_excluded"] is not expected_exclusion
+            or raw["passes"] is not passes
+        ):
+            raise SystemExit("frozen E-DREAM-02 derived verdict changed")
         if passes:
             eligible_passes.append(premium)
         if premium > 0:
@@ -83,26 +128,14 @@ def load_dream_sweep() -> dict[str, object]:
                 common_manipulator_entry = entry_before_premium
             elif entry_before_premium != common_manipulator_entry:
                 raise SystemExit("E-DREAM-02 premium sweep is not exact-linear")
-        rows.append(
-            {
-                "premium_uT": premium,
-                "eligible": eligible,
-                "manipulator_excluded": expected_exclusion,
-                "manipulator_net_uT_per_event": str(manipulator_net),
-                "honest_net_uT_per_event": str(honest_net),
-                "main_improve_mB": str(main_quality),
-                "manip_arm_improve_mB": str(manipulation_quality),
-                "passes": passes,
-            }
-        )
-        hashes[path.as_posix()] = file_sha256(path)
+        rows.append(dict(raw))
 
     if eligible_passes:
         raise SystemExit(f"E-DREAM-02 expected KILL contradicted by premiums {eligible_passes}")
     if common_manipulator_entry != Decimal("1605.6299"):
         raise SystemExit("E-DREAM-02 measured entry margin changed")
     return {
-        "name": "frozen preregistered premium sweep re-evaluation",
+        "name": "frozen preregistered premium sweep projection re-evaluation",
         "passed": True,
         "verdict": "KILLED",
         "events_per_arm": EVENTS,
@@ -111,7 +144,13 @@ def load_dream_sweep() -> dict[str, object]:
         "common_manipulator_entry_uT_per_event": str(common_manipulator_entry),
         "eligible_passes": eligible_passes,
         "rows": rows,
-        "artifact_sha256": hashes,
+        "artifact_sha256": {
+            f"C:/tmp/dream-lane/{name}": digest for name, digest in sorted(hashes.items())
+        },
+        "projection": {
+            "path": "tools/gates/fixtures/e_dream_02_sweep.json",
+            "sha256": projection_sha256,
+        },
     }
 
 
@@ -235,6 +274,7 @@ def main() -> int:
         "crates/noos-reflex/src/dream.rs",
         "protocol/spec/constants-v1.toml",
         "tools/gates/run_dream_chorus_claim.py",
+        "tools/gates/fixtures/e_dream_02_sweep.json",
     ]
     if args.claim == "S-DREAM":
         emit(
@@ -286,8 +326,7 @@ def main() -> int:
         ],
         sources=dream_sources,
         limitations=[
-            "The frozen simulator artifacts are re-evaluated, not represented as independent or cross-vendor evidence.",
-            "The repository module is a deterministic instrument/lifecycle precursor; it does not regenerate the 100,000-event arms.",
+            "The committed projection re-evaluates the registered metrics and binds the original simulator artifact hashes; it does not regenerate or claim custody of the historical 100,000-event raw arms.",
             "The kill is preserved without sweep extension or threshold adjustment.",
         ],
     )

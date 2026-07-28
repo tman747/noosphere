@@ -65,7 +65,7 @@ LOCAL_IMPLEMENTED = {claim for claim in CLAIM_BINDINGS if claim != "S-ACCESS"}
 
 FIXTURES = (
     (
-        Path("C:/tmp/chorus-quorum-lab"),
+        ROOT / "tools/gates/fixtures/chorus_quorum",
         "chorus_adapter.py",
         (
             "METRIC mechanism_false_accept=0",
@@ -74,7 +74,7 @@ FIXTURES = (
         ),
     ),
     (
-        Path("C:/tmp/nel-quarantine-lab"),
+        ROOT / "tools/gates/fixtures/nel_quarantine",
         "nel_adapter.py",
         (
             "METRIC double_payouts=0",
@@ -141,6 +141,15 @@ def main() -> int:
     sources = ["tools/gates/run_agent_commerce_claim.py"]
     sources.extend(f"crates/{package}/Cargo.toml" for package in packages)
     sources.extend(modules)
+    if args.claim == "I-AGENT":
+        sources.extend(
+            [
+                "tools/gates/fixtures/chorus_quorum/chorus_adapter.py",
+                "tools/gates/fixtures/chorus_quorum/lineage_quorum_engine.py",
+                "tools/gates/fixtures/nel_quarantine/nel_adapter.py",
+                "tools/gates/fixtures/nel_quarantine/molecular_quarantine_test.py",
+            ]
+        )
     result = "IMPLEMENTED" if args.claim in LOCAL_IMPLEMENTED else "EXTERNAL_BLOCKED"
     checks = [
         evidence_check("claim-implementation", "implementation", True, observations),
