@@ -864,6 +864,17 @@ class EvidenceStore:
             raise MonitorError("daily sample ledger tail has no sample ID")
         return sample_id
 
+    def _previous_ledger_id(self, day: str) -> str | None:
+        candidates = sorted(
+            path
+            for path in self.samples.glob("*.jsonl")
+            if path.stem < day
+        )
+        return self._last_id(candidates[-1]) if candidates else None
+
+    def _append_predecessor(self, day: str, path: Path) -> str | None:
+        return self._last_id(path) or self._previous_ledger_id(day)
+
     def append(self, checks: list[CheckResult], observed_at: str) -> dict[str, object]:
         day = observed_at[:10]
         path = self._sample_path(day)
@@ -878,7 +889,7 @@ class EvidenceStore:
                 "release_version": self.release_version,
                 "deployment_sha256": self.deployment_sha256,
                 "observed_at_utc": observed_at,
-                "previous_sample_id": self._last_id(path),
+                "previous_sample_id": self._append_predecessor(day, path),
                 "status": "ok" if all(check.ok for check in checks) else "degraded",
                 "checks": [check.document() for check in checks],
             }
@@ -897,6 +908,7 @@ class EvidenceStore:
         if not path.is_file() or path.stat().st_size > MAX_DAY_BYTES:
             raise MonitorError("daily sample ledger is missing or oversized")
         envelopes: list[dict[str, object]] = []
+        previous_day_id = self._previous_ledger_id(day)
         previous: str | None = None
         for raw in path.read_bytes().splitlines():
             if not raw:
@@ -905,7 +917,14 @@ class EvidenceStore:
             if not isinstance(value, dict):
                 raise MonitorError("daily sample entry is not an object")
             verify_envelope(value, SAMPLE_DOMAIN, "sample_id")
-            if value.get("previous_sample_id") != previous:
+            linked = value.get("previous_sample_id")
+            if not envelopes:
+                # Ledgers created before global chaining used a per-day null
+                # root. Keep those historical files summarizable, but require
+                # every non-null root to bind the actual preceding ledger.
+                if linked is not None and linked != previous_day_id:
+                    raise MonitorError("daily sample cross-ledger hash chain is discontinuous")
+            elif linked != previous:
                 raise MonitorError("daily sample hash chain is discontinuous")
             previous = str(value["sample_id"])
             envelopes.append(value)

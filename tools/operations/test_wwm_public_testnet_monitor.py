@@ -287,6 +287,29 @@ class PublicTestnetMonitorTests(unittest.TestCase):
         self.assertFalse(summary["formal_e_wwm_23_evidence"])
         self.assertEqual(store.summarize("2026-07-15"), summary)
 
+        next_day = store.append(checks, "2026-07-16T00:00:00Z")
+        self.assertEqual(next_day["previous_sample_id"], second["sample_id"])
+        next_summary = store.summarize("2026-07-16")
+        self.assertEqual(next_summary["sample_count"], 1)
+        monitor.verify_envelope(next_summary, monitor.SUMMARY_DOMAIN, "summary_id")
+
+        broken_payload = {
+            name: value
+            for name, value in next_day.items()
+            if name
+            not in {"sample_id", "signer_key_id", "public_key_base64", "signature_base64"}
+        }
+        broken_payload["observed_at_utc"] = "2026-07-17T00:00:00Z"
+        broken_payload["previous_sample_id"] = "00" * 32
+        broken = monitor.sign_payload(
+            broken_payload, key, monitor.SAMPLE_DOMAIN, "sample_id"
+        )
+        store._sample_path("2026-07-17").write_bytes(  # noqa: SLF001
+            monitor.canonical_json(broken) + b"\n"
+        )
+        with self.assertRaisesRegex(monitor.MonitorError, "cross-ledger"):
+            store.summarize("2026-07-17")
+
         tampered = dict(second)
         tampered["status"] = "degraded"
         with self.assertRaisesRegex(monitor.MonitorError, "identity is invalid"):
