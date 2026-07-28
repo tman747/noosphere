@@ -287,6 +287,11 @@ def validate_burn_in(document: dict[str, Any], ledger_path: Path, revision: str)
         raise EvidenceError("burn-in endpoint sample ids do not match the sealed ledger")
     release = document["release"]
     signer_key_id = document.get("signer_key_id")
+    monitor_source_sha256 = release.get("monitor_source_sha256")
+    if not isinstance(monitor_source_sha256, str) or not HEX64.fullmatch(
+        monitor_source_sha256
+    ):
+        raise EvidenceError("burn-in does not bind the executing monitor source")
     check_names = document.get("check_names")
     previous: str | None = None
     prior_observed: datetime | None = None
@@ -306,6 +311,7 @@ def validate_burn_in(document: dict[str, Any], ledger_path: Path, revision: str)
             "release_version": f"0.1.0+git.{revision}",
             "deployment_sha256": release.get("deployment_sha256"),
             "signer_key_id": signer_key_id,
+            "monitor_source_sha256": monitor_source_sha256,
             "status": "ok",
         }
         if any(sample.get(field) != value for field, value in expected.items()):

@@ -38,6 +38,8 @@ param(
     [string]$InferenceTokenizerSha256 = '2685f72d8b2c27c72c116d2c6af9bb180adb4bf2f4fc9adee052dbcfe7f266f4',
     [string]$SeedHostname = 'wwm-seed.mindchain.network',
     [string]$SeedIp = '20.15.164.29',
+    [string]$MindScanIndexer = 'https://wwm-seed.mindchain.network',
+    [string]$MindScanListen = '127.0.0.1:29830',
     [switch]$SkipTunnel
 )
 
@@ -62,6 +64,7 @@ $SiteRoot = Join-Path $RepoRoot 'site'
 $GatewayScript = Join-Path $RepoRoot 'tools\operations\wwm_public_gateway.py'
 $StaticHostScript = Join-Path $RepoRoot 'tools\operations\wwm_static_bundle_server.py'
 $MonitorScript = Join-Path $RepoRoot 'tools\operations\wwm_public_testnet_monitor.py'
+$MindScanScript = Join-Path $RepoRoot 'tools\mindscan.py'
 $DeploymentManifest = Join-Path $RepoRoot 'deploy\wwm\public-testnet.json'
 $NeuralPublisherScript = Join-Path $RepoRoot 'tools\operations\wwm_neural_publisher.py'
 
@@ -84,6 +87,7 @@ foreach ($file in @(
     $CoordinatorConfig,
     $CoordinatorSeedFile,
     $MonitorScript,
+    $MindScanScript,
     $DeploymentManifest,
     $MonitorSigningKey,
     $R2Report,
@@ -148,6 +152,12 @@ if (
     throw 'Node binary is not bound to the exact repository source revision.'
 }
 $ReleaseVersion = $NodeVersionMatch.Groups['release'].Value
+$Deployment = Get-Content -LiteralPath $DeploymentManifest -Raw | ConvertFrom-Json
+$ChainId = [string]$Deployment.chain_binding.chain_id
+$GenesisHash = [string]$Deployment.chain_binding.genesis_hash
+if ($ChainId -notmatch '^[0-9a-f]{64}$' -or $GenesisHash -notmatch '^[0-9a-f]{64}$') {
+    throw 'Deployment manifest chain identity is not canonical.'
+}
 
 $GovernanceAccount = '17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce'
 $Specs = @(
@@ -207,6 +217,20 @@ $Specs = @(
         Environment = @{
             NOOS_WWM_WEB_CAPACITY_SEED = $CoordinatorSeed
         }
+    },
+    [pscustomobject]@{
+        Name = 'mindscan'
+        Exe = $PythonBinary
+        Args = @(
+            $MindScanScript,
+            '--listen', $MindScanListen,
+            '--indexer', $MindScanIndexer,
+            '--chain-id', $ChainId,
+            '--genesis-hash', $GenesisHash,
+            '--source-revision', $SourceRevision,
+            '--indexer-release-version', $ReleaseVersion,
+            '--release-version', $ReleaseVersion
+        )
     },
     [pscustomobject]@{
         Name = 'monitor'
@@ -306,6 +330,7 @@ $ProcessMarkers = @{
     'static-host' = $StaticHostScript
     'web-capacity' = $CoordinatorConfig
     'monitor' = $MonitorScript
+    'mindscan' = $MindScanScript
     'neural-publisher' = $NeuralPublisherScript
     'gateway' = $GatewayScript
     'seed2-rpc-fallback-tunnel' = '127.0.0.1:39652:127.0.0.1:29652'

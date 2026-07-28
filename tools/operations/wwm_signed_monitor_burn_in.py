@@ -452,7 +452,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--poll-seconds", type=int, default=15)
     parser.add_argument("--maximum-sample-gap-seconds", type=int, default=90)
     parser.add_argument("--maximum-observation-gap-seconds", type=int, default=90)
-    parser.add_argument("--expected-check-count", type=int, default=20)
+    parser.add_argument("--expected-check-count", type=int, default=22)
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args(argv)
 

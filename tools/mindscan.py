@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import mimetypes
 import re
@@ -16,20 +17,44 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "apps" / "mindscan"
 HASH = re.compile(r"^[0-9a-f]{64}$")
+REVISION = re.compile(r"^[0-9a-f]{40}$")
+REVISION_RELEASE = re.compile(r"^0\.1\.0\+git\.([0-9a-f]{40})$")
 HEIGHT = re.compile(r"^(0|[1-9][0-9]{0,19})$")
 MAX_UPSTREAM = 2 * 1024 * 1024
 
 
+def service_identity(source_revision: str, release_version: str) -> dict[str, object]:
+    release = REVISION_RELEASE.fullmatch(release_version)
+    if not REVISION.fullmatch(source_revision) or release is None or release.group(1) != source_revision:
+        raise ValueError("MindScan release identity must be exact")
+    return {
+        "source_revision": source_revision,
+        "release_version": release_version,
+        "source_sha256": hashlib.sha256(Path(__file__).resolve(strict=True).read_bytes()).hexdigest(),
+        "production": False,
+        "promotion_effect": "NONE",
+    }
+
+
 class ExplorerData:
-    def __init__(self, indexer: str, chain_id: str, genesis_hash: str):
+    def __init__(
+        self,
+        indexer: str,
+        chain_id: str,
+        genesis_hash: str,
+        indexer_release_version: str,
+    ):
         parsed = urllib.parse.urlsplit(indexer)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
             raise ValueError("indexer URL must be an absolute HTTP(S) origin")
         if not HASH.fullmatch(chain_id) or not HASH.fullmatch(genesis_hash):
             raise ValueError("expected chain identity must use canonical hashes")
+        if REVISION_RELEASE.fullmatch(indexer_release_version) is None:
+            raise ValueError("expected indexer release version must be exact")
         self.indexer = indexer.rstrip("/")
         self.chain_id = chain_id
         self.genesis_hash = genesis_hash
+        self.release_version = indexer_release_version
 
     @staticmethod
     def _height(value: Any, field: str) -> int:
@@ -89,8 +114,8 @@ class ExplorerData:
             raise RuntimeError("indexer protocol identity mismatch")
         if value["protocol_version"] != "v1" or value["api_version"] != "v1":
             raise RuntimeError("indexer protocol version mismatch")
-        if not isinstance(value["release_version"], str) or not value["release_version"]:
-            raise RuntimeError("indexer release identity is missing")
+        if value["release_version"] != self.release_version:
+            raise RuntimeError("indexer release identity mismatch")
         if value["readiness"] not in {"starting", "catching_up", "ready"}:
             raise RuntimeError("indexer readiness is invalid")
         if value["ready"] is not (value["readiness"] == "ready"):
@@ -190,6 +215,10 @@ class Handler(BaseHTTPRequestHandler):
     def data(self) -> ExplorerData:
         return self.server.data  # type: ignore[attr-defined]
 
+    @property
+    def identity(self) -> dict[str, object]:
+        return self.server.identity  # type: ignore[attr-defined]
+
     def send_body(self, status: int, body: bytes, content_type: str, *, cache: str = "no-store") -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
@@ -214,12 +243,15 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response({
                     "ok": status["ready"],
                     "schema": "noos/mindscan-health/v1",
+                    **self.identity,
                     "chain_id": status["chain_id"],
                     "genesis_hash": status["genesis_hash"],
                     "indexed_generation": status["indexed_generation"],
+                    "indexer_release_version": status["release_version"],
                 })
             elif path == "/api/status":
-                self.json_response(self.data.status())
+                status = self.data.status()
+                self.json_response({**status, "mindscan": self.identity})
             elif path == "/api/blocks":
                 query = urllib.parse.parse_qs(parsed.query, strict_parsing=False)
                 if set(query) - {"limit"}:
@@ -256,17 +288,29 @@ def main() -> int:
     parser.add_argument("--indexer", required=True)
     parser.add_argument("--chain-id", required=True)
     parser.add_argument("--genesis-hash", required=True)
+    parser.add_argument("--indexer-release-version", required=True)
+    parser.add_argument("--source-revision", required=True)
+    parser.add_argument("--release-version", required=True)
     parser.add_argument("--listen", default="127.0.0.1:18130")
     args = parser.parse_args()
+    identity = service_identity(args.source_revision, args.release_version)
     host, port_text = args.listen.rsplit(":", 1)
     server = ThreadingHTTPServer((host, int(port_text)), Handler)
-    server.data = ExplorerData(args.indexer, args.chain_id, args.genesis_hash)  # type: ignore[attr-defined]
+    server.data = ExplorerData(
+        args.indexer,
+        args.chain_id,
+        args.genesis_hash,
+        args.indexer_release_version,
+    )  # type: ignore[attr-defined]
+    server.identity = identity  # type: ignore[attr-defined]
     print(
         json.dumps({
             "listen": args.listen,
             "schema": "noos/mindscan/v1",
             "chain_id": args.chain_id,
             "genesis_hash": args.genesis_hash,
+            "indexer_release_version": args.indexer_release_version,
+            **identity,
         }),
         flush=True,
     )

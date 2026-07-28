@@ -17,6 +17,7 @@ PUBLIC_URLS = (
     "https://wwm-rpc.mindchain.network/healthz",
     "https://wwm-artifacts.mindchain.network/healthz",
     "https://wwm-status.mindchain.network/status.json",
+    "https://mindscan.mindchain.network/api/health",
 )
 SEMVER_BASE = (
     r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
@@ -103,6 +104,7 @@ def main() -> int:
         probe(PUBLIC_URLS[1], validator=validate_public),
         probe(PUBLIC_URLS[2], validator=validate_public),
         probe(PUBLIC_URLS[3], validator=validate_public),
+        probe(PUBLIC_URLS[4], validator=validate_chain),
         probe("http://127.0.0.1:29652/status", token, validate_chain),
     ]
     report = {

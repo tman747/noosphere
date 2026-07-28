@@ -81,6 +81,7 @@ class ExactReleaseEvidenceTests(unittest.TestCase):
         public = monitor.public_key_bytes(self.monitor_key)
         signer_key_id = hashlib.sha256(public).hexdigest()
         deployment = "81" * 32
+        monitor_source_sha256 = "82" * 32
         started = datetime(2026, 7, 27, tzinfo=timezone.utc)
         samples: list[dict[str, object]] = []
         previous: str | None = None
@@ -95,6 +96,7 @@ class ExactReleaseEvidenceTests(unittest.TestCase):
                 "source_revision": self.revision,
                 "release_version": f"0.1.0+git.{self.revision}",
                 "deployment_sha256": deployment,
+                "monitor_source_sha256": monitor_source_sha256,
                 "status": "ok",
                 "observed_at_utc": observed.isoformat().replace("+00:00", "Z"),
                 "previous_sample_id": previous,
@@ -125,6 +127,7 @@ class ExactReleaseEvidenceTests(unittest.TestCase):
                 "source_revision": self.revision,
                 "release_version": f"0.1.0+git.{self.revision}",
                 "deployment_sha256": deployment,
+                "monitor_source_sha256": monitor_source_sha256,
             },
             "signer_key_id": signer_key_id,
             "observed_at_utc": samples[-1]["observed_at_utc"],

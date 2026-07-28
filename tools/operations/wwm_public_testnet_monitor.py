@@ -84,6 +84,7 @@ class MonitorConfig:
     rpc_origin: str
     status_origin: str
     artifact_origin: str
+    mindscan_origin: str
     validator_status_urls: tuple[str, ...]
     indexer_origins: tuple[str, ...]
 
@@ -351,6 +352,7 @@ def load_config(args: argparse.Namespace) -> MonitorConfig:
         rpc_origin=exact_https_origin(endpoints.get("read_gateway"), "RPC endpoint"),
         status_origin=exact_https_origin(endpoints.get("status"), "status endpoint"),
         artifact_origin=exact_https_origin(endpoints.get("artifacts"), "artifact endpoint"),
+        mindscan_origin=exact_https_origin(endpoints.get("mindscan"), "MindScan endpoint"),
         validator_status_urls=validator_status_urls,
         indexer_origins=indexer_origins,
     )
@@ -477,6 +479,33 @@ def worker_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
     if status != 200:
         raise MonitorError("inference worker is not ready")
     return {"status": status, "ready": body.get("ready", True)}
+
+def mindscan_probe(config: MonitorConfig, timeout: float) -> dict[str, object]:
+    status, _, body = request_json(config.mindscan_origin + "/api/health", timeout)
+    if (
+        status != 200
+        or body.get("schema") != "noos/mindscan-health/v1"
+        or body.get("ok") is not True
+        or body.get("chain_id") != config.chain_id
+        or body.get("genesis_hash") != config.genesis_hash
+        or body.get("source_revision") != config.source_revision
+        or body.get("production") is not False
+        or body.get("promotion_effect") != "NONE"
+        or body.get("release_version") != config.release_version
+        or body.get("indexer_release_version") != config.release_version
+    ):
+        raise MonitorError("MindScan availability or exact-release identity mismatch")
+    source_sha256 = require_hex32(body.get("source_sha256"), "MindScan source SHA-256")
+    indexed_generation = canonical_uint(
+        body.get("indexed_generation"),
+        "MindScan indexed generation",
+    )
+    return {
+        "status": status,
+        "indexed_generation": indexed_generation,
+        "source_sha256": source_sha256,
+    }
+
 
 def canonical_uint(value: object, label: str) -> int:
     if isinstance(value, bool):
@@ -766,6 +795,7 @@ def collect_checks(config: MonitorConfig) -> list[CheckResult]:
         run_check("browser_coordinator", coordinator),
         run_check("inference_worker", worker),
         run_check("r2_private_mirror", r2),
+        run_check("mindscan", lambda: mindscan_probe(config, timeout)),
     ]
     rpc_targets: list[tuple[str, SeedHost, int]] = []
     default_rpc_port = config.seed_rpc_port
@@ -793,6 +823,7 @@ def collect_checks(config: MonitorConfig) -> list[CheckResult]:
         ("rpc_tls", config.rpc_origin),
         ("status_tls", config.status_origin),
         ("artifact_tls", config.artifact_origin),
+        ("mindscan_tls", config.mindscan_origin),
     ):
         checks.append(run_check(label, lambda origin=origin: tls_probe(origin, timeout)))
     return checks

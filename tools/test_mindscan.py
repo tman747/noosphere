@@ -12,6 +12,8 @@ import mindscan
 
 CHAIN_ID = "a" * 64
 GENESIS_HASH = "b" * 64
+REVISION = "1" * 40
+RELEASE_VERSION = f"0.1.0+git.{REVISION}"
 
 
 class Response(io.BytesIO):
@@ -45,7 +47,7 @@ def status(
         "genesis_hash": genesis_hash,
         "protocol_version": "v1",
         "api_version": "v1",
-        "release_version": "0.1.0+git." + "1" * 40,
+        "release_version": RELEASE_VERSION,
         "readiness": "ready",
         "ready": True,
         "indexed_generation": "7",
@@ -72,7 +74,12 @@ def block(height: int, byte: str) -> dict[str, str]:
 
 class MindScanGatewayTests(unittest.TestCase):
     def data(self) -> mindscan.ExplorerData:
-        return mindscan.ExplorerData("http://127.0.0.1:8080", CHAIN_ID, GENESIS_HASH)
+        return mindscan.ExplorerData(
+            "http://127.0.0.1:8080",
+            CHAIN_ID,
+            GENESIS_HASH,
+            RELEASE_VERSION,
+        )
 
     def test_routes_only_canonical_identifiers(self) -> None:
         data = self.data()
@@ -153,6 +160,33 @@ class MindScanGatewayTests(unittest.TestCase):
     def test_indexer_origin_and_expected_identity_reject_unsafe_configuration(self) -> None:
         for origin in ("file:///tmp/index", "http://user:secret@127.0.0.1:8080"):
             with self.subTest(origin=origin), self.assertRaisesRegex(ValueError, "absolute HTTP"):
-                mindscan.ExplorerData(origin, CHAIN_ID, GENESIS_HASH)
+                mindscan.ExplorerData(origin, CHAIN_ID, GENESIS_HASH, RELEASE_VERSION)
         with self.assertRaisesRegex(ValueError, "canonical hashes"):
-            mindscan.ExplorerData("http://127.0.0.1:8080", "not-a-hash", GENESIS_HASH)
+            mindscan.ExplorerData(
+                "http://127.0.0.1:8080",
+                "not-a-hash",
+                GENESIS_HASH,
+                RELEASE_VERSION,
+            )
+
+    def test_service_and_indexer_release_identity_are_exact(self) -> None:
+        identity = mindscan.service_identity(REVISION, RELEASE_VERSION)
+        self.assertEqual(identity["source_revision"], REVISION)
+        self.assertEqual(identity["release_version"], RELEASE_VERSION)
+        self.assertRegex(identity["source_sha256"], r"^[0-9a-f]{64}$")
+        self.assertFalse(identity["production"])
+        self.assertEqual(identity["promotion_effect"], "NONE")
+        with self.assertRaisesRegex(ValueError, "release identity"):
+            mindscan.service_identity(REVISION, "0.1.0")
+        with self.assertRaisesRegex(ValueError, "indexer release"):
+            mindscan.ExplorerData(
+                "http://127.0.0.1:8080",
+                CHAIN_ID,
+                GENESIS_HASH,
+                "0.1.0",
+            )
+        wrong_release = status()
+        wrong_release["release_version"] = f"0.1.0+git.{'2' * 40}"
+        with patch("urllib.request.urlopen", return_value=response(wrong_release)):
+            with self.assertRaisesRegex(RuntimeError, "release identity mismatch"):
+                self.data().status()

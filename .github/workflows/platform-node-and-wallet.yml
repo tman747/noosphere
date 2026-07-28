@@ -471,6 +471,7 @@ jobs:
             tools.operations.test_wwm_public_gateway \
             tools.operations.test_wwm_public_testnet_monitor \
             tools.operations.test_wwm_signed_monitor_burn_in \
+            tools.operations.test_wwm_exact_release_evidence \
             tools.test_mindscan \
             tools.test_network_readiness \
             2>&1 | tee browser-capacity-evidence/python-tests.txt

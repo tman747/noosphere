@@ -45,6 +45,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
                 "read_gateway": "https://rpc.example",
                 "status": "https://status.example",
                 "artifacts": "https://artifacts.example",
+                "mindscan": "https://mindscan.example",
             },
             "monitoring": {
                 "validator_status_endpoints": [
@@ -131,6 +132,7 @@ class PublicTestnetMonitorTests(unittest.TestCase):
         self.assertEqual(config.chain_id, "11" * 32)
         self.assertEqual(config.release_version, f"0.1.0+git.{'55' * 20}")
         self.assertEqual(config.artifact_origin, "https://artifacts.example")
+        self.assertEqual(config.mindscan_origin, "https://mindscan.example")
         self.assertEqual(config.worker_bearer_token, self.worker_token)
         self.assertEqual(len(config.validator_status_urls), 3)
         self.assertEqual(len(config.indexer_origins), 3)
@@ -174,6 +176,42 @@ class PublicTestnetMonitorTests(unittest.TestCase):
             headers={"Authorization": f"Bearer {self.worker_token}"},
         )
         self.assertNotIn(self.worker_token, json.dumps(detail))
+
+    def test_mindscan_probe_requires_exact_release_and_durable_generation(self) -> None:
+        config = monitor.load_config(self.arguments())
+        healthy = {
+            "schema": "noos/mindscan-health/v1",
+            "ok": True,
+            "production": False,
+            "promotion_effect": "NONE",
+            "chain_id": config.chain_id,
+            "genesis_hash": config.genesis_hash,
+            "source_revision": config.source_revision,
+            "release_version": config.release_version,
+            "indexer_release_version": config.release_version,
+            "source_sha256": "88" * 32,
+            "indexed_generation": "17",
+        }
+        with mock.patch.object(
+            monitor,
+            "request_json",
+            return_value=(200, {}, healthy),
+        ) as request:
+            detail = monitor.mindscan_probe(config, 5.0)
+        request.assert_called_once_with(
+            "https://mindscan.example/api/health",
+            5.0,
+        )
+        self.assertEqual(detail["indexed_generation"], 17)
+        wrong_release = dict(healthy)
+        wrong_release["release_version"] = "0.1.0+git." + "99" * 20
+        with mock.patch.object(
+            monitor,
+            "request_json",
+            return_value=(200, {}, wrong_release),
+        ):
+            with self.assertRaisesRegex(monitor.MonitorError, "exact-release"):
+                monitor.mindscan_probe(config, 5.0)
 
     def test_network_probe_requires_a_coherent_validator_and_indexer_fleet(self) -> None:
         config = monitor.load_config(self.arguments())
