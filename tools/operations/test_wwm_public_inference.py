@@ -760,6 +760,107 @@ class PublicInferenceSettlementTest(unittest.TestCase):
             finally:
                 service.close()
 
+    def test_cancel_cannot_be_overwritten_by_queued_start_claim(self) -> None:
+        class CancelDuringClaimClock:
+            def __init__(self) -> None:
+                self.value = 1_785_207_600_000
+                self.callback = None
+                self.armed = False
+
+            def __call__(self) -> int:
+                self.value += 1
+                if self.armed:
+                    self.armed = False
+                    assert self.callback is not None
+                    self.callback()
+                return self.value
+
+        with tempfile.TemporaryDirectory() as temporary:
+            clock = CancelDuringClaimClock()
+            settlement = SettlementFixture()
+            service = InferenceService(
+                database=Path(temporary) / "inference.sqlite3",
+                signing_seed=bytes.fromhex("12" * 32),
+                provider=SnapshotFixture(),
+                executor=ExecutorFixture(),
+                settlement_backend=settlement,
+                now_ms=clock,
+                start_worker=False,
+            )
+            try:
+                job_id = submit_fixture_job(service, "CANCEL_START_RACE_CANARY_954ad63e")
+                cancellation = []
+                clock.callback = lambda: cancellation.append(
+                    service.post(
+                        f"/api/wwm/v2/jobs/{job_id}/cancel",
+                        {"reason": "USER_REQUESTED"},
+                        "127.0.0.1",
+                        None,
+                    ).value
+                )
+                clock.armed = True
+                service._execute_job(job_id)
+                service._settle_job(job_id)
+                self.assertEqual(cancellation[0]["status"], "CANCEL_REQUESTED")
+                receipt = service.get(
+                    f"/api/wwm/v2/jobs/{job_id}/receipt",
+                    "",
+                    "127.0.0.1",
+                ).value
+                self.assertEqual(receipt["terminal_status"], "CANCELLED")
+                self.assertEqual(receipt["error_code"], "USER_REQUESTED")
+                self.assertEqual(receipt["output_tokens"], 0)
+                self.assertEqual(receipt["settlement_state"], "FINALIZED_REFUNDED")
+            finally:
+                service.close()
+
+    def test_cancel_cannot_be_overwritten_by_completion_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            settlement = SettlementFixture()
+            service = InferenceService(
+                database=Path(temporary) / "inference.sqlite3",
+                signing_seed=bytes.fromhex("12" * 32),
+                provider=SnapshotFixture(),
+                executor=ExecutorFixture(),
+                settlement_backend=settlement,
+                start_worker=False,
+            )
+            try:
+                job_id = submit_fixture_job(
+                    service,
+                    "CANCEL_COMPLETION_RACE_CANARY_6ab29d70",
+                )
+                original_sign = service._sign
+                cancellation = []
+
+                def sign_after_cancel(value, kind):
+                    if kind == "RECEIPT" and not cancellation:
+                        cancellation.append(
+                            service.post(
+                                f"/api/wwm/v2/jobs/{job_id}/cancel",
+                                {"reason": "USER_REQUESTED"},
+                                "127.0.0.1",
+                                None,
+                            ).value
+                        )
+                    return original_sign(value, kind)
+
+                service._sign = sign_after_cancel
+                service._execute_job(job_id)
+                service._settle_job(job_id)
+                self.assertEqual(cancellation[0]["status"], "CANCEL_REQUESTED")
+                receipt = service.get(
+                    f"/api/wwm/v2/jobs/{job_id}/receipt",
+                    "",
+                    "127.0.0.1",
+                ).value
+                self.assertEqual(receipt["terminal_status"], "CANCELLED")
+                self.assertEqual(receipt["error_code"], "USER_REQUESTED")
+                self.assertEqual(receipt["output_commitment"], "0" * 64)
+                self.assertEqual(receipt["settlement_state"], "FINALIZED_REFUNDED")
+            finally:
+                service.close()
+
     def test_running_cancel_reaches_executor_and_finalizes_refund(self) -> None:
         class BlockingExecutor:
             def __init__(self) -> None:

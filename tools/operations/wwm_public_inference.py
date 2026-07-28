@@ -1494,17 +1494,39 @@ class InferenceService:
             raise InferenceError(404, "JOB_NOT_FOUND", "Inference job was not found.")
         return row, json.loads(str(row["quote_json"]))
 
-    def _store_receipt(self, job_id: str, status: str, receipt: dict) -> None:
+    def _store_receipt(
+        self,
+        job_id: str,
+        status: str,
+        receipt: dict,
+        *,
+        expected_status: str | None = None,
+    ) -> bool:
         now = self.now_ms()
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            db.execute(
-                "UPDATE inference_jobs SET status=?,receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=?",
-                (status, canonical_json(receipt).decode("utf-8"), now, job_id),
-            )
+            if expected_status is None:
+                updated = db.execute(
+                    "UPDATE inference_jobs SET status=?,receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=?",
+                    (status, canonical_json(receipt).decode("utf-8"), now, job_id),
+                )
+            else:
+                updated = db.execute(
+                    "UPDATE inference_jobs SET status=?,receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=? AND status=?",
+                    (
+                        status,
+                        canonical_json(receipt).decode("utf-8"),
+                        now,
+                        job_id,
+                        expected_status,
+                    ),
+                )
+            if updated.rowcount != 1:
+                return False
             self._append_event_in_db(db, job_id, "receipt.completed", receipt)
         with self._condition:
             self._condition.notify_all()
+        return True
 
     def _store_chain_pending_receipt(
         self,
@@ -1514,7 +1536,9 @@ class InferenceService:
         status: str,
         receipt: dict,
         inference: Mapping[str, object],
-    ) -> None:
+        *,
+        expected_status: str | None = None,
+    ) -> bool:
         binding_json = row["settlement_binding_json"]
         if binding_json is None:
             raise InferenceError(
@@ -1536,10 +1560,24 @@ class InferenceService:
         now = self.now_ms()
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            db.execute(
-                "UPDATE inference_jobs SET status=?,receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=?",
-                (status, canonical_json(receipt).decode("utf-8"), now, job_id),
-            )
+            if expected_status is None:
+                updated = db.execute(
+                    "UPDATE inference_jobs SET status=?,receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=?",
+                    (status, canonical_json(receipt).decode("utf-8"), now, job_id),
+                )
+            else:
+                updated = db.execute(
+                    "UPDATE inference_jobs SET status=?,receipt_json=?,prompt=NULL,updated_ms=? WHERE job_id=? AND status=?",
+                    (
+                        status,
+                        canonical_json(receipt).decode("utf-8"),
+                        now,
+                        job_id,
+                        expected_status,
+                    ),
+                )
+            if updated.rowcount != 1:
+                return False
             db.execute(
                 """
                 INSERT INTO inference_settlements(
@@ -1559,6 +1597,7 @@ class InferenceService:
         with self._condition:
             self._condition.notify_all()
         self._settlement_queue.put_nowait(job_id)
+        return True
 
     def _store_completed_receipt(
         self,
@@ -1567,11 +1606,15 @@ class InferenceService:
         quote: dict,
         result: ExecutionResult,
         receipt: dict,
-    ) -> None:
+    ) -> bool:
         if self.settlement_backend is None:
-            self._store_receipt(job_id, "COMPLETED", receipt)
-            return
-        self._store_chain_pending_receipt(
+            return self._store_receipt(
+                job_id,
+                "COMPLETED",
+                receipt,
+                expected_status="RUNNING",
+            )
+        return self._store_chain_pending_receipt(
             job_id,
             row,
             quote,
@@ -1582,6 +1625,7 @@ class InferenceService:
                 "token_history_root": result.token_history_root,
                 "output_tokens": result.output_tokens,
             },
+            expected_status="RUNNING",
         )
 
     def _complete_without_output(self, job_id: str, status: str, error_code: str) -> None:
@@ -1905,14 +1949,29 @@ class InferenceService:
                 terminal_before_start = ("CANCELLED", "USER_REQUESTED")
             elif status != "QUEUED":
                 return
-            elif self.now_ms() >= deadline_at_ms:
-                terminal_before_start = ("FAILED", "JOB_DEADLINE_EXPIRED")
             else:
                 started_ms = self.now_ms()
-                db.execute(
-                    "UPDATE inference_jobs SET status='RUNNING',started_ms=?,updated_ms=? WHERE job_id=?",
-                    (started_ms, started_ms, job_id),
-                )
+                if started_ms >= deadline_at_ms:
+                    terminal_before_start = ("FAILED", "JOB_DEADLINE_EXPIRED")
+                else:
+                    claimed = db.execute(
+                        "UPDATE inference_jobs SET status='RUNNING',started_ms=?,updated_ms=? WHERE job_id=? AND status='QUEUED'",
+                        (started_ms, started_ms, job_id),
+                    )
+                    if claimed.rowcount != 1:
+                        current = db.execute(
+                            "SELECT status,deadline_at_ms FROM inference_jobs WHERE job_id=?",
+                            (job_id,),
+                        ).fetchone()
+                        if current is None:
+                            return
+                        current_status = str(current["status"])
+                        if current_status == "CANCEL_REQUESTED":
+                            terminal_before_start = ("CANCELLED", "USER_REQUESTED")
+                        elif self.now_ms() >= int(current["deadline_at_ms"]):
+                            terminal_before_start = ("FAILED", "JOB_DEADLINE_EXPIRED")
+                        else:
+                            return
         if terminal_before_start is not None:
             self._complete_without_output(job_id, *terminal_before_start)
             return
@@ -1999,13 +2058,23 @@ class InferenceService:
                     "tokenizer_executable_sha256": result.tokenizer_sha256,
                 }
             )
-            self._store_completed_receipt(
+            stored = self._store_completed_receipt(
                 job_id,
                 row,
                 quote,
                 result,
                 self._sign(receipt, "RECEIPT"),
             )
+            if not stored:
+                abort = execution_abort_code()
+                if abort is None:
+                    raise InferenceError(
+                        500,
+                        "JOB_STATE_TRANSITION_INVALID",
+                        "Inference completion lost its durable running state.",
+                    )
+                status = "CANCELLED" if abort == "USER_REQUESTED" else "FAILED"
+                self._complete_without_output(job_id, status, abort)
         except (InferenceError, UnicodeDecodeError) as error:
             code = execution_abort_code()
             if code is None:
