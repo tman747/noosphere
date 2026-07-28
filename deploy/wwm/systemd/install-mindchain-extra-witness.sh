@@ -2,13 +2,15 @@
 set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || { echo "installer must run as root" >&2; exit 1; }
-[[ "$#" -eq 4 ]] || { echo "usage: $0 <witness-index> <p2p-port> <bootstrap-registry-path> <bootstrap-public-key-path>" >&2; exit 1; }
+[[ "$#" -ge 4 && "$#" -le 5 ]] || { echo "usage: $0 <witness-index> <p2p-port> <bootstrap-registry-path> <bootstrap-public-key-path> [public-testnet-refund-activation-height]" >&2; exit 1; }
 WITNESS_INDEX="$1"
 P2P_PORT="$2"
 BOOTSTRAP_REGISTRY_SOURCE="$3"
 BOOTSTRAP_PUBLIC_KEY_SOURCE="$4"
+PUBLIC_TESTNET_REFUND_ACTIVATION_HEIGHT="${5:-0}"
 [[ "${WITNESS_INDEX}" =~ ^[0-3]$ ]] || { echo "invalid witness index" >&2; exit 1; }
 [[ "${P2P_PORT}" =~ ^[0-9]{4,5}$ ]] || { echo "invalid p2p port" >&2; exit 1; }
+[[ "${PUBLIC_TESTNET_REFUND_ACTIVATION_HEIGHT}" =~ ^(0|[1-9][0-9]*)$ ]] || { echo "public-testnet refund activation height is invalid" >&2; exit 1; }
 [[ -f "${BOOTSTRAP_REGISTRY_SOURCE}" && ! -L "${BOOTSTRAP_REGISTRY_SOURCE}" ]] || { echo "bootstrap registry source is missing or symbolic" >&2; exit 1; }
 [[ -f "${BOOTSTRAP_PUBLIC_KEY_SOURCE}" && ! -L "${BOOTSTRAP_PUBLIC_KEY_SOURCE}" ]] || { echo "bootstrap public key source is missing or symbolic" >&2; exit 1; }
 BOOTSTRAP_PUBLIC_KEY="$(tr -d '\r\n' < "${BOOTSTRAP_PUBLIC_KEY_SOURCE}")"
@@ -40,6 +42,7 @@ BOOTSTRAP_PUBLIC_KEY_FILE=/etc/mindchain-wwm/bootstrap-registry.public
 RPC_LISTEN=127.0.0.1:${RPC_PORT}
 RPC_TOKEN_FILE=${TOKEN_FILE}
 DATA_DIR=${DATA_DIR}
+PUBLIC_TESTNET_REFUND_ACTIVATION_HEIGHT=${PUBLIC_TESTNET_REFUND_ACTIVATION_HEIGHT}
 ENV
 chown root:mindchain-wwm "${ENV_FILE}"
 chmod 0640 "${ENV_FILE}"

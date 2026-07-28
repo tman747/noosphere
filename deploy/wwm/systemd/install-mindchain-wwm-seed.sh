@@ -5,8 +5,8 @@ if [[ "${EUID}" -ne 0 ]]; then
   echo "installer must run as root" >&2
   exit 1
 fi
-if [[ "$#" -ne 8 ]]; then
-  echo "usage: $0 <role:validator|producer-witness|witness> <witness-index:0..3> <p2p-port> <bootstrap-registry-path> <bootstrap-public-key-path> <binary-path> <binary-sha256> <parameters-path>" >&2
+if [[ "$#" -lt 8 || "$#" -gt 9 ]]; then
+  echo "usage: $0 <role:validator|producer-witness|witness> <witness-index:0..3> <p2p-port> <bootstrap-registry-path> <bootstrap-public-key-path> <binary-path> <binary-sha256> <parameters-path> [public-testnet-refund-activation-height]" >&2
   exit 1
 fi
 
@@ -18,6 +18,7 @@ BOOTSTRAP_PUBLIC_KEY_SOURCE="$5"
 BINARY_SOURCE="$6"
 EXPECTED_SHA256="$7"
 PARAMS_SOURCE="$8"
+PUBLIC_TESTNET_REFUND_ACTIVATION_HEIGHT="${9:-0}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 [[ "${NODE_ROLE}" =~ ^(validator|producer-witness|witness)$ ]] || { echo "invalid node role" >&2; exit 1; }
@@ -25,6 +26,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 [[ "${P2P_PORT}" =~ ^[0-9]{4,5}$ ]] || { echo "P2P port is invalid" >&2; exit 1; }
 (( P2P_PORT >= 1024 && P2P_PORT <= 65535 )) || { echo "P2P port is outside 1024..65535" >&2; exit 1; }
 [[ "${EXPECTED_SHA256}" =~ ^[0-9a-f]{64}$ ]] || { echo "binary SHA-256 is invalid" >&2; exit 1; }
+[[ "${PUBLIC_TESTNET_REFUND_ACTIVATION_HEIGHT}" =~ ^(0|[1-9][0-9]*)$ ]] || { echo "public-testnet refund activation height is invalid" >&2; exit 1; }
 [[ -f "${BINARY_SOURCE}" && ! -L "${BINARY_SOURCE}" ]] || { echo "binary source is missing or symbolic" >&2; exit 1; }
 [[ -f "${PARAMS_SOURCE}" && ! -L "${PARAMS_SOURCE}" ]] || { echo "genesis parameters source is missing or symbolic" >&2; exit 1; }
 [[ -f "${BOOTSTRAP_REGISTRY_SOURCE}" && ! -L "${BOOTSTRAP_REGISTRY_SOURCE}" ]] || { echo "bootstrap registry source is missing or symbolic" >&2; exit 1; }
@@ -70,8 +72,8 @@ chown root:mindchain-wwm /etc/mindchain-wwm/rpc-token
 chmod 0640 /etc/mindchain-wwm/rpc-token
 
 NODE_ENV_TMP="$(mktemp /etc/mindchain-wwm/node.env.XXXXXX)"
-printf 'NODE_ROLE=%s\nWITNESS_INDEX=%s\nP2P_LISTEN=/ip4/0.0.0.0/udp/%s/quic-v1\nBOOTSTRAP_REGISTRY=/etc/mindchain-wwm/bootstrap-registry.json\nBOOTSTRAP_PUBLIC_KEY_FILE=/etc/mindchain-wwm/bootstrap-registry.public\nPRODUCE_INTERVAL_MS=6000\n' \
-  "${NODE_ROLE}" "${WITNESS_INDEX}" "${P2P_PORT}" > "${NODE_ENV_TMP}"
+printf 'NODE_ROLE=%s\nWITNESS_INDEX=%s\nP2P_LISTEN=/ip4/0.0.0.0/udp/%s/quic-v1\nBOOTSTRAP_REGISTRY=/etc/mindchain-wwm/bootstrap-registry.json\nBOOTSTRAP_PUBLIC_KEY_FILE=/etc/mindchain-wwm/bootstrap-registry.public\nPRODUCE_INTERVAL_MS=6000\nPUBLIC_TESTNET_REFUND_ACTIVATION_HEIGHT=%s\n' \
+  "${NODE_ROLE}" "${WITNESS_INDEX}" "${P2P_PORT}" "${PUBLIC_TESTNET_REFUND_ACTIVATION_HEIGHT}" > "${NODE_ENV_TMP}"
 chown root:mindchain-wwm "${NODE_ENV_TMP}"
 chmod 0640 "${NODE_ENV_TMP}"
 mv "${NODE_ENV_TMP}" /etc/mindchain-wwm/node.env

@@ -4,6 +4,7 @@ param(
     [string]$NodeBinarySource = 'D:\noosphere-targets\public-live\debug\noosd.exe',
     [string]$TunnelConfig = 'C:\mindchain\wwm-testnet\cloudflared.yml',
     [string]$CloudflaredBinary = 'C:\mindchain\wwm-testnet\bin\cloudflared-2026.7.2.exe',
+    [UInt64]$PublicTestnetRefundActivationHeight = 0,
     [string]$TaskName = 'MindChainWWMTestnet',
     [switch]$StartNow
 )
@@ -57,6 +58,12 @@ if ($LASTEXITCODE -ne 0) { throw 'Failed to restrict the testnet secret director
 
 $PowerShell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
 $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$Supervisor`" -RepoRoot `"$RepoRoot`" -RuntimeRoot `"$RuntimeRoot`" -NodeBinary `"$InstalledNode`" -CloudflaredBinary `"$CloudflaredBinary`" -TunnelConfig `"$TunnelConfig`""
+if ($PublicTestnetRefundActivationHeight -gt 0) {
+    $height = $PublicTestnetRefundActivationHeight.ToString(
+        [Globalization.CultureInfo]::InvariantCulture
+    )
+    $arguments += " -PublicTestnetRefundActivationHeight $height"
+}
 $action = New-ScheduledTaskAction -Execute $PowerShell -Argument $arguments -WorkingDirectory $RepoRoot
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
 $settings = New-ScheduledTaskSettingsSet `
