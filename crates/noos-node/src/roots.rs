@@ -182,20 +182,15 @@ pub fn decode_public_testnet_v1_da_form(
 }
 
 /// Decode a body persisted by deployed public-testnet v1 nodes. Those nodes
-/// stored the full canonical body, including the separately committed real
-/// Ground ticket, under the ticket-independent DA root. New profile writes may
-/// instead contain the zero-ticket DA form. Both are accepted only when the
-/// stored ticket is zero or exactly matches the header record.
+/// stored the full canonical body under a ticket-independent DA root. Equal
+/// bodies at different heights therefore shared one blob key and could replace
+/// the redundant stored ticket. The caller supplies the authoritative header
+/// ticket and MUST re-verify the normalized DA root.
 pub fn decode_public_testnet_v1_stored_body(
     bytes: &[u8],
     expected_ticket: &GroundTicketV1,
 ) -> Result<noos_braid::BlockBodyV1, NodeError> {
     let mut body = decode_public_testnet_v1_canonical(bytes)?;
-    if body.ground_ticket.0 != zero_ticket() && body.ground_ticket.0 != *expected_ticket {
-        return Err(NodeError::BodyMismatch {
-            what: "public-testnet v1 stored ground ticket",
-        });
-    }
     body.ground_ticket = noos_braid::GroundTicketWire(*expected_ticket);
     Ok(body)
 }
@@ -268,7 +263,7 @@ mod tests {
     }
 
     #[test]
-    fn public_testnet_v1_store_accepts_only_its_header_ticket() {
+    fn public_testnet_v1_store_normalizes_its_redundant_ticket() {
         let ticket = GroundTicketV1 {
             profile_id: 1,
             nonce: 2,
@@ -285,12 +280,13 @@ mod tests {
                 .expect("matching deployed store ticket"),
             body
         );
-        assert!(matches!(
-            decode_public_testnet_v1_stored_body(&stored, &wrong_ticket),
-            Err(NodeError::BodyMismatch {
-                what: "public-testnet v1 stored ground ticket"
-            })
-        ));
+        let normalized = decode_public_testnet_v1_stored_body(&stored, &wrong_ticket)
+            .expect("shared body root may carry another block's ticket");
+        assert_eq!(normalized.ground_ticket.0, wrong_ticket);
+        assert_eq!(
+            public_testnet_v1_da_form_bytes(&normalized),
+            public_testnet_v1_da_form_bytes(&body)
+        );
     }
 
     #[test]

@@ -2938,7 +2938,14 @@ impl<P: StorePort> NodeCore<P> {
             .ok_or(NodeError::BodyMismatch {
                 what: "body blob missing",
             })?;
-        self.cfg.decode_stored_body(&bytes, ticket)
+        let body = self.cfg.decode_stored_body(&bytes, ticket)?;
+        let encoded = encode_body(&self.cfg.da_form_bytes(&body))?;
+        if encoded.shard_root().as_bytes() != &header.body_da_root {
+            return Err(NodeError::BodyMismatch {
+                what: "stored body DA root",
+            });
+        }
+        Ok(body)
     }
 
     // -- restart recovery ----------------------------------------------------------
