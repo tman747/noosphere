@@ -266,6 +266,41 @@ class DevnetSettlementBackend:
         callback(next_value)
         return next_value
 
+    def _finalize_resumed_submission(
+        self,
+        state: Mapping[str, Any],
+        callback: Callable[[dict[str, Any]], None],
+        *,
+        txid_key: str,
+        rejected_phase: str,
+    ) -> None:
+        txid = state.get(txid_key)
+        if not isinstance(txid, str) or HEX32.fullmatch(txid) is None:
+            raise PublicSettlementError(f"resumed {txid_key} is not a canonical transaction ID")
+        finalized = demo.finalize_wwm_submission(self.network, txid)
+        receipt_state = _object(_object(finalized, "receipt"), "state")
+        status_code = _uint(receipt_state, "status_code")
+        if status_code == 0:
+            return
+        settled_height = _uint(receipt_state, "settled_height")
+        self._checkpoint(
+            state,
+            callback,
+            rejected_phase,
+            **{
+                txid_key: None,
+                "rejected_submission": {
+                    "transaction_field": txid_key,
+                    "txid": txid,
+                    "settled_height": settled_height,
+                    "status_code": status_code,
+                },
+            },
+        )
+        raise PublicSettlementError(
+            f"resumed {txid_key} failed on chain with status {status_code}"
+        )
+
     def settle(
         self,
         request: Mapping[str, Any],
@@ -299,7 +334,12 @@ class DevnetSettlementBackend:
                     raise
                 open_txid = state.get("open_txid")
                 if isinstance(open_txid, str):
-                    demo.finalize_wwm_submission(self.network, open_txid)
+                    self._finalize_resumed_submission(
+                        state,
+                        on_checkpoint,
+                        txid_key="open_txid",
+                        rejected_phase="open_rejected",
+                    )
                     job_record = demo.verify_chain_bound_job(self.network, plan)
                 else:
                     def open_submitted(txid: str) -> None:
@@ -353,7 +393,12 @@ class DevnetSettlementBackend:
                 raise
             close_txid = state.get("close_txid")
             if isinstance(close_txid, str):
-                demo.finalize_wwm_submission(self.network, close_txid)
+                self._finalize_resumed_submission(
+                    state,
+                    on_checkpoint,
+                    txid_key="close_txid",
+                    rejected_phase="close_rejected",
+                )
                 records = demo.verify_chain_bound_close(
                     self.network,
                     plan,

@@ -1348,6 +1348,66 @@ class PublicInferenceSettlementTest(unittest.TestCase):
                 job_record,
             )
 
+    def test_devnet_backend_clears_rejected_resumed_submission(self) -> None:
+        backend = object.__new__(DevnetSettlementBackend)
+        backend.network = object()
+        txid = hex32(19)
+        checkpoints: list[dict] = []
+        rejected = {
+            "txid": txid,
+            "receipt": {
+                "state": {
+                    "settled_height": 123,
+                    "status_code": 1002,
+                }
+            },
+        }
+        with patch(
+            "tools.operations.wwm_public_settlement.demo.finalize_wwm_submission",
+            return_value=rejected,
+        ):
+            with self.assertRaisesRegex(PublicSettlementError, "status 1002"):
+                backend._finalize_resumed_submission(
+                    {"close_txid": txid},
+                    checkpoints.append,
+                    txid_key="close_txid",
+                    rejected_phase="close_rejected",
+                )
+        self.assertEqual(len(checkpoints), 1)
+        self.assertEqual(checkpoints[0]["phase"], "close_rejected")
+        self.assertIsNone(checkpoints[0]["close_txid"])
+        self.assertEqual(
+            checkpoints[0]["rejected_submission"],
+            {
+                "transaction_field": "close_txid",
+                "txid": txid,
+                "settled_height": 123,
+                "status_code": 1002,
+            },
+        )
+
+        checkpoints.clear()
+        applied = {
+            "txid": txid,
+            "receipt": {
+                "state": {
+                    "settled_height": 124,
+                    "status_code": 0,
+                }
+            },
+        }
+        with patch(
+            "tools.operations.wwm_public_settlement.demo.finalize_wwm_submission",
+            return_value=applied,
+        ):
+            backend._finalize_resumed_submission(
+                {"open_txid": txid},
+                checkpoints.append,
+                txid_key="open_txid",
+                rejected_phase="open_rejected",
+            )
+        self.assertEqual(checkpoints, [])
+
     def test_wwm_openapi_keeps_resolution_and_receipt_schemas_top_level(self) -> None:
         root = Path(__file__).resolve().parents[2]
         contract = json.loads(
